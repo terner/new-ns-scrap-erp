@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getErrorMessage, readJsonResponse } from '@/lib/api-client'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/Dialog'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { SlidersHorizontal } from 'lucide-react'
 import { z } from 'zod'
 
@@ -48,6 +50,8 @@ const auditPayloadSchema = z.object({
 })
 
 type EventGroup = 'all' | 'auth' | 'users' | 'permissions' | 'activity'
+type AuditColumnKey = 'actor' | 'createdAt' | 'event' | 'group' | 'metadata' | 'target'
+type SortDirection = 'asc' | 'desc'
 
 const eventGroups: Array<{ label: string; value: EventGroup }> = [
   { label: 'ทั้งหมด', value: 'all' },
@@ -58,6 +62,14 @@ const eventGroups: Array<{ label: string; value: EventGroup }> = [
 ]
 
 const pageSizeOptions = [25, 50, 100, 200]
+const auditColumns: Array<ResizableColumnDefinition<AuditColumnKey>> = [
+  { key: 'createdAt', defaultWidth: 170, minWidth: 140 },
+  { key: 'group', defaultWidth: 130, minWidth: 110 },
+  { key: 'event', defaultWidth: 230, minWidth: 170 },
+  { key: 'actor', defaultWidth: 210, minWidth: 150 },
+  { key: 'target', defaultWidth: 210, minWidth: 150 },
+  { key: 'metadata', defaultWidth: 360, minWidth: 220 },
+]
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -160,6 +172,9 @@ export function AuditLogPageClient() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [sortKey, setSortKey] = useState<AuditColumnKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const columnResize = useResizableColumns('admin.audit.main.v1', auditColumns)
 
   const loadRows = useCallback(async () => {
     setIsLoading(true)
@@ -197,6 +212,19 @@ export function AuditLogPageClient() {
     }
     return counts
   }, [data.rows])
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return data.rows
+
+    return [...data.rows].sort((a, b) => {
+      const aValue = getAuditSortValue(a, sortKey)
+      const bValue = getAuditSortValue(b, sortKey)
+      const result = typeof aValue === 'number' && typeof bValue === 'number'
+        ? aValue - bValue
+        : String(aValue).localeCompare(String(bValue), 'th', { numeric: true })
+
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [data.rows, sortDirection, sortKey])
 
   function resetFilters() {
     setActor('')
@@ -205,6 +233,16 @@ export function AuditLogPageClient() {
     setPage(1)
     setQuery('')
     setTarget('')
+  }
+
+  function handleSort(key: AuditColumnKey) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(key)
+    setSortDirection('asc')
   }
 
   return (
@@ -406,15 +444,18 @@ export function AuditLogPageClient() {
           </label>
           <div className="flex items-end gap-2 lg:col-span-3">
             <button className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 h-9 flex items-center shrink-0" type="button" onClick={resetFilters}>ล้าง filter</button>
-            <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 h-9 flex items-center shrink-0 ml-auto" disabled={isLoading || data.rows.length === 0} type="button" onClick={() => exportAuditCsv(data.rows)}>Export CSV หน้านี้</button>
+            <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 h-9 flex items-center shrink-0 ml-auto" disabled={isLoading || data.rows.length === 0} type="button" onClick={() => exportAuditCsv(sortedRows)}>Export CSV หน้านี้</button>
           </div>
         </div>
       </div>
 
-      <div className="rounded-md border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 text-sm text-slate-600">
           <div>พบทั้งหมด <span className="font-semibold text-slate-900">{data.total.toLocaleString('th-TH')}</span> รายการ</div>
           <div className="flex items-center gap-2">
+            {columnResize.hasCustomWidths ? (
+              <button className="hidden rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50 lg:inline-flex" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+            ) : null}
             <button className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={page <= 1 || isLoading} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
             <span className="font-medium text-xs">หน้า {data.page} / {data.totalPages}</span>
             <button className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={page >= data.totalPages || isLoading} type="button" onClick={() => setPage((value) => Math.min(data.totalPages, value + 1))}>ถัดไป</button>
@@ -426,51 +467,57 @@ export function AuditLogPageClient() {
 
         {/* Desktop Table View (Hidden on Mobile) */}
         {!isLoading && (
-          <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
-            <table className="w-full text-sm min-w-[1000px]">
-              <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                {auditColumns.map((column, index) => {
+                  const style = columnResize.getColumnStyle(column.key)
+                  if (index === auditColumns.length - 1) {
+                    return <col key={column.key} style={{ minWidth: column.minWidth }} />
+                  }
+                  return <col key={column.key} style={style} />
+                })}
+              </colgroup>
+              <thead className="bg-slate-100">
                 <tr>
-                  <th className="p-3 text-left font-semibold">เวลา</th>
-                  <th className="p-3 text-left font-semibold">กลุ่ม</th>
-                  <th className="p-3 text-left font-semibold">เหตุการณ์</th>
-                  <th className="p-3 text-left font-semibold">ผู้ทำรายการ</th>
-                  <th className="p-3 text-left font-semibold">เป้าหมาย</th>
-                  <th className="p-3 text-left font-semibold">รายละเอียด</th>
+                  <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="เวลา" resizeProps={columnResize.getResizeHandleProps('createdAt', 'เวลา')} sortKey="createdAt" onSort={handleSort} />
+                  <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="กลุ่ม" resizeProps={columnResize.getResizeHandleProps('group', 'กลุ่ม')} sortKey="group" onSort={handleSort} />
+                  <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="เหตุการณ์" resizeProps={columnResize.getResizeHandleProps('event', 'เหตุการณ์')} sortKey="event" onSort={handleSort} />
+                  <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="ผู้ทำรายการ" resizeProps={columnResize.getResizeHandleProps('actor', 'ผู้ทำรายการ')} sortKey="actor" onSort={handleSort} />
+                  <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="เป้าหมาย" resizeProps={columnResize.getResizeHandleProps('target', 'เป้าหมาย')} sortKey="target" onSort={handleSort} />
+                  <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="รายละเอียด" resizeProps={columnResize.getResizeHandleProps('metadata', 'รายละเอียด')} sortKey="metadata" onSort={handleSort} />
                 </tr>
               </thead>
-              <tbody>
-                {data.rows.map((row) => {
+              <tbody className="divide-y divide-slate-100">
+                {sortedRows.map((row) => {
                   const groupLabel = eventGroup(row.eventType)
                   return (
-                    <tr key={row.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => setSelectedRow(row)}>
-                      <td className="whitespace-nowrap p-3 text-xs text-slate-500">{formatDate(row.createdAt)}</td>
-                      <td className="p-3"><span className={`inline-flex rounded border px-2 py-0.5 text-xs font-bold ${groupBadgeClass(groupLabel)}`}>{groupLabel}</span></td>
-                      <td className="p-3">
-                        <div className="font-bold text-slate-900">{eventTitle(row.eventType)}</div>
-                        <div className="font-mono text-xs text-slate-400 mt-0.5">{row.eventType}</div>
+                    <tr key={row.id} className="cursor-pointer transition-colors hover:bg-slate-50" onClick={() => setSelectedRow(row)}>
+                      <td className="whitespace-nowrap px-3 py-3 text-xs text-slate-500">{formatDate(row.createdAt)}</td>
+                      <td className="whitespace-nowrap px-3 py-3"><span className={`inline-flex rounded border px-2 py-0.5 text-xs font-bold ${groupBadgeClass(groupLabel)}`}>{groupLabel}</span></td>
+                      <td className="min-w-0 px-3 py-3">
+                        <div className="truncate font-bold text-slate-900" title={eventTitle(row.eventType)}>{eventTitle(row.eventType)}</div>
+                        <div className="mt-0.5 truncate font-mono text-xs text-slate-400" title={row.eventType}>{row.eventType}</div>
                       </td>
-                      <td className="p-3 text-slate-800 font-semibold">{userLabel(row.actor)}</td>
-                      <td className="p-3 text-slate-700">{userLabel(row.target)}</td>
-                      <td className="max-w-xl truncate p-3 font-mono text-xs text-slate-400" title={metadataText(row.metadata)}>
-                        {metadataText(row.metadata)}
-                      </td>
+                      <td className="min-w-0 px-3 py-3 font-semibold text-slate-800"><div className="truncate" title={userLabel(row.actor)}>{userLabel(row.actor)}</div></td>
+                      <td className="min-w-0 px-3 py-3 text-slate-700"><div className="truncate" title={userLabel(row.target)}>{userLabel(row.target)}</div></td>
+                      <td className="min-w-0 px-3 py-3"><div className="truncate font-mono text-xs text-slate-400" title={metadataText(row.metadata)}>{metadataText(row.metadata)}</div></td>
                     </tr>
                   )
                 })}
-                {data.rows.length === 0 ? (
+                {sortedRows.length === 0 ? (
                   <tr>
-                    <td className="p-8 text-center text-sm text-slate-400 font-medium" colSpan={6}>ยังไม่มี Audit หรือ Activity Log ตามเงื่อนไขนี้</td>
+                    <td className="px-3 py-10 text-center text-sm font-medium text-slate-400" colSpan={auditColumns.length}>ยังไม่มี Audit หรือ Activity Log ตามเงื่อนไขนี้</td>
                   </tr>
                 ) : null}
               </tbody>
             </table>
           </div>
         )}
-
         {/* Mobile View: Dense Card List (Hidden on Desktop) */}
-        {!isLoading && data.rows.length > 0 ? (
+        {!isLoading && sortedRows.length > 0 ? (
           <div className="lg:hidden divide-y divide-slate-100">
-            {data.rows.map((row) => {
+            {sortedRows.map((row) => {
               const groupLabel = eventGroup(row.eventType)
               return (
                 <div key={row.id} className="p-4 bg-white space-y-3 animate-fade-in hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedRow(row)}>
@@ -501,7 +548,7 @@ export function AuditLogPageClient() {
           </div>
         ) : null}
 
-        {!isLoading && data.rows.length === 0 ? (
+        {!isLoading && sortedRows.length === 0 ? (
           <div className="lg:hidden p-8 text-center text-sm text-slate-400">
             ยังไม่มี Audit หรือ Activity Log ตามเงื่อนไขนี้
           </div>
@@ -562,6 +609,18 @@ export function AuditLogPageClient() {
       ) : null}
     </section>
   )
+}
+
+function getAuditSortValue(row: AuditEvent, key: AuditColumnKey): number | string {
+  if (key === 'createdAt') {
+    const timestamp = Date.parse(row.createdAt)
+    return Number.isNaN(timestamp) ? 0 : timestamp
+  }
+  if (key === 'group') return eventGroup(row.eventType)
+  if (key === 'event') return eventTitle(row.eventType) + ' ' + row.eventType
+  if (key === 'actor') return userLabel(row.actor)
+  if (key === 'target') return userLabel(row.target)
+  return metadataText(row.metadata)
 }
 
 function DetailItem({ className = '', label, value, mono = false }: { className?: string; label: string; value: string; mono?: boolean }) {

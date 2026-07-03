@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Plus, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Button } from '@/components/ui/Button'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
@@ -11,54 +12,61 @@ import { formatDateDisplay } from '@/lib/format'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 
-const costSourceColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'source', defaultWidth: 120 },
-  { key: 'date', defaultWidth: 100 },
-  { key: 'product', defaultWidth: 180 },
-  { key: 'supplier', defaultWidth: 120 },
-  { key: 'remainingQty', defaultWidth: 110 },
-  { key: 'remainingAmount', defaultWidth: 110 },
+type CostSourceColumnKey = 'date' | 'product' | 'remainingAmount' | 'remainingQty' | 'source' | 'supplier'
+type ReadinessColumnKey = 'costPoolQty' | 'costPoolValue' | 'netValue' | 'poBuyAmount' | 'poSellAmount' | 'product' | 'status'
+type ProductColumnKey = 'gp' | 'gpPct' | 'matchedCogs' | 'product' | 'qty' | 'sales'
+type PurchaseColumnKey = 'date' | 'docNo' | 'matchedAmount' | 'remainingAmount' | 'status' | 'supplier' | 'totalAmount'
+type SalesColumnKey = 'customer' | 'date' | 'docNo' | 'gp' | 'gpPct' | 'matchedCogs' | 'pendingAmount' | 'status' | 'totalAmount'
+type SortDirection = 'asc' | 'desc'
+
+const costSourceColumns: Array<ResizableColumnDefinition<CostSourceColumnKey>> = [
+  { key: 'source', defaultWidth: 120, minWidth: 95 },
+  { key: 'date', defaultWidth: 100, minWidth: 90 },
+  { key: 'product', defaultWidth: 180, minWidth: 150 },
+  { key: 'supplier', defaultWidth: 120, minWidth: 110 },
+  { key: 'remainingQty', defaultWidth: 110, minWidth: 100 },
+  { key: 'remainingAmount', defaultWidth: 110, minWidth: 105 },
 ]
 
-const readinessColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'product', defaultWidth: 150 },
-  { key: 'costPoolQty', defaultWidth: 110 },
-  { key: 'costPoolValue', defaultWidth: 120 },
-  { key: 'poBuyAmount', defaultWidth: 120 },
-  { key: 'poSellAmount', defaultWidth: 120 },
-  { key: 'netValue', defaultWidth: 120 },
-  { key: 'status', defaultWidth: 100 },
+const readinessColumns: Array<ResizableColumnDefinition<ReadinessColumnKey>> = [
+  { key: 'product', defaultWidth: 150, minWidth: 130 },
+  { key: 'costPoolQty', defaultWidth: 110, minWidth: 100 },
+  { key: 'costPoolValue', defaultWidth: 120, minWidth: 110 },
+  { key: 'poBuyAmount', defaultWidth: 120, minWidth: 110 },
+  { key: 'poSellAmount', defaultWidth: 120, minWidth: 110 },
+  { key: 'netValue', defaultWidth: 120, minWidth: 110 },
+  { key: 'status', defaultWidth: 100, minWidth: 95 },
 ]
 
-const productColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'product', defaultWidth: 180 },
-  { key: 'qty', defaultWidth: 110 },
-  { key: 'sales', defaultWidth: 120 },
-  { key: 'matchedCogs', defaultWidth: 120 },
-  { key: 'gp', defaultWidth: 120 },
-  { key: 'gpPct', defaultWidth: 100 },
+const productColumns: Array<ResizableColumnDefinition<ProductColumnKey>> = [
+  { key: 'product', defaultWidth: 180, minWidth: 150 },
+  { key: 'qty', defaultWidth: 110, minWidth: 95 },
+  { key: 'sales', defaultWidth: 120, minWidth: 105 },
+  { key: 'matchedCogs', defaultWidth: 120, minWidth: 110 },
+  { key: 'gp', defaultWidth: 120, minWidth: 105 },
+  { key: 'gpPct', defaultWidth: 100, minWidth: 90 },
 ]
 
-const purchaseColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'docNo', defaultWidth: 150 },
-  { key: 'date', defaultWidth: 110 },
-  { key: 'supplier', defaultWidth: 180 },
-  { key: 'totalAmount', defaultWidth: 120 },
-  { key: 'matchedAmount', defaultWidth: 120 },
-  { key: 'remainingAmount', defaultWidth: 120 },
-  { key: 'status', defaultWidth: 110 },
+const purchaseColumns: Array<ResizableColumnDefinition<PurchaseColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 110, minWidth: 95 },
+  { key: 'supplier', defaultWidth: 180, minWidth: 150 },
+  { key: 'totalAmount', defaultWidth: 120, minWidth: 105 },
+  { key: 'matchedAmount', defaultWidth: 120, minWidth: 110 },
+  { key: 'remainingAmount', defaultWidth: 120, minWidth: 110 },
+  { key: 'status', defaultWidth: 110, minWidth: 95 },
 ]
 
-const salesColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'docNo', defaultWidth: 150 },
-  { key: 'date', defaultWidth: 110 },
-  { key: 'customer', defaultWidth: 180 },
-  { key: 'totalAmount', defaultWidth: 120 },
-  { key: 'matchedCogs', defaultWidth: 120 },
-  { key: 'gp', defaultWidth: 120 },
-  { key: 'gpPct', defaultWidth: 100 },
-  { key: 'pendingAmount', defaultWidth: 120 },
-  { key: 'status', defaultWidth: 110 },
+const salesColumns: Array<ResizableColumnDefinition<SalesColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 110, minWidth: 95 },
+  { key: 'customer', defaultWidth: 180, minWidth: 150 },
+  { key: 'totalAmount', defaultWidth: 120, minWidth: 110 },
+  { key: 'matchedCogs', defaultWidth: 120, minWidth: 110 },
+  { key: 'gp', defaultWidth: 120, minWidth: 105 },
+  { key: 'gpPct', defaultWidth: 100, minWidth: 90 },
+  { key: 'pendingAmount', defaultWidth: 120, minWidth: 110 },
+  { key: 'status', defaultWidth: 110, minWidth: 95 },
 ]
 
 type Option = {
@@ -219,6 +227,64 @@ function sourceFormDefaults(): CostSourceForm {
     totalAmount: '',
     unitCost: '',
   }
+}
+
+function compareSortValues(left: string | number, right: string | number) {
+  if (typeof left === 'number' && typeof right === 'number') return left - right
+  return String(left ?? '').localeCompare(String(right ?? ''), 'th', { numeric: true, sensitivity: 'base' })
+}
+
+function useDashboardTableSort<TRow, TKey extends string>(rows: TRow[], getSortValue: (row: TRow, key: TKey) => string | number) {
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [sortKey, setSortKey] = useState<TKey | null>(null)
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows
+    return [...rows].sort((left, right) => {
+      const result = compareSortValues(getSortValue(left, sortKey), getSortValue(right, sortKey))
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [getSortValue, rows, sortDirection, sortKey])
+
+  const changeSort = (key: TKey) => {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
+  return { changeSort, sortDirection, sortedRows, sortKey }
+}
+
+function getCostSourceSortValue(row: CostSourceRow, key: CostSourceColumnKey) {
+  if (key === 'source') return `${row.sourceType} ${row.sourceNo}`
+  if (key === 'product') return `${row.productCode} ${row.productName}`
+  if (key === 'supplier') return row.supplierName
+  return row[key]
+}
+
+function getReadinessSortValue(row: DashboardPayload['readinessRows'][number], key: ReadinessColumnKey) {
+  if (key === 'product') return row.productName
+  return row[key]
+}
+
+function getProductSortValue(row: DashboardPayload['productRows'][number], key: ProductColumnKey) {
+  if (key === 'product') return row.productName
+  if (key === 'matchedCogs') return row.cost
+  return row[key]
+}
+
+function getPurchaseSortValue(row: DashboardPayload['purchaseRows'][number], key: PurchaseColumnKey) {
+  if (key === 'supplier') return row.partyName
+  if (key === 'status') return row.allocationStatus
+  return row[key]
+}
+
+function getSalesSortValue(row: DashboardPayload['salesRows'][number], key: SalesColumnKey) {
+  if (key === 'customer') return row.partyName
+  if (key === 'status') return row.allocationStatus
+  return row[key]
 }
 
 function statusLabel(status: string) {
@@ -385,18 +451,18 @@ export function TradingDashboardPageClient() {
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="rounded-md bg-white p-3 shadow">
         <div className="grid gap-2 lg:grid-cols-[140px_140px_minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_auto_auto]">
           <DatePickerInput ariaLabel="วันที่เริ่มต้น" className="h-10 text-sm" value={visibleFromDate} onChange={setFromDate} />
           <DatePickerInput ariaLabel="วันที่สิ้นสุด" className="h-10 text-sm" value={visibleToDate} onChange={setToDate} />
-          <SearchCombobox hideLabel inputClassName="h-10 text-sm border-slate-300 rounded-xl focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700" inputId="trading-dashboard-supplier" label="Supplier" options={supplierOptions} placeholder="ค้นหา Supplier" value={supplierId} onChange={setSupplierId} />
-          <SearchCombobox hideLabel inputClassName="h-10 text-sm border-slate-300 rounded-xl focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700" inputId="trading-dashboard-customer" label="Customer" options={customerOptions} placeholder="ค้นหา Customer" value={customerId} onChange={setCustomerId} />
+          <SearchCombobox hideLabel inputClassName="h-10 text-sm border-slate-300 rounded-md focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700" inputId="trading-dashboard-supplier" label="Supplier" options={supplierOptions} placeholder="ค้นหา Supplier" value={supplierId} onChange={setSupplierId} />
+          <SearchCombobox hideLabel inputClassName="h-10 text-sm border-slate-300 rounded-md focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700" inputId="trading-dashboard-customer" label="Customer" options={customerOptions} placeholder="ค้นหา Customer" value={customerId} onChange={setCustomerId} />
           {tab === 'product' ? (
-            <SearchCombobox hideLabel inputClassName="h-10 text-sm border-slate-300 rounded-xl focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700" inputId="trading-dashboard-product" label="สินค้า" options={productOptions} placeholder="ค้นหาสินค้า" value={productId} onChange={setProductId} />
+            <SearchCombobox hideLabel inputClassName="h-10 text-sm border-slate-300 rounded-md focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700" inputId="trading-dashboard-product" label="สินค้า" options={productOptions} placeholder="ค้นหาสินค้า" value={productId} onChange={setProductId} />
           ) : <div className="hidden lg:block" />}
-          <input className="h-10 rounded-xl border border-slate-300 px-3 text-sm bg-white font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" placeholder="ค้นหาเลขบิล" value={billNo} onChange={(event) => setBillNo(event.target.value)} />
-          <button className="h-10 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" type="button" onClick={() => void loadData()}>Refresh</button>
-          <button className="h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" type="button" onClick={clearFilters}>ล้าง</button>
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm bg-white font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" placeholder="ค้นหาเลขบิล" value={billNo} onChange={(event) => setBillNo(event.target.value)} />
+          <button className="h-10 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" type="button" onClick={() => void loadData()}>Refresh</button>
+          <button className="h-10 rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" type="button" onClick={clearFilters}>ล้าง</button>
         </div>
       </div>
 
@@ -405,7 +471,7 @@ export function TradingDashboardPageClient() {
         <AgingPanel aging={data?.aging ?? null} isLoading={isLoading} />
       </div>
 
-      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4">
           <div className="flex flex-wrap">
             {tabs.map((item) => (
@@ -421,15 +487,15 @@ export function TradingDashboardPageClient() {
           </div>
           <div className="flex gap-2 py-2">
             <button
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer"
               type="button"
               onClick={() => setIsSourceModalOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
               Trading Cost Source
             </button>
-            <Link className="rounded-xl border border-purple-300 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs flex items-center gap-1" href="/trading/matching">Trading Matching</Link>
-            <Link className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs flex items-center gap-1" href="/dual-costing/deal-margin">Deal Margin</Link>
+            <Link className="flex h-9 items-center gap-1 rounded-md border border-purple-300 bg-purple-50 px-3 text-sm font-semibold text-purple-700 hover:bg-purple-100 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs" href="/trading/matching">Trading Matching</Link>
+            <Link className="flex h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-800 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs" href="/dual-costing/deal-margin">Deal Margin</Link>
           </div>
         </div>
 
@@ -484,6 +550,7 @@ function CostSourceModal({
   supplierOptions: SearchComboboxOption[]
 }) {
   const columnResize = useResizableColumns('trading.dashboard.cost-source.v5', costSourceColumns)
+  const { changeSort, sortDirection, sortedRows, sortKey } = useDashboardTableSort(rows, getCostSourceSortValue)
   const unitCost = Number(form.unitCost)
   const qty = Number(form.qty)
   const totalAmount = Number(form.totalAmount)
@@ -497,18 +564,17 @@ function CostSourceModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="max-h-[92vh] max-w-5xl overflow-hidden !p-0" fallbackTitle="Trading Cost Source" hideClose>
-        <DialogHeader className="bg-slate-900 text-white px-6 py-4">
-          <div className="flex items-start justify-between gap-3 w-full">
+      <DialogContent className="max-h-[92vh] max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 !p-0 shadow-2xl outline-none focus:outline-none flex flex-col" fallbackTitle="Trading Cost Source" hideClose>
+        <DialogHeader className="shrink-0 rounded-t-md bg-slate-900 px-6 py-4 text-white">
+          <div className="flex items-start gap-3 w-full">
             <div>
               <DialogTitle className="text-white text-base font-bold">Trading Cost Source</DialogTitle>
-              <DialogDescription className="text-slate-400 text-xs mt-1">บันทึกต้นทุน Trading แบบไม่ผูก PB เพื่อใช้จับคู่กับบิลขาย Trading</DialogDescription>
+              <DialogDescription className="text-slate-300 text-xs mt-1">บันทึกต้นทุน Trading แบบไม่ผูก PB เพื่อใช้จับคู่กับบิลขาย Trading</DialogDescription>
             </div>
-            <button className="rounded-xl px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white transition-colors outline-none focus:outline-none focus:ring-0 cursor-pointer" type="button" onClick={onClose}>✕</button>
           </div>
         </DialogHeader>
-        <div className="grid max-h-[calc(92vh-128px)] gap-4 overflow-y-auto bg-slate-50 p-4 grid-cols-2 lg:grid-cols-[360px_minmax(0,1fr)]">
-          <div className="rounded-xl border border-slate-100 bg-white p-4 col-span-2 lg:col-span-1">
+        <div className="grid flex-1 gap-4 overflow-y-auto bg-slate-50 p-4 text-sm sm:p-5 grid-cols-2 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <div className="rounded-md border border-slate-100 bg-white p-4 col-span-2 lg:col-span-1">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
                 <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor="trading-cost-source-date">วันที่</label>
@@ -516,7 +582,7 @@ function CostSourceModal({
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <SearchCombobox
-                  inputClassName="h-10 text-sm border-slate-300 rounded-xl focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700"
+                  inputClassName="h-10 text-sm border-slate-300 rounded-md focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700"
                   inputId="trading-cost-source-product"
                   label="สินค้า *"
                   options={productOptions}
@@ -527,7 +593,7 @@ function CostSourceModal({
               </div>
               <div className="col-span-2">
                 <SearchCombobox
-                  inputClassName="h-10 text-sm border-slate-300 rounded-xl focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700"
+                  inputClassName="h-10 text-sm border-slate-300 rounded-md focus:ring-1 focus:ring-slate-200 focus:border-slate-400 focus:outline-none bg-white font-medium text-slate-700"
                   inputId="trading-cost-source-supplier"
                   label="Supplier"
                   options={supplierOptions}
@@ -544,7 +610,7 @@ function CostSourceModal({
                 <NumberField id="trading-cost-source-total" label="มูลค่ารวม" value={form.totalAmount} onChange={(value) => update('totalAmount', value)} />
               </div>
               <div className="col-span-2 sm:col-span-1 flex flex-col justify-end">
-                <div className="rounded-xl bg-emerald-50 px-3 py-2 text-sm border border-emerald-100">
+                <div className="rounded-md bg-emerald-50 px-3 py-2 text-sm border border-emerald-100">
                   <div className="text-xs font-semibold text-emerald-700">ยอดที่จะบันทึก</div>
                   <div className="font-bold text-emerald-900">{formatMoney(estimatedTotal)}</div>
                 </div>
@@ -552,30 +618,30 @@ function CostSourceModal({
               <div className="col-span-2">
                 <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor="trading-cost-source-notes">หมายเหตุ</label>
                 <textarea
-                  className="min-h-20 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                  className="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
                   id="trading-cost-source-notes"
                   value={form.notes}
                   onChange={(event) => update('notes', event.target.value)}
                 />
               </div>
-              {error ? <div className="col-span-2 rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div> : null}
+              {error ? <div className="col-span-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div> : null}
               <button
-                className="col-span-2 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 text-sm font-semibold text-white transition-colors outline-none focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
+                className="col-span-2 h-10 rounded-md bg-slate-900 hover:bg-slate-800 px-4 text-sm font-normal text-white transition-colors outline-none focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
                 disabled={!canSubmit || isSaving}
                 type="button"
                 onClick={onSubmit}
               >
-                {isSaving ? 'กำลังบันทึก...' : 'บันทึก Cost Source'}
+                {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
               </button>
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs col-span-2 lg:col-span-1">
+          <div className="rounded-md border border-slate-200 bg-white overflow-hidden shadow-xs col-span-2 lg:col-span-1">
             <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 bg-slate-50/50">
               <div>
                 <div className="text-sm font-bold text-slate-800">รายการ Cost Source ล่าสุด</div>
                 <div className="text-xs text-slate-500">แสดงเฉพาะรายการ active ที่ยังเป็นต้นทุน Trading ได้</div>
               </div>
-              <button className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-800 outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer transition-colors" type="button" onClick={onRefresh}>
+              <button className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-800 outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer transition-colors" type="button" onClick={onRefresh}>
                 <RefreshCw className="h-3.5 w-3.5" />
                 Refresh
               </button>
@@ -583,12 +649,10 @@ function CostSourceModal({
             <div className="overflow-x-auto p-4 overflow-hidden">
               <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
                 {columnResize.hasCustomWidths ? (
-                  <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
-                    คืนค่าเดิมตาราง
-                  </button>
+                  <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
                 ) : null}
               </div>
-              <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
                   {costSourceColumns.map((col) => (
                     <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -596,18 +660,18 @@ function CostSourceModal({
                 </colgroup>
                 <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium text-xs">
                   <tr>
-                    <ResizableTableHead label="Source" resizeProps={columnResize.getResizeHandleProps('source', 'Source')} />
-                    <ResizableTableHead label="Date" resizeProps={columnResize.getResizeHandleProps('date', 'Date')} />
-                    <ResizableTableHead label="Product" resizeProps={columnResize.getResizeHandleProps('product', 'Product')} />
-                    <ResizableTableHead label="Supplier" resizeProps={columnResize.getResizeHandleProps('supplier', 'Supplier')} />
-                    <ResizableTableHead align="right" label="Remain Qty" resizeProps={columnResize.getResizeHandleProps('remainingQty', 'Remain Qty')} />
-                    <ResizableTableHead align="right" label="Remain" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'Remain')} />
+                    <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Source" resizeProps={columnResize.getResizeHandleProps('source', 'Source')} sortKey="source" onSort={changeSort} />
+                    <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Date" resizeProps={columnResize.getResizeHandleProps('date', 'Date')} sortKey="date" onSort={changeSort} />
+                    <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Product" resizeProps={columnResize.getResizeHandleProps('product', 'Product')} sortKey="product" onSort={changeSort} />
+                    <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Supplier" resizeProps={columnResize.getResizeHandleProps('supplier', 'Supplier')} sortKey="supplier" onSort={changeSort} />
+                    <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Remain Qty" resizeProps={columnResize.getResizeHandleProps('remainingQty', 'Remain Qty')} sortKey="remainingQty" onSort={changeSort} />
+                    <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Remain" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'Remain')} sortKey="remainingAmount" onSort={changeSort} />
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={6}>กำลังโหลดข้อมูล</td></tr> : null}
-                  {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={6}>ยังไม่มี Cost Source</td></tr> : null}
-                  {rows.map((row) => (
+                  {!isLoading && sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={6}>ยังไม่มี Cost Source</td></tr> : null}
+                  {sortedRows.map((row) => (
                     <tr key={row.id} className="border-t border-slate-200">
                       <td className="p-2 font-mono text-xs font-semibold text-slate-800 overflow-hidden truncate">{row.sourceNo}</td>
                       <td className="p-2 text-xs overflow-hidden truncate">{formatDateDisplay(row.date)}</td>
@@ -622,8 +686,8 @@ function CostSourceModal({
             </div>
           </div>
         </div>
-        <DialogFooter className="bg-slate-50 border-t border-slate-200 px-6 py-3.5 flex justify-end gap-2">
-          <button className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors h-10 outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer flex items-center justify-center" type="button" onClick={onClose}>ปิด</button>
+        <DialogFooter className="shrink-0 rounded-b-md border-t border-slate-100 bg-white px-6 py-3.5 flex justify-end gap-2">
+          <Button className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -635,7 +699,7 @@ function NumberField({ id, label, onChange, value }: { id: string; label: string
     <div>
       <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor={id}>{label}</label>
       <input
-        className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm text-right bg-white font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+        className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-right bg-white font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
         id={id}
         inputMode="decimal"
         min="0"
@@ -650,9 +714,10 @@ function NumberField({ id, label, onChange, value }: { id: string; label: string
 
 function ReadinessPanel({ isLoading, rows, summary }: { isLoading: boolean; rows: DashboardPayload['readinessRows']; summary: DashboardPayload['summary'] | null }) {
   const columnResize = useResizableColumns('trading.dashboard.readiness.v5', readinessColumns)
-  const visibleRows = rows.slice(0, 6)
+  const { changeSort, sortDirection, sortedRows, sortKey } = useDashboardTableSort(rows, getReadinessSortValue)
+  const visibleRows = sortedRows.slice(0, 6)
   return (
-    <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 bg-slate-50/50">
         <div>
           <div className="text-sm font-bold text-slate-800">Stock / Cost Source Readiness</div>
@@ -670,12 +735,10 @@ function ReadinessPanel({ isLoading, rows, summary }: { isLoading: boolean; rows
         <div className="hidden lg:block overflow-x-auto overflow-hidden">
           <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
             {columnResize.hasCustomWidths ? (
-              <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
-                คืนค่าเดิมตาราง
-              </button>
+              <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
             ) : null}
           </div>
-          <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {readinessColumns.map((col) => (
                 <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -683,13 +746,13 @@ function ReadinessPanel({ isLoading, rows, summary }: { isLoading: boolean; rows
             </colgroup>
             <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-600 font-semibold">
               <tr>
-                <ResizableTableHead label="Product" resizeProps={columnResize.getResizeHandleProps('product', 'Product')} />
-                <ResizableTableHead align="right" label="Cost Source Qty" resizeProps={columnResize.getResizeHandleProps('costPoolQty', 'Cost Source Qty')} />
-                <ResizableTableHead align="right" label="Cost Source" resizeProps={columnResize.getResizeHandleProps('costPoolValue', 'Cost Source')} />
-                <ResizableTableHead align="right" label="PO Buy" resizeProps={columnResize.getResizeHandleProps('poBuyAmount', 'PO Buy')} />
-                <ResizableTableHead align="right" label="PO Sell" resizeProps={columnResize.getResizeHandleProps('poSellAmount', 'PO Sell')} />
-                <ResizableTableHead align="right" label="Net" resizeProps={columnResize.getResizeHandleProps('netValue', 'Net')} />
-                <ResizableTableHead align="center" label="Status" resizeProps={columnResize.getResizeHandleProps('status', 'Status')} />
+                <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Product" resizeProps={columnResize.getResizeHandleProps('product', 'Product')} sortKey="product" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Cost Source Qty" resizeProps={columnResize.getResizeHandleProps('costPoolQty', 'Cost Source Qty')} sortKey="costPoolQty" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Cost Source" resizeProps={columnResize.getResizeHandleProps('costPoolValue', 'Cost Source')} sortKey="costPoolValue" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="PO Buy" resizeProps={columnResize.getResizeHandleProps('poBuyAmount', 'PO Buy')} sortKey="poBuyAmount" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="PO Sell" resizeProps={columnResize.getResizeHandleProps('poSellAmount', 'PO Sell')} sortKey="poSellAmount" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Net" resizeProps={columnResize.getResizeHandleProps('netValue', 'Net')} sortKey="netValue" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey ?? undefined} align="center" direction={sortDirection} label="Status" resizeProps={columnResize.getResizeHandleProps('status', 'Status')} sortKey="status" onSort={changeSort} />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -779,25 +842,39 @@ function AgingPanel({ aging, isLoading }: { aging: DashboardPayload['aging'] | n
 
 function ProductTable({ isLoading, rows, totals }: { isLoading: boolean; rows: DashboardPayload['productRows']; totals: { cost: number; gp: number; qty: number; sales: number } }) {
   const columnResize = useResizableColumns('trading.dashboard.products.v5', productColumns)
+  const { changeSort, sortDirection, sortedRows, sortKey } = useDashboardTableSort(rows, getProductSortValue)
   return (
     <div className="p-4">
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full min-w-[860px] table-fixed text-xs">
+      <div className="hidden lg:block overflow-x-auto overflow-hidden">
+        <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
+          {columnResize.hasCustomWidths ? (
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          ) : null}
+        </div>
+        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {productColumns.map((col, index) => {
+              if (index === productColumns.length - 1) {
+                return <col key={col.key} style={{ minWidth: col.minWidth }} />
+              }
+              return <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
+            })}
+          </colgroup>
           <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-600">
             <tr>
-              <th className="p-2.5 text-left font-semibold">Product</th>
-              <th className="w-28 p-2.5 text-right font-semibold">Qty</th>
-              <th className="w-32 p-2.5 text-right font-semibold">Sales</th>
-              <th className="w-32 p-2.5 text-right font-semibold">Matched COGS</th>
-              <th className="w-32 p-2.5 text-right font-semibold">GP</th>
-              <th className="w-24 p-2.5 text-right font-semibold">GP%</th>
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Product" resizeProps={columnResize.getResizeHandleProps('product', 'Product')} sortKey="product" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Qty" resizeProps={columnResize.getResizeHandleProps('qty', 'Qty')} sortKey="qty" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Sales" resizeProps={columnResize.getResizeHandleProps('sales', 'Sales')} sortKey="sales" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Matched COGS" resizeProps={columnResize.getResizeHandleProps('matchedCogs', 'Matched COGS')} sortKey="matchedCogs" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="GP" resizeProps={columnResize.getResizeHandleProps('gp', 'GP')} sortKey="gp" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="GP%" resizeProps={columnResize.getResizeHandleProps('gpPct', 'GP%')} sortKey="gpPct" onSort={changeSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={6}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={6}>ยังไม่มีข้อมูลตามเงื่อนไข</td></tr> : null}
-            {rows.map((row) => (
+            {!isLoading && sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={6}>ยังไม่มีข้อมูลตามเงื่อนไข</td></tr> : null}
+            {sortedRows.map((row) => (
               <tr key={row.productId} className="hover:bg-slate-50/30 transition-colors">
                 <td className="p-2.5 font-semibold text-slate-800 min-w-0 overflow-hidden"><div className="truncate" title={row.productName || ''}>{row.productName}</div></td>
                 <td className="p-2.5 text-right font-medium text-slate-700 whitespace-nowrap tabular-nums pl-4">{formatMoney(row.qty)} {row.unit}</td>
@@ -824,8 +901,8 @@ function ProductTable({ isLoading, rows, totals }: { isLoading: boolean; rows: D
       {/* Mobile view Card List */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-semibold text-xs">กำลังโหลดข้อมูล</div> : null}
-        {!isLoading && rows.length === 0 ? <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-semibold text-xs">ยังไม่มีข้อมูลตามเงื่อนไข</div> : null}
-        {!isLoading && rows.map((row) => (
+        {!isLoading && sortedRows.length === 0 ? <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-semibold text-xs">ยังไม่มีข้อมูลตามเงื่อนไข</div> : null}
+        {!isLoading && sortedRows.map((row) => (
           <div key={row.productId} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
             <div className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">{row.productName}</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
@@ -859,18 +936,17 @@ function ProductTable({ isLoading, rows, totals }: { isLoading: boolean; rows: D
 
 function PurchaseTable({ isLoading, rows }: { isLoading: boolean; rows: DashboardPayload['purchaseRows'] }) {
   const columnResize = useResizableColumns('trading.dashboard.purchases.v5', purchaseColumns)
+  const { changeSort, sortDirection, sortedRows, sortKey } = useDashboardTableSort(rows, getPurchaseSortValue)
   return (
     <div className="p-4">
       {/* Desktop view */}
       <div className="hidden lg:block overflow-x-auto overflow-hidden">
         <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
           {columnResize.hasCustomWidths ? (
-            <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
-              คืนค่าเดิมตาราง
-            </button>
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
           ) : null}
         </div>
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {purchaseColumns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -878,19 +954,19 @@ function PurchaseTable({ isLoading, rows }: { isLoading: boolean; rows: Dashboar
           </colgroup>
           <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-700 font-semibold">
             <tr>
-              <ResizableTableHead label="PB / Cost Source" resizeProps={columnResize.getResizeHandleProps('docNo', 'PB / Cost Source')} />
-              <ResizableTableHead label="Date" resizeProps={columnResize.getResizeHandleProps('date', 'Date')} />
-              <ResizableTableHead label="Supplier" resizeProps={columnResize.getResizeHandleProps('supplier', 'Supplier')} />
-              <ResizableTableHead align="right" label="Buy Amount" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'Buy Amount')} />
-              <ResizableTableHead align="right" label="Matched Cost" resizeProps={columnResize.getResizeHandleProps('matchedAmount', 'Matched Cost')} />
-              <ResizableTableHead align="right" label="Remaining" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'Remaining')} />
-              <ResizableTableHead align="center" label="Status" resizeProps={columnResize.getResizeHandleProps('status', 'Status')} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="PB / Cost Source" resizeProps={columnResize.getResizeHandleProps('docNo', 'PB / Cost Source')} sortKey="docNo" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Date" resizeProps={columnResize.getResizeHandleProps('date', 'Date')} sortKey="date" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Supplier" resizeProps={columnResize.getResizeHandleProps('supplier', 'Supplier')} sortKey="supplier" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Buy Amount" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'Buy Amount')} sortKey="totalAmount" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Matched Cost" resizeProps={columnResize.getResizeHandleProps('matchedAmount', 'Matched Cost')} sortKey="matchedAmount" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Remaining" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'Remaining')} sortKey="remainingAmount" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="center" direction={sortDirection} label="Status" resizeProps={columnResize.getResizeHandleProps('status', 'Status')} sortKey="status" onSort={changeSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={7}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={7}>ยังไม่มีข้อมูลตามเงื่อนไข</td></tr> : null}
-            {rows.map((row) => (
+            {!isLoading && sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={7}>ยังไม่มีข้อมูลตามเงื่อนไข</td></tr> : null}
+            {sortedRows.map((row) => (
               <tr key={row.id} className="hover:bg-slate-50/30 transition-colors">
                 <td className="p-2.5 font-mono font-semibold overflow-hidden truncate"><Link className="text-purple-700 hover:underline" href={row.sourceUrl}>{row.docNo}</Link></td>
                 <td className="p-2.5 text-slate-500 font-medium overflow-hidden truncate">{formatDateDisplay(row.date)}</td>
@@ -908,8 +984,8 @@ function PurchaseTable({ isLoading, rows }: { isLoading: boolean; rows: Dashboar
       {/* Mobile view Card List */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-semibold text-xs">กำลังโหลดข้อมูล</div> : null}
-        {!isLoading && rows.length === 0 ? <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-semibold text-xs">ยังไม่มีข้อมูลตามเงื่อนไข</div> : null}
-        {!isLoading && rows.map((row) => (
+        {!isLoading && sortedRows.length === 0 ? <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-semibold text-xs">ยังไม่มีข้อมูลตามเงื่อนไข</div> : null}
+        {!isLoading && sortedRows.map((row) => (
           <div key={row.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
             <div className="flex justify-between items-start border-b border-slate-100 pb-2">
               <div className="font-mono text-xs font-semibold text-purple-700">
@@ -947,18 +1023,17 @@ function PurchaseTable({ isLoading, rows }: { isLoading: boolean; rows: Dashboar
 
 function SalesTable({ isLoading, rows }: { isLoading: boolean; rows: DashboardPayload['salesRows'] }) {
   const columnResize = useResizableColumns('trading.dashboard.sales.v5', salesColumns)
+  const { changeSort, sortDirection, sortedRows, sortKey } = useDashboardTableSort(rows, getSalesSortValue)
   return (
     <div className="p-4">
       {/* Desktop view */}
       <div className="hidden lg:block overflow-x-auto overflow-hidden">
         <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
           {columnResize.hasCustomWidths ? (
-            <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
-              คืนค่าเดิมตาราง
-            </button>
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
           ) : null}
         </div>
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {salesColumns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -966,21 +1041,21 @@ function SalesTable({ isLoading, rows }: { isLoading: boolean; rows: DashboardPa
           </colgroup>
           <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-700 font-semibold">
             <tr>
-              <ResizableTableHead label="SB" resizeProps={columnResize.getResizeHandleProps('docNo', 'SB')} />
-              <ResizableTableHead label="Date" resizeProps={columnResize.getResizeHandleProps('date', 'Date')} />
-              <ResizableTableHead label="Customer" resizeProps={columnResize.getResizeHandleProps('customer', 'Customer')} />
-              <ResizableTableHead align="right" label="Sales Amount" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'Sales Amount')} />
-              <ResizableTableHead align="right" label="Matched COGS" resizeProps={columnResize.getResizeHandleProps('matchedCogs', 'Matched COGS')} />
-              <ResizableTableHead align="right" label="GP" resizeProps={columnResize.getResizeHandleProps('gp', 'GP')} />
-              <ResizableTableHead align="right" label="GP%" resizeProps={columnResize.getResizeHandleProps('gpPct', 'GP%')} />
-              <ResizableTableHead align="right" label="Pending" resizeProps={columnResize.getResizeHandleProps('pendingAmount', 'Pending')} />
-              <ResizableTableHead align="center" label="Status" resizeProps={columnResize.getResizeHandleProps('status', 'Status')} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="SB" resizeProps={columnResize.getResizeHandleProps('docNo', 'SB')} sortKey="docNo" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Date" resizeProps={columnResize.getResizeHandleProps('date', 'Date')} sortKey="date" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Customer" resizeProps={columnResize.getResizeHandleProps('customer', 'Customer')} sortKey="customer" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Sales Amount" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'Sales Amount')} sortKey="totalAmount" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Matched COGS" resizeProps={columnResize.getResizeHandleProps('matchedCogs', 'Matched COGS')} sortKey="matchedCogs" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="GP" resizeProps={columnResize.getResizeHandleProps('gp', 'GP')} sortKey="gp" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="GP%" resizeProps={columnResize.getResizeHandleProps('gpPct', 'GP%')} sortKey="gpPct" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="Pending" resizeProps={columnResize.getResizeHandleProps('pendingAmount', 'Pending')} sortKey="pendingAmount" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="center" direction={sortDirection} label="Status" resizeProps={columnResize.getResizeHandleProps('status', 'Status')} sortKey="status" onSort={changeSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ยังไม่มีข้อมูลตามเงื่อนไข</td></tr> : null}
-            {rows.map((row) => (
+            {!isLoading && sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ยังไม่มีข้อมูลตามเงื่อนไข</td></tr> : null}
+            {sortedRows.map((row) => (
               <tr key={row.id} className="hover:bg-slate-50/30 transition-colors">
                 <td className="p-2.5 font-mono font-semibold overflow-hidden truncate"><Link className="text-purple-700 hover:underline" href={row.sourceUrl}>{row.docNo}</Link></td>
                 <td className="p-2.5 text-slate-500 font-medium overflow-hidden truncate">{formatDateDisplay(row.date)}</td>
@@ -1000,8 +1075,8 @@ function SalesTable({ isLoading, rows }: { isLoading: boolean; rows: DashboardPa
       {/* Mobile view Card List */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-semibold text-xs">กำลังโหลดข้อมูล</div> : null}
-        {!isLoading && rows.length === 0 ? <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-semibold text-xs">ยังไม่มีข้อมูลตามเงื่อนไข</div> : null}
-        {!isLoading && rows.map((row) => (
+        {!isLoading && sortedRows.length === 0 ? <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-semibold text-xs">ยังไม่มีข้อมูลตามเงื่อนไข</div> : null}
+        {!isLoading && sortedRows.map((row) => (
           <div key={row.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
             <div className="flex justify-between items-start border-b border-slate-100 pb-2">
               <div className="font-mono text-xs font-semibold text-purple-700">

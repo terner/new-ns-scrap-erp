@@ -40,6 +40,12 @@ export type SalesBillDetail = {
     productId: string
     productName: string
     qty: number
+    sourceDeductWeight: number
+    sourceGrossWeight: number
+    sourceLineCount: number
+    sourceNetWeight: number
+    sourceProductCode: string
+    sourceProductName: string
     sourceLabel: string
     sourceType: string
     tradingSourceDocNo: string
@@ -266,6 +272,14 @@ function buildDurableItems(input: {
   lineFacts: SalesBillLineFact[]
   poSellDocNoSet: Set<string>
   stockUnitCostByLineNo: Map<number, number | null>
+  deliverySummaryById: Map<string, {
+    deductWeight: number
+    grossWeight: number
+    lineCount: number
+    netWeight: number
+    productCode: string
+    productName: string
+  }>
   tradingFactByLineNo: Map<number, Prisma.trading_allocation_factsGetPayload<{
     include: {
       purchase_bills: { select: { doc_no: true } }
@@ -299,6 +313,10 @@ function buildDurableItems(input: {
     const wtoMeta = jsonObject(wtoSource?.meta)
     const deliveryLineId = jsonString(wtoMeta.deliveryLineId)
     const deliverySummaryId = jsonString(wtoMeta.deliverySummaryId)
+    const sourceSummaryKey = wtoSource?.weight_ticket_product_summary_id != null
+      ? String(wtoSource.weight_ticket_product_summary_id)
+      : ''
+    const sourceSummary = sourceSummaryKey ? input.deliverySummaryById.get(sourceSummaryKey) ?? null : null
     const sourceType = input.bill.transaction_mode === 'TRADING'
       ? tradingSource.sourceType
       : Array.from(new Set([
@@ -308,6 +326,11 @@ function buildDurableItems(input: {
         }),
         ...poAllocations.map((allocation) => allocation.allocation_type === 'PO_SELL' ? 'PO Sell' : 'Spot Sale'),
       ])).join(' / ')
+    const sourceProductCode = sourceSummary?.productCode || wtoSource?.product_code_snapshot || line.product_code_snapshot
+    const sourceProductName = sourceSummary?.productName || wtoSource?.product_name_snapshot || line.product_name_snapshot || '-'
+    const soldWeight = input.bill.transaction_mode === 'STOCK'
+      ? toNumber(line.gross_weight) || toNumber(line.net_weight) || toNumber(line.qty)
+      : toNumber(line.net_weight) || toNumber(line.qty)
 
     return {
       amount: toNumber(line.line_amount),
@@ -317,10 +340,10 @@ function buildDurableItems(input: {
       deliveryVehicleNo: input.vehicleByDeliveryDocNo.get(deliveryTicketDocNo) ?? '',
       deductWeight: toNumber(line.deduct_weight),
       discount: toNumber(line.discount_amount),
-      grossWeight: toNumber(line.gross_weight),
+      grossWeight: input.bill.transaction_mode === 'STOCK' ? soldWeight : toNumber(line.gross_weight),
       lineNo: line.line_no,
       matchedCogs: tradingSource.matchedCogs,
-      netWeight: toNumber(line.net_weight) || toNumber(line.qty),
+      netWeight: soldWeight,
       note: line.notes ?? '',
       poSellDocNo,
       price: toNumber(line.unit_price),
@@ -328,6 +351,12 @@ function buildDurableItems(input: {
       productId: line.product_code_snapshot,
       productName: line.product_name_snapshot || '-',
       qty: toNumber(line.qty),
+      sourceDeductWeight: sourceSummary?.deductWeight ?? toNumber(line.deduct_weight),
+      sourceGrossWeight: sourceSummary?.grossWeight ?? toNumber(line.gross_weight),
+      sourceLineCount: sourceSummary?.lineCount ?? 1,
+      sourceNetWeight: sourceSummary?.netWeight ?? (toNumber(line.net_weight) || toNumber(line.qty)),
+      sourceProductCode,
+      sourceProductName,
       sourceLabel: sourceParts.filter(Boolean).join(' / '),
       sourceType,
       tradingSourceDocNo: tradingSource.sourceDocNo,
@@ -454,6 +483,21 @@ export async function getSalesBillDetail(
           select: {
             doc_no: true,
             vehicle_no: true,
+            weight_ticket_product_summaries: {
+              select: {
+                deduct_weight: true,
+                gross_weight: true,
+                id: true,
+                line_count: true,
+                net_weight: true,
+                product_name: true,
+                products: {
+                  select: {
+                    code: true,
+                  },
+                },
+              },
+            },
           },
           where: {
             doc_no: { in: deliveryDocNos },
@@ -492,6 +536,28 @@ export async function getSalesBillDetail(
     : []
 
   const vehicleByDeliveryDocNo = new Map(deliveryTickets.map((ticket) => [ticket.doc_no, ticket.vehicle_no ?? '']))
+  const deliverySummaryById = new Map<string, {
+    deductWeight: number
+    grossWeight: number
+    lineCount: number
+    netWeight: number
+    productCode: string
+    productName: string
+  }>()
+  deliveryTickets.forEach((ticket) => {
+    ticket.weight_ticket_product_summaries.forEach((summary) => {
+      const productCode = summary.products?.code?.trim() ?? ''
+      if (!productCode) return
+      deliverySummaryById.set(String(summary.id), {
+        deductWeight: toNumber(summary.deduct_weight),
+        grossWeight: toNumber(summary.gross_weight),
+        lineCount: summary.line_count ?? 0,
+        netWeight: toNumber(summary.net_weight),
+        productCode,
+        productName: summary.product_name ?? '-',
+      })
+    })
+  })
   const poSellDocNoSet = new Set(poSells.map((poSell) => poSell.doc_no))
   const tradingFactByLineNo = new Map<number, (typeof tradingAllocationFacts)[number]>()
   tradingAllocationFacts.forEach((fact) => {
@@ -509,6 +575,7 @@ export async function getSalesBillDetail(
   }))
   const items = buildDurableItems({
     bill,
+    deliverySummaryById,
     lineFacts,
     poSellDocNoSet,
     stockUnitCostByLineNo,
@@ -573,16 +640,16 @@ export async function getSalesBillDetail(
       qty: toNumber(log.allocated_net_weight) || toNumber(log.allocated_qty),
       status: log.action === 'released_from_sales_bill'
         ? 'cancelled'
-        : log.action === 'loss_from_sales_bill'
+        : log.action === 'loss_from_sales_bill' || log.action === 'loss_from_wto_return'
           ? 'loss'
-          : log.action === 'returned_from_sales_bill'
+          : log.action === 'returned_from_sales_bill' || log.action === 'returned_from_wto'
             ? 'returned'
             : 'active',
       title: log.action === 'released_from_sales_bill'
         ? 'คืน WTO จากบิลขาย'
-        : log.action === 'loss_from_sales_bill'
+        : log.action === 'loss_from_sales_bill' || log.action === 'loss_from_wto_return'
           ? 'ตัดของขาดจากรับคืน WTO'
-          : log.action === 'returned_from_sales_bill'
+          : log.action === 'returned_from_sales_bill' || log.action === 'returned_from_wto'
             ? 'รับของคืนจาก WTO'
             : 'ใช้ WTO ในบิลขาย',
       type: 'WTO usage log',

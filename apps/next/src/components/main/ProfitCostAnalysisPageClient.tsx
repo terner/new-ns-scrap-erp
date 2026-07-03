@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { formatDateDisplay } from '@/lib/format'
 
 type Option = { active: boolean; code?: string; creditTerm?: number; id: string; name: string }
@@ -53,6 +55,26 @@ type ProfitCostPayload = {
 }
 
 type Tab = 'alerts' | 'channels' | 'customers' | 'products' | 'suppliers' | 'trend'
+type SortDirection = 'asc' | 'desc'
+type ProductColumnKey = 'avgBuy' | 'avgSell' | 'buyAmount' | 'buyQty' | 'code' | 'cogs' | 'gp' | 'gpPct' | 'metalGroup' | 'name' | 'profitPerKg' | 'revenue' | 'sellQty' | 'stockQty' | 'stockValue'
+
+const productColumns: Array<ResizableColumnDefinition<ProductColumnKey> & { align?: 'center' | 'left' | 'right'; label: string }> = [
+  { key: 'code', label: 'รหัสสินค้า', defaultWidth: 120, minWidth: 100 },
+  { key: 'name', label: 'สินค้า', defaultWidth: 220, minWidth: 160 },
+  { key: 'metalGroup', label: 'หมวดโลหะ', defaultWidth: 120, minWidth: 100 },
+  { key: 'buyQty', label: 'ซื้อ (กก.)', defaultWidth: 115, minWidth: 100, align: 'right' },
+  { key: 'buyAmount', label: 'มูลค่าซื้อ', defaultWidth: 125, minWidth: 110, align: 'right' },
+  { key: 'avgBuy', label: 'ซื้อเฉลี่ย', defaultWidth: 115, minWidth: 100, align: 'right' },
+  { key: 'sellQty', label: 'ขาย (กก.)', defaultWidth: 115, minWidth: 100, align: 'right' },
+  { key: 'revenue', label: 'รายได้', defaultWidth: 125, minWidth: 110, align: 'right' },
+  { key: 'avgSell', label: 'ขายเฉลี่ย', defaultWidth: 115, minWidth: 100, align: 'right' },
+  { key: 'cogs', label: 'COGS', defaultWidth: 120, minWidth: 105, align: 'right' },
+  { key: 'gp', label: 'GP', defaultWidth: 120, minWidth: 105, align: 'right' },
+  { key: 'gpPct', label: 'GP%', defaultWidth: 90, minWidth: 80, align: 'right' },
+  { key: 'profitPerKg', label: 'กำไร/กก.', defaultWidth: 115, minWidth: 100, align: 'right' },
+  { key: 'stockQty', label: 'Stock', defaultWidth: 115, minWidth: 100, align: 'right' },
+  { key: 'stockValue', label: 'Stock Value', defaultWidth: 130, minWidth: 115, align: 'right' },
+]
 
 function today() {
   const date = new Date()
@@ -243,11 +265,11 @@ export function ProfitCostAnalysisPageClient() {
         </div>
         <div className="p-3">
           {activeTab === 'products' ? <ProductTable rows={data?.rows.products ?? []} onSelect={setSelectedProduct} /> : null}
-          {activeTab === 'suppliers' ? <SimpleTable rows={(data?.rows.suppliers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.paid), money(row.payable), String(row.billCount)])} headers={['Supplier', 'กก.', 'ซื้อ', 'จ่ายแล้ว', 'ค้างจ่าย', 'บิล']} /> : null}
-          {activeTab === 'customers' ? <SimpleTable rows={(data?.rows.customers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.gp), `${pct(row.gpPct)}%`, money(row.receivable)])} headers={['Customer', 'กก.', 'ขาย', 'GP', 'GP %', 'ค้างรับ']} /> : null}
-          {activeTab === 'channels' ? <SimpleTable rows={(data?.rows.channels ?? []).map((row) => [row.group, row.name, money(row.qty), money(row.amount), money(row.gp), String(row.billCount)])} headers={['Group', 'Channel', 'กก.', 'ยอด', 'GP', 'บิล']} /> : null}
-          {activeTab === 'trend' ? <SimpleTable rows={(data?.rows.trend ?? []).map((row) => [formatDateDisplay(row.date), money(row.buyAmount), money(row.revenue), money(row.cogs), money(row.gp), money(row.sellQty)])} headers={['Date', 'ซื้อ', 'ขาย', 'COGS', 'GP', 'ขาย กก.']} /> : null}
-          {activeTab === 'alerts' ? <SimpleTable rows={(data?.alerts ?? []).map((row) => [row.severity, row.type, row.label, money(row.amount)])} headers={['Severity', 'Type', 'รายการ', 'ค่า']} /> : null}
+          {activeTab === 'suppliers' ? <SimpleTable tableKey="suppliers" rows={(data?.rows.suppliers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.paid), money(row.payable), String(row.billCount)])} headers={['Supplier', 'กก.', 'ซื้อ', 'จ่ายแล้ว', 'ค้างจ่าย', 'บิล']} /> : null}
+          {activeTab === 'customers' ? <SimpleTable tableKey="customers" rows={(data?.rows.customers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.gp), `${pct(row.gpPct)}%`, money(row.receivable)])} headers={['Customer', 'กก.', 'ขาย', 'GP', 'GP %', 'ค้างรับ']} /> : null}
+          {activeTab === 'channels' ? <SimpleTable tableKey="channels" rows={(data?.rows.channels ?? []).map((row) => [row.group, row.name, money(row.qty), money(row.amount), money(row.gp), String(row.billCount)])} headers={['Group', 'Channel', 'กก.', 'ยอด', 'GP', 'บิล']} /> : null}
+          {activeTab === 'trend' ? <SimpleTable tableKey="trend" rows={(data?.rows.trend ?? []).map((row) => [formatDateDisplay(row.date), money(row.buyAmount), money(row.revenue), money(row.cogs), money(row.gp), money(row.sellQty)])} headers={['Date', 'ซื้อ', 'ขาย', 'COGS', 'GP', 'ขาย กก.']} /> : null}
+          {activeTab === 'alerts' ? <SimpleTable tableKey="alerts" rows={(data?.alerts ?? []).map((row) => [row.severity, row.type, row.label, money(row.amount)])} headers={['Severity', 'Type', 'รายการ', 'ค่า']} /> : null}
         </div>
       </div>
 
@@ -278,6 +300,33 @@ function money(value?: number) {
 
 function pct(value?: number) {
   return (value ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 1 })
+}
+
+function compareSortValues(left: string | number, right: string | number) {
+  if (typeof left === 'number' && typeof right === 'number') {
+    return left - right
+  }
+
+  return String(left).localeCompare(String(right), 'th', { numeric: true })
+}
+
+function parseSortCell(value: string) {
+  const normalized = value.replace(/[^\d.-]/g, '')
+  if (!normalized) return value
+  const numberValue = Number(normalized)
+  return Number.isFinite(numberValue) ? numberValue : value
+}
+
+function getProductSortValue(row: ProductRow, key: ProductColumnKey): string | number {
+  return row[key] ?? ''
+}
+
+function formatProductCell(row: ProductRow, key: ProductColumnKey) {
+  if (key === 'code') return row.code || '-'
+  if (key === 'name') return row.name
+  if (key === 'metalGroup') return row.metalGroup || '-'
+  if (key === 'gpPct') return `${pct(row.gpPct)}%`
+  return money(row[key] as number)
 }
 
 function toneClass(tone: string) {
@@ -351,42 +400,77 @@ function BarRows({ rows }: { rows: { label: string; value: number }[] }) {
 }
 
 function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void; rows: ProductRow[] }) {
+  const [sortKey, setSortKey] = useState<ProductColumnKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const columnResize = useResizableColumns('main.profit-cost-analysis.products.v1', productColumns)
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows
+
+    return [...rows].sort((left, right) => {
+      const result = compareSortValues(getProductSortValue(left, sortKey), getProductSortValue(right, sortKey))
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [rows, sortDirection, sortKey])
+
+  function changeSort(key: ProductColumnKey) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
   return (
     <>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
-        <table className="min-w-[1180px] w-full text-sm">
-          <thead className="bg-slate-900 text-white text-xs">
+      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        {columnResize.hasCustomWidths ? (
+          <div className="flex justify-end border-b border-slate-100 px-3 py-3">
+            <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          </div>
+        ) : null}
+        <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {productColumns.map((column) => (
+              <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            ))}
+          </colgroup>
+          <thead className="bg-slate-100">
             <tr>
-              {['Code', 'Product', 'Metal', 'ซื้อ', 'มูลค่าซื้อ', 'ซื้อเฉลี่ย', 'ขาย', 'รายได้', 'ขายเฉลี่ย', 'COGS', 'GP', 'GP %', '฿/กก.', 'Stock', 'Stock Value'].map((header) => <th key={header} className="p-2 text-left last:text-right font-semibold">{header}</th>)}
+              {productColumns.map((column) => (
+                <ResizableTableHead
+                  key={column.key}
+                  activeSortKey={sortKey ?? undefined}
+                  align={column.align}
+                  direction={sortDirection}
+                  label={column.label}
+                  sortKey={column.key}
+                  onSort={changeSort}
+                  resizeProps={columnResize.getResizeHandleProps(column.key, column.label)}
+                />
+              ))}
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row) => <tr key={row.id} className="cursor-pointer border-t border-slate-100 hover:bg-purple-50/50" onClick={() => onSelect(row)}>
-              <td className="p-2 font-mono text-xs text-slate-600 whitespace-nowrap">{row.code || '-'}</td>
-              <td className="p-2 font-semibold text-slate-800 min-w-0 overflow-hidden"><div className="truncate" title={row.name}>{row.name}</div></td>
-              <td className="p-2 text-slate-600 whitespace-nowrap">{row.metalGroup || '-'}</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{money(row.buyQty)}</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{money(row.buyAmount)}</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{money(row.avgBuy)}</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{money(row.sellQty)}</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{money(row.revenue)}</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{money(row.avgSell)}</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{money(row.cogs)}</td>
-              <td className={`p-2 text-right font-bold font-mono text-xs whitespace-nowrap tabular-nums pl-4 ${row.gp >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{money(row.gp)}</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{pct(row.gpPct)}%</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{money(row.profitPerKg)}</td>
-              <td className="p-2 text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4">{money(row.stockQty)}</td>
-              <td className="p-2 text-right font-bold font-mono text-xs text-slate-800 whitespace-nowrap tabular-nums pl-4">{money(row.stockValue)}</td>
+          <tbody className="divide-y divide-slate-100">
+            {sortedRows.map((row) => <tr key={row.id} className="cursor-pointer transition-colors hover:bg-slate-50" onClick={() => onSelect(row)}>
+              {productColumns.map((column) => (
+                <td key={column.key} className={`px-3 py-3 ${column.align === 'right' ? 'text-right font-mono tabular-nums' : 'text-left'} ${column.key === 'gp' ? row.gp >= 0 ? 'font-bold text-emerald-700' : 'font-bold text-red-700' : column.key === 'stockValue' ? 'font-bold text-slate-800' : column.key === 'name' ? 'font-semibold text-slate-800' : 'text-slate-700'}`}>
+                  <div className={column.align === 'right' ? 'whitespace-nowrap' : 'truncate'} title={String(formatProductCell(row, column.key))}>{formatProductCell(row, column.key)}</div>
+                </td>
+              ))}
             </tr>)}
-            {rows.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={15}>ไม่มีข้อมูล</td></tr> : null}
+            {sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={productColumns.length}>ไม่มีข้อมูล</td></tr> : null}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[600px] overflow-y-auto">
-        {rows.map((row) => (
+        {sortedRows.map((row) => (
           <div key={row.id} className="p-3 bg-white rounded-lg border border-slate-100 mb-2 shadow-sm flex flex-col gap-1.5 text-xs cursor-pointer" onClick={() => onSelect(row)}>
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800">{row.name}</span>
@@ -413,7 +497,7 @@ function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void;
             </div>
           </div>
         ))}
-        {rows.length === 0 && (
+        {sortedRows.length === 0 && (
           <div className="py-8 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>
         )}
       </div>
@@ -466,23 +550,82 @@ function ProductModal({ onClose, product }: { onClose: () => void; product: Prod
   )
 }
 
-function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: string[][]; tableKey: string }) {
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const columns = useMemo<Array<ResizableColumnDefinition<string> & { align?: 'center' | 'left' | 'right'; label: string }>>(() => {
+    return headers.map((header, index) => ({
+      key: String(index),
+      label: header,
+      defaultWidth: index === 0 ? 180 : 120,
+      minWidth: index === 0 ? 130 : 95,
+      align: index > 1 ? 'right' : 'left',
+    }))
+  }, [headers])
+  const columnResize = useResizableColumns(`main.profit-cost-analysis.${tableKey}.v1`, columns)
+  const sortedRows = useMemo(() => {
+    if (sortKey === null) return rows
+    const index = Number(sortKey)
+
+    return [...rows].sort((left, right) => {
+      const result = compareSortValues(parseSortCell(left[index] ?? ''), parseSortCell(right[index] ?? ''))
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [rows, sortDirection, sortKey])
+
+  function changeSort(key: string) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
   return (
     <>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
-        <table className="min-w-[720px] w-full text-sm">
-          <thead className="bg-slate-900 text-white text-xs"><tr>{headers.map((header) => <th key={header} className="p-2 text-left font-semibold">{header}</th>)}</tr></thead>
-          <tbody>
-            {rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t border-slate-100 hover:bg-purple-50/30">{row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className={`p-2 ${cellIndex > 1 ? 'text-right font-mono text-xs whitespace-nowrap tabular-nums pl-4' : 'text-slate-700 font-medium text-xs min-w-0 overflow-hidden'}`}><div className={cellIndex <= 1 ? "truncate" : ""} title={cellIndex <= 1 ? cell : undefined}>{cell}</div></td>)}</tr>)}
-            {rows.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={headers.length}>ไม่มีข้อมูล</td></tr> : null}
+      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        {columnResize.hasCustomWidths ? (
+          <div className="flex justify-end border-b border-slate-100 px-3 py-3">
+            <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          </div>
+        ) : null}
+        <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {columns.map((column) => (
+              <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            ))}
+          </colgroup>
+          <thead className="bg-slate-100">
+            <tr>
+              {columns.map((column) => (
+                <ResizableTableHead
+                  key={column.key}
+                  activeSortKey={sortKey ?? undefined}
+                  align={column.align}
+                  direction={sortDirection}
+                  label={column.label}
+                  sortKey={column.key}
+                  onSort={changeSort}
+                  resizeProps={columnResize.getResizeHandleProps(column.key, column.label)}
+                />
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {sortedRows.map((row, index) => <tr key={`${row[0]}-${index}`} className="transition-colors hover:bg-slate-50">{row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className={`px-3 py-3 ${cellIndex > 1 ? 'text-right font-mono whitespace-nowrap tabular-nums' : 'text-slate-700 font-medium min-w-0 overflow-hidden'}`}><div className={cellIndex <= 1 ? "truncate" : ""} title={cellIndex <= 1 ? cell : undefined}>{cell}</div></td>)}</tr>)}
+            {sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={headers.length}>ไม่มีข้อมูล</td></tr> : null}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[500px] overflow-y-auto">
-        {rows.map((row, index) => (
+        {sortedRows.map((row, index) => (
           <div key={index} className="p-3 bg-white rounded-lg border border-slate-100 mb-2 shadow-sm flex flex-col gap-1 text-xs">
             {row.map((cell, cellIndex) => (
               <div key={cellIndex} className="flex justify-between py-0.5">
@@ -492,7 +635,7 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] })
             ))}
           </div>
         ))}
-        {rows.length === 0 && (
+        {sortedRows.length === 0 && (
           <div className="py-6 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>
         )}
       </div>

@@ -282,6 +282,7 @@ export function CustomerSearchCombobox({
 
 export function ProductSearchCombobox({
   error,
+  hideLabel = false,
   inputId,
   options,
   value,
@@ -290,6 +291,7 @@ export function ProductSearchCombobox({
 }: {
   error?: string
   errorKey?: string
+  hideLabel?: boolean
   inputId: string
   options: Option[]
   value: string
@@ -299,6 +301,7 @@ export function ProductSearchCombobox({
     <SearchCombobox
       error={error}
       errorKey={errorKey}
+      hideLabel={hideLabel}
       inputId={inputId}
       label="สินค้า *"
       options={options.map((product) => ({

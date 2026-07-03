@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 
 type CashEntry = { account: string; date: string; description: string; id: string; in: number; out: number; refNo: string; type: string }
 type CashDay = {
@@ -57,8 +59,58 @@ type BusinessPayload = {
   summary: Record<string, number>
 }
 type Mode = 'combined' | 'expense' | 'purchase' | 'sales'
+type SortDirection = 'asc' | 'desc'
+type TableColumn<TKey extends string> = ResizableColumnDefinition<TKey> & { align?: 'center' | 'left' | 'right'; label: string }
+type CashEntryColumnKey = 'account' | 'cashIn' | 'cashOut' | 'description' | 'refNo' | 'type'
+type BusinessCombinedColumnKey = 'apIncrease' | 'arIncrease' | 'cogs' | 'date' | 'expenseAmount' | 'gp' | 'netCash' | 'paymentAmount' | 'purchaseAmount' | 'receiptAmount' | 'saleAmount'
+type BusinessModeColumnKey = 'amount' | 'category' | 'cogs' | 'date' | 'docNo' | 'gp' | 'payee' | 'qty'
+type BusinessModeRow = BusinessDoc & { date: string }
 
 const weekdays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์']
+const cashEntryColumns: Array<TableColumn<CashEntryColumnKey>> = [
+  { key: 'type', label: 'ประเภท', defaultWidth: 130, minWidth: 110 },
+  { key: 'description', label: 'รายละเอียด', defaultWidth: 240, minWidth: 170 },
+  { key: 'account', label: 'บัญชี', defaultWidth: 180, minWidth: 140 },
+  { key: 'refNo', label: 'เลขอ้างอิง', defaultWidth: 150, minWidth: 120 },
+  { key: 'cashIn', label: 'เงินเข้า', defaultWidth: 130, minWidth: 115, align: 'right' },
+  { key: 'cashOut', label: 'เงินออก', defaultWidth: 130, minWidth: 115, align: 'right' },
+]
+const businessCombinedColumns: Array<TableColumn<BusinessCombinedColumnKey>> = [
+  { key: 'date', label: 'วัน', defaultWidth: 100, minWidth: 90 },
+  { key: 'purchaseAmount', label: 'ซื้อ', defaultWidth: 125, minWidth: 110, align: 'right' },
+  { key: 'saleAmount', label: 'ขาย', defaultWidth: 125, minWidth: 110, align: 'right' },
+  { key: 'cogs', label: 'COGS', defaultWidth: 120, minWidth: 105, align: 'right' },
+  { key: 'gp', label: 'GP', defaultWidth: 120, minWidth: 105, align: 'right' },
+  { key: 'expenseAmount', label: 'ค่าใช้จ่าย', defaultWidth: 130, minWidth: 115, align: 'right' },
+  { key: 'receiptAmount', label: 'รับเงิน', defaultWidth: 125, minWidth: 110, align: 'right' },
+  { key: 'paymentAmount', label: 'จ่ายเงิน', defaultWidth: 125, minWidth: 110, align: 'right' },
+  { key: 'netCash', label: 'Net Cash', defaultWidth: 130, minWidth: 115, align: 'right' },
+  { key: 'arIncrease', label: 'AR เพิ่ม', defaultWidth: 120, minWidth: 105, align: 'right' },
+  { key: 'apIncrease', label: 'AP เพิ่ม', defaultWidth: 120, minWidth: 105, align: 'right' },
+]
+const businessModeColumns: Record<Exclude<Mode, 'combined'>, Array<TableColumn<BusinessModeColumnKey>>> = {
+  expense: [
+    { key: 'date', label: 'วันที่จ่าย', defaultWidth: 120, minWidth: 105 },
+    { key: 'docNo', label: 'เลขที่ EXP', defaultWidth: 140, minWidth: 120 },
+    { key: 'category', label: 'หมวดค่าใช้จ่าย', defaultWidth: 190, minWidth: 150 },
+    { key: 'payee', label: 'ผู้รับเงิน', defaultWidth: 190, minWidth: 150 },
+    { key: 'amount', label: 'ยอดจ่าย', defaultWidth: 130, minWidth: 115, align: 'right' },
+  ],
+  purchase: [
+    { key: 'date', label: 'วันที่เอกสาร', defaultWidth: 120, minWidth: 105 },
+    { key: 'docNo', label: 'เลขที่ PB', defaultWidth: 150, minWidth: 125 },
+    { key: 'qty', label: 'น้ำหนัก', defaultWidth: 125, minWidth: 110, align: 'right' },
+    { key: 'amount', label: 'ยอดซื้อ', defaultWidth: 140, minWidth: 120, align: 'right' },
+  ],
+  sales: [
+    { key: 'date', label: 'วันที่เอกสาร', defaultWidth: 120, minWidth: 105 },
+    { key: 'docNo', label: 'เลขที่ SB', defaultWidth: 150, minWidth: 125 },
+    { key: 'qty', label: 'น้ำหนัก', defaultWidth: 125, minWidth: 110, align: 'right' },
+    { key: 'amount', label: 'ยอดขาย', defaultWidth: 140, minWidth: 120, align: 'right' },
+    { key: 'cogs', label: 'COGS', defaultWidth: 130, minWidth: 115, align: 'right' },
+    { key: 'gp', label: 'GP', defaultWidth: 130, minWidth: 115, align: 'right' },
+  ],
+}
 
 function currentMonth() {
   const date = new Date()
@@ -73,6 +125,29 @@ function shiftMonth(month: string, offset: number) {
 
 function money(value: unknown) {
   return formatMoney(typeof value === 'number' ? value : Number(value ?? 0))
+}
+
+function compareSortValues(left: string | number, right: string | number) {
+  if (typeof left === 'number' && typeof right === 'number') {
+    return left - right
+  }
+
+  return String(left).localeCompare(String(right), 'th', { numeric: true })
+}
+
+function getBusinessCombinedSortValue(day: BusinessDay, key: BusinessCombinedColumnKey): string | number {
+  if (key === 'date') return day.day
+  return day[key]
+}
+
+function getBusinessModeSortValue(row: BusinessModeRow, key: BusinessModeColumnKey): string | number {
+  return row[key] ?? ''
+}
+
+function getCashEntrySortValue(entry: CashEntry, key: CashEntryColumnKey): string | number {
+  if (key === 'cashIn') return entry.in
+  if (key === 'cashOut') return entry.out
+  return entry[key]
 }
 
 function pct(value: number, max: number) {
@@ -331,25 +406,83 @@ function MonthControls({ month, setMonth }: { month: string; setMonth: (month: s
 }
 
 function BusinessCombinedTable({ days }: { days: BusinessDay[] }) {
+  const [sortKey, setSortKey] = useState<BusinessCombinedColumnKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const columnResize = useResizableColumns('main.business-calendar.combined.v1', businessCombinedColumns)
+  const sortedDays = useMemo(() => {
+    if (!sortKey) return days
+
+    return [...days].sort((left, right) => {
+      const result = compareSortValues(getBusinessCombinedSortValue(left, sortKey), getBusinessCombinedSortValue(right, sortKey))
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [days, sortDirection, sortKey])
+
+  function changeSort(key: BusinessCombinedColumnKey) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
   return (
     <>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-100">
-        <table className="w-full min-w-[1040px] text-xs">
-          <thead className="sticky top-0 bg-slate-900 text-white text-xs">
+      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        {columnResize.hasCustomWidths ? (
+          <div className="flex justify-end border-b border-slate-100 px-3 py-3">
+            <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          </div>
+        ) : null}
+        <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {businessCombinedColumns.map((column) => (
+              <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            ))}
+          </colgroup>
+          <thead className="bg-slate-100">
             <tr>
-              {['วัน', '📥 ซื้อ', '📤 ขาย', 'COGS', '💎 GP', '💸 ค่าใช้จ่าย', '💰 รับ', '💸 จ่าย', '📊 Net Cash', 'AR+', 'AP+'].map((header) => <th key={header} className="p-2.5 text-right first:text-left font-semibold">{header}</th>)}
+              {businessCombinedColumns.map((column) => (
+                <ResizableTableHead
+                  key={column.key}
+                  activeSortKey={sortKey ?? undefined}
+                  align={column.align}
+                  direction={sortDirection}
+                  label={column.label}
+                  sortKey={column.key}
+                  onSort={changeSort}
+                  resizeProps={columnResize.getResizeHandleProps(column.key, column.label)}
+                />
+              ))}
             </tr>
           </thead>
-          <tbody>
-            {days.map((day) => <tr key={day.date} className={`border-t border-slate-100 hover:bg-slate-50/50 ${day.isWeekend ? 'bg-red-50/20' : ''} ${day.purchaseAmount + day.saleAmount + day.expenseAmount + day.receiptAmount + day.paymentAmount === 0 ? 'opacity-55' : ''}`}><td className="p-2.5 text-left font-bold text-slate-700">{day.day} {day.isToday ? <span className="rounded bg-yellow-100 px-1 text-xs font-bold text-yellow-800">วันนี้</span> : null}</td><Amount value={day.purchaseAmount} /><Amount value={day.saleAmount} /><Amount value={day.cogs} /><Amount value={day.gp} signed /><Amount value={day.expenseAmount} /><Amount value={day.receiptAmount} /><Amount value={day.paymentAmount} /><Amount value={day.netCash} signed /><Amount value={day.arIncrease} /><Amount value={day.apIncrease} /></tr>)}
+          <tbody className="divide-y divide-slate-100">
+            {sortedDays.map((day) => <tr key={day.date} className={`transition-colors hover:bg-slate-50 ${day.isWeekend ? 'bg-red-50/20' : ''} ${day.purchaseAmount + day.saleAmount + day.expenseAmount + day.receiptAmount + day.paymentAmount === 0 ? 'opacity-60' : ''}`}>
+              {businessCombinedColumns.map((column) => (
+                <td key={column.key} className={`px-3 py-3 ${column.align === 'right' ? 'text-right font-mono tabular-nums' : 'text-left font-semibold'} ${businessCombinedCellTone(day, column.key)}`}>
+                  {column.key === 'date' ? (
+                    <div className="flex items-center gap-2">
+                      <span>{day.day}</span>
+                      {day.isToday ? <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-bold text-yellow-800">วันนี้</span> : null}
+                    </div>
+                  ) : (
+                    <span className="whitespace-nowrap">{money(day[column.key])}</span>
+                  )}
+                </td>
+              ))}
+            </tr>)}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[600px] overflow-y-auto">
-        {days.map((day) => (
+        {sortedDays.map((day) => (
           <div key={day.date} className={`p-3 rounded-lg border mb-2 shadow-sm flex flex-col gap-1.5 text-xs bg-white ${day.isWeekend ? 'border-red-100 bg-red-50/20' : 'border-slate-100'} ${day.purchaseAmount + day.saleAmount + day.expenseAmount + day.receiptAmount + day.paymentAmount === 0 ? 'opacity-75' : ''}`}>
             <div className="flex justify-between items-center pb-1 border-b border-slate-50">
               <span className="font-bold text-slate-800">วันที่ {day.day}</span>
@@ -376,35 +509,98 @@ function BusinessCombinedTable({ days }: { days: BusinessDay[] }) {
   )
 }
 
+function businessCombinedCellTone(day: BusinessDay, key: BusinessCombinedColumnKey) {
+  if (key === 'purchaseAmount') return 'text-blue-700'
+  if (key === 'saleAmount' || key === 'receiptAmount') return 'text-emerald-700'
+  if (key === 'expenseAmount' || key === 'paymentAmount') return 'text-red-700'
+  if (key === 'gp' || key === 'netCash') return day[key] >= 0 ? 'font-bold text-emerald-700' : 'font-bold text-red-700'
+  if (key === 'date') return 'text-slate-700'
+  return 'text-slate-700'
+}
+
 function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<Mode, 'combined'> }) {
   const config = {
-    expense: { docs: (day: BusinessDay) => day.expenseDocs, headers: ['วันที่', 'เลขที่', 'หมวด', 'ผู้รับเงิน', 'ยอด'], title: '💸 Expense View' },
-    purchase: { docs: (day: BusinessDay) => day.purchaseDocs, headers: ['วันที่', 'เลขที่', 'น้ำหนัก', 'ยอดซื้อ'], title: '📥 Purchase View' },
-    sales: { docs: (day: BusinessDay) => day.saleDocs, headers: ['วันที่', 'เลขที่', 'น้ำหนัก', 'ยอดขาย', 'COGS', 'GP'], title: '📤 Sales View' },
+    expense: { docs: (day: BusinessDay) => day.expenseDocs, title: '💸 Expense View' },
+    purchase: { docs: (day: BusinessDay) => day.purchaseDocs, title: '📥 Purchase View' },
+    sales: { docs: (day: BusinessDay) => day.saleDocs, title: '📤 Sales View' },
   }[mode]
-  const rows = days.flatMap((day) => config.docs(day).map((doc) => ({ day, doc })))
+  const columns = businessModeColumns[mode]
+  const [sortKey, setSortKey] = useState<BusinessModeColumnKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const columnResize = useResizableColumns(`main.business-calendar.${mode}.v1`, columns)
+  const rows = useMemo(() => days.flatMap((day) => config.docs(day).map((doc) => ({ ...doc, date: day.date }))), [config, days])
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows
+
+    return [...rows].sort((left, right) => {
+      const result = compareSortValues(getBusinessModeSortValue(left, sortKey), getBusinessModeSortValue(right, sortKey))
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [rows, sortDirection, sortKey])
+
+  function changeSort(key: BusinessModeColumnKey) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
   return (
     <Panel title={config.title}>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
-        <table className="w-full min-w-[720px] text-xs">
-          <thead className="bg-slate-50 text-slate-500 text-xs">
-            <tr>{config.headers.map((header) => <th key={header} className="p-2 text-left font-semibold">{header}</th>)}</tr>
+      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        {columnResize.hasCustomWidths ? (
+          <div className="flex justify-end border-b border-slate-100 px-3 py-3">
+            <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          </div>
+        ) : null}
+        <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {columns.map((column) => (
+              <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            ))}
+          </colgroup>
+          <thead className="bg-slate-100">
+            <tr>
+              {columns.map((column) => (
+                <ResizableTableHead
+                  key={column.key}
+                  activeSortKey={sortKey ?? undefined}
+                  align={column.align}
+                  direction={sortDirection}
+                  label={column.label}
+                  sortKey={column.key}
+                  onSort={changeSort}
+                  resizeProps={columnResize.getResizeHandleProps(column.key, column.label)}
+                />
+              ))}
+            </tr>
           </thead>
-          <tbody>
-            {rows.map(({ day, doc }) => <tr key={`${mode}-${doc.id}`} className="border-t border-slate-100 hover:bg-slate-50/30"><td className="p-2">{day.date}</td><td className="p-2 font-mono text-slate-600">{doc.docNo}</td>{mode === 'expense' ? <><td className="p-2 text-slate-700">{doc.category ?? '-'}</td><td className="p-2 text-slate-700">{doc.payee ?? '-'}</td><td className="p-2 text-right font-mono font-bold text-red-600">{money(doc.amount)}</td></> : null}{mode === 'purchase' ? <><td className="p-2 text-right font-mono">{money(doc.qty)}</td><td className="p-2 text-right font-mono font-bold text-blue-600">{money(doc.amount)}</td></> : null}{mode === 'sales' ? <><td className="p-2 text-right font-mono">{money(doc.qty)}</td><td className="p-2 text-right font-mono font-bold text-emerald-600">{money(doc.amount)}</td><td className="p-2 text-right font-mono text-slate-600">{money(doc.cogs)}</td><td className="p-2 text-right font-mono font-bold text-purple-600">{money(doc.gp)}</td></> : null}</tr>)}
-            {rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400 text-xs" colSpan={config.headers.length}>ไม่มีข้อมูล</td></tr> : null}
+          <tbody className="divide-y divide-slate-100">
+            {sortedRows.map((row) => <tr key={`${mode}-${row.id}`} className="transition-colors hover:bg-slate-50">
+              {columns.map((column) => (
+                <td key={column.key} className={`px-3 py-3 ${column.align === 'right' ? 'text-right font-mono tabular-nums' : 'text-left'} ${businessModeCellTone(mode, row, column.key)}`}>
+                  <div className={column.align === 'right' ? 'whitespace-nowrap' : 'truncate'} title={String(formatBusinessModeCell(row, column.key))}>{formatBusinessModeCell(row, column.key)}</div>
+                </td>
+              ))}
+            </tr>)}
+            {sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400 text-xs" colSpan={columns.length}>ไม่มีข้อมูล</td></tr> : null}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[500px] overflow-y-auto rounded-lg">
-        {rows.map(({ day, doc }) => (
+        {sortedRows.map((doc) => (
           <div key={`${mode}-${doc.id}`} className="p-3 bg-white rounded-lg border border-slate-100 mb-2 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-center">
               <span className="font-bold text-slate-800">{doc.docNo}</span>
-              <span className="text-slate-500 text-xs">{day.date}</span>
+              <span className="text-slate-500 text-xs">{doc.date}</span>
             </div>
             {mode === 'expense' && (
               <div className="grid grid-cols-2 gap-1 mt-1 text-xs text-slate-600">
@@ -429,7 +625,7 @@ function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<
             )}
           </div>
         ))}
-        {rows.length === 0 && (
+        {sortedRows.length === 0 && (
           <div className="py-6 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>
         )}
       </div>
@@ -437,7 +633,45 @@ function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<
   )
 }
 
+function formatBusinessModeCell(row: BusinessModeRow, key: BusinessModeColumnKey) {
+  if (key === 'amount' || key === 'cogs' || key === 'gp' || key === 'qty') return money(row[key])
+  return row[key] ?? '-'
+}
+
+function businessModeCellTone(mode: Exclude<Mode, 'combined'>, row: BusinessModeRow, key: BusinessModeColumnKey) {
+  if (key === 'amount') {
+    if (mode === 'expense') return 'font-bold text-red-700'
+    if (mode === 'purchase') return 'font-bold text-blue-700'
+    return 'font-bold text-emerald-700'
+  }
+  if (key === 'gp') return (row.gp ?? 0) >= 0 ? 'font-bold text-emerald-700' : 'font-bold text-red-700'
+  if (key === 'docNo') return 'font-mono font-semibold text-slate-700'
+  return 'text-slate-700'
+}
+
 function CashDayModal({ day, onClose }: { day: CashDay; onClose: () => void }) {
+  const [sortKey, setSortKey] = useState<CashEntryColumnKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const columnResize = useResizableColumns('main.cash-flow-calendar.day-entries.v1', cashEntryColumns)
+  const sortedEntries = useMemo(() => {
+    if (!sortKey) return day.entries
+
+    return [...day.entries].sort((left, right) => {
+      const result = compareSortValues(getCashEntrySortValue(left, sortKey), getCashEntrySortValue(right, sortKey))
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [day.entries, sortDirection, sortKey])
+
+  function changeSort(key: CashEntryColumnKey) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl border-none">
@@ -453,21 +687,52 @@ function CashDayModal({ day, onClose }: { day: CashDay; onClose: () => void }) {
           </div>
           
           {/* Desktop Table View */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full min-w-[760px] text-xs">
-              <thead className="bg-slate-50 text-slate-500 text-xs">
-                <tr>{['ประเภท', 'รายละเอียด', 'บัญชี', 'Ref', 'เข้า', 'ออก'].map((header) => <th key={header} className="p-2 text-left font-semibold">{header}</th>)}</tr>
+          <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm sm:block">
+            {columnResize.hasCustomWidths ? (
+              <div className="flex justify-end border-b border-slate-100 px-3 py-3">
+                <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+              </div>
+            ) : null}
+            <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                {cashEntryColumns.map((column) => (
+                  <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+                ))}
+              </colgroup>
+              <thead className="bg-slate-100">
+                <tr>
+                  {cashEntryColumns.map((column) => (
+                    <ResizableTableHead
+                      key={column.key}
+                      activeSortKey={sortKey ?? undefined}
+                      align={column.align}
+                      direction={sortDirection}
+                      label={column.label}
+                      sortKey={column.key}
+                      onSort={changeSort}
+                      resizeProps={columnResize.getResizeHandleProps(column.key, column.label)}
+                    />
+                  ))}
+                </tr>
               </thead>
-              <tbody>
-                {day.entries.map((entry) => <tr key={entry.id} className="border-t border-slate-100 hover:bg-slate-50/30"><td className="p-2 text-slate-700">{entry.type}</td><td className="p-2 text-slate-700">{entry.description}</td><td className="p-2 text-slate-600">{entry.account}</td><td className="p-2 font-mono text-slate-500">{entry.refNo}</td><td className="p-2 text-right font-mono text-emerald-600 font-semibold">{money(entry.in)}</td><td className="p-2 text-right font-mono text-red-600 font-semibold">{money(entry.out)}</td></tr>)}
-                {day.entries.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={6}>ไม่มีรายการ</td></tr> : null}
+              <tbody className="divide-y divide-slate-100">
+                {sortedEntries.map((entry) => <tr key={entry.id} className="transition-colors hover:bg-slate-50">
+                  {cashEntryColumns.map((column) => (
+                    <td key={column.key} className={`px-3 py-3 ${column.align === 'right' ? 'text-right font-mono tabular-nums' : 'text-left'} ${cashEntryCellTone(column.key)}`}>
+                      <div className={column.align === 'right' ? 'whitespace-nowrap' : 'truncate'} title={String(formatCashEntryCell(entry, column.key))}>{formatCashEntryCell(entry, column.key)}</div>
+                    </td>
+                  ))}
+                </tr>)}
+                {sortedEntries.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={cashEntryColumns.length}>ไม่มีรายการ</td></tr> : null}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Mobile view inside Modal */}
           <div className="block sm:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[300px] overflow-y-auto rounded-lg">
-            {day.entries.map((entry) => (
+            {sortedEntries.map((entry) => (
               <div key={entry.id} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
                 <div className="flex justify-between items-start">
                   <span className="font-bold text-slate-800">{entry.description || entry.type}</span>
@@ -485,6 +750,19 @@ function CashDayModal({ day, onClose }: { day: CashDay; onClose: () => void }) {
       </div>
     </div>
   )
+}
+
+function formatCashEntryCell(entry: CashEntry, key: CashEntryColumnKey) {
+  if (key === 'cashIn') return money(entry.in)
+  if (key === 'cashOut') return money(entry.out)
+  return entry[key]
+}
+
+function cashEntryCellTone(key: CashEntryColumnKey) {
+  if (key === 'cashIn') return 'font-semibold text-emerald-700'
+  if (key === 'cashOut') return 'font-semibold text-red-700'
+  if (key === 'refNo') return 'font-mono text-slate-600'
+  return 'text-slate-700'
 }
 
 function Metric({ label, tone, value }: { label: string; tone: string; value: string }) {
@@ -527,11 +805,6 @@ function ModeButton({ active, mode, onClick }: { active: boolean; mode: Mode; on
     sales: 'bg-emerald-600 border-emerald-600 text-white'
   }
   return <button className={`rounded-lg border px-3 py-2 text-sm font-bold outline-none ${active ? activeClass[mode] : 'bg-white border-slate-100 text-slate-600 hover:bg-slate-50'}`} type="button" onClick={onClick} onPointerDown={onClick}>{label[mode]}</button>
-}
-
-function Amount({ signed = false, value }: { signed?: boolean; value: number }) {
-  const color = signed ? value >= 0 ? 'text-emerald-700 font-semibold' : 'text-red-600 font-semibold' : 'text-slate-700'
-  return <td className={`p-2 text-right font-mono ${color}`}>{money(value)}</td>
 }
 
 function Notice({ text }: { text?: string }) {

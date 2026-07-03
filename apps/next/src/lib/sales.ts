@@ -43,51 +43,52 @@ export const salesLineItemSchema = z.object({
   price: positiveNumber('ราคาขาย/หน่วย'),
   productId: z.string().trim().min(1, 'เลือกสินค้า').max(80, 'รหัสสินค้ายาวเกินไป').regex(safeIdPattern, 'รหัสสินค้ามีรูปแบบไม่ถูกต้อง'),
   qty: positiveNumber('จำนวน'),
+  salesBillLineNo: z.coerce.number().int().min(1).nullable().optional(),
   tradingCostSourceId: optionalSafeId('Trading cost source'),
 })
 
 export const salesBillFormSchema = z.object({
-  branchId: requiredSafeId('สาขา'),
-  channelId: requiredSafeId('ช่องทางขาย'),
-  customerAdvanceId: optionalSafeId('รับเงินล่วงหน้า Customer'),
-  customerId: z.string().trim().min(1, 'เลือกลูกค้า').max(80, 'รหัสลูกค้ายาวเกินไป').regex(safeIdPattern, 'รหัสลูกค้ามีรูปแบบไม่ถูกต้อง'),
-  deliveryTicketId: optionalSafeId('ใบส่งของ'),
-  discountTotal: money('ส่วนลดท้ายบิล').default(0),
-  exportOrderNo: optionalBusinessCode('เลขที่ order ส่งออก'),
-  hasVat: z.boolean().default(false),
-  items: z.array(salesLineItemSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ').max(50, 'รายการสินค้ามากเกินไป'),
-  licensePlate: optionalGeneralText('ทะเบียนรถ', 40),
-  note: optionalGeneralText('หมายเหตุ', 500),
-  poSellId: optionalSafeId('PO Sell'),
-  refNo: z.preprocess(
-    blankToNull,
-    z.string().trim().max(50, 'เลขที่อ้างอิงยาวเกินไป').regex(/^[A-Za-z0-9_-]+$/, 'เลขที่อ้างอิงใช้ได้เฉพาะอังกฤษ ตัวเลข ขีดกลาง และ underscore').nullable().default(null),
-  ),
-  transactionMode: z.enum(['STOCK', 'TRADING']).default('STOCK'),
-  vatInvoiceDate: z.preprocess(
-    blankToNull,
-    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ใบกำกับภาษีต้องเป็นรูปแบบ YYYY-MM-DD').nullable().default(null),
-  ),
-  vatInvoiceNo: z.preprocess(
-    blankToNull,
-    z.string().trim().max(50, 'เลขที่ใบกำกับภาษียาวเกินไป').regex(/^[A-Za-z0-9_-]+$/, 'เลขที่ใบกำกับภาษีใช้ได้เฉพาะอังกฤษ ตัวเลข ขีดกลาง และ underscore').nullable().default(null),
-  ),
-  vatInvoiceIssued: z.boolean().default(false),
-  vatType: z.enum(['NONE', 'EXCLUDE', 'INCLUDE']).default('NONE'),
-  warehouseId: optionalSafeId('คลัง'),
+    branchId: requiredSafeId('สาขา'),
+    channelId: requiredSafeId('ช่องทางขาย'),
+    customerAdvanceId: optionalSafeId('รับเงินล่วงหน้า Customer'),
+    customerId: z.string().trim().min(1, 'เลือกลูกค้า').max(80, 'รหัสลูกค้ายาวเกินไป').regex(safeIdPattern, 'รหัสลูกค้ามีรูปแบบไม่ถูกต้อง'),
+    deliveryTicketId: optionalSafeId('ใบส่งของ'),
+    discountTotal: money('ส่วนลดท้ายบิล').default(0),
+    exportOrderNo: optionalBusinessCode('เลขที่ order ส่งออก'),
+    hasVat: z.boolean().default(false),
+    items: z.array(salesLineItemSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ').max(50, 'รายการสินค้ามากเกินไป'),
+    licensePlate: optionalGeneralText('ทะเบียนรถ', 40),
+    note: optionalGeneralText('หมายเหตุ', 500),
+    poSellId: optionalSafeId('PO Sell'),
+    refNo: z.preprocess(
+      blankToNull,
+      z.string().trim().max(50, 'เลขที่อ้างอิงยาวเกินไป').regex(/^[A-Za-z0-9_-]+$/, 'เลขที่อ้างอิงใช้ได้เฉพาะอังกฤษ ตัวเลข ขีดกลาง และ underscore').nullable().default(null),
+    ),
+    transactionMode: z.enum(['STOCK', 'TRADING']).default('STOCK'),
+    vatInvoiceDate: z.preprocess(
+      blankToNull,
+      z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ใบกำกับภาษีต้องเป็นรูปแบบ YYYY-MM-DD').nullable().default(null),
+    ),
+    vatInvoiceNo: z.preprocess(
+      blankToNull,
+      z.string().trim().max(50, 'เลขที่ใบกำกับภาษียาวเกินไป').regex(/^[A-Za-z0-9_-]+$/, 'เลขที่ใบกำกับภาษีใช้ได้เฉพาะอังกฤษ ตัวเลข ขีดกลาง และ underscore').nullable().default(null),
+    ),
+    vatInvoiceIssued: z.boolean().default(false),
+    vatType: z.enum(['NONE', 'EXCLUDE', 'INCLUDE']).default('NONE'),
+    warehouseId: optionalSafeId('คลัง'),
 }).refine((value) => !value.vatInvoiceIssued || Boolean(value.vatInvoiceNo), {
-  message: 'กรอกเลขที่ใบกำกับภาษีเมื่อเลือกออกใบกำกับภาษีแล้ว',
-  path: ['vatInvoiceNo'],
-}).refine((value) => !value.vatInvoiceIssued || Boolean(value.vatInvoiceDate), {
-  message: 'กรอกวันที่ใบกำกับภาษีเมื่อเลือกออกใบกำกับภาษีแล้ว',
-  path: ['vatInvoiceDate'],
-}).refine((value) => value.transactionMode !== 'STOCK' || Boolean(value.deliveryTicketId), {
-  message: 'เลือกใบส่งของ WTO',
-  path: ['deliveryTicketId'],
-}).refine((value) => value.transactionMode !== 'TRADING' || value.items.every((item) => Boolean(item.deliveryTicketId) || Boolean(item.tradingCostSourceId)), {
-  message: 'บิลขาย Trading ต้องเลือกบิลซื้อ Trading/Cost Source ให้ครบทุกแถวที่ไม่ใช่ WTO',
-  path: ['items'],
-})
+    message: 'กรอกเลขที่ใบกำกับภาษีเมื่อเลือกออกใบกำกับภาษีแล้ว',
+    path: ['vatInvoiceNo'],
+  }).refine((value) => !value.vatInvoiceIssued || Boolean(value.vatInvoiceDate), {
+    message: 'กรอกวันที่ใบกำกับภาษีเมื่อเลือกออกใบกำกับภาษีแล้ว',
+    path: ['vatInvoiceDate'],
+  }).refine((value) => value.transactionMode !== 'STOCK' || Boolean(value.deliveryTicketId), {
+    message: 'เลือกใบส่งของ WTO',
+    path: ['deliveryTicketId'],
+  }).refine((value) => value.transactionMode !== 'TRADING' || value.items.every((item) => Boolean(item.deliveryTicketId) || Boolean(item.tradingCostSourceId)), {
+    message: 'บิลขาย Trading ต้องเลือกบิลซื้อ Trading/Cost Source ให้ครบทุกแถวที่ไม่ใช่ WTO',
+    path: ['items'],
+  })
 
 export const salesBillCancelSchema = z.object({
   note: z.string()
@@ -103,11 +104,38 @@ export const salesBillStockReturnSchema = z.object({
     .min(1, 'เลือก pending_out ที่ต้องรับคืน')
     .max(120, 'รหัส pending_out ยาวเกินไป')
     .regex(safeIdPattern, 'รหัส pending_out มีรูปแบบไม่ถูกต้อง'),
+  pendingOutKeys: z.array(z.string()
+    .trim()
+    .min(1, 'เลือก pending_out ที่ต้องรับคืน')
+    .max(120, 'รหัส pending_out ยาวเกินไป')
+    .regex(safeIdPattern, 'รหัส pending_out มีรูปแบบไม่ถูกต้อง'))
+    .min(1, 'เลือก pending_out ที่ต้องรับคืน')
+    .max(100, 'รายการ pending_out มากเกินไป')
+    .optional(),
   note: optionalGeneralText('หมายเหตุรับคืน', 500),
   reason: optionalGeneralText('เหตุผลส่วนต่าง', 500),
   returnedQty: z.coerce.number({ invalid_type_error: 'น้ำหนักที่ชั่งคืนต้องเป็นตัวเลข' })
     .finite('น้ำหนักที่ชั่งคืนต้องเป็นตัวเลข')
     .min(0, 'น้ำหนักที่ชั่งคืนต้องไม่ติดลบ'),
+})
+
+export const wtoStockReturnSchema = z.object({
+  note: optionalGeneralText('หมายเหตุรับคืน', 500),
+  productId: z.string()
+    .trim()
+    .min(1, 'เลือกสินค้าที่ต้องรับคืน')
+    .max(80, 'รหัสสินค้ายาวเกินไป')
+    .regex(safeIdPattern, 'รหัสสินค้ามีรูปแบบไม่ถูกต้อง'),
+  reason: optionalGeneralText('เหตุผลส่วนต่าง', 500),
+  returnedQty: z.coerce.number({ invalid_type_error: 'น้ำหนักที่ชั่งคืนต้องเป็นตัวเลข' })
+    .finite('น้ำหนักที่ชั่งคืนต้องเป็นตัวเลข')
+    .min(0, 'น้ำหนักที่ชั่งคืนต้องไม่ติดลบ'),
+  salesBillDocNo: optionalSafeId('บิลขายอ้างอิง'),
+  warehouseId: z.string()
+    .trim()
+    .min(1, 'เลือกคลังที่ต้องรับคืน')
+    .max(80, 'รหัสคลังยาวเกินไป')
+    .regex(safeIdPattern, 'รหัสคลังมีรูปแบบไม่ถูกต้อง'),
 })
 
 export const poSellFormSchema = z.object({
@@ -124,3 +152,4 @@ export type SalesBillFormValues = z.infer<typeof salesBillFormSchema>
 export type SalesBillCancelValues = z.infer<typeof salesBillCancelSchema>
 export type SalesBillStockReturnValues = z.infer<typeof salesBillStockReturnSchema>
 export type PoSellFormValues = z.infer<typeof poSellFormSchema>
+export type WtoStockReturnValues = z.infer<typeof wtoStockReturnSchema>

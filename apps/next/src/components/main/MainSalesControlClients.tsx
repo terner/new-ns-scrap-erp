@@ -4,8 +4,19 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 
 type AnyRow = Record<string, number | string | boolean | null | undefined>
+type SortDirection = 'asc' | 'desc'
+type TableColumn<TKey extends string> = ResizableColumnDefinition<TKey> & { align?: 'center' | 'left' | 'right'; label: string }
+type SalesPlanColumnKey = 'action' | 'channel' | 'containers' | 'customerName' | 'fx' | 'kgPerContainer' | 'lme' | 'productName' | 'sellPctLme' | 'sellPrice' | 'status' | 'totalKg'
+type SalesPlanAnalysisColumnKey = 'bestPlanPct' | 'bestPlanPrice' | 'lockedKg' | 'metalGroup' | 'name' | 'projectedMarginPct' | 'projectedProfit' | 'recommendation' | 'remainingKg' | 'stock' | 'wac'
+type SalesPlanRemainingColumnKey = 'code' | 'lockedContainers' | 'lockedKg' | 'metalGroup' | 'name' | 'remainingContainers' | 'remainingKg' | 'stock' | 'value' | 'wac'
+type CommissionCategoryColumnKey = 'amount' | 'category' | 'qty'
+type CommissionSupplierColumnKey = 'amount' | 'bills' | 'pct' | 'qty' | 'supplier'
+type CommissionBillColumnKey = 'amount' | 'commissionStatus' | 'date' | 'docNo' | 'price' | 'productName' | 'profitDiff' | 'qty' | 'salesPrice' | 'supplierName'
+type CommissionSummaryColumnKey = 'amount' | 'category' | 'qty' | 'salesName'
 type LmeConfig = { fxRate: number; kgPerContainer: number; lmeAluminumUSD: number; lmeBrassUSD: number; lmeCopperUSD: number; updatedAt: string; updatedBy: string }
 type SalesPlanPayload = {
   filters: { channels: { id: string; name: string }[]; metalGroups: string[]; month: string }
@@ -63,6 +74,76 @@ type CommissionPayload = {
   totals: Record<string, number>
 }
 
+const salesPlanColumns: Array<TableColumn<SalesPlanColumnKey>> = [
+  { key: 'productName', label: 'สินค้า', defaultWidth: 220, minWidth: 160 },
+  { key: 'channel', label: 'ช่องทาง', defaultWidth: 125, minWidth: 105, align: 'center' },
+  { key: 'customerName', label: 'ลูกค้า', defaultWidth: 190, minWidth: 145 },
+  { key: 'containers', label: 'ตู้', defaultWidth: 85, minWidth: 75, align: 'right' },
+  { key: 'kgPerContainer', label: 'กก./ตู้', defaultWidth: 105, minWidth: 90, align: 'right' },
+  { key: 'totalKg', label: 'รวม กก.', defaultWidth: 120, minWidth: 105, align: 'right' },
+  { key: 'sellPctLme', label: '% LME', defaultWidth: 95, minWidth: 80, align: 'right' },
+  { key: 'lme', label: 'LME (USD/MT)', defaultWidth: 120, minWidth: 105, align: 'right' },
+  { key: 'fx', label: 'FX', defaultWidth: 90, minWidth: 75, align: 'right' },
+  { key: 'sellPrice', label: 'ราคา THB/kg', defaultWidth: 135, minWidth: 115, align: 'right' },
+  { key: 'status', label: 'สถานะ', defaultWidth: 150, minWidth: 120, align: 'center' },
+  { key: 'action', label: 'จัดการ', defaultWidth: 80, minWidth: 70, align: 'right' },
+]
+const salesPlanAnalysisColumns: Array<TableColumn<SalesPlanAnalysisColumnKey>> = [
+  { key: 'name', label: 'สินค้า', defaultWidth: 230, minWidth: 165 },
+  { key: 'metalGroup', label: 'หมวด', defaultWidth: 130, minWidth: 105 },
+  { key: 'stock', label: 'Stock รวม (กก.)', defaultWidth: 140, minWidth: 120, align: 'right' },
+  { key: 'lockedKg', label: 'ล็อกแล้ว (กก.)', defaultWidth: 140, minWidth: 120, align: 'right' },
+  { key: 'remainingKg', label: 'ว่างให้ขาย (กก.)', defaultWidth: 150, minWidth: 125, align: 'right' },
+  { key: 'wac', label: 'WAC ต้นทุน', defaultWidth: 130, minWidth: 110, align: 'right' },
+  { key: 'bestPlanPrice', label: 'ราคาเสนอดีสุด', defaultWidth: 140, minWidth: 120, align: 'right' },
+  { key: 'bestPlanPct', label: '% LME', defaultWidth: 100, minWidth: 85, align: 'right' },
+  { key: 'projectedProfit', label: 'กำไรคาดการณ์', defaultWidth: 150, minWidth: 125, align: 'right' },
+  { key: 'projectedMarginPct', label: 'Margin %', defaultWidth: 120, minWidth: 100, align: 'right' },
+  { key: 'recommendation', label: 'คำแนะนำ', defaultWidth: 180, minWidth: 140, align: 'center' },
+]
+const salesPlanRemainingColumns: Array<TableColumn<SalesPlanRemainingColumnKey>> = [
+  { key: 'code', label: 'รหัส', defaultWidth: 110, minWidth: 90 },
+  { key: 'name', label: 'สินค้า', defaultWidth: 220, minWidth: 160 },
+  { key: 'metalGroup', label: 'หมวด', defaultWidth: 130, minWidth: 105 },
+  { key: 'stock', label: 'Stock ทั้งหมด (กก.)', defaultWidth: 150, minWidth: 125, align: 'right' },
+  { key: 'lockedKg', label: 'ล็อกแล้ว (กก.)', defaultWidth: 140, minWidth: 120, align: 'right' },
+  { key: 'lockedContainers', label: 'ล็อกแล้ว (ตู้)', defaultWidth: 135, minWidth: 115, align: 'right' },
+  { key: 'remainingKg', label: 'รอล็อก (กก.)', defaultWidth: 140, minWidth: 120, align: 'right' },
+  { key: 'remainingContainers', label: 'รอล็อก (ตู้)', defaultWidth: 135, minWidth: 115, align: 'right' },
+  { key: 'wac', label: 'WAC', defaultWidth: 120, minWidth: 100, align: 'right' },
+  { key: 'value', label: 'มูลค่า WAC', defaultWidth: 140, minWidth: 120, align: 'right' },
+]
+const commissionCategoryColumns: Array<TableColumn<CommissionCategoryColumnKey>> = [
+  { key: 'category', label: 'ประเภท / หมวดสินค้า', defaultWidth: 240, minWidth: 170 },
+  { key: 'qty', label: 'จำนวน (กก.)', defaultWidth: 140, minWidth: 115, align: 'right' },
+  { key: 'amount', label: 'ยอดซื้อ (บาท)', defaultWidth: 150, minWidth: 125, align: 'right' },
+]
+const commissionSupplierColumns: Array<TableColumn<CommissionSupplierColumnKey>> = [
+  { key: 'supplier', label: 'Supplier', defaultWidth: 260, minWidth: 180 },
+  { key: 'bills', label: 'บิล', defaultWidth: 95, minWidth: 80, align: 'right' },
+  { key: 'qty', label: 'น้ำหนัก (กก.)', defaultWidth: 140, minWidth: 115, align: 'right' },
+  { key: 'amount', label: 'ยอดรับซื้อ (บาท)', defaultWidth: 160, minWidth: 130, align: 'right' },
+  { key: 'pct', label: '% ของ Total', defaultWidth: 130, minWidth: 110, align: 'right' },
+]
+const commissionBillColumns: Array<TableColumn<CommissionBillColumnKey>> = [
+  { key: 'date', label: 'วันที่', defaultWidth: 115, minWidth: 100 },
+  { key: 'docNo', label: 'เลขที่บิล', defaultWidth: 140, minWidth: 115 },
+  { key: 'supplierName', label: 'Supplier', defaultWidth: 200, minWidth: 150 },
+  { key: 'productName', label: 'สินค้า', defaultWidth: 220, minWidth: 160 },
+  { key: 'qty', label: 'น้ำหนัก (กก.)', defaultWidth: 130, minWidth: 110, align: 'right' },
+  { key: 'price', label: 'ราคาซื้อ', defaultWidth: 120, minWidth: 100, align: 'right' },
+  { key: 'salesPrice', label: 'ราคาหน้าใบ', defaultWidth: 125, minWidth: 105, align: 'right' },
+  { key: 'profitDiff', label: 'ส่วนต่างกำไร', defaultWidth: 135, minWidth: 115, align: 'right' },
+  { key: 'amount', label: 'ยอดรวม (บาท)', defaultWidth: 150, minWidth: 125, align: 'right' },
+  { key: 'commissionStatus', label: 'สถานะค่าคอม', defaultWidth: 150, minWidth: 125, align: 'center' },
+]
+const commissionSummaryColumns: Array<TableColumn<CommissionSummaryColumnKey>> = [
+  { key: 'salesName', label: 'Sales', defaultWidth: 220, minWidth: 160 },
+  { key: 'category', label: 'ประเภท / หมวดสินค้า', defaultWidth: 260, minWidth: 180 },
+  { key: 'qty', label: 'จำนวน KG', defaultWidth: 140, minWidth: 115, align: 'right' },
+  { key: 'amount', label: 'มูลค่ารวม (บาท)', defaultWidth: 160, minWidth: 130, align: 'right' },
+]
+
 function money(value: unknown) {
   return formatMoney(typeof value === 'number' ? value : Number(value ?? 0))
 }
@@ -73,6 +154,40 @@ function text(value: unknown) {
 
 function num(value: unknown) {
   return typeof value === 'number' ? value : Number(value ?? 0)
+}
+
+function compareSortValues(left: string | number, right: string | number) {
+  if (typeof left === 'number' && typeof right === 'number') {
+    return left - right
+  }
+
+  return String(left).localeCompare(String(right), 'th', { numeric: true })
+}
+
+function getAnySortValue(row: AnyRow, key: string): string | number {
+  if (key === 'action') return ''
+  if (key === 'lockedContainers') return 0
+  const value = row[key]
+  return typeof value === 'number' || typeof value === 'string' ? value : ''
+}
+
+function getCommissionBillSortValue(row: CommissionBillRow, key: CommissionBillColumnKey, commissionEligible: boolean): string | number {
+  if (key === 'commissionStatus') return row.isCommissionable ? 1 : 0
+  if (key === 'profitDiff') return commissionEligible ? num(row.salesPrice) - num(row.price) : 0
+  return row[key] ?? ''
+}
+
+function sortedByKey<TRow, TKey extends string>(
+  rows: TRow[],
+  key: TKey | null,
+  direction: SortDirection,
+  getValue: (row: TRow, key: TKey) => string | number,
+) {
+  if (!key) return rows
+  return [...rows].sort((left, right) => {
+    const result = compareSortValues(getValue(left, key), getValue(right, key))
+    return direction === 'asc' ? result : -result
+  })
 }
 
 function csvEscape(value: string) {
@@ -98,6 +213,15 @@ export function SalesPlanPageClient() {
   const [month, setMonth] = useState('')
   const [filterGroup, setFilterGroup] = useState('')
   const [filterChannel, setFilterChannel] = useState('')
+  const [planSortKey, setPlanSortKey] = useState<SalesPlanColumnKey | null>(null)
+  const [planSortDirection, setPlanSortDirection] = useState<SortDirection>('asc')
+  const [analysisSortKey, setAnalysisSortKey] = useState<SalesPlanAnalysisColumnKey | null>(null)
+  const [analysisSortDirection, setAnalysisSortDirection] = useState<SortDirection>('asc')
+  const [remainingSortKey, setRemainingSortKey] = useState<SalesPlanRemainingColumnKey | null>(null)
+  const [remainingSortDirection, setRemainingSortDirection] = useState<SortDirection>('asc')
+  const planResize = useResizableColumns('main.sales-plan.plan.v1', salesPlanColumns)
+  const analysisResize = useResizableColumns('main.sales-plan.analysis.v1', salesPlanAnalysisColumns)
+  const remainingResize = useResizableColumns('main.sales-plan.remaining.v1', salesPlanRemainingColumns)
 
   useEffect(() => {
     dailyFetchJson<SalesPlanPayload>('/api/sales-plan').then((payload) => {
@@ -110,6 +234,31 @@ export function SalesPlanPageClient() {
   const analysisRows = useMemo(() => (data?.productAnalysis ?? [])
     .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
     .filter((row) => !filterChannel || filterChannel), [data, filterGroup, filterChannel])
+  const sortedPlanRows = useMemo(() => {
+    const rows = data?.planRows ?? []
+    if (!planSortKey) return rows
+
+    return [...rows].sort((left, right) => {
+      const result = compareSortValues(getAnySortValue(left, planSortKey), getAnySortValue(right, planSortKey))
+      return planSortDirection === 'asc' ? result : -result
+    })
+  }, [data?.planRows, planSortDirection, planSortKey])
+  const sortedAnalysisRows = useMemo(() => {
+    if (!analysisSortKey) return analysisRows
+
+    return [...analysisRows].sort((left, right) => {
+      const result = compareSortValues(getAnySortValue(left, analysisSortKey), getAnySortValue(right, analysisSortKey))
+      return analysisSortDirection === 'asc' ? result : -result
+    })
+  }, [analysisRows, analysisSortDirection, analysisSortKey])
+  const sortedRemainingRows = useMemo(() => {
+    if (!remainingSortKey) return analysisRows
+
+    return [...analysisRows].sort((left, right) => {
+      const result = compareSortValues(getAnySortValue(left, remainingSortKey), getAnySortValue(right, remainingSortKey))
+      return remainingSortDirection === 'asc' ? result : -result
+    })
+  }, [analysisRows, remainingSortDirection, remainingSortKey])
   
   const remainingContainers = analysisRows.reduce((sum, row) => sum + num(row.remainingContainers), 0)
   const stockTotal = analysisRows.reduce((sum, row) => sum + num(row.stock), 0)
@@ -124,6 +273,34 @@ export function SalesPlanPageClient() {
       ['Month', 'Product', 'ช่องทาง', 'Customer', 'Containers', 'Kg/ตู้', 'รวม กก.', '% LME', 'LME (USD/MT)', 'FX', 'ราคาขาย (THB/kg)', 'สถานะ'],
       (data?.planRows ?? []).map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
     )
+  }
+
+  function changePlanSort(key: SalesPlanColumnKey) {
+    if (key === 'action') return
+    if (planSortKey === key) {
+      setPlanSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setPlanSortKey(key)
+    setPlanSortDirection('asc')
+  }
+
+  function changeAnalysisSort(key: SalesPlanAnalysisColumnKey) {
+    if (analysisSortKey === key) {
+      setAnalysisSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setAnalysisSortKey(key)
+    setAnalysisSortDirection('asc')
+  }
+
+  function changeRemainingSort(key: SalesPlanRemainingColumnKey) {
+    if (remainingSortKey === key) {
+      setRemainingSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setRemainingSortKey(key)
+    setRemainingSortDirection('asc')
   }
 
   return (
@@ -196,32 +373,42 @@ export function SalesPlanPageClient() {
       </div>
 
       {/* 1. Sales Plan Section */}
-      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-semibold text-slate-600">
           📝 ตารางวางแผน — ปลดล็อก = อยู่ในขั้นเสนอ / ล็อก = ราคายืนยันแล้วและกันยอดตามแผนขาย
         </div>
 
         {/* Desktop view */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200/60">
+        {planResize.hasCustomWidths ? (
+          <div className="hidden justify-end px-4 pt-3 lg:flex">
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={planResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          </div>
+        ) : null}
+        <div className="hidden overflow-x-auto lg:block">
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: planResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              {salesPlanColumns.map((column) => (
+                <col key={column.key} style={planResize.getColumnStyle(column.key)} />
+              ))}
+            </colgroup>
+            <thead className="bg-slate-100">
               <tr>
-                <th className="p-2.5 text-left font-semibold text-slate-600">สินค้า</th>
-                <th className="w-28 p-2.5 text-center font-semibold text-slate-600">ช่องทาง</th>
-                <th className="p-2.5 text-left font-semibold text-slate-600">ลูกค้า</th>
-                <th className="w-20 p-2.5 text-right font-semibold text-slate-600">ตู้</th>
-                <th className="w-24 p-2.5 text-right font-semibold text-slate-600">กก./ตู้</th>
-                <th className="w-28 p-2.5 text-right font-semibold text-slate-600">รวม กก.</th>
-                <th className="w-20 bg-amber-50/20 p-2.5 text-right font-semibold text-amber-800">% LME</th>
-                <th className="w-24 p-2.5 text-right font-semibold text-slate-600">LME (USD/MT)</th>
-                <th className="w-20 p-2.5 text-right font-semibold text-slate-600">FX</th>
-                <th className="w-28 bg-emerald-50/20 p-2.5 text-right font-semibold text-emerald-800">ราคา (THB/kg)</th>
-                <th className="w-28 p-2.5 text-center font-semibold text-slate-600">สถานะ</th>
-                <th className="p-2.5" />
+                {salesPlanColumns.map((column) => (
+                  <ResizableTableHead
+                    key={column.key}
+                    activeSortKey={planSortKey ?? undefined}
+                    align={column.align}
+                    direction={planSortDirection}
+                    label={column.label}
+                    sortKey={column.key === 'action' ? undefined : column.key}
+                    onSort={changePlanSort}
+                    resizeProps={planResize.getResizeHandleProps(column.key, column.label)}
+                  />
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {(data?.planRows ?? []).map((row) => (
+              {sortedPlanRows.map((row) => (
                 <tr className="hover:bg-slate-50/50 transition-colors" key={text(row.id)}>
                   <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.productId)}><option>{text(row.productName) || '-เลือก-'}</option></select></td>
                   <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.channel)}><option>{text(row.channel) || 'ส่งออก'}</option></select></td>
@@ -237,14 +424,14 @@ export function SalesPlanPageClient() {
                   <td className="p-1.5 text-right"><button className="rounded-full w-6 h-6 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 opacity-60 transition-colors" disabled type="button">×</button></td>
                 </tr>
               ))}
-              {!(data?.planRows ?? []).length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={12}>ยังไม่มีรายการในเดือนนี้ - กด + เพิ่มรายการ</td></tr> : null}
+              {!sortedPlanRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanColumns.length}>ยังไม่มีรายการในเดือนนี้ - กด + เพิ่มรายการ</td></tr> : null}
             </tbody>
           </table>
         </div>
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20">
-          {(data?.planRows ?? []).map((row) => (
+          {sortedPlanRows.map((row) => (
             <div key={text(row.id)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div className="font-bold text-slate-800 text-sm">{text(row.productName) || 'ไม่ได้ระบุสินค้า'}</div>
@@ -285,12 +472,12 @@ export function SalesPlanPageClient() {
               </div>
             </div>
           ))}
-          {!(data?.planRows ?? []).length ? <div className="text-center text-slate-400 py-4 font-semibold text-xs">ยังไม่มีรายการในเดือนนี้ - กด + เพิ่มรายการ</div> : null}
+          {!sortedPlanRows.length ? <div className="text-center text-slate-400 py-4 font-semibold text-xs">ยังไม่มีรายการในเดือนนี้ - กด + เพิ่มรายการ</div> : null}
         </div>
       </div>
 
       {/* 2. Analysis Section */}
-      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4">
           <div>
             <h3 className="font-bold text-slate-800 text-sm">📊 วิเคราะห์แผนขาย vs สต๊อกว่างขาย — ผู้บริหารตัดสินใจ</h3>
@@ -299,25 +486,36 @@ export function SalesPlanPageClient() {
         </div>
 
         {/* Desktop View Table */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200">
+        {analysisResize.hasCustomWidths ? (
+          <div className="hidden justify-end px-4 pt-3 lg:flex">
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={analysisResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          </div>
+        ) : null}
+        <div className="hidden overflow-x-auto lg:block">
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: analysisResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              {salesPlanAnalysisColumns.map((column) => (
+                <col key={column.key} style={analysisResize.getColumnStyle(column.key)} />
+              ))}
+            </colgroup>
+            <thead className="bg-slate-100">
               <tr>
-                <th className="p-2.5 text-left font-semibold text-slate-600">สินค้า</th>
-                <th className="p-2.5 text-left font-semibold text-slate-600">หมวด</th>
-                <th className="p-2.5 text-right font-semibold text-slate-600">Stock รวม (กก.)</th>
-                <th className="p-2.5 text-right font-semibold text-emerald-700">🔒 ล็อกแล้ว (กก.)</th>
-                <th className="bg-yellow-50/20 p-2.5 text-right font-semibold text-yellow-800">⏳ ว่างให้ขาย (กก.)</th>
-                <th className="p-2.5 text-right font-semibold text-slate-600">WAC ต้นทุน</th>
-                <th className="bg-amber-50/20 p-2.5 text-right font-semibold text-amber-800">ราคาเสนอดีสุด</th>
-                <th className="p-2.5 text-right font-semibold text-slate-600">% LME</th>
-                <th className="bg-emerald-50/20 p-2.5 text-right font-semibold text-emerald-800">กำไรคาดการณ์</th>
-                <th className="bg-emerald-50/20 p-2.5 text-right font-semibold text-emerald-800">Margin %</th>
-                <th className="p-2.5 text-center font-semibold text-slate-600">คำแนะนำ</th>
+                {salesPlanAnalysisColumns.map((column) => (
+                  <ResizableTableHead
+                    key={column.key}
+                    activeSortKey={analysisSortKey ?? undefined}
+                    align={column.align}
+                    direction={analysisSortDirection}
+                    label={column.label}
+                    sortKey={column.key}
+                    onSort={changeAnalysisSort}
+                    resizeProps={analysisResize.getResizeHandleProps(column.key, column.label)}
+                  />
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {analysisRows.map((row) => (
+              {sortedAnalysisRows.map((row) => (
                 <tr className="hover:bg-slate-50/50 transition-colors" key={text(row.code)}>
                   <td className="p-2.5 min-w-0 overflow-hidden"><div className="font-semibold text-slate-800 truncate" title={text(row.name)}>{text(row.name)}</div><div className="font-mono text-xs text-slate-400 font-semibold truncate" title={text(row.code)}>{text(row.code)}</div></td>
                   <td className="p-2.5 text-xs text-slate-500 font-medium min-w-0 overflow-hidden"><div className="truncate" title={text(row.metalGroup)}>{text(row.metalGroup)}</div></td>
@@ -332,7 +530,7 @@ export function SalesPlanPageClient() {
                   <td className="p-2.5 text-center min-w-0 overflow-hidden"><div className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 truncate" title={text(row.recommendation)}>{text(row.recommendation)}</div></td>
                 </tr>
               ))}
-              {!analysisRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={11}>ไม่มีสต๊อกทองแดง/ทองเหลืองให้วิเคราะห์</td></tr> : null}
+              {!sortedAnalysisRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanAnalysisColumns.length}>ไม่มีสต๊อกทองแดง/ทองเหลืองให้วิเคราะห์</td></tr> : null}
             </tbody>
             {analysisRows.length ? <tfoot className="border-t border-slate-200 bg-slate-50/50 font-bold text-slate-700"><tr><td className="p-3 text-xs" colSpan={2}>รวม</td><td className="p-3 text-right text-slate-700 text-xs">{money(stockTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(lockedTotal)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingKgTotal)}</td><td colSpan={3} /><td className={`p-3 text-right text-xs ${projectedProfitTotal >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{money(projectedProfitTotal)}</td><td colSpan={2} /></tr></tfoot> : null}
           </table>
@@ -340,7 +538,7 @@ export function SalesPlanPageClient() {
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20 border-t border-slate-100">
-          {analysisRows.map((row) => (
+          {sortedAnalysisRows.map((row) => (
             <div key={text(row.code)} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div>
@@ -377,12 +575,12 @@ export function SalesPlanPageClient() {
               </div>
             </div>
           ))}
-          {!analysisRows.length ? <div className="text-center text-slate-400 py-4 font-semibold text-xs">ไม่มีสต๊อกทองแดง/ทองเหลืองให้วิเคราะห์</div> : null}
+          {!sortedAnalysisRows.length ? <div className="text-center text-slate-400 py-4 font-semibold text-xs">ไม่มีสต๊อกทองแดง/ทองเหลืองให้วิเคราะห์</div> : null}
         </div>
       </div>
 
       {/* 3. Containers Remaining Section */}
-      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/50 p-4">
           <h3 className="font-bold text-slate-800 text-sm">📦 สต๊อกว่างขาย คงเหลือหลังหักล็อกราคา — เดือน {(month || data?.filters.month) ?? ''}</h3>
           <div className="text-xs flex items-center gap-1.5">
@@ -392,24 +590,36 @@ export function SalesPlanPageClient() {
         </div>
 
         {/* Desktop View Table */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200/60">
+        {remainingResize.hasCustomWidths ? (
+          <div className="hidden justify-end px-4 pt-3 lg:flex">
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={remainingResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          </div>
+        ) : null}
+        <div className="hidden overflow-x-auto lg:block">
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: remainingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              {salesPlanRemainingColumns.map((column) => (
+                <col key={column.key} style={remainingResize.getColumnStyle(column.key)} />
+              ))}
+            </colgroup>
+            <thead className="bg-slate-100">
               <tr>
-                <th className="p-2.5 text-left font-semibold text-slate-600">รหัส</th>
-                <th className="p-2.5 text-left font-semibold text-slate-700">สินค้า</th>
-                <th className="p-2.5 text-left font-semibold text-slate-700">หมวด</th>
-                <th className="p-2.5 text-right font-semibold text-slate-700">Stock ทั้งหมด (กก.)</th>
-                <th className="p-2.5 text-right font-semibold text-emerald-700">🔒 ล็อกแล้ว (กก.)</th>
-                <th className="p-2.5 text-right font-semibold text-emerald-700">🔒 ล็อกแล้ว (ตู้)</th>
-                <th className="bg-yellow-50/20 p-2.5 text-right font-semibold text-yellow-800">⏳ รอล็อก (กก.)</th>
-                <th className="bg-yellow-50/20 p-2.5 text-right font-semibold text-yellow-800">⏳ รอล็อก (ตู้)</th>
-                <th className="p-2.5 text-right font-semibold text-slate-700">WAC</th>
-                <th className="p-2.5 text-right font-semibold text-slate-700">มูลค่า WAC</th>
+                {salesPlanRemainingColumns.map((column) => (
+                  <ResizableTableHead
+                    key={column.key}
+                    activeSortKey={remainingSortKey ?? undefined}
+                    align={column.align}
+                    direction={remainingSortDirection}
+                    label={column.label}
+                    sortKey={column.key}
+                    onSort={changeRemainingSort}
+                    resizeProps={remainingResize.getResizeHandleProps(column.key, column.label)}
+                  />
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {analysisRows.map((row) => (
+              {sortedRemainingRows.map((row) => (
                 <tr className={`hover:bg-slate-50/50 transition-colors ${num(row.remainingKg) > 0 ? '' : 'opacity-60'}`} key={`${text(row.code)}-remain`}>
                   <td className="p-2.5 font-mono text-xs text-slate-400 font-semibold min-w-0 overflow-hidden"><div className="truncate" title={text(row.code)}>{text(row.code)}</div></td>
                   <td className="p-2.5 text-slate-800 font-medium min-w-0 overflow-hidden"><div className="truncate" title={text(row.name)}>{text(row.name)}</div></td>
@@ -423,7 +633,7 @@ export function SalesPlanPageClient() {
                   <td className="p-2.5 text-right font-bold text-slate-700 whitespace-nowrap tabular-nums pl-4">{money(row.value)}</td>
                 </tr>
               ))}
-              {!analysisRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={10}>ไม่มีสต๊อกทองแดง/ทองเหลือง</td></tr> : null}
+              {!sortedRemainingRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanRemainingColumns.length}>ไม่มีสต๊อกทองแดง/ทองเหลือง</td></tr> : null}
             </tbody>
             {analysisRows.length ? <tfoot className="border-t border-slate-100 bg-slate-50/50 font-bold text-slate-700"><tr><td className="p-3 text-xs" colSpan={3}>รวม</td><td className="p-3 text-right text-slate-700 text-xs">{money(stockTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(lockedTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(0)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingKgTotal)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingContainers)}</td><td /><td className="p-3 text-right text-slate-700 text-xs">{money(remainingValueTotal)}</td></tr></tfoot> : null}
           </table>
@@ -431,7 +641,7 @@ export function SalesPlanPageClient() {
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20 border-t border-slate-100">
-          {analysisRows.map((row) => (
+          {sortedRemainingRows.map((row) => (
             <div key={`${text(row.code)}-remain`} className={`bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3 ${num(row.remainingKg) > 0 ? '' : 'opacity-65'}`}>
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div>
@@ -456,7 +666,7 @@ export function SalesPlanPageClient() {
               </div>
             </div>
           ))}
-          {!analysisRows.length ? <div className="text-center text-slate-500 py-4 font-semibold text-xs">ไม่มีสต๊อกทองแดง/ทองเหลือง</div> : null}
+          {!sortedRemainingRows.length ? <div className="text-center text-slate-500 py-4 font-semibold text-xs">ไม่มีสต๊อกทองแดง/ทองเหลือง</div> : null}
         </div>
       </div>
 
@@ -507,9 +717,22 @@ export function SalesCommissionPageClient() {
   const [summarySalesFilter, setSummarySalesFilter] = useState('ALL')
   const [table3Page, setTable3Page] = useState(1)
   const [table4Page, setTable4Page] = useState(1)
-  const [table3Sort, setTable3Sort] = useState<'bills' | 'qty' | 'amount' | 'pct'>('amount')
-  const [table3SortDir, setTable3SortDir] = useState<'asc' | 'desc'>('desc')
+  const [table1SortKey, setTable1SortKey] = useState<CommissionCategoryColumnKey | null>(null)
+  const [table1SortDir, setTable1SortDir] = useState<SortDirection>('asc')
+  const [table2SortKey, setTable2SortKey] = useState<CommissionCategoryColumnKey | null>(null)
+  const [table2SortDir, setTable2SortDir] = useState<SortDirection>('asc')
+  const [table3Sort, setTable3Sort] = useState<CommissionSupplierColumnKey>('amount')
+  const [table3SortDir, setTable3SortDir] = useState<SortDirection>('desc')
+  const [table4SortKey, setTable4SortKey] = useState<CommissionBillColumnKey | null>(null)
+  const [table4SortDir, setTable4SortDir] = useState<SortDirection>('asc')
+  const [summarySortKey, setSummarySortKey] = useState<CommissionSummaryColumnKey | null>(null)
+  const [summarySortDir, setSummarySortDir] = useState<SortDirection>('asc')
   const [table4Search, setTable4Search] = useState('')
+  const table1Resize = useResizableColumns('main.sales-commission.category-all.v1', commissionCategoryColumns)
+  const table2Resize = useResizableColumns('main.sales-commission.category-commissionable.v1', commissionCategoryColumns)
+  const table3Resize = useResizableColumns('main.sales-commission.suppliers.v1', commissionSupplierColumns)
+  const table4Resize = useResizableColumns('main.sales-commission.bill-details.v1', commissionBillColumns)
+  const summaryResize = useResizableColumns('main.sales-commission.summary.v1', commissionSummaryColumns)
 
   const query = useMemo(() => {
     const params = new URLSearchParams()
@@ -565,6 +788,8 @@ export function SalesCommissionPageClient() {
     })
     return Object.entries(groups).map(([category, d]) => ({ category, ...d }))
   }, [billRows])
+  const sortedTable1Data = useMemo(() => sortedByKey(table1Data, table1SortKey, table1SortDir, (row, key) => row[key]), [table1Data, table1SortDir, table1SortKey])
+  const sortedTable2Data = useMemo(() => sortedByKey(table2Data, table2SortKey, table2SortDir, (row, key) => row[key]), [table2Data, table2SortDir, table2SortKey])
 
   // Table 3: Supplier ในความดูแล
   const table3Data = useMemo(() => {
@@ -598,6 +823,7 @@ export function SalesCommissionPageClient() {
       )
     })
   }, [billRows, table4Search])
+  const sortedTable4Data = useMemo(() => sortedByKey(table4FilteredData, table4SortKey, table4SortDir, (row, key) => getCommissionBillSortValue(row, key, Boolean(sales?.commissionEligible))), [sales?.commissionEligible, table4FilteredData, table4SortDir, table4SortKey])
 
   // Grouped Summary Table for Page 1
   const summaryTableData = useMemo(() => {
@@ -630,6 +856,15 @@ export function SalesCommissionPageClient() {
     if (summarySalesFilter === 'ALL') return result
     return result.filter((row) => row.salesId === summarySalesFilter)
   }, [data, summarySalesFilter])
+  const summaryFlatRows = useMemo(() => {
+    const rows = summaryTableData.flatMap((row) => {
+      if (!row.categories.length) {
+        return [{ amount: 0, category: 'ไม่มีข้อมูล', qty: 0, salesId: row.salesId, salesName: row.salesName }]
+      }
+      return row.categories.map((category) => ({ ...category, salesId: row.salesId, salesName: row.salesName }))
+    })
+    return sortedByKey(rows, summarySortKey, summarySortDir, (row, key) => row[key])
+  }, [summarySortDir, summarySortKey, summaryTableData])
 
   // Helper for downloading CSV of Table 4
   const handleDownloadCsv = () => {
@@ -650,12 +885,56 @@ export function SalesCommissionPageClient() {
     downloadCsv(`sales_tracking_${sales.code || sales.id}.csv`, headers, rows)
   }
 
+  function changeTable1Sort(key: CommissionCategoryColumnKey) {
+    if (table1SortKey === key) {
+      setTable1SortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setTable1SortKey(key)
+    setTable1SortDir('asc')
+  }
+
+  function changeTable2Sort(key: CommissionCategoryColumnKey) {
+    if (table2SortKey === key) {
+      setTable2SortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setTable2SortKey(key)
+    setTable2SortDir('asc')
+  }
+
+  function changeTable3Sort(key: CommissionSupplierColumnKey) {
+    if (table3Sort === key) {
+      setTable3SortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setTable3Sort(key)
+    setTable3SortDir('asc')
+  }
+
+  function changeTable4Sort(key: CommissionBillColumnKey) {
+    if (table4SortKey === key) {
+      setTable4SortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setTable4SortKey(key)
+    setTable4SortDir('asc')
+  }
+
+  function changeSummarySort(key: CommissionSummaryColumnKey) {
+    if (summarySortKey === key) {
+      setSummarySortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSummarySortKey(key)
+    setSummarySortDir('asc')
+  }
+
   if (selectedSales && sales) {
     // Sort Table 3
     const sortedTable3 = [...table3Data].sort((a, b) => {
-      const valA = a[table3Sort]
-      const valB = b[table3Sort]
-      return table3SortDir === 'desc' ? valB - valA : valA - valB
+      const result = compareSortValues(a[table3Sort], b[table3Sort])
+      return table3SortDir === 'asc' ? result : -result
     })
 
     // Pagination constants
@@ -663,10 +942,10 @@ export function SalesCommissionPageClient() {
     const table4PageSize = 20
 
     const totalTable3Pages = Math.ceil(sortedTable3.length / table3PageSize) || 1
-    const totalTable4Pages = Math.ceil(table4FilteredData.length / table4PageSize) || 1
+    const totalTable4Pages = Math.ceil(sortedTable4Data.length / table4PageSize) || 1
 
     const pagedTable3 = sortedTable3.slice((table3Page - 1) * table3PageSize, table3Page * table3PageSize)
-    const pagedTable4 = table4FilteredData.slice((table4Page - 1) * table4PageSize, table4Page * table4PageSize)
+    const pagedTable4 = sortedTable4Data.slice((table4Page - 1) * table4PageSize, table4Page * table4PageSize)
 
     return (
       <section className="space-y-4 text-[13.5px]">
@@ -724,26 +1003,45 @@ export function SalesCommissionPageClient() {
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Table 1 */}
           <Panel title="📦 Table 1: ยอดซื้อรวมตามหมวดสินค้า">
-            <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 border-b border-slate-100">
+            {table1Resize.hasCustomWidths ? (
+              <div className="mb-2 hidden justify-end lg:flex">
+                <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={table1Resize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+              </div>
+            ) : null}
+            <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
+              <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table1Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+                <colgroup>
+                  {commissionCategoryColumns.map((column) => (
+                    <col key={column.key} style={table1Resize.getColumnStyle(column.key)} />
+                  ))}
+                </colgroup>
+                <thead className="bg-slate-100">
                   <tr>
-                    <th className="p-3 text-left font-semibold text-slate-600">ประเภท / หมวดสินค้า</th>
-                    <th className="p-3 text-right font-semibold text-slate-600">จำนวน (กก.)</th>
-                    <th className="p-3 text-right font-semibold text-slate-600">ยอดซื้อ (บาท)</th>
+                    {commissionCategoryColumns.map((column) => (
+                      <ResizableTableHead
+                        key={column.key}
+                        activeSortKey={table1SortKey ?? undefined}
+                        align={column.align}
+                        direction={table1SortDir}
+                        label={column.label}
+                        sortKey={column.key}
+                        onSort={changeTable1Sort}
+                        resizeProps={table1Resize.getResizeHandleProps(column.key, column.label)}
+                      />
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {table1Data.map((row) => (
+                  {sortedTable1Data.map((row) => (
                     <tr key={row.category} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-3 font-semibold text-slate-800">{row.category}</td>
                       <td className="p-3 text-right font-mono tabular-nums text-slate-700">{money(row.qty)}</td>
                       <td className="p-3 text-right font-mono tabular-nums text-slate-700">{money(row.amount)}</td>
                     </tr>
                   ))}
-                  {table1Data.length === 0 ? (
+                  {sortedTable1Data.length === 0 ? (
                     <tr>
-                      <td className="py-8 text-center text-slate-400 font-semibold" colSpan={3}>ไม่มีข้อมูลการซื้อ</td>
+                      <td className="py-8 text-center text-slate-400 font-semibold" colSpan={commissionCategoryColumns.length}>ไม่มีข้อมูลการซื้อ</td>
                     </tr>
                   ) : (
                     <tr className="bg-slate-50/55 font-bold">
@@ -759,26 +1057,45 @@ export function SalesCommissionPageClient() {
 
           {/* Table 2 */}
           <Panel title="📈 Table 2: ยอดซื้อที่ได้รับค่าคอมมิชชั่นตามหมวดสินค้า">
-            <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 border-b border-slate-100">
+            {table2Resize.hasCustomWidths ? (
+              <div className="mb-2 hidden justify-end lg:flex">
+                <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={table2Resize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+              </div>
+            ) : null}
+            <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
+              <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table2Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+                <colgroup>
+                  {commissionCategoryColumns.map((column) => (
+                    <col key={column.key} style={table2Resize.getColumnStyle(column.key)} />
+                  ))}
+                </colgroup>
+                <thead className="bg-slate-100">
                   <tr>
-                    <th className="p-3 text-left font-semibold text-slate-600">ประเภท / หมวดสินค้า</th>
-                    <th className="p-3 text-right font-semibold text-slate-600">จำนวน (กก.)</th>
-                    <th className="p-3 text-right font-semibold text-slate-600">ยอดซื้อ (บาท)</th>
+                    {commissionCategoryColumns.map((column) => (
+                      <ResizableTableHead
+                        key={column.key}
+                        activeSortKey={table2SortKey ?? undefined}
+                        align={column.align}
+                        direction={table2SortDir}
+                        label={column.label}
+                        sortKey={column.key}
+                        onSort={changeTable2Sort}
+                        resizeProps={table2Resize.getResizeHandleProps(column.key, column.label)}
+                      />
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {table2Data.map((row) => (
+                  {sortedTable2Data.map((row) => (
                     <tr key={row.category} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-3 font-semibold text-slate-800">{row.category}</td>
                       <td className="p-3 text-right font-mono tabular-nums text-slate-700">{money(row.qty)}</td>
                       <td className="p-3 text-right font-mono tabular-nums text-slate-700">{money(row.amount)}</td>
                     </tr>
                   ))}
-                  {table2Data.length === 0 ? (
+                  {sortedTable2Data.length === 0 ? (
                     <tr>
-                      <td className="py-8 text-center text-slate-400 font-semibold" colSpan={3}>ไม่มีข้อมูลรายการที่ได้คอมมิชชั่น</td>
+                      <td className="py-8 text-center text-slate-400 font-semibold" colSpan={commissionCategoryColumns.length}>ไม่มีข้อมูลรายการที่ได้คอมมิชชั่น</td>
                     </tr>
                   ) : (
                     <tr className="bg-slate-50/55 font-bold">
@@ -795,15 +1112,32 @@ export function SalesCommissionPageClient() {
 
         {/* Table 3 */}
         <Panel title="🏭 Table 3: Supplier ในความดูแล">
-          <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm mb-3">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50 border-b border-slate-100">
+          {table3Resize.hasCustomWidths ? (
+            <div className="mb-2 hidden justify-end lg:flex">
+              <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={table3Resize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+            </div>
+          ) : null}
+          <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm mb-3">
+            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table3Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                {commissionSupplierColumns.map((column) => (
+                  <col key={column.key} style={table3Resize.getColumnStyle(column.key)} />
+                ))}
+              </colgroup>
+              <thead className="bg-slate-100">
                 <tr>
-                  <th className="p-3 text-left font-semibold text-slate-600">Supplier</th>
-                  <th className="p-3 text-right font-semibold text-slate-600">บิล</th>
-                  <th className="p-3 text-right font-semibold text-slate-600">น้ำหนัก (กก.)</th>
-                  <th className="p-3 text-right font-semibold text-slate-600">ยอดรับซื้อ (บาท)</th>
-                  <th className="p-3 text-right font-semibold text-slate-600">% ของ Total</th>
+                  {commissionSupplierColumns.map((column) => (
+                    <ResizableTableHead
+                      key={column.key}
+                      activeSortKey={table3Sort}
+                      align={column.align}
+                      direction={table3SortDir}
+                      label={column.label}
+                      sortKey={column.key}
+                      onSort={changeTable3Sort}
+                      resizeProps={table3Resize.getResizeHandleProps(column.key, column.label)}
+                    />
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -818,7 +1152,7 @@ export function SalesCommissionPageClient() {
                 ))}
                 {pagedTable3.length === 0 ? (
                   <tr>
-                    <td className="py-8 text-center text-slate-400 font-semibold" colSpan={5}>ไม่มีข้อมูล Supplier</td>
+                    <td className="py-8 text-center text-slate-400 font-semibold" colSpan={commissionSupplierColumns.length}>ไม่มีข้อมูล Supplier</td>
                   </tr>
                 ) : (
                   <tr className="bg-slate-50/55 font-bold">
@@ -871,20 +1205,32 @@ export function SalesCommissionPageClient() {
               }}
             />
           </div>
-          <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm mb-3">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50 border-b border-slate-100">
+          {table4Resize.hasCustomWidths ? (
+            <div className="mb-2 hidden justify-end lg:flex">
+              <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={table4Resize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+            </div>
+          ) : null}
+          <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm mb-3">
+            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table4Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                {commissionBillColumns.map((column) => (
+                  <col key={column.key} style={table4Resize.getColumnStyle(column.key)} />
+                ))}
+              </colgroup>
+              <thead className="bg-slate-100">
                 <tr>
-                  <th className="p-3 text-left font-semibold text-slate-600">วันที่</th>
-                  <th className="p-3 text-left font-semibold text-slate-600">เลขที่บิล</th>
-                  <th className="p-3 text-left font-semibold text-slate-600">Supplier</th>
-                  <th className="p-3 text-left font-semibold text-slate-600">สินค้า</th>
-                  <th className="p-3 text-right font-semibold text-slate-600">น้ำหนัก (กก.)</th>
-                  <th className="p-3 text-right font-semibold text-slate-600">ราคาซื้อ</th>
-                  <th className="p-3 text-right font-semibold text-slate-600">ราคาหน้าใบ</th>
-                  <th className="p-3 text-right font-semibold text-slate-600">ส่วนต่างกำไร</th>
-                  <th className="p-3 text-right font-semibold text-slate-600">ยอดรวม (บาท)</th>
-                  <th className="p-3 text-center font-semibold text-slate-600">สถานะค่าคอม</th>
+                  {commissionBillColumns.map((column) => (
+                    <ResizableTableHead
+                      key={column.key}
+                      activeSortKey={table4SortKey ?? undefined}
+                      align={column.align}
+                      direction={table4SortDir}
+                      label={column.label}
+                      sortKey={column.key}
+                      onSort={changeTable4Sort}
+                      resizeProps={table4Resize.getResizeHandleProps(column.key, column.label)}
+                    />
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -915,7 +1261,7 @@ export function SalesCommissionPageClient() {
                 })}
                 {pagedTable4.length === 0 ? (
                   <tr>
-                    <td className="py-8 text-center text-slate-400 font-semibold" colSpan={10}>ไม่มีข้อมูลสินค้าละเอียด</td>
+                    <td className="py-8 text-center text-slate-400 font-semibold" colSpan={commissionBillColumns.length}>ไม่มีข้อมูลสินค้าละเอียด</td>
                   </tr>
                 ) : null}
               </tbody>
@@ -924,7 +1270,7 @@ export function SalesCommissionPageClient() {
           {/* Pagination */}
           {totalTable4Pages > 1 && (
             <div className="flex items-center justify-between pt-2">
-              <span className="text-xs text-slate-500 font-semibold">แสดงหน้า {table4Page} จาก {totalTable4Pages} (ทั้งหมด {table4FilteredData.length} รายการ)</span>
+              <span className="text-xs text-slate-500 font-semibold">แสดงหน้า {table4Page} จาก {totalTable4Pages} (ทั้งหมด {sortedTable4Data.length} รายการ)</span>
               <div className="flex gap-1">
                 <button
                   className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 outline-none"
@@ -1046,20 +1392,38 @@ export function SalesCommissionPageClient() {
           </select>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 border-b border-slate-100">
+        {summaryResize.hasCustomWidths ? (
+          <div className="mb-2 hidden justify-end lg:flex">
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={summaryResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          </div>
+        ) : null}
+        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: summaryResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              {commissionSummaryColumns.map((column) => (
+                <col key={column.key} style={summaryResize.getColumnStyle(column.key)} />
+              ))}
+            </colgroup>
+            <thead className="bg-slate-100">
               <tr>
-                <th className="p-3 text-left font-semibold text-slate-600">Sales</th>
-                <th className="p-3 text-left font-semibold text-slate-600">ประเภท / หมวดสินค้า</th>
-                <th className="p-3 text-right font-semibold text-slate-600">จำนวน KG</th>
-                <th className="p-3 text-right font-semibold text-slate-600">มูลค่ารวม (บาท)</th>
+                {commissionSummaryColumns.map((column) => (
+                  <ResizableTableHead
+                    key={column.key}
+                    activeSortKey={summarySortKey ?? undefined}
+                    align={column.align}
+                    direction={summarySortDir}
+                    label={column.label}
+                    sortKey={column.key}
+                    onSort={changeSummarySort}
+                    resizeProps={summaryResize.getResizeHandleProps(column.key, column.label)}
+                  />
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {summaryTableData.map((row) => (
-                <tr key={row.salesId} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="p-3 font-bold text-slate-800 align-top">
+              {summaryFlatRows.map((row) => (
+                <tr key={`${row.salesId}-${row.category}`} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="p-3 font-bold text-slate-800">
                     <button
                       className="text-blue-600 hover:text-blue-800 hover:underline outline-none text-left font-bold"
                       type="button"
@@ -1068,33 +1432,14 @@ export function SalesCommissionPageClient() {
                       {row.salesName}
                     </button>
                   </td>
-                  <td className="p-3 text-slate-700" colSpan={3}>
-                    {row.categories.length === 0 ? (
-                      <div className="text-slate-400 font-semibold py-1">ไม่มีข้อมูลการซื้อ</div>
-                    ) : (
-                      <table className="w-full text-xs">
-                        <tbody>
-                          {row.categories.map((cat) => (
-                            <tr key={cat.category} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/30">
-                              <td className="py-2 text-slate-600 font-semibold">{cat.category}</td>
-                              <td className="py-2 text-right font-mono tabular-nums text-slate-700 pr-10 w-40">{money(cat.qty)}</td>
-                              <td className="py-2 text-right font-mono tabular-nums text-slate-700 w-40">{money(cat.amount)}</td>
-                            </tr>
-                          ))}
-                          <tr className="font-bold border-t border-slate-100 bg-slate-50/30">
-                            <td className="py-2 text-slate-800">รวม ({row.salesName})</td>
-                            <td className="py-2 text-right font-mono tabular-nums text-slate-800 pr-10">{money(row.totalQty)}</td>
-                            <td className="py-2 text-right font-mono tabular-nums text-slate-800">{money(row.totalAmount)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    )}
-                  </td>
+                  <td className="p-3 font-semibold text-slate-700">{row.category}</td>
+                  <td className="p-3 text-right font-mono tabular-nums text-slate-700">{money(row.qty)}</td>
+                  <td className="p-3 text-right font-mono tabular-nums text-slate-700">{money(row.amount)}</td>
                 </tr>
               ))}
-              {summaryTableData.length === 0 ? (
+              {summaryFlatRows.length === 0 ? (
                 <tr>
-                  <td className="py-8 text-center text-slate-400 font-semibold" colSpan={4}>ไม่มีข้อมูล</td>
+                  <td className="py-8 text-center text-slate-400 font-semibold" colSpan={commissionSummaryColumns.length}>ไม่มีข้อมูล</td>
                 </tr>
               ) : (
                 <tr className="bg-slate-100/50 font-bold text-base">
@@ -1122,7 +1467,7 @@ function SimpleTable({ empty = 'ไม่มีข้อมูล', headers, row
   return (
     <div>
       {/* Desktop View Table */}
-      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
@@ -1198,7 +1543,7 @@ function SimpleTable({ empty = 'ไม่มีข้อมูล', headers, row
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="bg-slate-900 p-3 text-sm font-bold text-white">{title}</div>
       <div className="p-4">{children}</div>
     </div>

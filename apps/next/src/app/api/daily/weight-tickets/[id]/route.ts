@@ -143,7 +143,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const usage = await getWeightTicketUsageCounts(prisma, existing.id)
     if (!canMutateWeightTicket(existing, usage)) {
-      return NextResponse.json({ code: 'BAD_REQUEST', error: mutableTicketErrorMessage('edit') }, { status: 400 })
+      return NextResponse.json({ code: 'BAD_REQUEST', error: mutableTicketErrorMessage('edit', usage) }, { status: 400 })
     }
     if (values.type !== existing.doc_type) {
       return NextResponse.json({
@@ -484,7 +484,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     const usage = await getWeightTicketUsageCounts(prisma, existing.id)
     if (!canMutateWeightTicket(existing, usage)) {
-      return NextResponse.json({ code: 'BAD_REQUEST', error: mutableTicketErrorMessage('cancel') }, { status: 400 })
+      return NextResponse.json({ code: 'BAD_REQUEST', error: mutableTicketErrorMessage('cancel', usage) }, { status: 400 })
     }
     const beforeSnapshot = weightTicketAuditSnapshot(mapWeightTicketRow(existing as WeightTicketRow, usage))
 

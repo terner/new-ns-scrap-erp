@@ -175,6 +175,8 @@ type WeightTicketOption = {
 type TargetColKey = 'targetInfo' | 'branch' | 'notifyWti' | 'notifyWto' | 'status' | 'actions'
 type RuleColKey = 'priority' | 'name' | 'target' | 'stopAfter' | 'isActive' | 'actions'
 type JobColKey = 'createdAt' | 'document' | 'target' | 'status' | 'attempts' | 'actions'
+type SortDirection = 'asc' | 'desc'
+type SortValue = boolean | number | string | null | undefined
 
 const targetCols: Array<ResizableColumnDefinition<TargetColKey>> = [
   { key: 'targetInfo', defaultWidth: 260, minWidth: 180 },
@@ -202,6 +204,82 @@ const jobCols: Array<ResizableColumnDefinition<JobColKey>> = [
   { key: 'attempts', defaultWidth: 90, minWidth: 80 },
   { key: 'actions', defaultWidth: 200, minWidth: 160 },
 ]
+
+function compareSortValues(left: SortValue, right: SortValue) {
+  if (typeof left === 'number' && typeof right === 'number') return left - right
+  if (typeof left === 'boolean' && typeof right === 'boolean') return Number(left) - Number(right)
+  return String(left ?? '').localeCompare(String(right ?? ''), 'th', { numeric: true, sensitivity: 'base' })
+}
+
+function sortRows<T, K extends string>(
+  rows: T[],
+  sortKey: K | null,
+  direction: SortDirection,
+  getValue: (row: T, key: K) => SortValue,
+) {
+  if (!sortKey) return rows
+
+  return [...rows].sort((left, right) => {
+    const result = compareSortValues(getValue(left, sortKey), getValue(right, sortKey))
+    return direction === 'asc' ? result : -result
+  })
+}
+
+function targetStatusSortValue(target: Target) {
+  if (!target.is_active && target.last_event_type === 'not_found') return 'บอทออกจากกลุ่ม'
+  return target.is_active ? 'อยู่ในกลุ่ม' : 'ปิดใช้งาน'
+}
+
+function getTargetSortValue(target: Target, key: TargetColKey): SortValue {
+  switch (key) {
+    case 'targetInfo':
+      return `${target.display_name} ${target.target_type} ${target.target_id}`
+    case 'branch':
+      return target.branch_code ?? 'ทุกสาขา'
+    case 'notifyWti':
+      return target.notify_wti
+    case 'notifyWto':
+      return target.notify_wto
+    case 'status':
+      return targetStatusSortValue(target)
+    case 'actions':
+      return ''
+  }
+}
+
+function getRuleSortValue(rule: RoutingRule, key: RuleColKey, targetNameById: Map<string, string>): SortValue {
+  switch (key) {
+    case 'priority':
+      return rule.priority
+    case 'name':
+      return `${rule.name} ${rule.description ?? ''}`
+    case 'target':
+      return `${targetNameById.get(rule.target_id) ?? ''} ${rule.target_id}`
+    case 'stopAfter':
+      return rule.stop_after_match
+    case 'isActive':
+      return rule.is_active
+    case 'actions':
+      return ''
+  }
+}
+
+function getJobSortValue(job: NotificationJob, key: JobColKey, targetNameById: Map<string, string>): SortValue {
+  switch (key) {
+    case 'createdAt':
+      return Date.parse(job.created_at) || 0
+    case 'document':
+      return `${job.document_no} ${job.document_type}`
+    case 'target':
+      return `${targetNameById.get(job.target_id) ?? ''} ${job.target_id}`
+    case 'status':
+      return job.status
+    case 'attempts':
+      return job.attempt_count
+    case 'actions':
+      return ''
+  }
+}
 
 export function LineSettingsPageClient() {
   const [activeTab, setActiveTab] = useState<'overview' | 'credentials' | 'targets' | 'rules' | 'templates' | 'outbox' | 'analytics'>('overview')
@@ -303,6 +381,12 @@ export function LineSettingsPageClient() {
   const [jobTotalPages, setJobTotalPages] = useState(1)
   const [jobStatusFilter, setJobStatusFilter] = useState('')
   const [jobSearch, setJobSearch] = useState('')
+  const [targetSortKey, setTargetSortKey] = useState<TargetColKey | null>(null)
+  const [targetSortDirection, setTargetSortDirection] = useState<SortDirection>('asc')
+  const [ruleSortKey, setRuleSortKey] = useState<RuleColKey | null>(null)
+  const [ruleSortDirection, setRuleSortDirection] = useState<SortDirection>('asc')
+  const [jobSortKey, setJobSortKey] = useState<JobColKey | null>(null)
+  const [jobSortDirection, setJobSortDirection] = useState<SortDirection>('asc')
 
   // Loaders
   const loadCredentials = useCallback(async () => {
@@ -906,6 +990,43 @@ export function LineSettingsPageClient() {
   const targetResize = useResizableColumns('admin.line-settings.targets-table', targetCols)
   const ruleResize = useResizableColumns('admin.line-settings.rules-table', ruleCols)
   const jobResize = useResizableColumns('admin.line-settings.jobs-table', jobCols)
+  const targetNameById = useMemo(() => new Map(targets.map((target) => [target.target_id, target.display_name])), [targets])
+  const sortedTargets = useMemo(() => sortRows(targets, targetSortKey, targetSortDirection, getTargetSortValue), [targets, targetSortDirection, targetSortKey])
+  const sortedRules = useMemo(
+    () => sortRows(rules, ruleSortKey, ruleSortDirection, (rule, key) => getRuleSortValue(rule, key, targetNameById)),
+    [rules, ruleSortDirection, ruleSortKey, targetNameById],
+  )
+  const sortedJobs = useMemo(
+    () => sortRows(jobs, jobSortKey, jobSortDirection, (job, key) => getJobSortValue(job, key, targetNameById)),
+    [jobs, jobSortDirection, jobSortKey, targetNameById],
+  )
+
+  function handleTargetSort(nextKey: TargetColKey) {
+    if (targetSortKey === nextKey) {
+      setTargetSortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setTargetSortKey(nextKey)
+    setTargetSortDirection('asc')
+  }
+
+  function handleRuleSort(nextKey: RuleColKey) {
+    if (ruleSortKey === nextKey) {
+      setRuleSortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setRuleSortKey(nextKey)
+    setRuleSortDirection('asc')
+  }
+
+  function handleJobSort(nextKey: JobColKey) {
+    if (jobSortKey === nextKey) {
+      setJobSortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setJobSortKey(nextKey)
+    setJobSortDirection('asc')
+  }
 
   // Warnings check for targets Manual input
   const targetWarning = useMemo(() => {
@@ -920,7 +1041,7 @@ export function LineSettingsPageClient() {
       return '⚠️ คำเตือน: รหัสที่ขึ้นต้นด้วย C มักจะเป็น Group ID (กลุ่มไลน์) ไม่ใช่ User ID ข้อมูลนี้อาจจัดส่งไม่ตรงตัวผู้ใช้'
     }
     return null
-  }, [editingTarget?.target_id, editingTarget?.target_type])
+  }, [editingTarget])
 
   const templateFormConfig = editingTemplate ? getTemplateConfig(editingTemplate) : createDefaultTemplateConfig()
 
@@ -1339,29 +1460,49 @@ export function LineSettingsPageClient() {
                       <tr>
                         <ResizableTableHead
                           label="ข้อมูลผู้รับ / Target Info"
+                          activeSortKey={targetSortKey ?? undefined}
+                          direction={targetSortDirection}
+                          sortKey="targetInfo"
+                          onSort={handleTargetSort}
                           resizeProps={targetResize.getResizeHandleProps('targetInfo', 'ข้อมูลผู้รับ / Target Info')}
                         />
                         <ResizableTableHead
                           label="สาขาเชื่อมโยง"
+                          activeSortKey={targetSortKey ?? undefined}
+                          direction={targetSortDirection}
+                          sortKey="branch"
+                          onSort={handleTargetSort}
                           resizeProps={targetResize.getResizeHandleProps('branch', 'สาขาเชื่อมโยง')}
                         />
                         <ResizableTableHead
                           label="แจ้งเตือน WTI"
+                          activeSortKey={targetSortKey ?? undefined}
+                          direction={targetSortDirection}
+                          sortKey="notifyWti"
+                          onSort={handleTargetSort}
                           resizeProps={targetResize.getResizeHandleProps('notifyWti', 'แจ้งเตือน WTI')}
                         />
                         <ResizableTableHead
                           label="แจ้งเตือน WTO"
+                          activeSortKey={targetSortKey ?? undefined}
+                          direction={targetSortDirection}
+                          sortKey="notifyWto"
+                          onSort={handleTargetSort}
                           resizeProps={targetResize.getResizeHandleProps('notifyWto', 'แจ้งเตือน WTO')}
                         />
                         <ResizableTableHead
                           label="สถานะ"
+                          activeSortKey={targetSortKey ?? undefined}
+                          direction={targetSortDirection}
+                          sortKey="status"
+                          onSort={handleTargetSort}
                           resizeProps={targetResize.getResizeHandleProps('status', 'สถานะ')}
                         />
                         <ResizableTableHead align="right" label="จัดการ" resizeProps={targetResize.getResizeHandleProps('actions', 'จัดการ')} />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {targets.map((t) => (
+                      {sortedTargets.map((t) => (
                         <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-3">
@@ -1468,7 +1609,7 @@ export function LineSettingsPageClient() {
                     ไม่พบช่องทางการรับแจ้งเตือนที่ลงทะเบียนไว้
                   </div>
                 ) : (
-                  targets.map((t) => (
+                  sortedTargets.map((t) => (
                     <div key={t.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
                       <div className="flex items-center gap-3">
                         {t.picture_url ? (
@@ -1602,29 +1743,49 @@ export function LineSettingsPageClient() {
                       <tr>
                         <ResizableTableHead
                           label="ลำดับกฎ"
+                          activeSortKey={ruleSortKey ?? undefined}
+                          direction={ruleSortDirection}
+                          sortKey="priority"
+                          onSort={handleRuleSort}
                           resizeProps={ruleResize.getResizeHandleProps('priority', 'ลำดับกฎ')}
                         />
                         <ResizableTableHead
                           label="ชื่อกฎ / รายละเอียด"
+                          activeSortKey={ruleSortKey ?? undefined}
+                          direction={ruleSortDirection}
+                          sortKey="name"
+                          onSort={handleRuleSort}
                           resizeProps={ruleResize.getResizeHandleProps('name', 'ชื่อกฎ / รายละเอียด')}
                         />
                         <ResizableTableHead
                           label="ผู้รับปลายทาง"
+                          activeSortKey={ruleSortKey ?? undefined}
+                          direction={ruleSortDirection}
+                          sortKey="target"
+                          onSort={handleRuleSort}
                           resizeProps={ruleResize.getResizeHandleProps('target', 'ผู้รับปลายทาง')}
                         />
                         <ResizableTableHead
                           label="หยุดเช็คเมื่อตรง"
+                          activeSortKey={ruleSortKey ?? undefined}
+                          direction={ruleSortDirection}
+                          sortKey="stopAfter"
+                          onSort={handleRuleSort}
                           resizeProps={ruleResize.getResizeHandleProps('stopAfter', 'หยุดเช็คเมื่อตรง')}
                         />
                         <ResizableTableHead
                           label="สถานะ"
+                          activeSortKey={ruleSortKey ?? undefined}
+                          direction={ruleSortDirection}
+                          sortKey="isActive"
+                          onSort={handleRuleSort}
                           resizeProps={ruleResize.getResizeHandleProps('isActive', 'สถานะ')}
                         />
                         <ResizableTableHead align="right" label="จัดการ" resizeProps={ruleResize.getResizeHandleProps('actions', 'จัดการ')} />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {rules.map((r) => {
+                      {sortedRules.map((r) => {
                         const boundTarget = targets.find(t => t.target_id === r.target_id)
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-xs">
@@ -1692,7 +1853,7 @@ export function LineSettingsPageClient() {
                     ยังไม่มีกฎกระจายข้อมูลแจ้งเตือน (บิลทั้งหมดจะผ่านไปสู่เป้าหมายดีฟอลต์)
                   </div>
                 ) : (
-                  rules.map((r) => {
+                  sortedRules.map((r) => {
                     const boundTarget = targets.find(t => t.target_id === r.target_id)
                     return (
                       <div key={r.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3 text-xs">
@@ -1895,29 +2056,49 @@ export function LineSettingsPageClient() {
                       <tr>
                         <ResizableTableHead
                           label="เวลาสร้างคิว"
+                          activeSortKey={jobSortKey ?? undefined}
+                          direction={jobSortDirection}
+                          sortKey="createdAt"
+                          onSort={handleJobSort}
                           resizeProps={jobResize.getResizeHandleProps('createdAt', 'เวลาสร้างคิว')}
                         />
                         <ResizableTableHead
                           label="เลขที่เอกสาร"
+                          activeSortKey={jobSortKey ?? undefined}
+                          direction={jobSortDirection}
+                          sortKey="document"
+                          onSort={handleJobSort}
                           resizeProps={jobResize.getResizeHandleProps('document', 'เลขที่เอกสาร')}
                         />
                         <ResizableTableHead
                           label="กลุ่มไลน์ผู้รับ"
+                          activeSortKey={jobSortKey ?? undefined}
+                          direction={jobSortDirection}
+                          sortKey="target"
+                          onSort={handleJobSort}
                           resizeProps={jobResize.getResizeHandleProps('target', 'กลุ่มไลน์ผู้รับ')}
                         />
                         <ResizableTableHead
                           label="สถานะคิว"
+                          activeSortKey={jobSortKey ?? undefined}
+                          direction={jobSortDirection}
+                          sortKey="status"
+                          onSort={handleJobSort}
                           resizeProps={jobResize.getResizeHandleProps('status', 'สถานะคิว')}
                         />
                         <ResizableTableHead
                           label="จำนวนพยายาม"
+                          activeSortKey={jobSortKey ?? undefined}
+                          direction={jobSortDirection}
+                          sortKey="attempts"
+                          onSort={handleJobSort}
                           resizeProps={jobResize.getResizeHandleProps('attempts', 'จำนวนพยายาม')}
                         />
                         <ResizableTableHead align="right" label="จัดการ" resizeProps={jobResize.getResizeHandleProps('actions', 'จัดการ')} />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {jobs.map((job) => {
+                      {sortedJobs.map((job) => {
                         const dateStr = new Date(job.created_at).toLocaleString('th-TH')
                         const boundTarget = targets.find(t => t.target_id === job.target_id)
                         return (
@@ -1999,7 +2180,7 @@ export function LineSettingsPageClient() {
                     ไม่พบรายการคิวรอส่งแจ้งเตือนในระบบ
                   </div>
                 ) : (
-                  jobs.map((job) => {
+                  sortedJobs.map((job) => {
                     const dateStr = new Date(job.created_at).toLocaleString('th-TH')
                     const boundTarget = targets.find(t => t.target_id === job.target_id)
                     return (

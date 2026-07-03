@@ -1024,10 +1024,19 @@ export function weightTicketAuditSnapshot(row: ReturnType<typeof mapWeightTicket
   }
 }
 
-export function mutableTicketErrorMessage(action: 'cancel' | 'edit') {
+export function mutableTicketErrorMessage(action: 'cancel' | 'edit', usage?: WeightTicketUsage) {
+  const usageText = usage
+    ? usage.purchaseCount > 0 && usage.salesCount > 0
+      ? 'บิลรับซื้อและบิลขาย'
+      : usage.salesCount > 0
+        ? 'บิลขาย'
+        : usage.purchaseCount > 0
+          ? 'บิลรับซื้อ'
+          : 'เอกสารปลายทาง'
+    : 'บิลรับซื้อหรือบิลขาย'
   return action === 'cancel'
-    ? 'ยกเลิกไม่ได้ เพราะเอกสารถูกนำไปใช้กับบิลรับซื้อหรือบิลขายแล้ว'
-    : 'แก้ไขไม่ได้ เพราะเอกสารถูกนำไปใช้กับบิลรับซื้อหรือบิลขายแล้ว'
+    ? `ยกเลิกไม่ได้ เพราะเอกสารถูกนำไปใช้กับ${usageText}แล้ว`
+    : `แก้ไขไม่ได้ เพราะเอกสารถูกนำไปใช้กับ${usageText}แล้ว`
 }
 
 export const weightTicketInclude = {

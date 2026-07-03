@@ -11,7 +11,7 @@ tags:
   - ledger
 status: draft
 created: 2026-06-12
-updated: 2026-06-25
+updated: 2026-07-01
 ---
 
 # Stock Ledger DB API Design
@@ -34,6 +34,7 @@ updated: 2026-06-25
 | `stock_holds` | pending_out reservation fact | `WTO` สร้าง active pending_out, `SB` consume pending_out, `SB cancel` reopen pending_out เฉพาะกรณียังไม่มี return-from-WTO/SB |
 | `weight_ticket_status_logs` | WTI/WTO lifecycle | บันทึก created/edited/cancelled/usage status change |
 | `weight_ticket_usage_logs` | WTI/WTO usage fact | บันทึก `WTI -> PB` และ `WTO -> SB` allocation/release |
+| `sales_bill_source_allocations` | SB source/cost allocation fact | ผูก `SB` line กลับไปที่ `WTO`/stock source; สำหรับ WTO ต้องเก็บ `weight_ticket_product_summary_id` เพื่อ trace cost source โดยตรง |
 | `sales_bill_status_logs` | SB lifecycle | เพิ่มใน migration `20260612120000_add_sales_bill_status_logs.sql`; บันทึก create/cancel/status sync |
 
 ## Ledger Ref Types
@@ -110,6 +111,13 @@ Lifecycle:
 | Return remaining pending_out, full return | active pending_out `released` | no row; hold release makes stock available because this qty was never stock-out | stays `delivered` or `billed` when no remaining hold |
 | Return remaining pending_out, short return | returned qty `released`, shortage qty `lost` | create `WTO-RETURN-LOSS` stock-out row for shortage only | stays `delivered` or `billed` when no remaining hold |
 | Cancel SB from WTO after return | no reopen/recreate pending_out; keep return/loss facts | create `SB-CANCEL` stock-in row with original SB unit cost/value for the sold qty only | return/cancel timeline from facts |
+
+Source/cost allocation rule:
+
+- `sales_bill_lines` เก็บสินค้าและยอดขายที่ขายจริงใน `SB`
+- `sales_bill_source_allocations.weight_ticket_product_summary_id` เก็บ source summary ของ `WTO` เดิมที่เป็นต้นทุน/stock source
+- กรณีลูกค้าตีว่าสินค้าบางส่วนเป็น SKU อื่นในตอนเปิด `SB` ให้เปลี่ยน SKU ที่ `sales_bill_lines` ได้ แต่ห้ามเปลี่ยน `WTO`, `stock_holds`, หรือ source allocation ให้กลายเป็น SKU ใหม่
+- `sales_bill_source_allocations.source_line_no` ต้องหมายถึง line ของเอกสารต้นทางจริงเท่านั้น ไม่ใช่ line number ของ `SB`
 
 ## Removed PSALE Issue Contract
 

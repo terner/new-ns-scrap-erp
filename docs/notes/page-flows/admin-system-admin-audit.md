@@ -5,7 +5,7 @@ tags:
   - menu
   - admin-system
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-07-02
 route: /admin/audit
 ---
 
@@ -34,6 +34,8 @@ audit/activity log read model from app_audit_logs/auth-events API
 - filter group, actor, eventType, target, query, pagination ตาม current component
 - เปิด detail ของ event row
 - ใช้ API auth-events เป็น source หลักของหน้านี้
+
+- table presentation uses the shared resizable/sortable fixed-layout table mechanics; sorting is UI-only on the current loaded page
 
 ## Non-Responsibilities
 
@@ -70,6 +72,8 @@ audit/activity log read model from app_audit_logs/auth-events API
 - filters must not expose unauthorized audit data
 - current code เป็น proof baseline
 
+- UI table sort/resize must not change audit source, permission boundary, or query contract
+
 ## Side Effects
 
 - read-only audit page ไม่มี business side effect
@@ -84,4 +88,4 @@ P3 proof completed from current code.
 - [x] Verify current page/component API calls
 - [x] Verify current API route methods and permission boundary
 - [x] Keep business transaction side effects out of this page
-- [ ] Update this file if admin/system code changes
+- [x] Update this file for the 2026-07-02 table mechanics presentation change

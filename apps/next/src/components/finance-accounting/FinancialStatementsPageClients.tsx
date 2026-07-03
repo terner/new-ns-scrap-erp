@@ -2,12 +2,17 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
 type BranchRow = { code: string; id: string; name: string }
 type DetailRow = { amount: number; date: string; description: string; refNo: string }
 type StatementLine = { amount: number; details?: DetailRow[]; label: string; level?: number; section: string; tone?: 'default' | 'good' | 'bad' | 'muted' | 'total' }
 type SourceState = { basis: string; limitations: string[]; writeActionsEnabled: false }
+type DrillColumnKey = 'amount' | 'date' | 'description' | 'refNo'
+type StatementColumnKey = 'amount' | 'drill' | 'label' | 'section'
+type SortDirection = 'asc' | 'desc'
 
 type PlPayload = {
   branches: BranchRow[]
@@ -44,6 +49,60 @@ type CashPayload = {
   summary: { endingCash: number; financing: number; internalTransfers: number; investing: number; netChange: number; operating: number; openingCash: number; totalInflow: number; totalOutflow: number }
 }
 
+const statementColumns: Array<ResizableColumnDefinition<StatementColumnKey>> = [
+  { key: 'label', defaultWidth: 280, minWidth: 190 },
+  { key: 'section', defaultWidth: 165, minWidth: 125 },
+  { key: 'amount', defaultWidth: 170, minWidth: 135 },
+  { key: 'drill', defaultWidth: 125, minWidth: 105 },
+]
+
+const drillColumns: Array<ResizableColumnDefinition<DrillColumnKey>> = [
+  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'refNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'description', defaultWidth: 330, minWidth: 200 },
+  { key: 'amount', defaultWidth: 170, minWidth: 135 },
+]
+
+function compareSortValues(left: string | number, right: string | number) {
+  return typeof left === 'number' && typeof right === 'number'
+    ? left - right
+    : String(left).localeCompare(String(right), 'th', { numeric: true })
+}
+
+function getStatementSortValue(line: StatementLine, key: StatementColumnKey) {
+  if (key === 'drill') return line.details?.length ?? 0
+  return line[key]
+}
+
+function getDrillSortValue(row: DetailRow, key: DrillColumnKey) {
+  return row[key]
+}
+
+function useLocalTableSort<TRow, TKey extends string>(rows: TRow[], getSortValue: (row: TRow, key: TKey) => string | number) {
+  const [sortKey, setSortKey] = useState<TKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows
+
+    return [...rows].sort((left, right) => {
+      const result = compareSortValues(getSortValue(left, sortKey), getSortValue(right, sortKey))
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [getSortValue, rows, sortDirection, sortKey])
+
+  function handleSort(key: TKey) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
+  return { handleSort, sortDirection, sortedRows, sortKey }
+}
+
 function today() {
   return localDateInputValue(new Date())
 }
@@ -75,38 +134,38 @@ export function PlStatementPageClient() {
       <BaselineNotice sourceState={data?.sourceState} />
       {error ? <ErrorBox message={error} /> : null}
       {/* Desktop Filter Panel */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-200">
+      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <Segment active>📅 ช่วงวันที่</Segment><Segment>📆 รายเดือน</Segment><Segment>📊 ตารางรายปี (12 เดือน)</Segment>
         <QuickButton onClick={() => { const now = new Date(); setFrom(new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10)); setTo(today()) }}>📊 ปีนี้</QuickButton>
         <QuickButton onClick={() => setFrom(monthStart())}>เดือนนี้</QuickButton>
         <DateInput label="จาก" value={from} onChange={setFrom} /><DateInput label="ถึง" value={to} onChange={setTo} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
-        <select className="h-9 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={mode} onChange={(event) => setMode(event.target.value)}>
+        <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={mode} onChange={(event) => setMode(event.target.value)}>
           <option value="ALL">All (Stock+Trading)</option><option value="STOCK">Stock Only</option><option value="TRADING">Trading Only</option>
         </select>
         <DisabledButton>📥 Excel</DisabledButton>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden space-y-3">
+      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
         <div className="flex gap-2">
           <button 
             type="button" 
             onClick={() => setFrom(monthStart())}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-50 text-slate-700 outline-none"
+            className="flex-1 h-9 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50 text-slate-700 outline-none"
           >
             เดือนนี้
           </button>
           <button 
             type="button" 
             onClick={() => { const now = new Date(); setFrom(new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10)); setTo(today()) }}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-50 text-slate-700 outline-none"
+            className="flex-1 h-9 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50 text-slate-700 outline-none"
           >
             ปีนี้
           </button>
           <button
             type="button"
-            className="flex-1 h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
+            className="flex-1 h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
             onClick={() => setShowMobileFilters(true)}
           >
             ตัวกรอง {(branchId || mode !== 'ALL') ? '(มี)' : ''}
@@ -118,7 +177,7 @@ export function PlStatementPageClient() {
             <span className="text-xs font-semibold text-slate-500 block">จาก</span>
             <input
               type="date"
-              className="w-full h-9 rounded-lg border border-slate-300 px-3 text-xs outline-none bg-white"
+              className="w-full h-9 rounded-md border border-slate-300 px-3 text-xs outline-none bg-white"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
             />
@@ -127,7 +186,7 @@ export function PlStatementPageClient() {
             <span className="text-xs font-semibold text-slate-500 block">ถึง</span>
             <input
               type="date"
-              className="w-full h-9 rounded-lg border border-slate-300 px-3 text-xs outline-none bg-white"
+              className="w-full h-9 rounded-md border border-slate-300 px-3 text-xs outline-none bg-white"
               value={to}
               onChange={(e) => setTo(e.target.value)}
             />
@@ -155,7 +214,7 @@ export function PlStatementPageClient() {
                 <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
                 <select
                   aria-label="Branch select"
-                  className="w-full h-10 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
                   value={branchId}
                   onChange={(event) => setBranchId(event.target.value)}
                 >
@@ -168,7 +227,7 @@ export function PlStatementPageClient() {
                 <label className="mb-1 block font-semibold text-slate-600 text-xs">ประเภทรายการ</label>
                 <select
                   aria-label="Mode select"
-                  className="w-full h-10 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
                   value={mode}
                   onChange={(event) => setMode(event.target.value)}
                 >
@@ -196,7 +255,7 @@ export function PlStatementPageClient() {
                   setBranchId('')
                   setMode('ALL')
                 }}
-                className="flex-1 h-10 rounded-lg border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
               >
                 ล้างตัวกรอง
               </button>
@@ -225,7 +284,7 @@ export function PlStatementPageClient() {
         <SplitCard label="Stock" revenue={data?.split.stock.revenue ?? 0} cogs={data?.split.stock.cogs ?? 0} tone="emerald" />
         <SplitCard label="Trading" revenue={data?.split.trading.revenue ?? 0} cogs={data?.split.trading.cogs ?? 0} tone="purple" />
       </div>
-      <StatementTable isLoading={isLoading} rows={data?.sections ?? []} onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
+      <StatementTable isLoading={isLoading} rows={data?.sections ?? []} tableKey="pl-statement" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
       {drill ? <DrillModal rows={drill.rows} title={drill.title} onClose={() => setDrill(null)} /> : null}
     </section>
   )
@@ -245,7 +304,7 @@ export function BalanceSheetPageClient() {
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-200">
+      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <DateInput label="As of" value={asOf} onChange={setAsOf} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
         <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${data?.balanceCheck.balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{data?.balanceCheck.balanced ? 'BALANCED' : `OFF BY ${money(data?.balanceCheck.difference)}`}</span>
@@ -253,7 +312,7 @@ export function BalanceSheetPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden space-y-3">
+      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
         <div className="flex gap-2 items-center">
           <div className="flex-1 flex items-center gap-2">
             <span className="text-xs text-slate-500 font-semibold shrink-0">As of</span>
@@ -261,7 +320,7 @@ export function BalanceSheetPageClient() {
           </div>
           <button
             type="button"
-            className="h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
+            className="h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
             onClick={() => setShowMobileFilters(true)}
           >
             ตัวกรอง {branchId ? '(มี)' : ''}
@@ -289,7 +348,7 @@ export function BalanceSheetPageClient() {
                 <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
                 <select
                   aria-label="Branch select"
-                  className="w-full h-10 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
                   value={branchId}
                   onChange={(event) => setBranchId(event.target.value)}
                 >
@@ -320,7 +379,7 @@ export function BalanceSheetPageClient() {
                 onClick={() => {
                   setBranchId('')
                 }}
-                className="flex-1 h-10 rounded-lg border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
               >
                 ล้างตัวกรอง
               </button>
@@ -348,8 +407,8 @@ export function BalanceSheetPageClient() {
         </div>
       </div>
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <StatementTable isLoading={isLoading} rows={data?.sections.assets ?? []} title="Assets" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
-        <StatementTable isLoading={isLoading} rows={[...(data?.sections.liabilities ?? []), ...(data?.sections.equity ?? [])]} title="Liabilities + Equity" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
+        <StatementTable isLoading={isLoading} rows={data?.sections.assets ?? []} tableKey="balance-sheet-assets" title="Assets" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
+        <StatementTable isLoading={isLoading} rows={[...(data?.sections.liabilities ?? []), ...(data?.sections.equity ?? [])]} tableKey="balance-sheet-liabilities-equity" title="Liabilities + Equity" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
       </div>
       {drill ? <DrillModal rows={drill.rows} title={drill.title} onClose={() => setDrill(null)} /> : null}
     </section>
@@ -371,32 +430,32 @@ export function CashFlowStatementPageClient() {
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-200">
+      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <DateInput label="จาก" value={from} onChange={setFrom} /><DateInput label="ถึง" value={to} onChange={setTo} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
         <DisabledButton>📥 Excel</DisabledButton>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden space-y-3">
+      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
         <div className="flex gap-2">
           <button 
             type="button" 
             onClick={() => setFrom(monthStart())}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-50 text-slate-700 outline-none"
+            className="flex-1 h-9 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50 text-slate-700 outline-none"
           >
             เดือนนี้
           </button>
           <button 
             type="button" 
             onClick={() => { const now = new Date(); setFrom(new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10)); setTo(today()) }}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-50 text-slate-700 outline-none"
+            className="flex-1 h-9 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50 text-slate-700 outline-none"
           >
             ปีนี้
           </button>
           <button
             type="button"
-            className="flex-1 h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
+            className="flex-1 h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
             onClick={() => setShowMobileFilters(true)}
           >
             ตัวกรอง {branchId ? '(มี)' : ''}
@@ -408,7 +467,7 @@ export function CashFlowStatementPageClient() {
             <span className="text-xs font-semibold text-slate-500 block">จาก</span>
             <input
               type="date"
-              className="w-full h-9 rounded-lg border border-slate-300 px-3 text-xs outline-none bg-white text-slate-900"
+              className="w-full h-9 rounded-md border border-slate-300 px-3 text-xs outline-none bg-white text-slate-900"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
             />
@@ -417,7 +476,7 @@ export function CashFlowStatementPageClient() {
             <span className="text-xs font-semibold text-slate-500 block">ถึง</span>
             <input
               type="date"
-              className="w-full h-9 rounded-lg border border-slate-300 px-3 text-xs outline-none bg-white text-slate-900"
+              className="w-full h-9 rounded-md border border-slate-300 px-3 text-xs outline-none bg-white text-slate-900"
               value={to}
               onChange={(e) => setTo(e.target.value)}
             />
@@ -445,7 +504,7 @@ export function CashFlowStatementPageClient() {
                 <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
                 <select
                   aria-label="Branch select"
-                  className="w-full h-10 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
                   value={branchId}
                   onChange={(event) => setBranchId(event.target.value)}
                 >
@@ -471,7 +530,7 @@ export function CashFlowStatementPageClient() {
                 onClick={() => {
                   setBranchId('')
                 }}
-                className="flex-1 h-10 rounded-lg border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
               >
                 ล้างตัวกรอง
               </button>
@@ -497,7 +556,7 @@ export function CashFlowStatementPageClient() {
         <StatCard label="Internal Transfer excluded" value={money(data?.summary.internalTransfers)} tone="blue" />
         <StatCard label="Ending Cash" value={money(data?.summary.endingCash)} tone="cyan" />
       </div>
-      <StatementTable isLoading={isLoading} rows={data?.rows ?? []} onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
+      <StatementTable isLoading={isLoading} rows={data?.rows ?? []} tableKey="cash-flow-statement" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
       {drill ? <DrillModal rows={drill.rows} title={drill.title} onClose={() => setDrill(null)} /> : null}
     </section>
   )
@@ -533,7 +592,7 @@ function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">{children}</div>
 }
 
 function DateInput({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
@@ -541,19 +600,19 @@ function DateInput({ label, onChange, value }: { label: string; onChange: (value
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
-  return <select className="rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+  return <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
 }
 
 function Segment({ active = false, children }: { active?: boolean; children: ReactNode }) {
   return (
-    <span className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-0 ${active ? 'bg-[#0F172A] text-white' : 'bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100 transition'}`}>
+    <span className={`rounded-md px-3 py-1.5 text-xs font-semibold outline-none focus:ring-0 ${active ? 'bg-[#0F172A] text-white' : 'bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100 transition'}`}>
       {children}
     </span>
   )
 }
 
 function QuickButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return <button className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition outline-none focus:ring-0" type="button" onClick={onClick}>{children}</button>
+  return <button className="rounded-md bg-slate-50 border border-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition outline-none focus:ring-0" type="button" onClick={onClick}>{children}</button>
 }
 
 function DisabledButton({ children }: { children: ReactNode }) {
@@ -640,39 +699,61 @@ function Waterfall({ rows }: { rows: Array<[string, number]> }) {
   )
 }
 
-function StatementTable({ isLoading, onDrill, rows, title = 'Statement' }: { isLoading: boolean; onDrill: (line: StatementLine) => void | undefined; rows: StatementLine[]; title?: string }) {
+function StatementTable({ isLoading, onDrill, rows, tableKey, title = 'Statement' }: { isLoading: boolean; onDrill: (line: StatementLine) => void | undefined; rows: StatementLine[]; tableKey: string; title?: string }) {
+  const columnResize = useResizableColumns(`finance-accounting.financial-statements.${tableKey}.v1`, statementColumns)
+  const { handleSort, sortDirection, sortedRows, sortKey } = useLocalTableSort<StatementLine, StatementColumnKey>(rows, getStatementSortValue)
+
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-      <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">{title}</div>
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
+        <div className="text-sm font-bold text-slate-700">{title}</div>
+        {columnResize.hasCustomWidths ? (
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
+            type="button"
+            onClick={columnResize.resetColumnWidths}
+          >
+            คืนค่าเดิมตาราง
+          </button>
+        ) : null}
+      </div>
       <div className="max-h-[62vh] overflow-auto">
         {/* Desktop Table View */}
-        <table className="hidden lg:table w-full text-xs">
-          <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
+        <table className="hidden min-w-full divide-y divide-slate-200 text-sm lg:table" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <colgroup>
+            {statementColumns.map((column, index) => {
+              if (index === statementColumns.length - 1) {
+                return <col key={column.key} style={{ minWidth: column.minWidth }} />
+              }
+              return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            })}
+          </colgroup>
+          <thead className="sticky top-0 z-10 bg-slate-100">
             <tr>
-              <Th>รายการ</Th>
-              <Th>Section</Th>
-              <Th align="right">จำนวนเงิน</Th>
-              <Th align="center">Drill</Th>
+              <ResizableTableHead label="รายการ" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="label" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('label', 'รายการ')} />
+              <ResizableTableHead label="หมวดรายงาน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="section" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('section', 'หมวดรายงาน')} />
+              <ResizableTableHead align="right" label="จำนวนเงิน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="amount" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('amount', 'จำนวนเงิน')} />
+              <ResizableTableHead align="center" label="รายละเอียด" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="drill" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('drill', 'รายละเอียด')} />
             </tr>
           </thead>
-          <tbody>
-            <LoadingOrEmpty colSpan={4} isLoading={isLoading} rows={rows.length} />
-            {rows.map((line) => (
-              <tr key={`${line.section}-${line.label}`} className={`border-t border-slate-100 hover:bg-slate-50/50 transition ${line.tone === 'total' ? 'bg-slate-50/50 font-bold' : ''}`}>
-                <Td><span className={line.level ? 'pl-5' : ''}>{line.label}</span></Td>
-                <Td><span className="rounded-md bg-slate-100/80 px-2 py-0.5 text-slate-500 font-medium">{line.section}</span></Td>
-                <Td align="right">
+          <tbody className="divide-y divide-slate-100">
+            <LoadingOrEmpty colSpan={statementColumns.length} isLoading={isLoading} rows={rows.length} />
+            {sortedRows.map((line) => (
+              <tr key={`${line.section}-${line.label}`} className={`transition-colors hover:bg-slate-50 ${line.tone === 'total' ? 'bg-slate-50/50 font-bold' : ''}`}>
+                <td className="px-3 py-3 text-slate-900"><span className={line.level ? 'pl-5' : ''}>{line.label}</span></td>
+                <td className="px-3 py-3"><span className="rounded-md bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-500">{line.section}</span></td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums">
                   <span className={line.amount < 0 ? 'font-bold text-red-700' : line.tone === 'good' ? 'font-bold text-emerald-700' : 'font-bold text-slate-900'}>
                     {money(line.amount)}
                   </span>
-                </Td>
-                <Td align="center">
+                </td>
+                <td className="px-3 py-3 text-center">
                   {line.details?.length ? (
                     <button className="font-semibold text-blue-600 hover:underline outline-none focus:ring-0" type="button" onClick={() => onDrill(line)}>🔍 {line.details.length}</button>
                   ) : (
                     <span className="text-slate-300">-</span>
                   )}
-                </Td>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -681,7 +762,7 @@ function StatementTable({ isLoading, onDrill, rows, title = 'Statement' }: { isL
         {/* Mobile Card List View */}
         <div className="block lg:hidden divide-y divide-slate-100">
           <LoadingOrEmptyMobile isLoading={isLoading} rows={rows.length} />
-          {!isLoading && rows.map((line) => (
+          {!isLoading && sortedRows.map((line) => (
             <div key={`${line.section}-${line.label}`} className={`p-4 transition ${line.tone === 'total' ? 'bg-slate-50/50 font-bold' : ''}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-1">
@@ -712,33 +793,55 @@ function StatementTable({ isLoading, onDrill, rows, title = 'Statement' }: { isL
 }
 
 function DrillModal({ onClose, rows, title }: { onClose: () => void; rows: DetailRow[]; title: string }) {
+  const columnResize = useResizableColumns('finance-accounting.financial-statements.drill.v1', drillColumns)
+  const { handleSort, sortDirection, sortedRows, sortKey } = useLocalTableSort<DetailRow, DrillColumnKey>(rows, getDrillSortValue)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-xl">
+      <div className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-md bg-slate-900 shadow-xl">
         <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
           <h2 className="text-sm font-bold">🔍 {title}</h2>
           <button className="text-slate-300 hover:text-white text-xs font-semibold outline-none focus:ring-0" type="button" onClick={onClose}>
             ปิด
           </button>
         </div>
+        {columnResize.hasCustomWidths ? (
+          <div className="hidden justify-end border-b border-slate-100 bg-white px-3 py-2 lg:flex">
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              คืนค่าเดิมตาราง
+            </button>
+          </div>
+        ) : null}
         <div className="max-h-[60vh] overflow-auto">
           {/* Desktop Table View */}
-          <table className="hidden lg:table w-full text-xs">
-            <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
+          <table className="hidden min-w-full divide-y divide-slate-200 text-sm lg:table" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+            <colgroup>
+              {drillColumns.map((column, index) => {
+                if (index === drillColumns.length - 1) {
+                  return <col key={column.key} style={{ minWidth: column.minWidth }} />
+                }
+                return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+              })}
+            </colgroup>
+            <thead className="sticky top-0 z-10 bg-slate-100">
               <tr>
-                <Th>วันที่</Th>
-                <Th>เลขที่</Th>
-                <Th>รายละเอียด</Th>
-                <Th align="right">จำนวนเงิน</Th>
+                <ResizableTableHead label="วันที่" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="date" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
+                <ResizableTableHead label="เลขที่เอกสาร" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="refNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('refNo', 'เลขที่เอกสาร')} />
+                <ResizableTableHead label="รายละเอียด" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="description" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('description', 'รายละเอียด')} />
+                <ResizableTableHead align="right" label="จำนวนเงิน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="amount" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('amount', 'จำนวนเงิน')} />
               </tr>
             </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={`${row.refNo}-${index}`} className="border-t border-slate-100 hover:bg-slate-50/50 transition">
-                  <Td>{row.date}</Td>
-                  <Td><span className="font-mono text-blue-700 font-semibold">{row.refNo}</span></Td>
-                  <Td className="max-w-xs truncate">{row.description}</Td>
-                  <Td align="right"><span className={row.amount < 0 ? 'text-red-700' : 'text-slate-800'}>{money(row.amount)}</span></Td>
+            <tbody className="divide-y divide-slate-100">
+              {sortedRows.map((row, index) => (
+                <tr key={`${row.refNo}-${index}`} className="transition-colors hover:bg-slate-50">
+                  <td className="whitespace-nowrap px-3 py-3 text-slate-600">{row.date}</td>
+                  <td className="whitespace-nowrap px-3 py-3 font-mono font-semibold text-blue-700">{row.refNo}</td>
+                  <td className="min-w-0 px-3 py-3 text-slate-700"><div className="truncate">{row.description}</div></td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-semibold tabular-nums"><span className={row.amount < 0 ? 'text-red-700' : 'text-slate-800'}>{money(row.amount)}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -746,7 +849,7 @@ function DrillModal({ onClose, rows, title }: { onClose: () => void; rows: Detai
 
           {/* Mobile Card List View */}
           <div className="block lg:hidden divide-y divide-slate-100">
-            {rows.map((row, index) => (
+            {sortedRows.map((row, index) => (
               <div key={`${row.refNo}-${index}`} className="p-4 space-y-2 text-xs">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400">{row.date}</span>
@@ -778,16 +881,6 @@ function LoadingOrEmpty({ colSpan, isLoading, rows }: { colSpan: number; isLoadi
   if (isLoading) return <tr><td className="py-8 text-center text-slate-400" colSpan={colSpan}>กำลังโหลดข้อมูล</td></tr>
   if (rows === 0) return <tr><td className="py-8 text-center text-slate-400" colSpan={colSpan}>ยังไม่มีข้อมูล</td></tr>
   return null
-}
-
-function Th({ align = 'left', children }: { align?: 'center' | 'left' | 'right'; children: ReactNode }) {
-  const textAlign = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
-  return <th className={`whitespace-nowrap px-4 py-2.5 font-bold text-slate-600 bg-slate-50 border-b border-slate-100 ${textAlign}`}>{children}</th>
-}
-
-function Td({ align = 'left', children, className = '' }: { align?: 'center' | 'left' | 'right'; children: ReactNode; className?: string }) {
-  const textAlign = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
-  return <td className={`whitespace-nowrap px-4 py-3 border-b border-slate-100/60 ${textAlign} text-slate-700 ${className}`}>{children}</td>
 }
 
 function ErrorBox({ message }: { message: string }) {

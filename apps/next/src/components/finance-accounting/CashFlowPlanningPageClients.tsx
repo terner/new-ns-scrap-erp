@@ -2,11 +2,17 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
 type BranchRow = { code: string; id: string; name: string }
 type SourceState = { basis: string; limitations: string[]; writeActionsEnabled: false }
 type Insight = { body: string; explain: string; title: string; type: 'danger' | 'ok' | 'warn' }
+type DetailColumnKey = 'label' | 'value'
+type DayEventColumnKey = 'amount' | 'label' | 'refNo' | 'type'
+type TopPartyColumnKey = 'amount' | 'days' | 'docNo' | 'party'
+type SortDirection = 'asc' | 'desc'
 
 type AnalysisPayload = {
   branches: BranchRow[]
@@ -54,6 +60,55 @@ type ForecastPayload = {
   summary: { endCash: number; lowestBal: number; negCount: number; negDay: { closing: number; date: string } | null; startCash: number; totalIn: number; totalOut: number }
 }
 
+const detailColumns: Array<ResizableColumnDefinition<DetailColumnKey>> = [
+  { key: 'label', defaultWidth: 360, minWidth: 220 },
+  { key: 'value', defaultWidth: 190, minWidth: 140 },
+]
+
+const topPartyColumns: Array<ResizableColumnDefinition<TopPartyColumnKey>> = [
+  { key: 'party', defaultWidth: 240, minWidth: 160 },
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'amount', defaultWidth: 170, minWidth: 135 },
+  { key: 'days', defaultWidth: 100, minWidth: 80 },
+]
+
+const dayEventColumns: Array<ResizableColumnDefinition<DayEventColumnKey>> = [
+  { key: 'type', defaultWidth: 120, minWidth: 95 },
+  { key: 'refNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'label', defaultWidth: 320, minWidth: 190 },
+  { key: 'amount', defaultWidth: 170, minWidth: 135 },
+]
+
+function compareSortValues(left: string | number, right: string | number) {
+  return typeof left === 'number' && typeof right === 'number'
+    ? left - right
+    : String(left).localeCompare(String(right), 'th', { numeric: true })
+}
+
+function useLocalTableSort<TRow, TKey extends string>(rows: TRow[], getSortValue: (row: TRow, key: TKey) => string | number) {
+  const [sortKey, setSortKey] = useState<TKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows
+
+    return [...rows].sort((left, right) => {
+      const result = compareSortValues(getSortValue(left, sortKey), getSortValue(right, sortKey))
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [getSortValue, rows, sortDirection, sortKey])
+
+  function handleSort(key: TKey) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
+  return { handleSort, sortDirection, sortedRows, sortKey }
+}
 function today() {
   return localDateInputValue(new Date())
 }
@@ -82,14 +137,14 @@ export function CashFlowAnalysisPageClient() {
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-200">
+      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <DateInput label="From" value={from} onChange={setFrom} />
         <DateInput label="To" value={to} onChange={setTo} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden space-y-3">
+      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
         <div className="flex gap-2 items-center">
           <div className="flex-1 grid grid-cols-2 gap-2">
             <div className="flex items-center gap-1.5">
@@ -103,7 +158,7 @@ export function CashFlowAnalysisPageClient() {
           </div>
           <button
             type="button"
-            className="h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
+            className="h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
             onClick={() => setShowMobileFilters(true)}
           >
             ตัวกรอง {branchId ? '(มี)' : ''}
@@ -131,7 +186,7 @@ export function CashFlowAnalysisPageClient() {
                 <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
                 <select
                   aria-label="Branch select"
-                  className="w-full h-10 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
                   value={branchId}
                   onChange={(event) => setBranchId(event.target.value)}
                 >
@@ -147,14 +202,14 @@ export function CashFlowAnalysisPageClient() {
                 onClick={() => {
                   setBranchId('')
                 }}
-                className="flex-1 h-10 rounded-lg border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowMobileFilters(false)}
-                className="flex-1 h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                className="flex-1 h-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
               >
                 ตกลง
               </button>
@@ -199,7 +254,7 @@ export function CashFlowForecastCalendarPageClient() {
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-200">
+      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <span className="text-sm font-bold">Forecast:</span>
         {[7, 30, 90].map((item) => <button key={item} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${horizon === item ? 'bg-[#0F172A] text-white' : 'bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100'}`} type="button" onClick={() => setHorizon(item)}>{item} วัน</button>)}
         <DateInput label="เริ่ม" value={startDate} onChange={setStartDate} />
@@ -208,13 +263,13 @@ export function CashFlowForecastCalendarPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden space-y-3">
+      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
         <div className="flex gap-2 items-center justify-between">
           <div className="flex gap-1.5 overflow-x-auto">
             {[7, 30, 90].map((item) => (
               <button
                 key={item}
-                className={`h-9 px-3 rounded-lg text-xs font-semibold ${horizon === item ? 'bg-[#0F172A] text-white' : 'bg-slate-50 border border-slate-200 text-slate-600'}`}
+                className={`h-9 px-3 rounded-md text-xs font-semibold ${horizon === item ? 'bg-[#0F172A] text-white' : 'bg-slate-50 border border-slate-200 text-slate-600'}`}
                 type="button"
                 onClick={() => setHorizon(item)}
               >
@@ -224,7 +279,7 @@ export function CashFlowForecastCalendarPageClient() {
           </div>
           <button
             type="button"
-            className="h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none shrink-0"
+            className="h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none shrink-0"
             onClick={() => setShowMobileFilters(true)}
           >
             ตัวกรอง {branchId ? '(มี)' : ''}
@@ -257,7 +312,7 @@ export function CashFlowForecastCalendarPageClient() {
                 <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
                 <select
                   aria-label="Branch select"
-                  className="w-full h-10 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
                   value={branchId}
                   onChange={(event) => setBranchId(event.target.value)}
                 >
@@ -277,14 +332,14 @@ export function CashFlowForecastCalendarPageClient() {
                 onClick={() => {
                   setBranchId('')
                 }}
-                className="flex-1 h-10 rounded-lg border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowMobileFilters(false)}
-                className="flex-1 h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                className="flex-1 h-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
               >
                 ตกลง
               </button>
@@ -343,7 +398,7 @@ function DateInput({ label, onChange, value }: { label: string; onChange: (value
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
-  return <select className="rounded-md border bg-white px-2 py-1.5 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+  return <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-slate-400" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
@@ -352,7 +407,7 @@ function Panel({ children, title }: { children: ReactNode; title: string }) {
 
 function Bar({ label, max, tone, value }: { label: string; max: number; tone: 'blue' | 'emerald'; value: number }) {
   const color = tone === 'emerald' ? 'from-emerald-500 to-teal-500 text-emerald-700' : 'from-blue-500 to-indigo-500 text-blue-700'
-  return <div className="mb-3"><div className="mb-1 flex justify-between text-sm"><span className="text-slate-600">{label}</span><span className={`font-bold ${color.split(' ').at(-1)}`}>{money(value)}</span></div><div className="h-4 w-full overflow-hidden rounded-md-full bg-slate-100"><div className={`h-4 rounded-md-full bg-gradient-to-r ${color}`} style={{ width: `${Math.min(100, Math.abs(value) / max * 100)}%` }} /></div></div>
+  return <div className="mb-3"><div className="mb-1 flex justify-between text-sm"><span className="text-slate-600">{label}</span><span className={`font-bold ${color.split(' ').at(-1)}`}>{money(value)}</span></div><div className="h-4 w-full overflow-hidden rounded-full bg-slate-100"><div className={`h-4 rounded-full bg-gradient-to-r ${color}`} style={{ width: `${Math.min(100, Math.abs(value) / max * 100)}%` }} /></div></div>
 }
 
 function TrapDonut({ ar, cash, stock }: { ar: number; cash: number; stock: number }) {
@@ -377,28 +432,58 @@ function InsightCard({ insight }: { insight: Insight }) {
 }
 
 function DetailTable({ isLoading, rows }: { isLoading: boolean; rows: AnalysisPayload['detailRows'] }) {
+  const columnResize = useResizableColumns('finance-accounting.cash-flow-analysis.detail.v1', detailColumns)
+  const { handleSort, sortDirection, sortedRows, sortKey } = useLocalTableSort<AnalysisPayload['detailRows'][number], DetailColumnKey>(rows, (row, key) => row[key])
+
   return (
-    <div className="rounded-md bg-white p-4 shadow">
-      <h3 className="mb-3 font-bold">📊 ตารางรายละเอียด</h3>
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
+        <h3 className="font-bold text-slate-800">📊 ตารางรายละเอียด</h3>
+        {columnResize.hasCustomWidths ? (
+          <button
+            className="hidden h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50 lg:inline-flex"
+            type="button"
+            onClick={columnResize.resetColumnWidths}
+          >
+            คืนค่าเดิมตาราง
+          </button>
+        ) : null}
+      </div>
       {/* Desktop Table View */}
-      <table className="hidden lg:table w-full text-sm">
-        <tbody>
-          {isLoading ? <tr><td className="py-8 text-center text-slate-400" colSpan={2}>กำลังโหลดข้อมูล</td></tr> : null}
-          {rows.map((row) => (
-            <tr key={row.label} className={`border-t ${row.tone === 'warn' ? 'bg-amber-50' : row.tone === 'bad' ? 'bg-red-50' : row.label.includes('Projected') ? 'bg-blue-50' : ''}`}>
-              <td className="px-4 py-3.5">{row.label}</td>
-              <td className={`p-2 text-right font-bold ${row.tone === 'bad' ? 'text-red-700' : row.tone === 'good' ? 'text-emerald-700' : ''}`}>
-                {row.suffix === '%' ? row.value.toFixed(2) : money(row.value)}{row.suffix ?? ''}
-              </td>
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <colgroup>
+            {detailColumns.map((column, index) => {
+              if (index === detailColumns.length - 1) {
+                return <col key={column.key} style={{ minWidth: column.minWidth }} />
+              }
+              return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            })}
+          </colgroup>
+          <thead className="bg-slate-100">
+            <tr>
+              <ResizableTableHead label="รายการ" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="label" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('label', 'รายการ')} />
+              <ResizableTableHead align="right" label="มูลค่า" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="value" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('value', 'มูลค่า')} />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {isLoading ? <tr><td className="py-8 text-center text-slate-400" colSpan={detailColumns.length}>กำลังโหลดข้อมูล</td></tr> : null}
+            {sortedRows.map((row) => (
+              <tr key={row.label} className={`transition-colors hover:bg-slate-50 ${row.tone === 'warn' ? 'bg-amber-50/70' : row.tone === 'bad' ? 'bg-red-50/70' : row.label.includes('Projected') ? 'bg-blue-50/70' : ''}`}>
+                <td className="px-3 py-3 text-slate-700">{row.label}</td>
+                <td className={`whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums ${row.tone === 'bad' ? 'text-red-700' : row.tone === 'good' ? 'text-emerald-700' : 'text-slate-900'}`}>
+                  {row.suffix === '%' ? row.value.toFixed(2) : money(row.value)}{row.suffix ?? ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {/* Mobile Card List View */}
-      <div className="block lg:hidden divide-y divide-slate-100">
+      <div className="block divide-y divide-slate-100 lg:hidden">
         {isLoading && <div className="py-6 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล</div>}
-        {!isLoading && rows.map((row) => (
+        {!isLoading && sortedRows.map((row) => (
           <div key={row.label} className={`flex justify-between items-center p-3 text-xs ${row.tone === 'warn' ? 'bg-amber-50/50' : row.tone === 'bad' ? 'bg-red-50/50' : row.label.includes('Projected') ? 'bg-blue-50/50' : ''}`}>
             <span className="text-slate-700">{row.label}</span>
             <span className={`font-bold ${row.tone === 'bad' ? 'text-red-700' : row.tone === 'good' ? 'text-emerald-700' : 'text-slate-900'}`}>
@@ -434,36 +519,68 @@ function CalendarGrid({ days, isLoading, onSelect }: { days: ProjectionDay[]; is
 
 function TopAr({ rows }: { rows: ForecastPayload['insights']['topAR'] }) {
   const headingCls = 'bg-emerald-50 text-emerald-700'
+  const columnResize = useResizableColumns('finance-accounting.cash-flow-forecast.top-ar.v1', topPartyColumns)
+  const { handleSort, sortDirection, sortedRows, sortKey } = useLocalTableSort<ForecastPayload['insights']['topAR'][number], TopPartyColumnKey>(rows, (row, key) => {
+    if (key === 'party') return row.customerName
+    if (key === 'amount') return row.receivableBalance
+    if (key === 'days') return row.daysOverdue
+    return row.docNo
+  })
+
   return (
-    <div className="rounded-md bg-white shadow">
-      <div className={`border-b border-emerald-100 p-3 font-bold ${headingCls}`}>📥 ต้องเร่งเก็บลูกค้าคนไหน (Top 10 Overdue)</div>
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 p-3 font-bold ${headingCls}`}>
+        <span>📥 ต้องเร่งเก็บลูกค้าคนไหน (Top 10 Overdue)</span>
+        {columnResize.hasCustomWidths ? (
+          <button
+            className="hidden h-9 items-center rounded-md border border-emerald-200 bg-white px-3 text-sm font-normal text-emerald-700 hover:bg-emerald-50 lg:inline-flex"
+            type="button"
+            onClick={columnResize.resetColumnWidths}
+          >
+            คืนค่าเดิมตาราง
+          </button>
+        ) : null}
+      </div>
       
       {/* Desktop Table View */}
-      <table className="hidden lg:table w-full text-sm">
-        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
-          <tr>
-            <Th>ชื่อ</Th><Th>บิล</Th><Th align="right">ค้าง</Th><Th align="right">วัน</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-              <Td>{row.customerName}</Td>
-              <Td mono>{row.docNo}</Td>
-              <Td align="right" strong>{money(row.receivableBalance)}</Td>
-              <Td align="right" strong>{row.daysOverdue}</Td>
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <colgroup>
+            {topPartyColumns.map((column, index) => {
+              if (index === topPartyColumns.length - 1) {
+                return <col key={column.key} style={{ minWidth: column.minWidth }} />
+              }
+              return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            })}
+          </colgroup>
+          <thead className="bg-slate-100">
+            <tr>
+              <ResizableTableHead label="ลูกค้า" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="party" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('party', 'ลูกค้า')} />
+              <ResizableTableHead label="เลขที่บิล" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="docNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่บิล')} />
+              <ResizableTableHead align="right" label="ยอดค้าง" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="amount" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดค้าง')} />
+              <ResizableTableHead align="right" label="ค้างมาแล้ว" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="days" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('days', 'ค้างมาแล้ว')} />
             </tr>
-          ))}
-          {!rows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={4}>ไม่มีลูกค้าค้างเกินกำหนด ✓</td></tr> : null}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {sortedRows.map((row) => (
+              <tr key={row.id} className="transition-colors hover:bg-slate-50/50">
+                <td className="px-3 py-3 font-medium text-slate-900">{row.customerName}</td>
+                <td className="whitespace-nowrap px-3 py-3 font-mono text-xs font-semibold text-blue-700">{row.docNo}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-slate-900">{money(row.receivableBalance)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-red-700">{row.daysOverdue} วัน</td>
+              </tr>
+            ))}
+            {!rows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={topPartyColumns.length}>ไม่มีลูกค้าค้างเกินกำหนด ✓</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
 
       {/* Mobile Card List View */}
-      <div className="block lg:hidden divide-y divide-slate-100">
+      <div className="block divide-y divide-slate-100 lg:hidden">
         {!rows.length ? (
           <div className="py-4 text-center text-slate-400 text-xs">ไม่มีลูกค้าค้างเกินกำหนด ✓</div>
         ) : (
-          rows.map((row) => (
+          sortedRows.map((row) => (
             <div key={row.id} className="p-3 space-y-1 text-xs hover:bg-slate-50/50 transition">
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-slate-900">{row.customerName}</span>
@@ -483,36 +600,68 @@ function TopAr({ rows }: { rows: ForecastPayload['insights']['topAR'] }) {
 
 function TopAp({ rows }: { rows: ForecastPayload['insights']['topAP'] }) {
   const headingCls = 'bg-red-50 text-red-700'
+  const columnResize = useResizableColumns('finance-accounting.cash-flow-forecast.top-ap.v1', topPartyColumns)
+  const { handleSort, sortDirection, sortedRows, sortKey } = useLocalTableSort<ForecastPayload['insights']['topAP'][number], TopPartyColumnKey>(rows, (row, key) => {
+    if (key === 'party') return row.supplierName
+    if (key === 'amount') return row.payableBalance
+    if (key === 'days') return row.daysToDue
+    return row.docNo
+  })
+
   return (
-    <div className="rounded-md bg-white shadow">
-      <div className={`border-b border-red-100 p-3 font-bold ${headingCls}`}>📤 อาจจะต้องเลื่อนจ่าย Supplier คนไหน (Top 10 ยอดสูง)</div>
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-red-100 p-3 font-bold ${headingCls}`}>
+        <span>📤 อาจจะต้องเลื่อนจ่าย Supplier คนไหน (Top 10 ยอดสูง)</span>
+        {columnResize.hasCustomWidths ? (
+          <button
+            className="hidden h-9 items-center rounded-md border border-red-200 bg-white px-3 text-sm font-normal text-red-700 hover:bg-red-50 lg:inline-flex"
+            type="button"
+            onClick={columnResize.resetColumnWidths}
+          >
+            คืนค่าเดิมตาราง
+          </button>
+        ) : null}
+      </div>
       
       {/* Desktop Table View */}
-      <table className="hidden lg:table w-full text-sm">
-        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
-          <tr>
-            <Th>ชื่อ</Th><Th>บิล</Th><Th align="right">ค้าง</Th><Th align="right">วัน</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-              <Td>{row.supplierName}</Td>
-              <Td mono>{row.docNo}</Td>
-              <Td align="right" strong>{money(row.payableBalance)}</Td>
-              <Td align="right"><span className={row.daysToDue < 7 ? 'text-red-700' : 'text-slate-600'}>{row.daysToDue}</span></Td>
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <colgroup>
+            {topPartyColumns.map((column, index) => {
+              if (index === topPartyColumns.length - 1) {
+                return <col key={column.key} style={{ minWidth: column.minWidth }} />
+              }
+              return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            })}
+          </colgroup>
+          <thead className="bg-slate-100">
+            <tr>
+              <ResizableTableHead label="Supplier" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="party" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('party', 'Supplier')} />
+              <ResizableTableHead label="เลขที่บิล" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="docNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่บิล')} />
+              <ResizableTableHead align="right" label="ยอดค้าง" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="amount" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดค้าง')} />
+              <ResizableTableHead align="right" label="ครบกำหนดใน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="days" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('days', 'ครบกำหนดใน')} />
             </tr>
-          ))}
-          {!rows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={4}>ไม่มี AP คงเหลือ</td></tr> : null}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {sortedRows.map((row) => (
+              <tr key={row.id} className="transition-colors hover:bg-slate-50/50">
+                <td className="px-3 py-3 font-medium text-slate-900">{row.supplierName}</td>
+                <td className="whitespace-nowrap px-3 py-3 font-mono text-xs font-semibold text-blue-700">{row.docNo}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-slate-900">{money(row.payableBalance)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-semibold tabular-nums"><span className={row.daysToDue < 7 ? 'text-red-700' : 'text-slate-600'}>{row.daysToDue} วัน</span></td>
+              </tr>
+            ))}
+            {!rows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={topPartyColumns.length}>ไม่มี AP คงเหลือ</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
 
       {/* Mobile Card List View */}
-      <div className="block lg:hidden divide-y divide-slate-100">
+      <div className="block divide-y divide-slate-100 lg:hidden">
         {!rows.length ? (
           <div className="py-4 text-center text-slate-400 text-xs">ไม่มี AP คงเหลือ</div>
         ) : (
-          rows.map((row) => (
+          sortedRows.map((row) => (
             <div key={row.id} className="p-3 space-y-1 text-xs hover:bg-slate-50/50 transition">
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-slate-900">{row.supplierName}</span>
@@ -531,46 +680,76 @@ function TopAp({ rows }: { rows: ForecastPayload['insights']['topAP'] }) {
 }
 
 function DayModal({ day, onClose }: { day: ProjectionDay; onClose: () => void }) {
+  const columnResize = useResizableColumns('finance-accounting.cash-flow-forecast.day-events.v1', dayEventColumns)
+  const { handleSort, sortDirection, sortedRows, sortKey } = useLocalTableSort<ForecastEvent, DayEventColumnKey>(day.events, (event, key) => {
+    if (key === 'amount') return event.inOut === 'IN' ? event.amount : -event.amount
+    return event[key]
+  })
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
+      <div className="w-full max-w-3xl overflow-hidden rounded-md bg-slate-900 shadow-xl">
         <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
           <h2 className="text-sm font-bold">📅 {day.date} · Closing {money(day.closing)}</h2>
           <button className="text-slate-300 hover:text-white text-xs font-semibold outline-none focus:ring-0" type="button" onClick={onClose}>
             ปิด
           </button>
         </div>
-        <div className="max-h-[60vh] overflow-auto">
+        {columnResize.hasCustomWidths ? (
+          <div className="hidden justify-end border-b border-slate-100 bg-white px-3 py-2 lg:flex">
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              คืนค่าเดิมตาราง
+            </button>
+          </div>
+        ) : null}
+        <div className="max-h-[60vh] overflow-auto bg-white">
           {/* Desktop Table View */}
-          <table className="hidden lg:table w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
-              <tr>
-                <Th>Type</Th><Th>Ref</Th><Th>Label</Th><Th align="right">Amount</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {day.events.map((event) => (
-                <tr key={`${event.type}-${event.refNo}`} className="border-t">
-                  <Td>{event.type}</Td>
-                  <Td mono>{event.refNo}</Td>
-                  <Td>{event.label}</Td>
-                  <Td align="right">
-                    <span className={event.inOut === 'IN' ? 'text-emerald-700' : 'text-red-700'}>
-                      {event.inOut === 'IN' ? '+' : '-'}{money(event.amount)}
-                    </span>
-                  </Td>
+          <div className="hidden lg:block">
+            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <colgroup>
+                {dayEventColumns.map((column, index) => {
+                  if (index === dayEventColumns.length - 1) {
+                    return <col key={column.key} style={{ minWidth: column.minWidth }} />
+                  }
+                  return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+                })}
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-slate-100">
+                <tr>
+                  <ResizableTableHead label="ประเภท" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="type" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} />
+                  <ResizableTableHead label="เลขอ้างอิง" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="refNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('refNo', 'เลขอ้างอิง')} />
+                  <ResizableTableHead label="รายการ" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="label" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('label', 'รายการ')} />
+                  <ResizableTableHead align="right" label="จำนวนเงิน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="amount" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('amount', 'จำนวนเงิน')} />
                 </tr>
-              ))}
-              {!day.events.length ? <tr><td className="py-5 text-center text-slate-400" colSpan={4}>ไม่มี event ในวันนี้</td></tr> : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sortedRows.map((event) => (
+                  <tr key={`${event.type}-${event.refNo}`} className="transition-colors hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700">{event.type}</td>
+                    <td className="whitespace-nowrap px-3 py-3 font-mono text-xs font-semibold text-blue-700">{event.refNo}</td>
+                    <td className="min-w-0 px-3 py-3 text-slate-700"><div className="truncate">{event.label}</div></td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums">
+                      <span className={event.inOut === 'IN' ? 'text-emerald-700' : 'text-red-700'}>
+                        {event.inOut === 'IN' ? '+' : '-'}{money(event.amount)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {!day.events.length ? <tr><td className="py-5 text-center text-slate-400" colSpan={dayEventColumns.length}>ไม่มี event ในวันนี้</td></tr> : null}
+              </tbody>
+            </table>
+          </div>
 
           {/* Mobile Card List View */}
-          <div className="block lg:hidden divide-y divide-slate-100">
+          <div className="block divide-y divide-slate-100 lg:hidden">
             {!day.events.length ? (
               <div className="py-5 text-center text-slate-400 text-xs">ไม่มี event ในวันนี้</div>
             ) : (
-              day.events.map((event) => (
+              sortedRows.map((event) => (
                 <div key={`${event.type}-${event.refNo}`} className="p-3.5 space-y-2 text-xs">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold text-slate-900">{event.type}</span>
@@ -591,16 +770,6 @@ function DayModal({ day, onClose }: { day: ProjectionDay; onClose: () => void })
       </div>
     </div>
   )
-}
-
-function Th({ align = 'left', children }: { align?: 'center' | 'left' | 'right'; children: ReactNode }) {
-  const textAlign = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
-  return <th className={`whitespace-nowrap p-2 font-semibold ${textAlign}`}>{children}</th>
-}
-
-function Td({ align = 'left', children, mono = false, strong = false }: { align?: 'center' | 'left' | 'right'; children: ReactNode; mono?: boolean; strong?: boolean }) {
-  const textAlign = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
-  return <td className={`whitespace-nowrap p-2 ${textAlign} ${mono ? 'font-mono text-xs' : 'text-xs'} ${strong ? 'font-bold' : ''}`}>{children}</td>
 }
 
 function ErrorBox({ message }: { message: string }) {

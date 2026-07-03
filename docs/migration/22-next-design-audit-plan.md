@@ -1,0 +1,812 @@
+# 22 Next Design Audit Plan
+
+## Purpose
+
+แผนนี้ใช้ตรวจทุกหน้าของ active Next app ว่าตรงกับ `docs/design.md` และรูปแบบหน้ามาตรฐานของระบบหรือไม่ โดยแยกงานออกจาก functional QA เพื่อให้ตรวจได้ครบโดยไม่ปนกับการแก้ business logic.
+
+## Scope
+
+- Target app: `apps/next/`
+- Design source of truth: `docs/design.md`
+- Route baseline:
+  - `apps/next/src/lib/navigation.ts`
+  - `docs/page-inventory-checklist.csv`
+  - `docs/migration/18-next-system-sitemap.md`
+- Existing historical visual audit: `docs/migration/12-frontend-visual-audit-checklist.md`
+
+Current inventory checkpoint on 2026-07-01:
+
+- `docs/page-inventory-checklist.csv` has 118 rows.
+- Active/app page files under `apps/next/src/app/**/page.tsx` include newer app-only pages that may not be fully reflected in the older sitemap.
+- The audit should treat catch-all, login, reset password, direct detail pages, and hidden retained pages separately from active sidebar business pages.
+
+## What "Matches Design" Means
+
+Each business page should be checked against these items:
+
+1. Page shell and hierarchy
+   - Title/subtitle match navigation and page-flow meaning.
+   - Page content is dense ERP style, not landing-page style.
+   - No unnecessary nested cards or extra outer card around KPI groups.
+
+2. Filters and actions
+   - Filter wrapper, gaps, and control heights follow `docs/design.md`.
+   - Primary action buttons align right on desktop.
+   - Mobile filters do not overflow or compress labels.
+   - List pages with document/item statuses have a status segmented filter.
+   - Status options are page-specific and must match the real flow; do not copy statuses from another page when the page does not support them.
+
+3. Tables and mobile layout
+   - Desktop tables use soft lined table style.
+   - Primary table/list comparison should use `/daily/weight-ticket-list`: `min-w-full divide-y divide-slate-200`, `border-slate-200`, `px-3 py-3` cells, sortable/resizable headers, `minWidth` for every resizable column, and final-column auto-stretch.
+   - Numeric columns keep values and units readable.
+   - Long customer/supplier/product/document labels do not collide with numbers.
+   - Heavy tables have mobile card layout where required, following `/daily/weight-ticket-list`: document/date header, light grouped info box, and footer summary section.
+   - Column headers describe the business meaning clearly; avoid vague `เลขที่` / `วันที่` when the page should say `เลขที่ RV`, `วันที่เอกสาร`, `วันที่สร้าง`, `วันที่รับเงิน`, etc.
+   - If several date meanings matter, each gets its own named column.
+
+4. KPI and summary cards
+   - KPI cards use the approved compact card style.
+   - Mobile KPI layout uses two columns where readable.
+   - Zero money values are neutral, not success/error colors.
+   - KPI cards are present only when they help the user decide or act; remove cards that duplicate `พบทั้งหมด X รายการ` or simple table aggregates.
+   - For list pages where users mainly inspect table rows and row actions, table content should be the primary surface.
+
+5. Modals and forms
+   - Detail modals use the current dark-header/grouped-card pattern where applicable.
+   - Forms wrap before labels or values become cramped.
+   - Money, identifiers, quantities, and business codes use the correct field type behavior from `docs/design.md`.
+
+6. Typography, contrast, and spacing
+   - User-facing UI uses Noto Sans Thai.
+   - No 10px/11px UI text.
+   - Dark mode borders and badges remain readable.
+   - Text, units, and numbers do not overlap.
+
+7. Wording and business meaning
+   - Thai labels match page-flow docs.
+   - Document/status wording is consistent across list, detail, modal, print, and export surfaces.
+   - Any intentional design override is documented.
+
+8. Row actions
+   - Hide unavailable row actions by default instead of showing disabled buttons.
+   - Show disabled actions only when the lock itself is important and the UI explains why.
+
+## Suggested Audit Order
+
+Start with user-facing operational pages before admin/support pages:
+
+1. Daily transaction pages: Purchase Bill, Sales Bill, WTI/WTO, payments, receipts, expense, transfer.
+2. Stock pages: balance, ledger, transfer, status convert, grade convert, adjust.
+3. Finance and debt: AR, AP, bank, cash position, supplier/customer advance.
+4. Production: orders, dashboard, reports, yield/loss, cost, reconciliation.
+5. Dual costing, trading, PO reports.
+6. Main dashboards, tracking, reports.
+7. Master data and company data.
+8. Finance/accounting management reports.
+9. Admin, settings, support pages.
+10. Hidden/direct/detail/auth pages.
+
+## Finding Format
+
+Use this format for each issue:
+
+```text
+DESIGN-AUDIT: [P0/P1/P2/P3]
+Page:
+Area:
+Expected:
+Actual:
+Risk:
+Suggested fix:
+Evidence:
+```
+
+Severity:
+
+- P0: Blocks use, unreadable/overlapping critical UI, or broken page.
+- P1: Design mismatch that affects daily operation, data entry, or review accuracy.
+- P2: Consistency issue, mobile discomfort, or non-critical layout drift.
+- P3: Polish, wording, spacing, or low-risk visual cleanup.
+
+## Browser QA Policy
+
+For this audit, browser checks should be run only after the route batch is selected. Each checked route should cover:
+
+- Desktop viewport.
+- Mobile viewport.
+- Console/network errors.
+- Main table/list state.
+- Main modal/form state if the page has one.
+
+Do not use browser automation for Plane. This audit only targets the local or deployed Next app.
+
+## Deliverables
+
+Recommended lightweight deliverables:
+
+1. A route matrix with status: `not checked`, `pass`, `issue found`, `needs browser`, `not active`, `hidden/direct`.
+2. A ranked issue list using the finding format above.
+3. One fix batch at a time, grouped by module or shared component.
+
+## Notes
+
+Do not change runtime business behavior during design fixes unless the mismatch is caused by wrong wording or wrong field behavior documented in the relevant page flow.
+
+## Page Findings Draft
+
+## Static Sidebar Audit Checkpoint - 2026-07-01
+
+Scope checked in this pass:
+
+- Parsed `apps/next/src/lib/navigation.ts` as the current sidebar source of truth.
+- Found 106 unique sidebar hrefs after collapsing duplicate parent/child links.
+- Found direct `page.tsx` files for 104 routes.
+- This pass is a static code/design scan only. No browser/DOM pass was run yet; browser checks should run after selecting a route batch.
+
+Design rules used for this pass:
+
+- `docs/design.md`
+- `docs/agent-rules/ui.md`
+- Primary table/list reference: `/daily/weight-ticket-list`
+- Existing design plan findings below in this file
+
+### P1 Active Sidebar Routes That Are Still Placeholders
+
+These are visible sidebar routes but do not have a direct page file and currently fall through to the catch-all scaffold page:
+
+- None remaining after the Accounting Periods and Posting Rules policy page checkpoints.
+
+Evidence:
+
+- `apps/next/src/app/[...slug]/page.tsx`
+
+Resolved in local design checkpoint:
+
+- `/finance-accounting/accounting-periods` now has a direct FA5 policy/readiness page. It remains policy UI only and does not enforce closed-period locks yet.
+- `/finance-accounting/posting-rules` now has a direct FA5 source-to-account mapping readiness page. It remains policy UI only and does not post GL journals yet.
+
+### P2 Shared Design Drift To Fix In Batches
+
+1. Transaction/detail modals still drift from the `rounded-md` / dark-header / `border-0` modal baseline.
+   - Affected page families:
+     - `/sales/bills`
+     - `/purchase/po-buy`
+     - `/sales/po-sell`
+     - `/purchase/payments`
+     - `/sales/receipts`
+   - Typical source files:
+     - `apps/next/src/components/daily/TransactionBillsPageClient.tsx`
+     - `apps/next/src/components/purchase-flow/PoBuyPageClient.tsx`
+     - `apps/next/src/components/sales/PoSellPageClient.tsx`
+     - `apps/next/src/components/daily/MoneyMovementPageClient.tsx`
+   - Expected: `DialogContent` baseline should use `rounded-md`, `border-0`, `!p-0`/`p-0`, `overflow-hidden`, dark header where applicable, and no outer/focus border leakage.
+
+2. Tracking, trading, and stock operation detail modals need border/header review.
+   - Affected routes:
+     - `/tracking/customer`
+     - `/tracking/supplier`
+     - `/tracking/product`
+     - `/trading/matching`
+     - `/trading/dashboard`
+     - `/stock/status-convert`
+     - `/stock/convert`
+     - `/stock/adjust`
+   - Typical source files:
+     - `apps/next/src/components/tracking/CustomerTrackingPageClient.tsx`
+     - `apps/next/src/components/purchase-flow/SupplierTrackingPageClient.tsx`
+     - `apps/next/src/components/tracking/ProductTrackingPageClient.tsx`
+     - `apps/next/src/components/purchase-flow/TradingMatchingPageClient.tsx`
+     - `apps/next/src/components/trading/TradingDashboardPageClient.tsx`
+     - `apps/next/src/components/stock/StockOperationPageClient.tsx`
+   - Expected: detail modal content should follow the same dark-header/grouped-card pattern and explicitly avoid border leakage.
+
+3. Field type matrix review is needed where `type="number"` appears in money/price/tax-like contexts.
+   - Confirm each field against the `Field Input Decision Matrix` before changing it. Some hits are valid quantity/percent exceptions; do not blanket-replace.
+   - Affected route families:
+     - `/sales/bills`
+     - `/purchase/advance-payments`
+     - `/purchase/payments`
+     - `/sales/receipts`
+     - `/stock/transfer`
+     - `/stock/status-convert`
+     - `/stock/convert`
+     - `/stock/adjust`
+     - `/finance-accounting/working-capital`
+     - `/finance-accounting/stock-finance`
+     - `/finance-accounting/profit-leak`
+     - `/master-data/customers`
+   - Expected: money/price/value/VAT/WHT/discount fields use the money input pattern; quantity/weight/percent fields may stay as number exceptions with spinner hidden and correct `step`.
+
+4. Dual Costing has font baseline drift.
+   - Affected routes:
+     - `/dual-costing/cost-allocator`
+     - `/dual-costing/waiting-allocations`
+     - `/dual-costing/cost-allocation-ledger`
+     - `/dual-costing/report`
+   - Evidence sources:
+     - `apps/next/src/app/dual-costing/cost-allocator/page.tsx`
+     - `apps/next/src/components/dual-costing/CostAllocatorPageClient.tsx`
+     - `apps/next/src/components/dual-costing/DualCostingManagementPageClient.tsx`
+   - Expected: remove explicit `font-sans` from UI surfaces and inherit the app baseline `Noto Sans Thai`.
+
+5. Finance/accounting report pages use older filter/card styling and compact controls that should be normalized when those pages are touched.
+   - Affected routes:
+     - `/finance-accounting/working-capital`
+     - `/finance-accounting/stock-finance`
+     - `/finance-accounting/profit-leak`
+     - `/finance-accounting/tax-vat-wht`
+   - Expected: filter wrapper, gaps, and controls should match `rounded-md bg-white p-3 shadow`, `gap-2`, and `h-9`/`h-10` control sizing unless the page has a documented override.
+
+### P3 Consistency Cleanup Queue
+
+- Several operational pages still use compact `h-7`/`h-8` controls in filter/action areas. Review when fixing the surrounding page instead of doing a noisy standalone sweep.
+- Some row actions render disabled edit/cancel controls. Design baseline says hide unavailable row actions unless the disabled lock itself matters and is explained.
+- Generic table headers such as `เลขที่` and `วันที่` are widespread. Fix page-by-page using the real business meaning: `เลขที่ RV`, `เลขที่บิลขาย`, `วันที่เอกสาร`, `วันที่สร้าง`, `วันที่รับเงิน`, etc.
+- Master data shared pages mostly fall into wording cleanup, not urgent layout risk, unless a specific page is selected for UI polish.
+
+### Suggested Fix Order
+
+1. No high-confidence operational static table-mechanics finding remains after the `/sales/receipts` follow-up; `/sales/receipts`, `/purchase/payments`, `/sales/po-sell`, `/sales/bills`, `/purchase/receipt-vouchers`, and `/production/report` now have local code/layout checkpoints and still need browser QA.
+2. Normalize shared modal surfaces in one batch per component family: transaction bills, PO Buy/Sell, money movement, stock operation, then tracking/trading. `/daily/expense` has a local static design checkpoint; keep it in the browser-QA queue instead of reworking it again from the same static finding.
+3. Review the field input matrix only inside the touched form batch; do not blanket-convert all `type="number"` hits.
+4. Polish finance/accounting report filter/card styling after operational transaction pages are stable.
+5. Run browser QA per selected batch on desktop and mobile before claiming visual completion.
+
+### Routes With No High-Confidence Static Finding Yet
+
+The absence of a static finding is not a visual pass. These still need browser review for overlap, mobile layout, dark mode, and real data states. Static scan did not raise a high-confidence issue for several dashboard/report/admin pages, especially pages that are mostly read-only or share already-normalized components.
+
+### `/purchase/receipt-vouchers`
+
+- 2026-07-01 implementation checkpoint: the RV list now uses page-specific filter/search wording (`เลขที่ RV`, `วันที่ออกเอกสาร`), status segmented filters (`ทุกสถานะ / ใช้งาน / ยกเลิก`), resizable desktop table with final action-column auto-stretch, dense mobile cards, normal-sized clear-filter controls, and right-aligned desktop create action. Cancelled rows keep print available while unavailable edit/cancel actions are hidden. The create/edit, detail, and cancel modal headers now follow the dark-header baseline, and the detail modal groups document and amount/contact facts into cards. Browser QA remains pending because this batch was local code/layout validation only.
+
+### `/sales/bills`
+
+- 2026-07-01 implementation checkpoint: the Sales Bill list now uses page-specific table wording (`เลขที่บิลขาย`, `วันที่สร้าง`, `รายการ`, `สถานะรับเงิน`), hides unavailable edit/cancel row actions, keeps the compact VAT invoice indicator (`vatInvoiceNo` or `ยังไม่ออก`), uses normal clear-filter sizing, shows mobile filter count for date/type/status filters, uses dense mobile cards, and lets the desktop final action column auto-stretch like `/daily/weight-ticket-list`. The Sales Bill detail modal now follows the dark-header `rounded-md` baseline, moves the SB number/customer into the header/title/subtitle, avoids repeating customer inside the document card, and uses white grouped cards for the main document/status/item sections. The cancel dialog keeps the mobile bottom sheet but uses desktop `rounded-md` modal radius. Browser QA remains pending because this batch was local code/layout validation only.
+- 2026-07-02 transaction-bill modal follow-up: the Sales Bill create/edit modal shell now explicitly prevents border/focus leakage, no longer renders a corner `X` close button, uses the outline secondary footer action, and uses the slate primary `บันทึก` save button. The Sales Bill detail modal and shared cancel dialog no longer render duplicate header close buttons when `hideClose` is already set, and the Trading allocation correction toggle now uses normal `h-9` control height. Browser QA remains pending because this batch was local code/layout validation only.
+
+### `/purchase/bills`
+
+- 2026-07-01 implementation checkpoint: the Purchase Bill create/edit modal header now keeps the dark `rounded-md` shell but no longer renders a corner close control; the footer cancel action is the close path. PB item `ราคา/กก.` and `ราคาหน้าใบ` fields now use the existing `InlineMoneyInput` money pattern on both desktop table and mobile card layouts, while quantity/weight fields remain valid number exceptions. The PB detail modal now follows the dark-header `rounded-md` baseline, moves the PB number/supplier into the header title/subtitle, removes the repeated supplier row from the inner document card, and avoids outer/focus outline leakage. Browser QA remains pending because this batch was local code/layout validation only.
+- 2026-07-02 transaction-bill modal follow-up: the Purchase Bill create/edit modal shell now explicitly prevents border/focus leakage with `overflow-hidden`, `border-0`, and outline suppression, and the footer actions now match the modal baseline: outline secondary cancel and slate primary `บันทึก` for normal saves. The shared cancel dialog no longer renders a duplicate header close button when `hideClose` is already set. Browser QA remains pending because this batch was local code/layout validation only.
+- Remaining follow-up: run desktop/mobile browser QA for `/purchase/bills` create/edit/detail/cancel visual confirmation when the selected visual batch reaches browser verification.
+
+### `/purchase/po-buy`
+
+- 2026-07-02 modal polish checkpoint: the PO Buy create/edit modal, detail modal, cancel dialog, and short-close dialog now follow the `rounded-md` dark-header modal baseline with `!p-0`, `border-0`, `overflow-hidden`, outline suppression, no duplicate corner close button, white footer, outline close/cancel controls, and slate `บันทึก` for normal form saves. The add-line action is normal `h-9`, and inner form summary/table cards use `rounded-md` where they were drifting to larger radii. Runtime PO Buy API behavior, remaining/reconciliation logic, Cost Pool availability, PB allocation, stock, AP, VAT, print behavior, and DB state were not changed. Browser/computer-use QA was not run per user instruction.
+- Remaining follow-up: run desktop/mobile browser QA for PO Buy create/edit/detail/cancel/short-close visual confirmation when browser verification is re-enabled.
+
+### `/sales/po-sell`
+
+- 2026-07-01 implementation checkpoint: the PO Sell list already had the page-specific Thai headers and hidden unavailable edit/cancel actions; this pass finished the remaining table/modal drift by aligning the desktop table shell with the lined table baseline, letting the final action column auto-stretch, replacing fixed `colSpan={15}` with the column definition count, and normalizing the create/edit, cancel, and detail dialogs to the `rounded-md` dark-header modal baseline with no outer border/outline leakage. The detail subtitle now keeps readable slate-300 contrast in dark mode. Browser QA remains pending because this batch was local code/layout validation only.
+- 2026-07-02 modal polish follow-up: the PO Sell form, cancel, and detail dialogs now remove duplicate header close buttons when `hideClose` is already set; form footer actions now use outline cancel plus slate primary `บันทึก`; cancel/detail footers use the white footer baseline; the cancel dialog no longer uses `rounded-t-2xl` for the bottom-sheet shell. Runtime PO Sell API behavior, match status, Sales Bill allocation, Cost Allocator, stock, AR, VAT, print behavior, and DB state were not changed. Browser/computer-use QA was not run per user instruction.
+- Remaining follow-up: run desktop/mobile browser QA for PO Sell when the selected visual batch reaches browser verification.
+
+### `/purchase/payments`
+
+- 2026-07-01 implementation checkpoint: the PMA waiting-payment table and PMT history table now align more closely with the `/daily/weight-ticket-list` lined/resizable table baseline. Both desktop tables use `border-slate-200`, `min-w-full divide-y divide-slate-200 text-sm`, final-column auto-stretch, and column-definition based loading/empty `colSpan` values. PMA cancel actions now hide when unavailable instead of rendering disabled controls. The create PMT modal, payment cancel dialog, waiting-payment cancel dialog, and PMT history detail dialog now use the `rounded-md` dark-header modal baseline with hidden corner close controls; the PMT detail header puts the document number in the title and the supplier/party name in the subtitle. Payment money fields already use the money input pattern, so no `type="number"` conversion was needed. Browser QA remains pending because this batch was local code/layout validation only.
+- 2026-07-02 money-movement modal follow-up: the shared PMT/RCP entry modal now uses the no-leak `rounded-md` dark-header shell with `!p-0`, `border-0`, `outline-none`, a white footer, outline cancel/close actions, and a slate `บันทึก` primary action instead of mode-colored save buttons. Payment form money controls that were still `h-8` were raised to `h-9`; compact remove icon buttons remain `h-8` as dense row actions. Runtime API behavior, PMA/PMT allocation rules, account split math, and DB state were not changed. Browser/computer-use QA was not run per user instruction.
+
+### `/daily/payment-approval`
+
+- 2026-07-01 implementation checkpoint: the payment approval AP/advance and expense/petty-return desktop tables now align more closely with the `/daily/weight-ticket-list` lined/resizable table baseline. The tables use `border-slate-200`, `min-w-full divide-y divide-slate-200 text-sm`, final-column auto-stretch, and column-definition based loading/empty `colSpan` values. Table wording now keeps the source/PMA boundary visible (`เลขที่ Source / PMA`, `เอกสารต้นทาง`, `วันที่เอกสาร`, `ยอดตั้งต้น`, `ยอดรออนุมัติ`, `สถานะอนุมัติ`) so pending rows remain source `PB/ADV/EXP` candidates and approved/voided rows remain PMA snapshots. Non-printable pending/voided rows no longer render disabled print checkboxes; only printable approved rows expose selection. The clear-filter control uses `ล้างตัวกรอง`, mobile filters show a real date/status count, tab count badges are round, and the detail dialog now follows the `rounded-md` dark-header modal baseline with no corner close control, no focus outline leakage, document number/party subtitle, and white grouped source/finance/approval cards. Browser QA remains pending because this batch was local code/layout validation only.
+
+### `/sales/receipts`
+
+- 2026-07-01 implementation checkpoint: the RCP waiting-receipt table now aligns more closely with the `/daily/weight-ticket-list` lined/resizable table baseline. The desktop table uses `border-slate-200`, `min-w-full divide-y divide-slate-200 text-sm`, final-column auto-stretch, column-definition based loading/empty `colSpan` values, and its reset-width button now reads/writes the receipt queue column state instead of the payment queue state. Receipt line `receiptAmount`, `withholdingTaxAmount`, and `discountAmount` fields now follow the Field Input Decision Matrix money-input pattern on both desktop and mobile layouts. The receipt cancel, receivable bill detail, and receipt history detail dialogs now use the `rounded-md` dark-header modal baseline with hidden corner close controls; detail headers put the RCP document number in the title and customer name in the subtitle. Browser QA remains pending because this batch was local code/layout validation only.
+- 2026-07-02 money-movement modal follow-up: the RCP create/edit modal now shares the same no-leak shell/footer as PMT, receipt add-line controls are normal `h-9`, mobile receipt line cards and the receipt summary block use `rounded-md`, footer close/cancel actions are outline buttons, and detail dialogs no longer repeat the customer name inside grouped cards when the dark header subtitle already shows it. RCP money fields remain on the text + decimal money-input pattern. Runtime receipt create/edit/cancel behavior, bank statement effects, and AR/SB balance rules were not changed. Browser/computer-use QA was not run per user instruction.
+- 2026-07-02 follow-up: the remaining static table-mechanics drift was corrected. In the RCP queue, `เลขที่ใบรับเงิน` now sorts by the visible RCP document number and `บิลขายอ้างอิง` has its own sortable/resizable business header for the SB reference. In the RCP history table, bill refs, receiving account, WHT, Bank Fee, status, and notes now use sortable `ResizableTableHead` headers with inactive/active up/down indicators; the action column remains resize-only. The history account header now follows the mode (`บัญชีที่รับเงิน` for receipt, `บัญชีที่จ่าย` for payment), and receipt form/detail wording now says `บิลขายที่รับเงิน` instead of `บิลขายที่ทำจ่าย`. Browser/computer-use QA was not run per user instruction.
+- Remaining follow-up: run desktop/mobile browser QA for `/sales/receipts` create/edit/cancel/detail visual confirmation when the selected visual batch reaches browser verification.
+
+### `/daily/expense`
+
+- 2026-07-01 implementation checkpoint: the EXP list now aligns more closely with the `/daily/weight-ticket-list` lined/resizable table baseline. The desktop table uses `border-slate-200`, `min-w-full divide-y divide-slate-200 text-sm`, final-column auto-stretch, and column-definition based loading/empty `colSpan` values. Table wording is page-specific (`เลขที่ EXP`, `วันที่จ่าย`, `เลขอ้างอิง`, `ผู้รับเงิน`, `หมวดค่าใช้จ่าย`, `บัญชีจ่าย`, `สถานะเอกสาร`, `ยอดจ่ายจริง`) instead of generic list labels. The mobile filter button now shows the real count for date/category/account/status filters, the clear-filter action uses `ล้างตัวกรอง`, and unavailable edit/cancel row actions are hidden instead of rendered as a dash. The create/edit form and detail dialog now use the `rounded-md` dark-header modal baseline with hidden corner close controls; the detail header puts the EXP document number in the title and payee in the subtitle. Browser QA remains pending because this batch was local code/layout validation only.
+- Remaining follow-up: run desktop/mobile browser QA for `/daily/expense` list, mobile filters, create/edit form, and detail dialog when the selected visual batch reaches browser verification.
+
+### Stock operation pages
+
+- Routes: `/stock/status-convert`, `/stock/convert`, and `/stock/adjust`.
+- 2026-07-02 modal polish checkpoint: the shared `StockOperationPageClient` create modal now uses the no-border-leak dark-header shell (`rounded-md`, `!p-0`, `border-0`, `bg-slate-900`, outline suppression), a white footer, outline cancel control, and slate `บันทึก` save action. The custom Stock Adjust and Grade Adjustment detail overlays now use a slate outer shell, rounded dark headers, and rounded white footers to avoid corner/border leakage. The Cost Pool manual allocation input is normal `h-9`, and the stock preview panel uses `rounded-md`. Runtime stock APIs, ledger posting/reversal behavior, stock snapshot math, cost-pool allocation formulas, and DB state were not changed. Browser/computer-use QA was not run per user instruction.
+- Remaining follow-up: run desktop/mobile browser QA for stock operation create/detail/reverse flows when browser verification is re-enabled.
+
+### `/production/report`
+
+- 2026-07-01 implementation checkpoint: adjusted `ProductionReportPageClient` so report KPI cards render above the filter, the `ทั้งหมด` quick range no longer shows stale date values as active filters, KPI values append deterministic units where possible, and the tab spacing is tighter. Follow-up corrections removed the duplicate order-count KPI and the ambiguous cost/kg KPI; row count now stays in the table toolbar, while KPI cards focus on analytic production metrics. The WIP and product-summary tabs were also normalized to the same toolbar + table shell as `รายการใบสั่งผลิต`, including `colgroup`, `ResizableTableHead`, sortable headers, resizable column handles, final-column auto-stretch, and reset-width controls instead of separate card headers/badges. The detail table now exposes status, RM, Process, total cost, Loss Value, RM baht/kg, and production cost baht/kg columns explicitly, and the product-summary tab groups from actual `outputProducts` facts rather than the order header product. Browser QA remains pending because this batch is code/layout adjustment only.
+- Keep KPI cards because this is an analytic report page; the cards summarize production performance and are not just duplicating `พบทั้งหมด X รายการ`.
+- Move KPI summary cards to the very top of the page, above the filter section, to comply with the standard List Page Pattern.
+- Remove the outer gray wrapper/background from the KPI cards and use the floating grid layout (AcexPOS style) as per design docs.
+- Keep customer-requested production metric terms as English: `Input`, `Output`, `WIP`, `Loss`, and `Yield`.
+- Rename vague main table headers:
+  - `เลขที่` -> `เลขที่ใบสั่งผลิต`.
+  - `วันที่` -> `วันที่สร้าง` when the column represents production-order creation/order date.
+  - `Total Cost` -> `ต้นทุนรวม`; cost terms that are not customer-requested metric terms should be Thai.
+- Tune report table widths so long business headers such as `เลขที่ใบสั่งผลิต` and `ต้นทุนผลผลิต ฿/กก.` are readable, while product/machine cells may truncate.
+- Cost and value metrics should use neutral color by default; they are not inherently success states. Keep red/green only for meaningful good/bad metrics such as Loss/Yield where applicable.
+- Filter order should follow list-page convention: search first, date range second, export action right aligned on desktop. Use `ล้างตัวกรอง` and show it only when a filter is active.
+- Filter wording must match behavior: search should include production order number, product, machine/type, and branch if the placeholder says so; date range should be labelled `วันที่สร้าง:`.
+- Production/Yield requires segmented filters in the same filter card:
+  - `ช่วงเวลา: ทั้งหมด / วันนี้ / 7 วัน / เดือนนี้`
+  - `สถานะผลิต: ทุกสถานะ / ยังไม่เริ่ม / กำลังผลิต / เสร็จบางส่วน / เสร็จสิ้น / ยกเลิก`
+  - selecting a manual date range should become custom and must not falsely highlight a quick range.
+- Structure the report tables as line tabs instead of stacked tables. Expected tabs: `รายการใบสั่งผลิต`, `WIP คงเหลือ`, and `สรุปตามสินค้า`.
+- Do not repeat the selected tab label as a separate heading above the table. The count/pagination row should sit close to the table as the table toolbar.
+- Main report table should follow `/daily/weight-ticket-list` table mechanics: resizable columns with `defaultWidth` and `minWidth`, sortable `ResizableTableHead`, final-column auto-stretch, reset button in the pagination toolbar, and dense mobile cards grouped by document/date, production descriptors, and metric summary.
+
+### `/production/orders`
+
+- 2026-07-01 implementation checkpoint: the production order list now aligns more closely with the `/daily/weight-ticket-list` and corrected `/production/report` table baseline. The desktop table uses the lined shell, `border-slate-200`, `min-w-full divide-y divide-slate-200 text-sm`, resizable columns, final-column auto-stretch, and page-specific wording (`วันที่สร้าง`, `เลขที่ใบสั่งผลิต`, `สถานะผลิต`). Pagination controls now use the `h-9` baseline and the reset-width action is desktop-only. Filter wording uses `ล้างตัวกรอง`, and the mobile filter button shows the real active date/status count.
+- The create/detail modal now follows the `rounded-md` dark-header baseline with hidden corner close control, document number in the title, product/branch in the subtitle, and no duplicated target-product banner. The header detail tab groups facts into white cards, and unavailable complete/cancel actions are hidden instead of rendered disabled. Input/output movement tables and the selected product stock preview table now use lined table shells, explicit column sizing, final-column stretch, neutral value color, and column-count based empty rows.
+- This batch is UI/layout only. It intentionally does not change the stock-sensitive `/api/production/orders` contract, PI/PO2 writes, reverse behavior, complete/cancel validation, WIP calculation, stock ledger, product-stock API, status lifecycle, or reconciliation rules. Browser QA remains pending because this checkpoint was local code/layout validation only.
+
+## Detailed Static Sidebar Design Audit Checkpoint - 2026-07-01
+
+Scope of this pass:
+
+- Re-parsed `apps/next/src/lib/navigation.ts` as the active sidebar source of truth.
+- Checked 106 unique sidebar routes.
+- Found 104 direct `page.tsx` routes and 2 visible sidebar routes that still fell through to the catch-all scaffold at the start of this audit. `/finance-accounting/accounting-periods` and `/finance-accounting/posting-rules` have since been given direct policy pages.
+- Reviewed page/component code against `docs/design.md`, `docs/agent-rules/ui.md`, and the closest active references, especially `/daily/weight-ticket-list` and the corrected `/production/report`.
+- This is still a static code/design audit only. No browser/DOM UAT was run in this pass because project rules say browser testing should run only when explicitly requested or after selecting a route batch.
+
+Refined static scan counts:
+
+- P1 visible sidebar route without direct page: 0 remaining routes after the Accounting Periods and Posting Rules policy page checkpoints.
+- P2 table exists but does not use `ResizableTableHead` / `useResizableColumns`: 24 routes.
+- P2 table page without a clear mobile card/list alternate after accounting for `md:hidden` and `lg:hidden`: 3 routes.
+- P2 explicit `font-sans` override against the Noto Sans Thai baseline: 4 routes.
+- P2 pages with `type="number"` that need Field Input Decision Matrix review before changing: 21 routes.
+- P2 routes with dialog/modal surfaces that should be reviewed against the dark-header/grouped-card modal baseline: 50 routes.
+- P2 routes with row actions that render disabled edit/cancel-like controls instead of hiding unavailable actions: at least 5 route families.
+- P3 wording/header specificity is widespread; static scan found many generic `เลขที่` / `วันที่` occurrences. Fix page-by-page using the real business meaning rather than blanket replacing.
+
+### P1 Visible Sidebar Routes Still Showing Scaffold
+
+These are visible in `navigation.ts` but have no direct `apps/next/src/app/**/page.tsx`, so they resolve through `apps/next/src/app/[...slug]/page.tsx` and show `Next.js route scaffold`.
+
+- None remaining after the Accounting Periods and Posting Rules policy page checkpoints.
+
+Suggested fix:
+
+- Keep new policy pages in the browser QA queue before claiming visual completion.
+
+Resolved:
+
+- `/finance-accounting/accounting-periods` now has a direct FA5 policy/readiness page with period states, readiness checks, close/freeze impact, pending hardening work, and a Cost Pool-style sortable/resizable fixed-layout lock impact table. Browser QA remains pending.
+- `/finance-accounting/posting-rules` now has a direct FA5 source-to-account mapping readiness page with rule groups, mapping controls, GL/report boundaries, pending hardening work, and a Cost Pool-style sortable/resizable fixed-layout target rule groups table. Browser QA remains pending.
+
+### P2 Table Mechanics Still Older Than The Design Reference
+
+Expected:
+
+- Main data tables should follow `/daily/weight-ticket-list`: lined desktop table, `colgroup`, `ResizableTableHead`, sortable headers where useful, resize handles, explicit column min widths, final-column auto-stretch, reset-width control, and dense mobile card/list view for heavy tables.
+
+Routes/components with high-confidence table mechanics drift:
+
+- Main dashboard/report pages:
+  - None remaining in this static table-mechanics queue after the main dashboard/report table checkpoints below. Browser QA remains pending.
+- Finance / Accounting:
+  - None remaining in this static table-mechanics queue after the A2, A5, A6, and A7 design checkpoints. Browser QA remains pending.
+- Lower-priority playground:
+  - `/daily/design-mockup`
+
+Notes:
+
+- Many finance-accounting pages already have mobile card/list alternates, so the primary issue is desktop table mechanics and old compact `text-xs` table style, not only mobile behavior.
+- Dual Costing table mechanics for `/dual-costing/cost-allocator`, `/dual-costing/cost-pool`, `/dual-costing/deal-margin`, `/dual-costing/match-log`, `/dual-costing/cost-allocation-ledger`, `/dual-costing/report`, and `/dual-costing/waiting-allocations` now have local static design checkpoints. Browser QA remains pending for these routes.
+- Finance/accounting table mechanics for cash-flow planning, financial statements, fixed assets, and loans/equity/opening/historical now have local static design checkpoints. Browser QA remains pending for those slices.
+- Admin Users & Permissions table mechanics for `/admin/users-permissions`, `/admin/users`, and `/admin/roles-permissions` now has a local static design checkpoint: the Users and Roles desktop tables use `ResizableTableHead`, persisted resizable widths, reset-width control, `colgroup`, fixed table layout, and client-side sorting after search; mobile cards use the same sorted row sets. Browser QA remains pending for these routes.
+- Daily Petty Advance table mechanics for `/daily/petty-advance` now has a local static design checkpoint: sortable business headers with inactive/active up/down indicators were added on top of the existing resizable fixed-layout table, and mobile cards use the same sorted paged row set. Browser QA remains pending for this route.
+- Stock Transfer table mechanics for `/stock/transfer` now has a local static design checkpoint: sortable business headers with inactive/active up/down indicators were added on top of the existing resizable fixed-layout table, and mobile cards use the same sorted row set as desktop. Browser QA remains pending for this route.
+
+### P2 Dual Costing Font And Mixed-Language Drift
+
+Affected routes:
+
+- `/dual-costing/cost-allocation-ledger`
+- `/dual-costing/cost-allocator`
+- `/dual-costing/report`
+- `/dual-costing/waiting-allocations`
+
+Expected:
+
+- Do not add explicit `font-sans`; controls/cards/tables should inherit the app baseline `Noto Sans Thai`.
+- Thai-first business table headings should be used unless the business term is intentionally English.
+
+Observed examples:
+
+- `CostAllocatorPageClient.tsx` includes a button with `font-sans`.
+- Dual Costing tables still show mixed headers such as `Customer`, `Counterparty`, `Source`, `Available`, `Matched`, `Revenue`, `Avg Cost`, and `Match Status`.
+
+Suggested fix:
+
+- Remove `font-sans` overrides first.
+- Normalize Dual Costing table shell and headers in one focused batch rather than patching each label ad hoc.
+
+### P2 Operational Pages With Modal / Action / Wording Drift
+
+High-impact route families:
+
+- `/purchase/bills` and `/sales/bills`
+  - `/sales/bills` has a 2026-07-01 local design checkpoint for table wording/actions, mobile filter count, final-column auto-stretch, Sales Bill detail grouped cards, and Sales Bill/cancel modal radius normalization.
+  - `/purchase/bills` has a 2026-07-01 local design checkpoint for purchase form corner-close removal, PB item money fields, and PB detail modal radius/header/detail-card normalization.
+- `/purchase/payments` and `/sales/receipts`
+  - `/purchase/payments` has a 2026-07-01 local design checkpoint for table shell/colgroup/colSpan cleanup, hidden unavailable PMA cancel actions, PMT form/cancel/detail modal radius normalization, and money-pattern confirmation.
+  - `/sales/receipts` has a 2026-07-01 local design checkpoint for RCP queue table shell/colgroup/colSpan cleanup, receipt queue reset-width state, receipt cancel/detail modal radius normalization, and receipt line money fields through the Field Input Decision Matrix.
+  - 2026-07-02 follow-up: RCP queue sorting now separates displayed RCP doc number from referenced Sales Bill doc number, `บิลขายอ้างอิง` is sortable/resizable, and the RCP history table now has sortable up/down `ResizableTableHead` headers for bill refs, receiving account, WHT, Bank Fee, status, and notes. Receipt wording was corrected from `บิลขายที่ทำจ่าย` to `บิลขายที่รับเงิน`. Browser/computer-use QA was not run per user instruction.
+  - 2026-07-02 money-movement modal follow-up: PMT/RCP shared entry, cancel, and detail surfaces now align with the dark-header/no-border-leak modal baseline; form controls that were still `h-8` became `h-9` except compact remove icons; duplicate customer fields were removed from RCP detail grouped cards. Browser/computer-use QA was not run per user instruction.
+- `/daily/transfer`
+  - 2026-07-01 design polish completed for the high-confidence static findings: transfer table shell/final-column auto-stretch, page-specific TRF/date/account/amount headers, mobile filter count, neutral quick-range filters, hidden unavailable cancel action, and rounded-md dark-header transfer form/detail surfaces.
+  - Remaining: browser QA for desktop/mobile visual confirmation.
+- `/daily/expense`
+  - 2026-07-01 design polish completed for the high-confidence static findings: EXP table shell/final-column auto-stretch, page-specific EXP/date/payee/category/account/status/amount headers, mobile filter count, hidden unavailable edit/cancel action, and rounded-md dark-header expense form/detail surfaces.
+  - Remaining: browser QA for desktop/mobile visual confirmation.
+- `/purchase/receipt-vouchers`
+  - 2026-07-01 design polish completed for the high-confidence static findings: page-specific headers/filter wording, final-column auto-stretch, desktop action alignment, hidden unavailable edit/cancel actions, and dark-header modal surfaces.
+  - Remaining: browser QA for desktop/mobile visual confirmation.
+- `/sales/po-sell`
+  - 2026-07-01 design polish completed for the high-confidence static findings: table wording/action visibility is aligned, the final action column auto-stretches, and create/edit, cancel, and detail dialogs now follow the `rounded-md` dark-header modal baseline.
+  - Remaining: browser QA for desktop/mobile visual confirmation.
+- `/daily/payment-approval`
+  - 2026-07-01 design polish completed for the high-confidence static findings: AP/advance and expense/petty-return table shell/final-column auto-stretch, source/PMA wording, column-count based empty/loading rows, hidden unavailable print checkboxes, mobile filter count, and rounded-md dark-header detail modal with grouped cards.
+  - Remaining: browser QA for desktop/mobile visual confirmation.
+- `/production/orders`, stock operation pages, tracking pages, and trading pages
+  - `/production/orders` has a 2026-07-01 local design checkpoint for list table wording/shell, pagination sizing, mobile filter count, dark-header modal surfaces, grouped detail cards, hidden unavailable complete/cancel actions, and movement/stock-preview table shells.
+  - `/tracking/customer` main table has a 2026-07-01 table-mechanics checkpoint: sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted column widths, fixed table layout, and mobile cards rendering from the same sorted row set as desktop.
+  - Remaining stock operation, tracking, and trading pages are mainly modal-surface or secondary-detail-table review items: normalize detail/form dialog header, border/radius, grouped card layout, avoid border leakage, and review plain detail tables only when that page batch is selected.
+  - Do not change business behavior during these visual passes.
+
+### P2 Field Input Matrix Review Queue
+
+Do not blanket replace these. Check each field against the `Field Input Decision Matrix` in `docs/design.md` when the page is in the selected fix batch.
+
+Affected route families:
+
+- `/daily/weight-ticket-list`
+- `/dual-costing/cost-allocator`
+- `/finance-accounting/profit-leak`
+- `/finance-accounting/stock-finance`
+- `/finance-accounting/working-capital`
+- `/master-data/customers`
+- `/purchase/advance-payments`
+- `/purchase/bills`
+- `/purchase/payments`
+- `/sales/bills`
+- `/sales/receipts`
+- `/sales-plan`
+- `/sales-commission`
+- `/stock/adjust`
+- `/stock/convert`
+- `/stock/status-convert`
+- `/stock/transfer`
+- `/tracking/customer`
+- `/tracking/product`
+- `/tracking/supplier`
+- `/trading/dashboard`
+
+Expected:
+
+- Money/price/value/VAT/WHT/discount fields should use the money pattern.
+- Quantities, weights, percentages, and intentionally numeric counts may remain number inputs only when the matrix allows it and spinner clutter is hidden.
+
+### Pages That Are Closer To Current Design
+
+- `/daily/weight-ticket-list`
+  - Remains the primary list/table reference.
+  - It has desktop resizable/sortable table, mobile filters, mobile card list, table shell, and pagination/reset controls.
+- `/business-calendar`
+  - After the latest correction, the Combined daily table and Expense, Purchase, and Sales detail tables now use the active lined/resizable table shell with persisted column widths, reset-width controls, sortable up/down headers, fixed table layout, Thai-first business headers, and safer nowrap/tabular numeric alignment.
+  - Mobile cards now render from the same sorted row sets as the desktop tables. Month/mode filters, KPI cards, chart data, purchase/sales/expense/receipt/payment sources, AP/AR values, Actual GP, Net Cash, and read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/cash-flow-calendar`
+  - After the latest correction, the day-entry detail table inside the cash day modal now uses the active lined/resizable table shell with persisted column widths, reset-width control, sortable up/down headers, fixed table layout, Thai-first business headers, and safer nowrap/tabular numeric alignment for cash-in/cash-out values.
+  - Mobile entry cards now render from the same sorted row set as the desktop modal table. Month controls, KPI cards, charts, calendar grid, opening/ending cash, net cash formula, source rows, and read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/cash-others-summary`
+  - After the latest correction, the Cash Accounts table now uses the active lined/resizable table shell with persisted column widths, reset-width control, sortable up/down headers, fixed table layout, and safer nowrap/tabular numeric alignment for Balance and THB Equivalent.
+  - Mobile account cards now render from the same sorted row set as the desktop table. As-of filter, KPIs, Trading Pending cards, asset/debt donut data, AR aging, receivable/debt/stock key rows, and read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/finance/bank`
+  - After the latest correction, the Bank Statement detail table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, persisted resizable widths, reset-width control, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile cards now render from the same sorted row set as desktop. Account/date/search/ref/type filters, server date sort query, Excel export, charts, account/OD summaries, detail modal, and API/read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/finance/customer-advance`
+  - After the latest correction, the Customer Advance list table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, persisted resizable widths, reset-width control, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile cards now render from the same sorted row set as desktop. Export, summary KPIs, disabled create/cancel actions, allocation source messaging, and API/read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/finance/supplier-advance`
+  - After the latest correction, the Supplier Advance list table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, persisted resizable widths, reset-width control, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile cards now render from the same sorted row set as desktop. Export, summary KPIs, disabled create/cancel actions, allocation source messaging, and API/read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/sales-plan`
+  - After the latest correction, the plan table, sales-plan vs stock analysis table, and remaining-stock table now use the active lined/resizable table shell with persisted column widths, reset-width controls, sortable up/down headers, fixed table layout, Thai-first business headers, and safer nowrap/tabular numeric alignment.
+  - Mobile cards now render from the same sorted row sets as their desktop tables. LME config, filters, KPI totals, CSV export contents, plan lock/write behavior, stock/WAC source, best-plan price, projected profit, margin formula, and read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/sales-commission`
+  - After the latest correction, the overview sales/category summary table and selected-sales drilldown tables now use the active lined/resizable table shell with persisted column widths, reset-width controls, sortable up/down headers, fixed table layout, and safer nowrap/tabular numeric alignment.
+  - The overview table was flattened from nested mini tables into a real sortable/resizable table. Date/branch filters, salesperson cards, commission eligibility, annual/current totals, supplier grouping, bill detail search, CSV export contents, step-tier commission formula, and read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/trading/dashboard`
+  - After the latest correction, the Trading Cost Source modal table, Stock / Cost Source Readiness table, Trading by Product table, Trading Purchase table, and Trading Sales table now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Product, purchase, sales, and readiness mobile cards now render from the same sorted row sets as desktop. Dashboard filters, KPI totals, aging buckets, cost-source create behavior, allocation facts, GP formulas, and DB/API behavior were not changed.
+  - Browser QA remains pending.
+  - 2026-07-02 modal/filter polish follow-up: the dashboard filter shell now uses the current `rounded-md bg-white p-3 shadow` baseline with `rounded-md` controls, and the Trading Cost Source modal now uses the dark-header no-border-leak modal baseline with `hideClose`, `rounded-md`, `border-0`, `bg-slate-900`, `!p-0`, shadow, outline suppression, a slate scroll body, slate `บันทึก` save action, and a white footer with an outline `ปิด` action. The custom header `X` close button was removed. Trading purchase/sales/product/readiness tables, manual cost-source save API, filters, matched COGS/GP formulas, aging buckets, source links, API behavior, and DB state were not changed. Browser/computer-use QA was not run per the current instruction.
+- `/trading/matching`
+  - After the latest correction, the allocation rows table and Trading purchase/cost source remaining table now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting before pagination, persisted resizable widths, reset-width controls, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Allocation and remaining-cost mobile cards now render from the same sorted paged row sets as desktop. Export query, allocation facts, ex-VAT GP formula, filters, read-only correction boundary, detail modal behavior, and API/DB state were not changed.
+  - Browser QA remains pending.
+  - 2026-07-02 modal polish follow-up: the deal detail dialog now uses the dark-header no-border-leak modal baseline with `hideClose`, `rounded-md`, `border-0`, `bg-slate-900`, `!p-0`, shadow, outline suppression, a slate scroll body, and a white footer with an outline `ปิด` action. The custom header `X` close button was removed. Allocation rows, remaining cost rows, export query, ex-VAT GP formula, filters, read-only correction boundary, API behavior, and DB state were not changed. Browser/computer-use QA was not run per the current instruction.
+- `/production/report`
+  - After the latest correction, the report, WIP, and product-summary tables now share the same toolbar/table mechanics and mobile card pattern.
+  - Browser QA remains pending.
+- `/production/production-cost-report`
+  - Supporting route note: this page is no longer in the active Production menu, but its existing cost breakdown table now uses sortable `ResizableTableHead` headers with inactive/active up/down indicators, derived-column sorting, persisted resizable widths, reset-width control, `colgroup`, and fixed table layout. Mobile cost cards and CSV export now follow the same sorted row order.
+  - Production cost API behavior, RM/process-cost formulas, allocation method display, filters, summary cards, stock/ledger behavior, and DB state were not changed. Browser/computer-use QA was not run per the current instruction.
+- `/stock/transfer`
+  - After the latest correction, the stock transfer list table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting of the displayed row set before rendering, the same sorted row set for mobile cards, persisted resizable widths, a reset-width control, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - ST draft/post/cancel policy, paired stock ledger movement, source-stock preview, ready-stock validation, filters, server pagination, summary KPIs, create/edit/post modal behavior, API behavior, and DB state were not changed.
+  - Browser QA remains pending.
+- `/daily/petty-advance`
+  - After the latest correction, the petty advance table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting before pagination, the same sorted paged row set for mobile cards, persisted resizable widths, a reset-width control, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - PADV/PRET business behavior, bank statement timing, recipient account snapshots, return-money validation, filters, summary KPIs, create/edit/return modal behavior, API behavior, and DB state were not changed.
+  - Browser QA remains pending.
+- `/production/reconciliation`
+  - After the latest correction, the reconciliation issue table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting before rendering, the same sorted row set for mobile cards, persisted resizable widths, a reset-width control, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Reconciliation issue detection, PI/PO2 ledger checks, WIP calculation, filters, summary KPIs, API behavior, and DB state were not changed.
+  - Browser QA remains pending.
+- `/profit-cost-analysis`
+  - After the latest correction, the product, supplier, customer, channel, trend, and alert tables now use the active lined/resizable table shell with persisted column widths, reset-width controls, sortable up/down headers, fixed table layout, and safer nowrap/tabular numeric alignment.
+  - Mobile cards now render from the same sorted row sets as the desktop tables. Profit/Cost formulas, filters, summary cards, top-product charts, AP/AR values, stock values, and read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/purchase/receipt-vouchers`
+  - After the latest correction, the list table/action/filter wording and RV modal surfaces follow the active baseline more closely.
+  - Browser QA remains pending.
+- `/sales/bills`
+  - After the latest correction, the Sales Bill list table/action/filter and detail/cancel modal surfaces follow the active baseline more closely.
+  - Browser QA remains pending.
+- `/sales/po-sell`
+  - After the latest correction, the PO Sell list table/action and form/cancel/detail modal surfaces follow the active baseline more closely.
+  - Browser QA remains pending.
+- `/dual-costing/cost-allocator`
+  - After the latest correction, the target-sale table, Cost Pool lot table, and Preview table now use the active lined/resizable table shell with Thai-first business headers, reset-width controls, and dense mobile cards.
+  - Follow-up correction after visual feedback: every business header in all three tables now uses `ResizableTableHead` sorting props, shows inactive/active up/down sort indicators, applies client-side ascending/descending sorting before pagination or preview slicing, and uses fixed table layout so resize handles visibly adjust the columns like `/dual-costing/cost-pool`.
+  - The page no longer overrides the app font with `font-sans`, and the Manual target-cost field now uses the money input pattern instead of `type="number"`.
+  - Browser QA remains pending.
+- `/dual-costing/cost-pool`
+  - After the latest correction, the main Cost Pool table now uses the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width control, and final status-column auto-stretch.
+  - Follow-up correction after visual feedback: every business header now uses `ResizableTableHead` sorting props, shows inactive/active up/down sort indicators, applies client-side ascending/descending sorting before pagination, and uses fixed table layout so resize handles visibly adjust the columns like `/daily/weight-ticket-list` and `/sales/po-sell`.
+  - The table now shows the branch column already present in the read model, mobile uses dense cards from the same sorted paged row set instead of horizontal table scrolling, and filter/pagination wording/sizing follows the shared list baseline more closely.
+  - Browser QA remains pending.
+- `/dual-costing/match-log`
+  - After the latest correction, the desktop audit table now uses the active lined/resizable table shell with persisted column widths, reset-width control, and column-definition based loading/empty `colSpan` values.
+  - Follow-up correction after visual feedback: every business header now uses `ResizableTableHead` sorting props, shows inactive/active up/down sort indicators, applies client-side ascending/descending sorting after PO Sell target filtering and before pagination, and uses fixed table layout so resize handles visibly adjust the columns like `/dual-costing/cost-pool`.
+  - Reverse remains a disabled/read-only shell; this pass did not change API behavior, export contract, reverse policy, or DB state.
+  - Browser QA remains pending.
+- `/dual-costing/cost-allocation-ledger`
+  - After the latest correction, the desktop allocation ledger table now uses the active lined/resizable table shell with persisted column widths, reset-width control, and column-definition based loading/empty `colSpan` values.
+  - Follow-up correction after visual feedback: every business header now uses `ResizableTableHead` sorting props, shows inactive/active up/down sort indicators, applies client-side ascending/descending sorting before pagination, and uses fixed table layout so resize handles visibly adjust the columns like `/dual-costing/cost-pool`.
+  - Ledger API behavior, calculations, reverse policy, report views, and DB state were not changed.
+  - Browser QA remains pending.
+- `/dual-costing/deal-margin`
+  - After the latest correction, the per-deal desktop table now uses the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width control, final status-column auto-stretch, and a shared pagination toolbar.
+  - Follow-up correction after visual feedback: every business header now uses `ResizableTableHead` sorting props, shows inactive/active up/down sort indicators, applies client-side ascending/descending sorting before pagination, and uses fixed table layout so resize handles visibly adjust the columns like `/dual-costing/cost-pool`.
+  - The mobile card list now uses the same paged row set as desktop and uses clearer Thai-first labels for revenue, matched cost, deal margin, and match status.
+  - Browser QA remains pending.
+- `/dual-costing/report`
+  - After the latest correction, the category summary report table now uses the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width control, and column-definition based empty `colSpan` values.
+  - Every business header now uses `ResizableTableHead` sorting props, shows inactive/active up/down sort indicators, applies client-side ascending/descending sorting before rendering, and uses fixed table layout so resize handles visibly adjust the columns like `/dual-costing/cost-pool`.
+  - The mobile category cards now use the same sorted row set as the desktop report table. Report formulas, Deal Cost/WAC boundary, API behavior, and DB state were not changed.
+  - Browser QA remains pending.
+- `/dual-costing/waiting-allocations`
+  - After the latest correction, the summary-by-category desktop table now uses the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width control, and column-definition based empty `colSpan` values.
+  - Summary headers now use `ResizableTableHead` sorting props, show inactive/active up/down sort indicators, apply client-side ascending/descending sorting before rendering, and use fixed table layout so resize handles visibly adjust the columns like `/dual-costing/cost-pool`.
+  - The mobile summary cards now use the same sorted row set as the desktop summary table, and page-local `font-sans` overrides were removed. Waiting allocation APIs, filters, Cost Allocator links, allocation statuses, and DB state were not changed.
+  - Browser QA remains pending.
+- Financial statements finance pages: `/finance-accounting/pl-statement`, `/finance-accounting/balance-sheet`, and `/finance-accounting/cash-flow-statement`
+  - After the latest correction, the shared Statement tables and drilldown detail modal now use the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width controls, and safer nowrap/tabular numeric alignment.
+  - Follow-up correction after visual feedback: the shared Statement tables and drilldown detail modal now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting before rendering, fixed table layout so resize handles visibly adjust columns, and the same sorted row sets for mobile cards.
+  - KPI/report cards, management baseline notice, disabled Excel affordance, and existing mobile card views were preserved.
+  - Browser QA remains pending.
+- Cash-flow planning finance pages: `/finance-accounting/cash-flow-analysis` and `/finance-accounting/cf-forecast-calendar`
+  - After the latest correction, the Cash Flow Analysis detail table, Forecast Calendar Top AR/AP insight tables, and day-event detail modal now use the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width controls, and safer nowrap/tabular numeric alignment.
+  - Follow-up correction after visual feedback: the Cash Flow Analysis detail table, Forecast Calendar Top AR/AP insight tables, and day-event detail modal now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting before rendering, fixed table layout so resize handles visibly adjust columns, and the same sorted row sets for mobile cards.
+  - Existing charts, cards, calendar grid, filter layout, baseline notice, and mobile card views were preserved.
+  - Browser QA remains pending.
+- Loans/equity/opening/historical finance pages: `/finance-accounting/loan-contracts`, `/finance-accounting/loan-dashboard`, `/finance-accounting/equity-maint`, `/finance-accounting/opening-balance`, and `/finance-accounting/historical-data`
+  - After the latest correction, the Loan Contracts desktop table, Loan Dashboard upcoming/overdue due tables, Opening Balance accounts table, and Historical Data dynamic month table now use the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width controls, and safer nowrap/tabular numeric alignment.
+  - Follow-up correction after visual feedback: Loan Contracts, Loan Dashboard upcoming/overdue due tables, Opening Balance accounts, and Historical Data dynamic month tables now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting before pagination or rendering, fixed table layout so resize handles visibly adjust columns, and the same sorted row sets for mobile cards. `/finance-accounting/equity-maint` has no main table in this slice.
+  - Existing KPI cards, tabs, disabled write/import actions, mobile card views, and the Equity read card/form layout were preserved.
+  - Browser QA remains pending.
+- Fixed assets finance pages: `/finance-accounting/asset-register`, `/finance-accounting/depreciation`, `/finance-accounting/asset-disposal`, and `/finance-accounting/asset-overview`
+  - After the latest correction, the visible desktop tables in the fixed-assets slice now use the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width controls, and safer nowrap/tabular numeric alignment.
+  - Follow-up correction for `/finance-accounting/asset-register`: the main Asset Register table now uses sortable business headers with inactive/active up/down indicators, applies client-side sorting before pagination, shares the sorted paged rows with mobile cards, and uses fixed table layout so column resizing behaves like `/dual-costing/cost-pool`.
+  - Follow-up correction for `/finance-accounting/depreciation`: both the Depreciation History table and Pending Assets table now use sortable business headers with inactive/active up/down indicators, apply client-side sorting before rendering/pagination, share sorted row sets with mobile cards, and use fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Follow-up correction for `/finance-accounting/asset-disposal`: the Asset Disposal History table now uses sortable business headers with inactive/active up/down indicators, applies client-side sorting before pagination, shares the sorted paged rows with mobile cards, and uses fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Follow-up correction for `/finance-accounting/asset-overview`: the Cash & Others table now uses sortable business headers with inactive/active up/down indicators, applies client-side sorting before rendering, shares the sorted row set with mobile cards, and uses fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Covered tables: Asset Register, Depreciation pending-assets, Depreciation History, Asset Disposal History, and Asset Overview Cash & Others. Existing mobile cards were preserved.
+  - Browser QA remains pending.
+- `/finance-accounting/accounting-periods`
+  - After the latest correction, the Close / freeze impact matrix now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, persisted resizable widths, reset-width control, fixed table layout, and mobile cards from the same sorted row set.
+  - Accounting Period DB model, write guards, readiness calculations, snapshot rebuild flow, year-close policy, report behavior, and DB state were not changed.
+  - Browser QA remains pending.
+- `/finance-accounting/posting-rules`
+  - After the latest correction, the Target rule groups readiness matrix now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, persisted resizable widths, reset-width control, fixed table layout, and mobile cards from the same sorted row set.
+  - GL posting, account mapping schema, readiness API, Accounting Period lock policy, rule versioning, report-helper behavior, and DB state were not changed.
+  - Browser QA remains pending.
+- `/tracking/customer`
+  - After the latest correction, the main Customer Tracking table now uses the active table mechanics: resizable desktop columns, sortable `ResizableTableHead` headers with inactive/active up/down indicators, fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`, and mobile cards backed by the same sorted row set.
+  - Follow-up correction: the Year Compare matrix now also uses sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width control, `colgroup`, and fixed table layout; mobile Year Compare renders compact customer/month cards from the same sorted row set instead of a wide horizontal table.
+  - Customer filters, export, top customer charts, detail drilldown data, AR aging, GP/receivable formulas, source links, API behavior, and DB state were not changed.
+  - Browser QA remains pending.
+  - 2026-07-02 modal polish follow-up: the Customer Tracking detail dialog now uses the dark-header no-border-leak modal baseline with `hideClose`, `rounded-md`, `border-0`, `bg-slate-900`, `!p-0`, shadow, outline suppression, a slate scroll body, and a white footer with an outline `ปิด` action. Customer filters, export, detail data, formulas, API behavior, and DB state were not changed. Browser/computer-use QA was not run per the current instruction.
+- `/tracking/supplier`
+  - After the latest correction, the Product breakdown table and Year Compare matrix now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Product breakdown mobile cards now use the same sorted top-20 row set as desktop, and Year Compare mobile now renders dense month cards from the same sorted row set instead of a wide mobile table scroll. Supplier filters, export, top-10 panels, detail drilldown tables, AP/payable formulas, API behavior, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+  - 2026-07-02 modal polish follow-up: the Supplier Tracking detail dialog now uses the dark-header no-border-leak modal baseline with `hideClose`, `rounded-md`, `border-0`, `bg-slate-900`, `!p-0`, shadow, outline suppression, a slate scroll body, and a white footer with an outline `ปิด` action. Supplier filters, export, PB/PMT/WTI/Grade Adjust/product/monthly detail data, AP/reliability formulas, API behavior, and DB state were not changed. Browser/computer-use QA was not run per the current instruction.
+- `/tracking/product`
+  - After the latest correction, the Product Tracking Year Compare matrix now uses sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile Year Compare now renders compact product/month cards from the same sorted row set as desktop. Product filters, export, top panels, detail drilldown tables, monthly product facts, purchase/sales/GP formulas, API behavior, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+  - 2026-07-02 modal polish follow-up: the Product Tracking detail dialog now uses the dark-header no-border-leak modal baseline with `hideClose`, `rounded-md`, `border-0`, `bg-slate-900`, `!p-0`, shadow, outline suppression, a slate scroll body, and a white footer with an outline `ปิด` action. Product filters, export, purchase/sales/monthly/production/allocation detail data, Stock Balance support link, COGS/GP formulas, API behavior, and DB state were not changed. Stock/WAC were not reintroduced to the primary table/export. Browser/computer-use QA was not run per the current instruction.
+- `/production/dashboard`
+  - After the latest correction, the Top 10 products and Machine Utilization widget tables now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile product and machine cards render from the same sorted row sets as desktop. Production dashboard API behavior, filters, KPI cards, chart data, top-product/machine formulas, stock ledger behavior, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+- `/dashboard`
+  - After the latest correction, the Receivables & Payables Aging and Stock by Group widget tables now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile aging and stock-group cards render from the same sorted row sets as desktop. Dashboard API behavior, filters, KPI cards, period logic, historical monthly merge, AR/AP aging formulas, stock valuation/grouping logic, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+- `/owner-daily`
+  - After the latest correction, the daily AR/AP due tables plus the loan/expense small tables now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile due/expense cards render from the same sorted row sets as desktop. Owner Daily API behavior, cash-plan formula, expected in/out logic, pending counts, loan/expense source rows, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+- `/daily-report`
+  - After the latest correction, the expanded product-by-group detail table, daily purchase bill table, daily sales bill table, and cash movement account table now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile product/bill cards render from the same sorted row sets as desktop, and the cash account table now has compact mobile cards from the sorted account rows. Daily Report API behavior, daily summary formulas, group breakdown formulas, purchase/sales bill source rows, cash movement calculations, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+- `/daily/expense-dashboard`
+  - Follow-up after the latest static scan: the read-only expense heatmap now uses sortable `ResizableTableHead` headers with inactive/active up/down indicators on the large desktop heatmap while preserving persisted resizable widths, `colgroup`, and fixed table layout.
+  - The tablet simplified table now also uses sortable/resizable headers, persisted widths, reset-width support, `colgroup`, and fixed table layout instead of a plain table. Mobile cards now render from the same sorted dashboard row set as desktop/tablet.
+  - Expense dashboard API behavior, legacy `amount + vat` math, active-category bucket logic, anomaly thresholds, period selector behavior, expense write flow, and DB state were not changed. Browser/computer-use QA was not run per the current instruction.
+- `/analytics-dashboard`
+  - Static follow-up after the latest correction: the rendered analytics tables already use sortable `ResizableTableHead` headers, persisted resizable widths, `colgroup`, fixed table layout, reset-width controls where applicable, and mobile card alternatives.
+  - Removed unused stale `DueTable` and `BillTable` helpers from `MainDashboardsPageClient.tsx`; they were not rendered by any route and only caused static scans to flag old non-resizable table markup. Analytics API behavior, formulas, filters, KPI cards, chart rows, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+- Master data shared pages under `/master-data/*`
+  - Most shared pages use `MasterDataPageClient`, which already has resizable desktop table, mobile toolbar/filter bottom sheet, mobile card list, and dark-header form modal.
+  - Remaining work is mostly modal polish, wording cleanup, and field-specific validation/presentation, not a full table rewrite.
+- `/finance/ar` and `/finance/ap`
+  - Both have resizable desktop tables and mobile card lists.
+  - `/finance/ar` wording checkpoint on 2026-07-02: AR summary/detail table headers, customer filter, aging bucket display, export copy, mobile summary card labels, and drilldown labels now use Thai-first, business-specific wording (`ลูกค้า`, `เลขที่บิลขาย`, `วันที่ออกบิล`, `วันครบกำหนด`, `ยังไม่ครบกำหนด`, `ช่องทางขาย`) while keeping the existing resizable/fixed-layout table mechanics. AR API, aging formulas, filters, export payload, pagination, sort keys, and DB state were not changed.
+  - `/finance/ar` follow-up table mechanics correction on 2026-07-02: the customer summary desktop table now also has sortable `ResizableTableHead` headers with inactive/active up/down indicators, client-side sorting before summary pagination, and the mobile summary cards use the same sorted paged row set. The AR detail table already had sortable/resizable fixed-layout behavior. AR API, formulas, filters, export payload, drilldown allocation facts, permissions, and DB state were not changed.
+  - `/finance/ap` design checkpoint on 2026-07-02: the supplier summary desktop table now has sortable `ResizableTableHead` headers with inactive/active up/down indicators, client-side sorting before pagination, explicit min widths, fixed layout, reset-width control, and final-column auto-stretch. AP summary/detail headers, supplier filter, aging bucket options, export copy, mobile cards, and drilldown labels now use Thai-first AP/PB wording (`ผู้ขาย`, `วันนี้/อนาคต`, `เลขที่บิลรับซื้อ`, `วันที่บิล`, `อายุหนี้`, `ยอดบิล`, `บิลรับซื้อ`, `ที่มา`). AP API, balance source, aging formulas, filters, export payload, pagination, payment allocation/drilldown data, and DB state were not changed. Browser/computer-use QA was not run per user instruction.
+
+- `/finance/foreign/fx-gain-loss-report`
+  - After the latest correction, the FX Gain/Loss desktop table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting, persisted resizable widths, a reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile FX Gain/Loss cards now render from the same sorted row set as desktop. The foreign finance read API, date/currency/ref-type filters, permission boundary, FX source rows, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+
+- `/finance/foreign/fcd-ledger`
+  - After the latest correction, the FCD Ledger desktop table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting, persisted resizable widths, a reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile FCD cards now render from the same sorted row set as desktop, and visible dates use the shared display formatter while preserving the opening-balance `-` row. The FCD read API, account selector contract, conservative foreign movement rule, FX lookup, permissions, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+
+- `/finance/foreign/fx-rate`
+  - After the latest correction, the FX Rate desktop rate-history table now uses sortable `ResizableTableHead` headers with inactive/active up/down indicators, client-side ascending/descending sorting, persisted resizable widths, a reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile FX Rate cards now render from the same sorted row set as desktop. The action column remains a presentation/action surface; FX rate API behavior, create/edit validation, latest-rate cards, date/currency/status filters, permissions, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+
+- `/finance/foreign/intl-transfer`
+  - After the latest correction, the International Transfer desktop table now uses sortable `ResizableTableHead` headers with inactive/active up/down indicators, client-side ascending/descending sorting, persisted resizable widths, a reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile International Transfer cards now render from the same sorted row set as desktop. Placeholder read-model columns that currently display `-` remain presentation-only; API behavior, disabled draft/bank-send form behavior, selector payloads, permission boundary, bank statement source rows, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+
+- `/finance/foreign/overseas-receipt`
+  - After the latest correction, the Overseas Receipt desktop table now uses sortable `ResizableTableHead` headers with inactive/active up/down indicators, client-side ascending/descending sorting, persisted resizable widths, a reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile Overseas Receipt cards now render from the same sorted row set as desktop. Placeholder read-model columns that currently display `-` remain presentation-only; API behavior, disabled draft/bank/FCD posting form behavior, selector payloads, permission boundary, bank statement source rows, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+
+- `/admin/line-settings`
+  - After the latest correction, the Targets / Groups, Routing Rules, and Outbox Queue desktop tables now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting before rendering, persisted resizable widths, reset-width controls, and fixed table layout.
+  - The mobile target/rule/job cards render from the same sorted row sets as desktop. LINE credential save, target sync/test/default/delete, rule save/delete/simulate, outbox retry/cancel/process, analytics, API behavior, and DB state were not changed.
+  - Browser QA remains pending.
+
+- `/admin/transaction-ledger`
+  - After the latest correction, the main read-only ledger table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting after filters, persisted resizable widths, a reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile ledger cards now render from the same sorted row set as desktop, and current client-side CSV export follows that sorted display order. Ledger read API, Excel export API, account cards, duplicate diagnostics, filters, permissions, and DB state were not changed.
+  - Browser QA remains pending.
+
+- `/admin/audit`
+  - After the latest correction, the main Audit & Activity Log table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting of the current page rows, persisted resizable widths, a reset-width control, and fixed table layout.
+  - Mobile audit cards render from the same sorted row set as desktop, and current-page CSV export follows that sorted order. `/api/admin/auth-events`, audit source, permission boundary, filters, pagination, and detail modal facts were not changed.
+  - Browser QA remains pending.
+
+- `/admin/migration-tools`
+  - After the latest correction, the Snapshot auto-backup table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, persisted resizable widths, a reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - The table remains a small support-page empty-state table; no separate mobile card layer was added in this pass. Backup/restore/reset/cloud sync behavior, permissions, API behavior, and DB state were not changed.
+  - Browser QA remains pending.
+
+- `/admin/system-settings`
+  - After the latest correction, the WHT settings desktop table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting, persisted resizable widths, reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile WHT cards now render from the same sorted row set as the desktop table. VAT/WHT master-data APIs, default WHT behavior, save confirmation flow, permissions, and DB state were not changed.
+  - Browser QA remains pending per the current instruction to avoid Computer Use/browser verification.
+
+
+- `/reports`
+  - After the latest correction, the aggregate report table and report catalog table now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Aggregate mobile cards use the same sorted row set as desktop, catalog mobile cards use the same sorted filtered row set as desktop, and CSV export follows the displayed aggregate sort order. Report formulas, catalog routes, filters, API behavior, permissions, and DB state were not changed.
+  - Browser QA remains pending.
+
+### Static Table Mechanics Rescan - 2026-07-02
+
+After completing the Foreign Finance table sweep, tracked `apps/next/src` TS/TSX files were rescanned for table mechanics without using browser/Computer Use.
+
+- Scope: tracked app source only; scratch/untracked tool files were excluded.
+- Result: 80 tracked files contain `<table>`.
+- High-confidence remaining primary sidebar list tables without Cost Pool-style resize/sort/fixed-layout mechanics: none found in this static pass.
+- Remaining non-matching hits were classified as intentional/static contexts: print-preview HTML, direct/detail pages, modal/form sub-tables, system-manual field documentation, design mockup playground, and the shared low-level `Table` wrapper. These should not be bulk-converted without a page-specific design decision because resize/sort would add behavior where the user is reading a document, filling line items, or viewing print/detail content rather than operating a primary list table.
+- Browser QA / real-data visual confirmation remains pending because the current instruction is to avoid browser/Computer Use.
+
+### Final Static Table Mechanics Classification - 2026-07-02
+
+After the `/daily/expense-dashboard` follow-up, tracked `apps/next/src` TS/TSX files were rescanned again from code only, with browser/Computer Use intentionally disabled by the latest user instruction.
+
+- Static implementation phases remaining: `0`.
+- High-confidence active sidebar primary/list/dashboard tables still missing Cost Pool-style resize/sort/fixed-layout behavior: `0`.
+- Active primary tables checked in this final static pass include the previously risky families: Finance/Accounting assets and management reports, main dashboards/reports, daily expense/petty/transfer/payment/receipt/bill pages, stock balance/operation pages, production orders/reports, tracking pages, AR/AP, foreign finance, admin support tables, and shared master-data pages.
+- Remaining raw `<table>` scan hits are not target candidates for bulk conversion:
+  - Print and document output templates: company profile sample print, business document print helpers, PDF/weight-ticket document templates.
+  - Direct/detail read pages: purchase/sales bill detail, advance-payment detail, payment-approval detail, weight-ticket detail.
+  - Form/modal/detail sub-tables: transaction bill item editors, money movement allocation/payment detail, daily expense line editors, stock transfer form/preview tables, stock operation source allocation/detail tables, stock balance drilldown mini tables, AR detail drilldown, fixed-asset import/depreciation preview.
+  - Small non-primary support/ranking widgets: tracking top panels and compact internal summary tables.
+  - Non-production/system contexts: design mockup playground, system manual field documentation, shared low-level `Table` wrapper.
+- Rationale: these tables are used for reading a document, filling/editing line items, confirming previews, compact detail drilldowns, print output, or internal examples. Adding sortable/resizable behavior there would be misleading and would diverge from the intended workflow.
+- Browser/real-data visual QA remains a separate pending pass if the user later re-enables browser checks.
+
+### Finance Accounting Filter Shell Follow-Up - 2026-07-02
+
+- `/finance-accounting/pl-statement`, `/finance-accounting/balance-sheet`, and `/finance-accounting/cash-flow-statement`
+  - The shared Financial Statements client now aligns desktop/mobile filter shells with `rounded-md bg-white p-3 shadow`.
+  - Filter buttons/selects/date controls now use `rounded-md`; the shared branch selector uses the standard `h-9` rounded control style; the already-resizable Statement table shell now uses `rounded-md`; and the drilldown modal now uses a dark rounded shell to avoid bright corner/border leakage.
+  - Report formulas, date/as-of/branch/mode query state, table sort/resize behavior, drilldown rows, disabled Excel affordance, API behavior, and DB state were not changed.
+  - Validation passed: targeted ESLint for `FinancialStatementsPageClients.tsx`, `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, and `git diff --check`.
+- `/finance-accounting/cash-flow-analysis` and `/finance-accounting/cf-forecast-calendar`
+  - The shared Cash-Flow Planning client now aligns desktop/mobile filter shells with `rounded-md bg-white p-3 shadow`.
+  - Filter buttons/selects/horizon controls now use `rounded-md`; the shared branch selector uses the standard `h-9` rounded control style; already-resizable detail, Top AR, and Top AP table shells now use `rounded-md`; the day-event detail modal uses a dark rounded shell with a white scroll body; and the invalid `rounded-md-full` bar class was corrected to `rounded-full`.
+  - Cash forecast formulas, AP/AR/payment schedule source rows, date/horizon/branch query state, charts/calendar grid, table sort/resize behavior, API behavior, and DB state were not changed.
+  - Validation passed: targeted ESLint for `CashFlowPlanningPageClients.tsx`, `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, and `git diff --check`.
+- `/finance-accounting/tax-vat-wht`
+  - The Tax/VAT/WHT client now aligns desktop/mobile filter shells with `rounded-md bg-white p-3 shadow`, uses `rounded-md` filter controls, and uses `rounded-md` lined shells for its already-resizable VAT/WHT and tax calendar tables.
+  - VAT/WHT calculations, month/year/branch query state, tax calendar rows, table sort/resize behavior, API behavior, and DB state were not changed.
+  - Validation passed: targeted ESLint for `TaxVatWhtPageClient.tsx`, `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, and `git diff --check`.
+- `/finance-accounting/working-capital`, `/finance-accounting/stock-finance`, and `/finance-accounting/profit-leak`
+  - The shared report client now aligns its desktop/mobile filter shells with `rounded-md bg-white p-3 shadow`.
+  - Filter controls now use `rounded-md`; the shared branch selector uses the standard `h-9` height; already-resizable report table containers now use a `rounded-md` lined shell.
+  - Report formulas, date/branch/target-margin query state, table sort/resize behavior, API behavior, export/drilldown assumptions, and DB state were not changed.
+  - Validation passed: targeted ESLint for `WorkingCapitalPageClients.tsx`, `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, and `git diff --check`.
+
+### Updated Suggested Fix Order
+
+1. No remaining high-confidence operational static inconsistency is currently listed after the final static table-mechanics classification. The listed operational pages are now in browser QA / real-data visual confirmation rather than another static rewrite.
+2. Normalize shared operational modal surfaces by component family: tracking pages, then trading pages. `TransactionBillsPageClient`, `MoneyMovementPageClient`, `PoBuyPageClient`, `PoSellPageClient`, and `StockOperationPageClient` now have static modal polish checkpoints and remain in browser QA rather than another static rewrite. `DailyExpensePageClient` has a table-mechanics follow-up checkpoint and should move to browser QA rather than another static rewrite.
+3. Foreign-finance static table mechanics sweep is corrected for `/finance/foreign/fx-gain-loss-report`, `/finance/foreign/fcd-ledger`, `/finance/foreign/fx-rate`, `/finance/foreign/intl-transfer`, and `/finance/foreign/overseas-receipt`; remaining work is browser QA / real-data visual confirmation, not another high-confidence static table rewrite.
+4. Review `type="number"` only inside the touched page batch using the design matrix; do not run a broad replacement sweep.
+5. Run browser QA desktop + mobile for the selected batch before claiming visual completion.
+
+### Full Sidebar Browser QA Closure - 2026-07-02
+
+- Final implementation/browser QA phase remaining: `0`.
+- Full active-sidebar browser QA passed after the final fixes: `106/106` routes pass, `0` warn, `0` fail.
+- Evidence:
+  - Targeted rerun for previously remaining warnings passed `3/3`: `/analytics-dashboard`, `/profit-cost-analysis`, `/daily/design-mockup`.
+  - Full rerun passed `106/106`: `reports/playwright/next-design-full-sidebar-rerun/report.md`.
+  - Validation passed: targeted ESLint for all touched files, `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, and `npm run build --workspace @ns-scrap-erp/next`.
+- UI-only fixes completed in the final browser-QA closeout:
+  - `/analytics-dashboard`: added `min-w-0` containment around analytics grid/table cards so resizable tables do not create mobile horizontal overflow.
+  - `/tracking/customer` and `/tracking/product`: tightened mobile search/filter/export toolbar sizing so XLSX/export controls no longer push past the viewport.
+  - `/dual-costing/deal-margin`: added min-width containment/truncation to summary, top deal, shared dual-costing panel/stat card, and mobile deal cards so long labels/amounts do not overflow.
+  - `/finance-accounting/tax-vat-wht`: fixed mobile loading/empty rendering so `<tr>` is no longer rendered inside a `<div>`, removing the hydration warning while preserving the desktop table helper.
+  - `/daily/design-mockup`: brought the two active demo tables under the same fixed/resizable table baseline with `colgroup`, `tableLayout: fixed`, and `ResizableTableHead` resize handles.
+- Runtime behavior, formulas, exports, API contracts, permissions, and DB state were not changed.
+- Computer Use was not used; verification used local Playwright/browser automation against `http://localhost:3000`.
