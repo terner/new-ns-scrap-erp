@@ -12,11 +12,9 @@ import { useResizableColumns, type ResizableColumnDefinition } from '@/component
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import {
   DualCostingErrorBox,
-  DualCostingHint,
   DualCostingPageSection,
   DualCostingPanel,
   DualCostingStatCard,
-  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type ProductOption = {
@@ -310,12 +308,7 @@ export function CostAllocatorPageClient() {
 
   return (
     <DualCostingPageSection>
-      <DualCostingHint tone="purple">
-        <strong>Cost Allocator</strong> ใช้เลือกบิลขายไม่มี PO หรือ PO Sell จากนั้น preview การหยิบต้นทุนจริงจาก Cost Pool ตามลำดับที่กำหนด โดย batch นี้ยังเป็น read-only และยังไม่เขียน match log จริง
-      </DualCostingHint>
-
       <DualCostingErrorBox error={error} />
-      <DualCostingWorkflowStrip active="allocator" />
 
       <DualCostingPanel title="⓪ เลือกประเภทปลายทางที่จะ Match ต้นทุน">
         <div className="flex flex-wrap gap-2">
@@ -340,9 +333,6 @@ export function CostAllocatorPageClient() {
               </button>
             )
           })}
-        </div>
-        <div className="mt-3 rounded-xl border border-amber-200/70 bg-amber-50/50 p-3 text-xs leading-relaxed text-amber-800">
-          Scope ล่าสุดใช้ Spot Sell / Sales Bill ไม่มี PO เป็น target หลักสำหรับทองแดงและทองเหลือง ส่วนการยืนยัน Match ยังปิดไว้จนกว่าจะมี durable allocation ledger
         </div>
       </DualCostingPanel>
 
@@ -497,7 +487,7 @@ export function CostAllocatorPageClient() {
                   <ResizableTableHead align="right" label={sourceType === 'production' ? 'จำนวนผลิต (กก.)' : 'จำนวนขาย (กก.)'} activeSortKey={targetSortKey ?? undefined} direction={targetSortDirection} sortKey="qty" onSort={handleTargetSort} resizeProps={targetColumnResize.getResizeHandleProps('qty', sourceType === 'production' ? 'จำนวนผลิต' : 'จำนวนขาย')} />
                   <ResizableTableHead align="right" label="จับคู่แล้ว" activeSortKey={targetSortKey ?? undefined} direction={targetSortDirection} sortKey="matchedQty" onSort={handleTargetSort} resizeProps={targetColumnResize.getResizeHandleProps('matchedQty', 'จับคู่แล้ว')} />
                   <ResizableTableHead align="right" label="ค้างจับคู่" activeSortKey={targetSortKey ?? undefined} direction={targetSortDirection} sortKey="remainingQty" onSort={handleTargetSort} resizeProps={targetColumnResize.getResizeHandleProps('remainingQty', 'ค้างจับคู่')} />
-                  <ResizableTableHead align="right" label={sourceType === 'production' ? 'ต้นทุน/กก.' : 'ราคา/หน่วย'} activeSortKey={targetSortKey ?? undefined} direction={targetSortDirection} sortKey="unitPrice" onSort={handleTargetSort} resizeProps={targetColumnResize.getResizeHandleProps('unitPrice', sourceType === 'production' ? 'ต้นทุนต่อกิโลกรัม' : 'ราคาต่อหน่วย')} />
+                  <ResizableTableHead align="right" label={sourceType === 'production' ? 'ต้นทุน/กก.' : 'ราคาขาย/หน่วย'} activeSortKey={targetSortKey ?? undefined} direction={targetSortDirection} sortKey="unitPrice" onSort={handleTargetSort} resizeProps={targetColumnResize.getResizeHandleProps('unitPrice', sourceType === 'production' ? 'ต้นทุนต่อกิโลกรัม' : 'ราคาขายต่อหน่วย')} />
                   <ResizableTableHead align="center" label="เลือก" resizeProps={targetColumnResize.getResizeHandleProps('action', 'เลือก')} />
                 </tr>
               </thead>
@@ -556,7 +546,7 @@ export function CostAllocatorPageClient() {
                     <div><span className="block text-xs text-slate-500">{sourceType === 'production' ? 'จำนวนผลิต' : 'จำนวนขาย'}</span><span className="mt-0.5 block font-bold tabular-nums text-slate-900">{formatMoney(target.qty)} กก.</span></div>
                     <div className="text-right"><span className="block text-xs text-slate-500">ค้างจับคู่</span><span className="mt-0.5 block font-bold tabular-nums text-amber-700">{formatMoney(target.remainingQty)} กก.</span></div>
                     <div><span className="block text-xs text-slate-500">จับคู่แล้ว</span><span className="mt-0.5 block font-bold tabular-nums text-slate-900">{formatMoney(target.matchedQty)} กก.</span></div>
-                    <div className="text-right"><span className="block text-xs text-slate-500">{sourceType === 'production' ? 'ต้นทุน/กก.' : 'ราคา/หน่วย'}</span><span className="mt-0.5 block font-bold tabular-nums text-slate-900">{formatMoney(target.unitPrice)}</span></div>
+                    <div className="text-right"><span className="block text-xs text-slate-500">{sourceType === 'production' ? 'ต้นทุน/กก.' : 'ราคาขาย/หน่วย'}</span><span className="mt-0.5 block font-bold tabular-nums text-slate-900">{formatMoney(target.unitPrice)}</span></div>
                   </div>
                   <Button
                     className="mt-3 w-full"
@@ -574,24 +564,6 @@ export function CostAllocatorPageClient() {
             })}
           </div>
           </div>
-
-
-
-          {hasPoSell ? (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5 mt-3">
-              <DualCostingStatCard icon="👥" label={sourceType === 'production' ? 'ผู้ผลิต' : 'ลูกค้า'} tone="slate" value={data?.selectedPoSell?.customerName === '-' ? 'ภายในโรงงาน' : (data?.selectedPoSell?.customerName ?? '-')} />
-              <DualCostingStatCard icon="📦" label="สินค้า" tone="slate" value={selectedProduct?.name ?? data?.selectedPoSell?.productName ?? '-'} />
-              <DualCostingStatCard icon="⚖️" label="จำนวนรวม" tone="slate" value={`${formatMoney(data?.selectedPoSell?.qty ?? 0)} กก.`} />
-              <DualCostingStatCard icon="💰" label={sourceType === 'production' ? 'ต้นทุน/กก.' : 'ราคาขาย'} tone="emerald" value={formatMoney(data?.selectedPoSell?.unitPrice ?? 0)} />
-              <DualCostingStatCard icon="⏳" label="ต้อง Match อีก" tone="amber" value={`${formatMoney(data?.selectedPoSell?.remainingQty ?? 0)} กก.`} />
-            </div>
-          ) : null}
-
-          {hasPoSell ? (
-            <div className="mt-3 flex justify-end">
-              <Button type="button" className="rounded-lg h-10 px-4 text-sm font-semibold focus-visible:ring-emerald-100" onClick={() => setShowPreview(true)}>Preview การจับคู่ต้นทุน</Button>
-            </div>
-          ) : null}
         </DualCostingPanel>
       ) : null}
 
