@@ -297,10 +297,8 @@ function WaitingAllocationsView() {
     <DualCostingPageSection>
       <DualCostingErrorBox error={error} />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <DualCostingStatCard icon="⏳" label="รายการที่รอส่งต่อ" tone="amber" value={String(data?.summary.count ?? 0)} />
-        <DualCostingStatCard icon="❌" label="ยังไม่ส่งจัดสรร" tone="red" value={String(data?.summary.fullyPending ?? 0)} />
-        <DualCostingStatCard icon="🔗" label="บางส่วน" tone="amber" value={String(data?.summary.partial ?? 0)} />
         <DualCostingStatCard icon="⚖️" label="น้ำหนักรอจัดสรร" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
         <div className="col-span-2 md:col-span-1">
           <DualCostingStatCard icon="💰" label="มูลค่ารอจัดสรร" tone="emerald" value={formatMoney(data?.summary.totalRevenue ?? 0)} />
