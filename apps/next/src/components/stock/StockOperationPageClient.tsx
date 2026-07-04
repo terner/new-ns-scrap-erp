@@ -1007,14 +1007,17 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
     const autoCount = rows.filter((row) => String(row.sourceType ?? '').startsWith('Auto')).length
     const reversed = rows.filter((row) => row.status === 'reversed').length
     return (
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 lg:grid-cols-7 text-sm">
-        <Metric emoji="📋" iconBg="bg-slate-100" label="รายการทั้งหมด" value={String(rows.length)} valueClassName="text-slate-900" />
-        <Metric emoji="✅" iconBg="bg-emerald-100 text-emerald-700" label="Posted" value={String(posted)} valueClassName="text-emerald-700" />
-        <Metric emoji="⏳" iconBg="bg-amber-100 text-amber-700" label="Pending Cost" value={String(pendingCost)} valueClassName="text-amber-700" />
-        <Metric emoji="📝" iconBg="bg-blue-100 text-blue-700" label="Manual" value={String(manualCount)} valueClassName="text-blue-700" />
-        <Metric emoji="🏭" iconBg="bg-purple-100 text-purple-700" label="Auto Cost Pool" value={String(autoCount)} valueClassName="text-purple-700" />
-        <Metric emoji="⚖️" iconBg="bg-slate-100" label="น้ำหนักรวม" value={`${formatMoney(totalQty)} กก.`} valueClassName="text-slate-900" />
-        <Metric emoji="🔄" iconBg="bg-slate-100 text-slate-500" label="Reversed" value={String(reversed)} valueClassName="text-slate-500" className="col-span-2 md:col-span-1" />
+      <div className="space-y-2.5 text-sm sm:space-y-4">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-4">
+          <Metric emoji="✅" iconBg="bg-emerald-100 text-emerald-700" label="Posted" value={String(posted)} valueClassName="text-emerald-700" />
+          <Metric emoji="⏳" iconBg="bg-amber-100 text-amber-700" label="Pending Cost" value={String(pendingCost)} valueClassName="text-amber-700" />
+          <Metric emoji="📝" iconBg="bg-blue-100 text-blue-700" label="Manual" value={String(manualCount)} valueClassName="text-blue-700" />
+        </div>
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-4">
+          <Metric emoji="🏭" iconBg="bg-purple-100 text-purple-700" label="Auto Cost Pool" value={String(autoCount)} valueClassName="text-purple-700" />
+          <Metric emoji="⚖️" iconBg="bg-slate-100" label="น้ำหนักรวม" value={`${formatMoney(totalQty)} กก.`} valueClassName="text-slate-900" />
+          <Metric emoji="🔄" iconBg="bg-slate-100 text-slate-500" label="Reversed" value={String(reversed)} valueClassName="text-slate-500" />
+        </div>
       </div>
     )
   }
@@ -1892,6 +1895,50 @@ function Field(props: { disabled?: boolean; label: string; onChange: (value: str
   )
 }
 
+function formatDecimalInput(value: number) {
+  return value.toFixed(2)
+}
+
+function DecimalField(props: { disabled?: boolean; label: string; onChange: (value: number) => void; value: number }) {
+  const [text, setText] = useState(() => formatDecimalInput(props.value))
+  const [isFocused, setIsFocused] = useState(false)
+
+  useEffect(() => {
+    if (isFocused) return
+    setText(formatDecimalInput(props.value))
+  }, [isFocused, props.value])
+
+  return (
+    <label className="block text-xs font-semibold text-slate-600">
+      {props.label}
+      <input
+        className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        disabled={props.disabled}
+        inputMode="decimal"
+        min={0}
+        step="0.01"
+        type="text"
+        value={text}
+        onBlur={() => {
+          setIsFocused(false)
+          const numericValue = Number(text || 0)
+          const safeValue = Number.isFinite(numericValue) ? numericValue : 0
+          setText(formatDecimalInput(safeValue))
+          props.onChange(safeValue)
+        }}
+        onChange={(event) => {
+          const nextValue = event.target.value
+          if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return
+          setText(nextValue)
+          const numericValue = Number(nextValue)
+          props.onChange(Number.isFinite(numericValue) ? numericValue : 0)
+        }}
+        onFocus={() => setIsFocused(true)}
+      />
+    </label>
+  )
+}
+
 function BaseDateDoc<T extends { date: string; docNo?: string | null }>({ setValues, values }: { setValues: (values: T) => void; values: T }) {
   return <>
     <Field label="วันที่" type="date" value={values.date} onChange={(date) => setValues({ ...values, date })} />
@@ -2359,7 +2406,7 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
             onChange={selectSourceProduct}
           />
         </div>
-        <Field label="น้ำหนักต้นทาง (กก.)" type="number" value={String(values.sourceQty)} onChange={(sourceQty) => setValues({ ...values, sourceQty: Number(sourceQty) })} />
+        <DecimalField label="น้ำหนักต้นทาง (กก.)" value={values.sourceQty} onChange={(sourceQty) => setValues({ ...values, sourceQty })} />
         <Select
           disabled={!values.sourceProductId}
           label="Lot ต้นทาง"
@@ -2408,7 +2455,7 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
             onChange={(targetProductId) => setValues({ ...values, targetProductId })}
           />
         </div>
-        <Field label="น้ำหนักปลายทาง (กก.)" type="number" value={String(values.targetQty)} onChange={(targetQty) => setValues({ ...values, targetQty: Number(targetQty) })} />
+        <DecimalField label="น้ำหนักปลายทาง (กก.)" value={values.targetQty} onChange={(targetQty) => setValues({ ...values, targetQty })} />
         <Field label="Lot ปลายทาง" value={values.targetLotNo ?? ''} onChange={(targetLotNo) => setValues({ ...values, targetLotNo })} />
         <ReadOnlyBox label="Target Product" value={targetProduct ? `${targetProduct.code ? `${targetProduct.code} - ` : ''}${targetProduct.name}` : '-'} />
         <label className="block text-sm font-medium md:col-span-2">Target Cost Policy
