@@ -12,14 +12,14 @@ import { formatDateDisplay } from '@/lib/format'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { stockAdjustReasonOptions, statusConvertFormSchema, stockConvertFormSchema, stockAdjustFormSchema } from '@/lib/stock'
-import type { StatusConvertFormValues, StockAdjustFormValues, StockConvertFormValues, StockCostPoolOption, StockOption } from '@/lib/stock'
+import type { StatusConvertFormValues, StockAdjustFormValues, StockBalanceOption, StockConvertFormValues, StockCostPoolOption, StockOption } from '@/lib/stock'
 import { z } from 'zod'
 import { ApiError } from '@/lib/api-client'
 
 type Mode = 'adjust' | 'convert' | 'status-convert'
 type Payload = {
   reasonOptions?: string[]
-  reference: { branches: StockOption[]; costPoolEntries?: StockCostPoolOption[]; customers?: StockOption[]; products: StockOption[]; warehouses: StockOption[] }
+  reference: { branches: StockOption[]; costPoolEntries?: StockCostPoolOption[]; customers?: StockOption[]; products: StockOption[]; stockBalanceEntries?: StockBalanceOption[]; warehouses: StockOption[] }
   rows: Array<Record<string, string | number | boolean | null>>
 }
 type OperationColumn = {
@@ -46,6 +46,7 @@ type StatusConvertSortKey =
   | 'value'
 
 const OPERATION_PAGE_SIZES = [10, 20, 50, 100]
+const SOURCE_PRODUCT_METAL_GROUPS = new Set(['ทองแดง', 'ทองเหลือง'])
 
 type StockAdjustSnapshot = {
   adjustType: 'NONE' | 'LOSS' | 'GAIN'
@@ -2177,7 +2178,7 @@ function CostPoolPreview({
                   <td className="p-2 text-right font-mono">{formatMoney(line.qty * line.entry.unitCost)}</td>
                 </tr>
               ))}
-              {!previewRows.length ? <tr><td className="p-3 text-center text-slate-400" colSpan={4}>เลือกสินค้า/สาขา/คลังและน้ำหนักเพื่อ preview Cost Pool</td></tr> : null}
+              {!previewRows.length ? <tr><td className="p-3 text-center text-slate-400" colSpan={4}>ตารางนี้แสดงเฉพาะ lot จาก Cost Pool จริง เลือกสินค้า/สาขาและน้ำหนักเพื่อ preview</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -2210,16 +2211,67 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
   const targetProduct = props.reference.products.find((item) => item.id === values.targetProductId)
   const lossQty = Math.max(0, Number(values.sourceQty) - Number(values.targetQty))
   const yieldPct = Number(values.sourceQty) > 0 ? (Number(values.targetQty) / Number(values.sourceQty)) * 100 : 0
-  const sourceCostPoolEntries = useMemo(() => {
+  const availableCostPoolEntries = useMemo(() => {
     const entries = props.reference.costPoolEntries ?? []
-    return entries
+    return entries.filter((entry) => entry.availableQty > 0)
+  }, [props.reference.costPoolEntries])
+  const locationCostPoolEntries = useMemo(() => {
+    return availableCostPoolEntries
+      .filter((entry) => !values.branchId || entry.branchId === values.branchId)
+  }, [availableCostPoolEntries, values.branchId])
+  const availableStockEntries = useMemo(() => {
+    const entries = props.reference.stockBalanceEntries ?? []
+    return entries.filter((entry) => entry.onHandQty > 0 && SOURCE_PRODUCT_METAL_GROUPS.has(entry.metalGroup ?? ''))
+  }, [props.reference.stockBalanceEntries])
+  const locationStockEntries = useMemo(() => {
+    return availableStockEntries
       .filter((entry) => !values.branchId || entry.branchId === values.branchId)
       .filter((entry) => !values.warehouseId || entry.warehouseId === values.warehouseId)
+  }, [availableStockEntries, values.branchId, values.warehouseId])
+  const sourceProductSearchOptions = useMemo<SearchComboboxOption[]>(() => {
+    const byProduct = new Map<string, { onHandQty: number; readyQty: number }>()
+    for (const entry of locationStockEntries.length ? locationStockEntries : availableStockEntries) {
+      if (!entry.productId) continue
+      const current = byProduct.get(entry.productId) ?? { onHandQty: 0, readyQty: 0 }
+      current.onHandQty += entry.onHandQty
+      current.readyQty += entry.readyQty
+      byProduct.set(entry.productId, current)
+    }
+    return [...byProduct.entries()]
+      .map(([productId, stock]) => {
+        const product = props.reference.products.find((item) => item.id === productId)
+        return {
+          id: productId,
+          label: product?.code ? `${product.code} - ${product.name} · พร้อมใช้ ${formatMoney(stock.readyQty)} กก.` : `${product?.name ?? productId} · พร้อมใช้ ${formatMoney(stock.readyQty)} กก.`,
+          searchText: `${product?.code ?? ''} ${product?.name ?? ''} ${productId}`.toLowerCase(),
+        }
+      })
+      .sort((left, right) => left.label.localeCompare(right.label, 'th'))
+  }, [availableStockEntries, locationStockEntries, props.reference.products])
+  const branchWarehousePoolEntries = useMemo(() => {
+    return locationCostPoolEntries
       .filter((entry) => !values.sourceProductId || entry.productId === values.sourceProductId)
+  }, [locationCostPoolEntries, values.sourceProductId])
+  const sourceLotOptions = useMemo<StockOption[]>(() => {
+    const seen = new Set<string>()
+    return branchWarehousePoolEntries
+      .filter((entry) => {
+        if (!entry.lotNo || seen.has(entry.lotNo)) return false
+        seen.add(entry.lotNo)
+        return true
+      })
+      .map((entry) => ({
+        active: true,
+        id: entry.lotNo ?? '',
+        name: `${entry.lotNo} · ${formatMoney(entry.availableQty)} กก. · ${formatMoney(entry.unitCost)} ฿/กก.`,
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id, 'th'))
+  }, [branchWarehousePoolEntries])
+  const sourceCostPoolEntries = useMemo(() => {
+    return branchWarehousePoolEntries
       .filter((entry) => !values.lotNo || entry.lotNo === values.lotNo)
-      .filter((entry) => entry.availableQty > 0)
       .sort((left, right) => sortCostPoolEntries(left, right, values.allocationMethod))
-  }, [props.reference.costPoolEntries, values.allocationMethod, values.branchId, values.lotNo, values.sourceProductId, values.warehouseId])
+  }, [branchWarehousePoolEntries, values.allocationMethod, values.lotNo])
   const autoPreview = useMemo(() => previewCostPoolAllocation(sourceCostPoolEntries, Number(values.sourceQty)), [sourceCostPoolEntries, values.sourceQty])
   const manualTotalQty = values.manualAllocations.reduce((sum, line) => sum + Number(line.qty || 0), 0)
   const costPreviewRows = values.allocationMethod === 'MANUAL'
@@ -2241,6 +2293,26 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
     setValues({ ...values, manualAllocations: qty > 0 ? [...existing, { poolEntryId, qty }] : existing })
   }
 
+  function findPreferredSourcePool(productId: string) {
+    const productStockEntries = availableStockEntries.filter((entry) => entry.productId === productId)
+    return productStockEntries.find((entry) => entry.branchId === values.branchId && entry.warehouseId === values.warehouseId)
+      ?? productStockEntries.find((entry) => entry.branchId === values.branchId)
+      ?? productStockEntries[0]
+      ?? null
+  }
+
+  function selectSourceProduct(sourceProductId: string) {
+    const preferredPool = findPreferredSourcePool(sourceProductId)
+    setValues({
+      ...values,
+      branchId: preferredPool?.branchId ?? values.branchId,
+      warehouseId: preferredPool?.warehouseId ?? values.warehouseId,
+      sourceProductId,
+      lotNo: null,
+      manualAllocations: [],
+    })
+  }
+
   const productSearchOptions = useMemo<SearchComboboxOption[]>(() => {
     return props.reference.products
       .filter((option) => option.active !== false)
@@ -2251,10 +2323,27 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
       }))
   }, [props.reference.products])
 
+  useEffect(() => {
+    if (!values.lotNo) return
+    if (sourceLotOptions.some((option) => option.id === values.lotNo)) return
+    setValues((current) => ({ ...current, lotNo: null, manualAllocations: [] }))
+  }, [sourceLotOptions, values.lotNo])
+  useEffect(() => {
+    if (!values.sourceProductId) return
+    if (sourceProductSearchOptions.some((option) => option.id === values.sourceProductId)) return
+    setValues((current) => ({ ...current, sourceProductId: '', lotNo: null, manualAllocations: [] }))
+  }, [sourceProductSearchOptions, values.sourceProductId])
+
   return <FormShell isSaving={props.isSaving} error={props.error} onCancel={props.onCancel} onSubmit={() => props.onSubmit(values)}>
     <div className="md:col-span-2 rounded-md border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2 animate-fade-in">
       <BaseDateDoc values={values} setValues={setValues} />
-      <BranchWarehouseFields branchId={values.branchId} reference={props.reference} setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '' })} setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId })} warehouseId={values.warehouseId} />
+      <BranchWarehouseFields
+        branchId={values.branchId}
+        reference={props.reference}
+        setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '', sourceProductId: '', lotNo: null, manualAllocations: [] })}
+        setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId, lotNo: null, manualAllocations: [] })}
+        warehouseId={values.warehouseId}
+      />
     </div>
     <div className="rounded-md border border-red-200 bg-red-50/40 p-5 shadow-sm md:col-span-2">
       <div className="mb-3 text-sm font-bold text-red-700">Source (ออก)</div>
@@ -2263,14 +2352,22 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
           <SearchCombobox
             inputId="stock-convert-source-product"
             label="สินค้าต้นทาง *"
-            options={productSearchOptions}
-            placeholder="พิมพ์รหัส/ชื่อสินค้า..."
+            disabled={!sourceProductSearchOptions.length}
+            options={sourceProductSearchOptions}
+            placeholder={sourceProductSearchOptions.length ? 'เลือกสินค้าหมวดทองแดง/ทองเหลือง...' : 'ไม่มีสินค้าหมวดทองแดง/ทองเหลืองพร้อมใช้'}
             value={values.sourceProductId}
-            onChange={(sourceProductId) => setValues({ ...values, sourceProductId })}
+            onChange={selectSourceProduct}
           />
         </div>
         <Field label="น้ำหนักต้นทาง (กก.)" type="number" value={String(values.sourceQty)} onChange={(sourceQty) => setValues({ ...values, sourceQty: Number(sourceQty) })} />
-        <Field label="Lot ต้นทาง" value={values.lotNo ?? ''} onChange={(lotNo) => setValues({ ...values, lotNo })} />
+        <Select
+          disabled={!values.sourceProductId}
+          label="Lot ต้นทาง"
+          options={sourceLotOptions}
+          placeholder={values.sourceProductId ? 'ทุก Lot ใน Cost Pool ตามสาขา' : 'เลือกสินค้าต้นทางก่อน'}
+          value={values.lotNo ?? ''}
+          onChange={(lotNo) => setValues({ ...values, lotNo: lotNo || null, manualAllocations: [] })}
+        />
         <ReadOnlyBox label="Source Product" value={sourceProduct ? `${sourceProduct.code ? `${sourceProduct.code} - ` : ''}${sourceProduct.name}` : '-'} />
         <label className="block text-sm font-medium md:col-span-2">วิธีตัดต้นทุน
           <select
