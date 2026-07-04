@@ -1001,23 +1001,15 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
   const totalQty = rows.reduce((sum, row) => sum + Number(row.qty ?? row.sourceQty ?? row.diffQty ?? 0), 0)
   const totalValue = rows.reduce((sum, row) => sum + Number(row.value ?? row.valueNote ?? 0), 0)
   if (mode === 'convert') {
-    const posted = rows.filter((row) => row.status === 'posted').length
-    const pendingCost = rows.filter((row) => row.costStatus === 'pending_cost').length
     const manualCount = rows.filter((row) => row.sourceType === 'Manual').length
     const autoCount = rows.filter((row) => String(row.sourceType ?? '').startsWith('Auto')).length
     const reversed = rows.filter((row) => row.status === 'reversed').length
     return (
-      <div className="space-y-2.5 text-sm sm:space-y-4">
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-4">
-          <Metric emoji="✅" iconBg="bg-emerald-100 text-emerald-700" label="Posted" value={String(posted)} valueClassName="text-emerald-700" />
-          <Metric emoji="⏳" iconBg="bg-amber-100 text-amber-700" label="Pending Cost" value={String(pendingCost)} valueClassName="text-amber-700" />
+      <div className="grid grid-cols-1 gap-2.5 text-sm sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
           <Metric emoji="📝" iconBg="bg-blue-100 text-blue-700" label="Manual" value={String(manualCount)} valueClassName="text-blue-700" />
-        </div>
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-4">
           <Metric emoji="🏭" iconBg="bg-purple-100 text-purple-700" label="Auto Cost Pool" value={String(autoCount)} valueClassName="text-purple-700" />
           <Metric emoji="⚖️" iconBg="bg-slate-100" label="น้ำหนักรวม" value={`${formatMoney(totalQty)} กก.`} valueClassName="text-slate-900" />
           <Metric emoji="🔄" iconBg="bg-slate-100 text-slate-500" label="Reversed" value={String(reversed)} valueClassName="text-slate-500" />
-        </div>
       </div>
     )
   }
