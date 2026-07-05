@@ -5,7 +5,7 @@ import { Plus, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
@@ -567,14 +567,10 @@ function CostSourceModal({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className="max-h-[92vh] max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 !p-0 shadow-2xl outline-none focus:outline-none flex flex-col" fallbackTitle="Trading Cost Source" hideClose>
         <DialogHeader className="shrink-0 rounded-t-md bg-slate-900 px-6 py-4 text-white">
-          <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-            <div className="min-w-0">
+          <div className="flex items-start gap-3 w-full">
+            <div>
               <DialogTitle className="text-white text-base font-bold">Trading Cost Source</DialogTitle>
               <DialogDescription className="text-slate-300 text-xs mt-1">บันทึกต้นทุน Trading แบบไม่ผูก PB เพื่อใช้จับคู่กับบิลขาย Trading</DialogDescription>
-            </div>
-            <div className="flex shrink-0 flex-wrap justify-end gap-2">
-              <Button className="h-9 border-emerald-600 bg-emerald-600 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white" disabled={!canSubmit || isSaving} type="button" variant="outline" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
-              <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={onClose}>ปิด</Button>
             </div>
           </div>
         </DialogHeader>
@@ -630,6 +626,14 @@ function CostSourceModal({
                 />
               </div>
               {error ? <div className="col-span-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div> : null}
+              <button
+                className="col-span-2 h-10 rounded-md bg-slate-900 hover:bg-slate-800 px-4 text-sm font-normal text-white transition-colors outline-none focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
+                disabled={!canSubmit || isSaving}
+                type="button"
+                onClick={onSubmit}
+              >
+                {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+              </button>
             </div>
           </div>
           <div className="rounded-md border border-slate-200 bg-white overflow-hidden shadow-xs col-span-2 lg:col-span-1">
@@ -683,6 +687,9 @@ function CostSourceModal({
             </div>
           </div>
         </div>
+        <DialogFooter className="shrink-0 rounded-b-md border-t border-slate-100 bg-white px-6 py-3.5 flex justify-end gap-2">
+          <Button className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

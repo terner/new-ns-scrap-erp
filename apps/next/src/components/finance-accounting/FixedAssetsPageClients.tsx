@@ -1,11 +1,10 @@
 'use client'
 
-import { Children, isValidElement, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
-import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 
 type AssetRegisterRow = {
@@ -444,7 +443,10 @@ export function AssetRegisterPageClient() {
       {error ? <ErrorBox message={error} /> : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="bg-white p-5 border border-slate-100 rounded-md shadow-sm">
+        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-4">
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 ${hasAssets ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+            🏢
+          </div>
           <div className="min-w-0 flex-1">
             <div className={`text-xs font-semibold truncate ${hasAssets ? 'text-emerald-600' : 'text-slate-500'}`}>มูลค่าคงเหลือสุทธิ (NBV)</div>
             <div className="mt-0.5 text-2xl font-extrabold text-slate-900 tracking-tight">{formatMoney(data?.summary.nbv)} ฿</div>
@@ -470,66 +472,25 @@ export function AssetRegisterPageClient() {
         </Panel>
         <Panel title="ค่าเสื่อม/เดือน">
           <div className={`text-2xl font-extrabold tracking-tight ${(data?.summary.monthlyDep ?? 0) > 0 ? 'text-amber-700' : 'text-slate-900'}`}>{formatMoney(data?.summary.monthlyDep)} ฿</div>
+          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+            <MiniStat label="รายการทั้งหมด" value={data?.summary.count ?? 0} />
+            <MiniStat label="แสดงผลปัจจุบัน" value={rows.length} />
+          </div>
         </Panel>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="ต้นทุนสุทธิรวม" value={formatMoney(data?.summary.netAssetCost)} tone="blue" />
-        <StatCard label="ค่าเสื่อมสะสมรวม" value={formatMoney(data?.summary.accumDep)} tone="amber" />
-      </div>
-
-      {/* Desktop Toolbar */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-        <input
-          className="h-9 min-w-[320px] flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none transition focus:border-slate-400"
-          placeholder="ค้นหา รหัส / ชื่อ / สถานที่ / สาขา"
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        <div className="flex items-center gap-2">
-          <select
-            className="h-9 w-auto min-w-[120px] rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none transition cursor-pointer focus:border-slate-400"
-            value={category}
-            onChange={(event) => setCategory(event.target.value)}
-          >
-            <option value="all">ทุกหมวด</option>
-            {(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-          <select
-            className="h-9 w-auto min-w-[120px] rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none transition cursor-pointer focus:border-slate-400"
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-          >
-            <option value="all">ทุกสถานะ</option>
-            {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-        </div>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <LinkButton href="/api/finance-accounting/asset-register?template=csv">ดาวน์โหลดแบบฟอร์ม CSV</LinkButton>
-          <button
-            type="button"
-            onClick={openImport}
-            className="inline-flex h-9 items-center rounded-lg border border-slate-100 bg-slate-50 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 outline-none focus:ring-0"
-          >
-            นำเข้า
-          </button>
-          <LinkButton href={exportHref}>ส่งออก CSV</LinkButton>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex h-9 items-center rounded-lg bg-blue-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 outline-none focus:ring-0"
-          >
-            + เพิ่มทรัพย์สิน
-          </button>
-        </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatCard label="จำนวนทรัพย์สิน" value={data?.summary.count ?? 0} tone="blue" icon="📋" />
+        <StatCard label="ต้นทุนสุทธิรวม" value={formatMoney(data?.summary.netAssetCost)} tone="blue" icon="💰" />
+        <StatCard label="ค่าเสื่อมสะสมรวม" value={formatMoney(data?.summary.accumDep)} tone="amber" icon="📉" />
+        <StatCard label="แสดงผลตามตัวกรอง" value={rows.length} tone="blue" icon="🔎" />
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 space-y-2 rounded-md border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden">
+      <div className="mb-4 space-y-2 rounded-md bg-white p-3 shadow lg:hidden">
         <div className="flex gap-2 items-center">
           <input
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-1 text-sm h-9 outline-none focus:border-slate-400 transition"
+            className="flex-1 rounded-md border border-slate-300 px-3 py-1 text-sm h-9 outline-none focus:border-slate-400 transition"
             placeholder="ค้นหา..."
             type="search"
             value={search}
@@ -537,7 +498,7 @@ export function AssetRegisterPageClient() {
           />
           <button
             type="button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
             onClick={() => setShowMobileFilters(true)}
           >
             ตัวกรอง {(category !== 'all' || status !== 'all') ? '(มี)' : ''}
@@ -547,10 +508,73 @@ export function AssetRegisterPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <MobileFilterSheet
-          bodyClassName="space-y-3"
-          footer={(
-            <>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
+          <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h4 className="font-bold text-slate-800 text-sm">ตัวกรองเพิ่มเติม</h4>
+              <button
+                className="p-1 text-slate-400 hover:text-slate-600 text-2xl font-bold focus:outline-none"
+                onClick={() => setShowMobileFilters(false)}
+                type="button"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block font-semibold text-slate-600 text-xs">หมวดหมู่</label>
+                <select
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value)}
+                >
+                  <option value="all">ทุกหมวด</option>
+                  {(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-slate-600 text-xs">สถานะ</label>
+                <select
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value)}
+                >
+                  <option value="all">ทุกสถานะ</option>
+                  {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </div>
+
+              <div className="border-t border-slate-100 pt-3 space-y-2">
+                <label className="block font-semibold text-slate-600 text-xs">จัดการไฟล์และระบบนำเข้า</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+                  <a
+                    href="/api/finance-accounting/asset-register?template=csv"
+                    className="flex h-10 items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    📄 Template
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => { setShowMobileFilters(false); openImport() }}
+                    className="flex h-10 items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    📥 Import
+                  </button>
+                  <a
+                    href={exportHref}
+                    onClick={() => setShowMobileFilters(false)}
+                    className="col-span-2 flex h-10 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition"
+                  >
+                    📤 Export CSV
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -568,66 +592,59 @@ export function AssetRegisterPageClient() {
               >
                 ตกลง
               </button>
-            </>
-          )}
-          onClose={() => setShowMobileFilters(false)}
-          title="ตัวกรองเพิ่มเติม"
-        >
-          <div>
-            <label className="mb-1 block font-semibold text-slate-600 text-xs">หมวดหมู่</label>
-            <select
-              className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-            >
-              <option value="all">ทุกหมวด</option>
-              {(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block font-semibold text-slate-600 text-xs">สถานะ</label>
-            <select
-              className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              <option value="all">ทุกสถานะ</option>
-              {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </div>
-
-          <div className="border-t border-slate-100 pt-3 space-y-2">
-            <label className="block font-semibold text-slate-600 text-xs">จัดการไฟล์และระบบนำเข้า</label>
-            <div className="grid grid-cols-2 gap-2">
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-              <a
-                href="/api/finance-accounting/asset-register?template=csv"
-                className="flex h-10 items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
-              >
-                แบบฟอร์ม CSV
-              </a>
-              <button
-                type="button"
-                onClick={() => { setShowMobileFilters(false); openImport() }}
-                className="flex h-10 items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
-              >
-                นำเข้า
-              </button>
-              <a
-                href={exportHref}
-                onClick={() => setShowMobileFilters(false)}
-                className="col-span-2 flex h-10 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition"
-              >
-                ส่งออก CSV
-              </a>
             </div>
           </div>
-        </MobileFilterSheet>
+        </div>
       ) : null}
 
-      {/* Pagination Controls */}
-      <div className="mb-3 flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+      {/* Desktop Table Card */}
+      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        <div className="grid gap-2 border-b border-slate-100 p-3 xl:grid-cols-[minmax(320px,1fr)_auto_auto] xl:items-center">
+        <input
+          className="h-9 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm outline-none transition focus:border-slate-400"
+          placeholder="ค้นหา รหัส / ชื่อ / สถานที่ / สาขา"
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="h-9 w-auto min-w-[120px] rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none transition cursor-pointer focus:border-slate-400"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+          >
+            <option value="all">ทุกหมวด</option>
+            {(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <select
+            className="h-9 w-auto min-w-[120px] rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none transition cursor-pointer focus:border-slate-400"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="all">ทุกสถานะ</option>
+            {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+          <LinkButton href="/api/finance-accounting/asset-register?template=csv">📄 Template CSV</LinkButton>
+          <button
+            type="button"
+            onClick={openImport}
+            className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 transition hover:bg-slate-50 outline-none focus:ring-0"
+          >
+            📥 Import
+          </button>
+          <LinkButton href={exportHref}>📤 Export CSV</LinkButton>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex h-9 items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 outline-none focus:ring-0"
+          >
+            + เพิ่มทรัพย์สิน
+          </button>
+        </div>
+      </div>
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-3 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
         <div>
           พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
         </div>
@@ -668,9 +685,7 @@ export function AssetRegisterPageClient() {
           ) : null}
         </div>
       </div>
-
-      {/* Desktop View Table */}
-      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {assetRegisterColumns.map((column, index) => {
@@ -729,17 +744,62 @@ export function AssetRegisterPageClient() {
           </table>
       </div>
 
+      </div>
+
+      {/* Mobile Pagination Controls */}
+      <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between lg:hidden">
+        <div>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            value={pageSize}
+            onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage <= 1}
+            type="button"
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            type="button"
+            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+          >
+            ถัดไป
+          </button>
+          {columnResize.hasCustomWidths ? (
+            <button
+              className="h-9 rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              คืนค่าเดิมตาราง
+            </button>
+          ) : null}
+        </div>
+      </div>
+
       {/* Mobile View Card List */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="bg-white rounded-md p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-100">กำลังโหลดข้อมูล...</div>
+          <div className="bg-white rounded-xl p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-100">กำลังโหลดข้อมูล...</div>
         ) : rows.length === 0 ? (
-          <div className="bg-white rounded-md p-4 shadow-sm border border-slate-100">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
             <AssetRegisterEmptyState hasFilters={hasActiveAssetFilters} />
           </div>
         ) : (
           pagedRows.map((row) => (
-            <div key={row.id} className="bg-white rounded-md p-4 shadow-sm border border-slate-100 space-y-3 hover:bg-slate-50/50 transition">
+            <div key={row.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 space-y-3 hover:bg-slate-50/50 transition">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div className="min-w-0 flex-1 pr-2">
                   <span className="font-mono font-bold text-xs text-amber-700 block">{row.code}</span>
@@ -773,11 +833,11 @@ export function AssetRegisterPageClient() {
         <Modal title={form.id ? `แก้ไขทรัพย์สิน ${form.code}` : 'เพิ่มทรัพย์สิน'}>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
             <Field label="รหัสทรัพย์สิน">
-              <input 
-                className={fieldClass} 
-                disabled 
-                placeholder={form.id ? "" : "(ระบบสร้างให้อัตโนมัติ)"} 
-                value={form.id ? form.code : "(ระบบสร้างให้อัตโนมัติ)"} 
+              <input
+                className={fieldClass}
+                disabled
+                placeholder={form.id ? "" : "(ระบบสร้างให้อัตโนมัติ)"}
+                value={form.id ? form.code : "(ระบบสร้างให้อัตโนมัติ)"}
               />
             </Field>
             <Field label="ชื่อทรัพย์สิน"><input className={fieldClass} value={form.name} onChange={(event) => updateForm('name', event.target.value)} /></Field>
@@ -806,12 +866,12 @@ export function AssetRegisterPageClient() {
             <Field label="วันที่ซื้อ"><input className={fieldClass} type="date" value={form.purchaseDate} onChange={(event) => updateForm('purchaseDate', event.target.value)} /></Field>
             <Field label="ประเภทการได้มา"><SelectControl options={data?.options.acquisitionTypes ?? []} value={form.acquisitionType} onChange={(value) => updateForm('acquisitionType', value)} /></Field>
             <div className="w-full">
-              <SearchCombobox 
-                inputId="form-supplier" 
-                label="ผู้ขาย" 
-                options={supplierOptions} 
-                value={form.supplierId} 
-                onChange={(value) => updateForm('supplierId', value)} 
+              <SearchCombobox
+                inputId="form-supplier"
+                label="ผู้ขาย"
+                options={supplierOptions}
+                value={form.supplierId}
+                onChange={(value) => updateForm('supplierId', value)}
                 placeholder="พิมพ์เพื่อค้นหาผู้ขาย..."
               />
             </div>
@@ -837,7 +897,7 @@ export function AssetRegisterPageClient() {
       ) : null}
 
       {modal === 'import' ? (
-        <Modal title="นำเข้าทะเบียนทรัพย์สิน">
+        <Modal title="Import Asset Register">
           <div className="space-y-3">
             <input
               accept=".csv,.tsv,.txt"
@@ -872,13 +932,13 @@ export function AssetRegisterPageClient() {
           </div>
           <ModalActions>
             <ActionButton onClick={() => setModal(null)}>ยกเลิก</ActionButton>
-            <ActionButton disabled={isSaving || importBlocked} strong onClick={commitImport}>{isSaving ? 'กำลังนำเข้า' : 'ยืนยันนำเข้า'}</ActionButton>
+            <ActionButton disabled={isSaving || importBlocked} strong onClick={commitImport}>{isSaving ? 'กำลังนำเข้า' : 'Commit Import'}</ActionButton>
           </ModalActions>
         </Modal>
       ) : null}
 
       {/* Floating Action Button (FAB) for Mobile */}
-      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 lg:hidden">
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
         <button
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform focus:outline-none text-2xl font-bold hover:bg-blue-700"
           onClick={openCreate}
@@ -909,6 +969,7 @@ export function DepreciationPageClient() {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
+  const [depreciationTab, setDepreciationTab] = useState<'pending' | 'history'>('pending')
   const [historySortDirection, setHistorySortDirection] = useState<SortDirection>('asc')
   const [historySortKey, setHistorySortKey] = useState<DepreciationSortKey | null>(null)
   const columnResize = useResizableColumns('finance-accounting.depreciation.history.v1', depreciationColumns)
@@ -998,7 +1059,7 @@ export function DepreciationPageClient() {
       })
       setPreview(result)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'ตรวจค่าเสื่อมไม่ได้')
+      setError(caught instanceof Error ? caught.message : 'Preview ค่าเสื่อมไม่ได้')
     } finally {
       setIsSaving(false)
     }
@@ -1043,26 +1104,34 @@ export function DepreciationPageClient() {
   return (
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
-      <Tabs defaultValue="pending" className="gap-3">
+      <Tabs
+        value={depreciationTab}
+        className="gap-2"
+        onValueChange={(value) => {
+          setDepreciationTab(value as typeof depreciationTab)
+          setPage(1)
+        }}
+      >
         <TabsList className="w-full overflow-x-auto rounded-md bg-white px-2 shadow-sm" variant="line">
           <TabsTrigger value="pending" variant="line">สินทรัพย์รอประมวลผล</TabsTrigger>
           <TabsTrigger value="history" variant="line">ประวัติการประมวลผล</TabsTrigger>
         </TabsList>
+      </Tabs>
 
       {/* Desktop Filter Panel */}
       <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
-        <select aria-label="Depreciation month" className="h-9 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={month} onChange={(event) => setMonth(event.target.value)}>
+        <select aria-label="Depreciation month" className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={month} onChange={(event) => setMonth(event.target.value)}>
           <option value="all">ดูรายปี (ทุกเดือน)</option>
           {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map((item) => <option key={item} value={item}>เดือน {item}</option>)}
         </select>
-        <input aria-label="Depreciation year" className="w-24 h-9 rounded-lg border border-slate-300 px-3 py-1 text-sm outline-none focus:border-slate-400 transition text-center" value={year} onChange={(event) => setYear(event.target.value)} />
-        <input aria-label="Depreciation period date" className="h-9 rounded-lg border border-slate-300 bg-slate-50 px-3 py-1 text-sm outline-none cursor-default" readOnly value={periodDate} />
-        
-        <select aria-label="Filter category" className="h-9 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={filterCategory} onChange={(event) => setFilterCategory(event.target.value)}>
+        <input aria-label="Depreciation year" className="w-24 h-9 rounded-md border border-slate-300 px-3 py-1 text-sm outline-none focus:border-slate-400 transition text-center" value={year} onChange={(event) => setYear(event.target.value)} />
+        <input aria-label="Depreciation period date" className="h-9 rounded-md border border-slate-300 bg-slate-50 px-3 py-1 text-sm outline-none cursor-default" readOnly value={periodDate} />
+
+        <select aria-label="Filter category" className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={filterCategory} onChange={(event) => setFilterCategory(event.target.value)}>
           <option value="all">ทุกหมวด</option>
           {categoryOptions.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <select aria-label="Filter department" className="h-9 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={filterDepartment} onChange={(event) => setFilterDepartment(event.target.value)}>
+        <select aria-label="Filter department" className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={filterDepartment} onChange={(event) => setFilterDepartment(event.target.value)}>
           <option value="all">ทุกแผนก</option>
           {departmentOptions.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
@@ -1071,36 +1140,36 @@ export function DepreciationPageClient() {
         <Chip tone="emerald">Run แล้ว {data?.period.postedRuns ?? 0}</Chip>
         <Chip tone="amber">รอ Run {filteredPendingAssets.length}</Chip>
         <span className="flex-1" />
-        <ActionButton disabled={isSaving || month === 'all' || filteredPendingAssets.length === 0} strong onClick={runPreview}>ตรวจค่าเสื่อมงวดนี้</ActionButton>
+        <ActionButton disabled={isSaving || month === 'all' || filteredPendingAssets.length === 0} strong onClick={runPreview}>Preview ค่าเสื่อมงวดนี้</ActionButton>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="rounded-md border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden space-y-3">
+      <div className="rounded-md bg-white p-3 shadow lg:hidden space-y-3">
         <div className="flex gap-2 items-center">
-          <select 
-            aria-label="Depreciation month" 
-            className="flex-1 h-9 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer" 
-            value={month} 
+          <select
+            aria-label="Depreciation month"
+            className="flex-1 h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+            value={month}
             onChange={(event) => setMonth(event.target.value)}
           >
             <option value="all">ดูรายปี (ทุกเดือน)</option>
             {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map((item) => <option key={item} value={item}>เดือน {item}</option>)}
           </select>
-          <input 
-            aria-label="Depreciation year" 
-            className="w-20 h-9 rounded-lg border border-slate-300 px-3 py-1 text-sm outline-none focus:border-slate-400 transition text-center" 
-            value={year} 
-            onChange={(event) => setYear(event.target.value)} 
+          <input
+            aria-label="Depreciation year"
+            className="w-20 h-9 rounded-md border border-slate-300 px-3 py-1 text-sm outline-none focus:border-slate-400 transition text-center"
+            value={year}
+            onChange={(event) => setYear(event.target.value)}
           />
           <button
             type="button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
             onClick={() => setShowMobileFilters(true)}
           >
             ตัวกรอง
           </button>
         </div>
-        
+
         <div className="flex flex-wrap gap-2 pt-1">
           <Chip tone="blue">คิดค่าเสื่อม {filteredPendingAssets.length}</Chip>
           <Chip tone="emerald">Run แล้ว {data?.period.postedRuns ?? 0}</Chip>
@@ -1117,16 +1186,64 @@ export function DepreciationPageClient() {
               : 'bg-blue-600 hover:bg-blue-700 text-white active:scale-95 transition-transform'
           }`}
         >
-          ตรวจค่าเสื่อมงวดนี้
+          Preview ค่าเสื่อมงวดนี้
         </button>
       </div>
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <MobileFilterSheet
-          bodyClassName="space-y-3"
-          footer={(
-            <>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
+          <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h4 className="font-bold text-slate-800 text-sm">ตัวกรองเพิ่มเติม</h4>
+              <button
+                className="p-1 text-slate-400 hover:text-slate-600 text-2xl font-bold focus:outline-none"
+                onClick={() => setShowMobileFilters(false)}
+                type="button"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block font-semibold text-slate-600 text-xs">หมวดหมู่ทรัพย์สิน</label>
+                <select
+                  aria-label="Filter category"
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  value={filterCategory}
+                  onChange={(event) => setFilterCategory(event.target.value)}
+                >
+                  <option value="all">ทุกหมวด</option>
+                  {categoryOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-slate-600 text-xs">แผนก</label>
+                <select
+                  aria-label="Filter department"
+                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
+                  value={filterDepartment}
+                  onChange={(event) => setFilterDepartment(event.target.value)}
+                >
+                  <option value="all">ทุกแผนก</option>
+                  {departmentOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-slate-600 text-xs">วันสิ้นสุดงวด (Period End Date)</label>
+                <input
+                  aria-label="Depreciation period date"
+                  className="w-full h-10 rounded-md border border-slate-300 bg-slate-50 px-3 py-1 text-sm outline-none cursor-default"
+                  readOnly
+                  value={periodDate}
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -1144,58 +1261,26 @@ export function DepreciationPageClient() {
               >
                 ตกลง
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {depreciationTab === 'pending' ? (
+        <MiniAssetTable
+          isLoading={isLoading}
+          rows={filteredPendingAssets}
+          summary={(
+            <>
+              {'\u0e1e\u0e1a\u0e2a\u0e34\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e23\u0e2d\u0e1b\u0e23\u0e30\u0e21\u0e27\u0e25\u0e1c\u0e25 '}<span className="font-semibold text-slate-900">{filteredPendingAssets.length}</span>{' \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23'}
             </>
           )}
-          onClose={() => setShowMobileFilters(false)}
-          title="ตัวกรองเพิ่มเติม"
-        >
-          <div>
-            <label className="mb-1 block font-semibold text-slate-600 text-xs">หมวดหมู่ทรัพย์สิน</label>
-            <select
-              aria-label="Filter category"
-              className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-              value={filterCategory}
-              onChange={(event) => setFilterCategory(event.target.value)}
-            >
-              <option value="all">ทุกหมวด</option>
-              {categoryOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block font-semibold text-slate-600 text-xs">แผนก</label>
-            <select
-              aria-label="Filter department"
-              className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-              value={filterDepartment}
-              onChange={(event) => setFilterDepartment(event.target.value)}
-            >
-              <option value="all">ทุกแผนก</option>
-              {departmentOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block font-semibold text-slate-600 text-xs">วันสิ้นสุดงวด (Period End Date)</label>
-            <input
-              aria-label="Depreciation period date"
-              className="w-full h-10 rounded-md border border-slate-300 bg-slate-50 px-3 py-1 text-sm outline-none cursor-default"
-              readOnly
-              value={periodDate}
-            />
-          </div>
-        </MobileFilterSheet>
+        />
       ) : null}
-        <TabsContent value="pending" className="space-y-3">
-          <div className="px-1 text-sm text-slate-600">
-            พบสินทรัพย์รอประมวลผล <span className="font-semibold text-slate-900">{filteredPendingAssets.length}</span> รายการ
-          </div>
-          <MiniAssetTable isLoading={isLoading} rows={filteredPendingAssets} />
-        </TabsContent>
 
-        <TabsContent value="history" className="space-y-3">
-          {/* Pagination Controls */}
-          <div className="mb-3 flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+      {depreciationTab === 'history' ? (
+        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 px-3 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <div>
               พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
               <span className="mx-2 text-slate-300">/</span>
@@ -1239,8 +1324,7 @@ export function DepreciationPageClient() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-        {/* Desktop view */}
+          {/* Desktop view */}
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
@@ -1287,10 +1371,10 @@ export function DepreciationPageClient() {
                     {row.status === 'reversed' ? (
                       <span className="text-xs text-slate-400 font-medium">{row.reversalReason || '-'}</span>
                     ) : (
-                      <button 
-                        className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition" 
-                        disabled={isSaving} 
-                        onClick={() => setReverseRow(row)} 
+                      <button
+                        className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition"
+                        disabled={isSaving}
+                        onClick={() => setReverseRow(row)}
                         type="button"
                       >
                         ย้อนกลับ
@@ -1304,7 +1388,7 @@ export function DepreciationPageClient() {
         </div>
 
         {/* Mobile view */}
-        <div className="block lg:hidden divide-y divide-slate-100/60">
+        <div className="block lg:hidden divide-y divide-slate-100/60 max-h-[60vh] overflow-y-auto">
           {isLoading ? (
             <div className="py-8 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล...</div>
           ) : filteredRows.length === 0 ? (
@@ -1352,10 +1436,10 @@ export function DepreciationPageClient() {
                   ) : (
                     <>
                       <span />
-                      <button 
-                        className="rounded-md border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition" 
-                        disabled={isSaving} 
-                        onClick={() => setReverseRow(row)} 
+                      <button
+                        className="rounded-md border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition"
+                        disabled={isSaving}
+                        onClick={() => setReverseRow(row)}
                         type="button"
                       >
                         ย้อนกลับ
@@ -1367,13 +1451,11 @@ export function DepreciationPageClient() {
             ))
           )}
         </div>
-          </div>
-        </TabsContent>
-      </Tabs>
-
+        </div>
+      ) : null}
 
       {preview ? (
-        <Modal title={`ตรวจรายการค่าเสื่อมงวด ${preview.periodKey}`}>
+        <Modal title={`Preview ค่าเสื่อมงวด ${preview.periodKey}`}>
           <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3">
             <StatCard label="จำนวนรายการ" value={preview.summary.count} />
             <StatCard label="ค่าเสื่อมรวม" value={formatMoney(preview.summary.totalDepreciation)} tone="red" />
@@ -1397,7 +1479,7 @@ export function DepreciationPageClient() {
           </TableShell>
           <ModalActions>
             <ActionButton onClick={() => setPreview(null)}>ยกเลิก</ActionButton>
-            <ActionButton disabled={isSaving || preview.rows.length === 0} strong onClick={commitRun}>{isSaving ? 'กำลังบันทึก' : 'ยืนยันบันทึกงวด'}</ActionButton>
+            <ActionButton disabled={isSaving || preview.rows.length === 0} strong onClick={commitRun}>{isSaving ? 'กำลัง Run' : 'Commit Run'}</ActionButton>
           </ModalActions>
         </Modal>
       ) : null}
@@ -1549,10 +1631,10 @@ export function AssetDisposalPageClient() {
         <Chip tone="emerald">บันทึกแล้ว {data?.summary.disposedRows ?? 0}</Chip>
         <Chip tone="amber">ย้อนกลับแล้ว {data?.summary.reversedRows ?? 0}</Chip>
         <div className="ml-auto">
-          <button 
-            type="button" 
-            onClick={openCreate} 
-            className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition outline-none"
+          <button
+            type="button"
+            onClick={openCreate}
+            className="h-9 px-4 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition outline-none"
           >
             + จำหน่ายทรัพย์สิน
           </button>
@@ -1560,7 +1642,7 @@ export function AssetDisposalPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-md border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden">
+      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden">
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="rounded-lg bg-blue-50 border border-blue-100 p-1.5">
             <div className="text-xs text-slate-500 font-semibold">จำหน่ายได้</div>
@@ -1577,57 +1659,52 @@ export function AssetDisposalPageClient() {
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <StatCard label="ยอดขายรวม (Proceeds)" value={formatMoney(data?.summary.proceeds)} tone="blue" />
-        <StatCard
-          label="กำไร/(ขาดทุน) สุทธิ"
-          value={formatMoney(data?.summary.gainLoss)}
-          tone={(data?.summary.gainLoss ?? 0) > 0 ? 'emerald' : (data?.summary.gainLoss ?? 0) < 0 ? 'red' : 'slate'}
-        />
+        <StatCard label="ยอดขายรวม (Proceeds)" value={formatMoney(data?.summary.proceeds)} tone="blue" icon="💵" />
+        <StatCard label="กำไร/(ขาดทุน) สุทธิ" value={formatMoney(data?.summary.gainLoss)} tone={(data?.summary.gainLoss ?? 0) >= 0 ? 'emerald' : 'red'} icon="📈" />
       </div>
-      {/* Pagination Controls */}
-      <div className="mb-3 flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {columnResize.hasCustomWidths ? (
-            <button
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50"
-              type="button"
-              onClick={columnResize.resetColumnWidths}
-            >
-              คืนค่าเดิมตาราง
-            </button>
-          ) : null}
-          <select
-            aria-label="จำนวนรายการต่อหน้า"
-            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            value={pageSize}
-            onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}
-          >
-            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
-          </select>
-          <button
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            disabled={currentPage <= 1}
-            type="button"
-            onClick={() => setPage((value) => Math.max(1, value - 1))}
-          >
-            ก่อนหน้า
-          </button>
-          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
-          <button
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            disabled={currentPage >= totalPages}
-            type="button"
-            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-          >
-            ถัดไป
-          </button>
-        </div>
-      </div>
-
+      {/* Table Card Controls */}
       <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-3 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {columnResize.hasCustomWidths ? (
+              <button
+                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={columnResize.resetColumnWidths}
+              >
+                คืนค่าเดิมตาราง
+              </button>
+            ) : null}
+            <select
+              aria-label="จำนวนรายการต่อหน้า"
+              className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              value={pageSize}
+              onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}
+            >
+              {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+            </select>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              disabled={currentPage <= 1}
+              type="button"
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              disabled={currentPage >= totalPages}
+              type="button"
+              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
         {/* Desktop view */}
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
@@ -1677,10 +1754,10 @@ export function AssetDisposalPageClient() {
                     {row.status === 'reversed' ? (
                       <span className="text-xs text-slate-400 font-medium">{row.reversalReason || '-'}</span>
                     ) : (
-                      <button 
-                        className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition" 
-                        disabled={isSaving} 
-                        onClick={() => openReverse(row)} 
+                      <button
+                        className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition"
+                        disabled={isSaving}
+                        onClick={() => openReverse(row)}
                         type="button"
                       >
                         ย้อนกลับ
@@ -1694,7 +1771,7 @@ export function AssetDisposalPageClient() {
         </div>
 
         {/* Mobile view */}
-        <div className="block lg:hidden divide-y divide-slate-100/60">
+        <div className="block lg:hidden divide-y divide-slate-100/60 max-h-[60vh] overflow-y-auto">
           {isLoading ? (
             <div className="py-8 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล...</div>
           ) : rows.length === 0 ? (
@@ -1743,10 +1820,10 @@ export function AssetDisposalPageClient() {
                   ) : (
                     <>
                       <span />
-                      <button 
-                        className="rounded-md border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition" 
-                        disabled={isSaving} 
-                        onClick={() => openReverse(row)} 
+                      <button
+                        className="rounded-md border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition"
+                        disabled={isSaving}
+                        onClick={() => openReverse(row)}
                         type="button"
                       >
                         ย้อนกลับ
@@ -1769,12 +1846,12 @@ export function AssetDisposalPageClient() {
             <Field label="ประเภท"><SelectControl options={data?.disposalTypes ?? []} value={form.disposalType} onChange={(value) => updateForm('disposalType', value)} /></Field>
             <MoneyField label="ราคาขาย" value={form.sellingPrice} onChange={(value) => updateForm('sellingPrice', value)} />
             <div className="w-full">
-                <SearchCombobox 
-                  inputId="form-customer" 
-                  label="ลูกค้า" 
-                  options={customerOptions} 
-                  value={form.customerId} 
-                  onChange={(value) => updateForm('customerId', value)} 
+                <SearchCombobox
+                  inputId="form-customer"
+                  label="ลูกค้า"
+                  options={customerOptions}
+                  value={form.customerId}
+                  onChange={(value) => updateForm('customerId', value)}
                   placeholder="พิมพ์เพื่อค้นหาลูกค้า..."
                 />
             </div>
@@ -1812,7 +1889,7 @@ export function AssetDisposalPageClient() {
       ) : null}
 
       {/* Floating Action Button (FAB) for Mobile */}
-      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 lg:hidden">
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
         <button
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform focus:outline-none text-2xl font-bold hover:bg-blue-700"
           onClick={openCreate}
@@ -1966,20 +2043,14 @@ function splitDelimitedLine(line: string, delimiter: string) {
 }
 
 function Modal({ children, title }: { children: ReactNode; title: string }) {
-  const childList = Children.toArray(children)
-  const actionElement = childList.find((child) => isValidElement<{ children?: ReactNode }>(child) && child.type === ModalActions)
-  const content = childList.filter((child) => !(isValidElement(child) && child.type === ModalActions))
-  const actions = isValidElement<{ children?: ReactNode }>(actionElement) ? actionElement.props.children : null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-6xl flex-col overflow-hidden rounded-md border-0 bg-slate-900 shadow-2xl">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 bg-slate-900 px-6 py-4">
-          <h2 className="min-w-0 truncate text-sm font-semibold text-white">{title}</h2>
-          {actions ? <div className="flex shrink-0 flex-wrap justify-end gap-2">{actions}</div> : null}
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4">
+      <div className="mt-8 w-full max-w-5xl overflow-hidden rounded-md bg-white shadow-xl">
+        <div className="bg-slate-900 px-6 py-4 border-b border-slate-800">
+          <h2 className="text-sm font-semibold text-white">{title}</h2>
         </div>
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-6">
-          {content}
+        <div className="p-6">
+          {children}
         </div>
       </div>
     </div>
@@ -1987,7 +2058,7 @@ function Modal({ children, title }: { children: ReactNode; title: string }) {
 }
 
 function ModalActions({ children }: { children: ReactNode }) {
-  return <>{children}</>
+  return <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-4">{children}</div>
 }
 
 function Field({ children, label }: { children: ReactNode; label: string }) {
@@ -2012,18 +2083,22 @@ function MoneyField({ label, onChange, value }: { label: string; onChange: (valu
 
 function ActionButton({ children, disabled = false, onClick, strong = false }: { children: ReactNode; disabled?: boolean; onClick: () => void; strong?: boolean }) {
   const color = strong
-    ? 'border-emerald-600 bg-emerald-600 text-white hover:border-emerald-700 hover:bg-emerald-700'
-    : 'border-rose-600 bg-rose-600 text-white hover:border-rose-700 hover:bg-rose-700'
-  return <button className={`${color} h-9 rounded-md border px-4 text-sm font-normal transition disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-0`} disabled={disabled} onClick={onClick} type="button">{children}</button>
+    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm focus:outline-none focus:ring-0'
+    : 'bg-transparent text-slate-500 hover:text-slate-800 border-none shadow-none focus:outline-none focus:ring-0'
+  return <button className={`${color} rounded-md px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 transition`} disabled={disabled} onClick={onClick} type="button">{children}</button>
+}
+
+function DisabledButton({ children, strong = false }: { children: ReactNode; strong?: boolean }) {
+  return <button className={`${strong ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'} rounded-md px-4 py-2 text-sm font-medium shadow-sm opacity-65 focus:outline-none focus:ring-0`} disabled type="button">{children}</button>
 }
 
 function LinkButton({ children, href }: { children: ReactNode; href: string }) {
-  return <a className="inline-flex h-9 items-center rounded-lg border border-slate-100 bg-slate-50 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 outline-none focus:ring-0" href={href}>{children}</a>
+  return <a className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 transition hover:bg-slate-50 outline-none focus:ring-0" href={href}>{children}</a>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="rounded-md border border-slate-100 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
       <h2 className="mb-3 font-semibold text-slate-900 text-sm">{title}</h2>
       {children}
     </div>
@@ -2032,7 +2107,7 @@ function Panel({ children, title }: { children: ReactNode; title: string }) {
 
 function FilterPanel({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-100 bg-white p-3 shadow-sm">
+    <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
       {children}
     </div>
   )
@@ -2040,23 +2115,23 @@ function FilterPanel({ children }: { children: ReactNode }) {
 
 function TableShell({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <div className="overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       {title ? (
-        <h2 className="border-b border-slate-100 px-4 py-3 font-bold text-slate-900 text-sm bg-slate-50/50">{title}</h2>
+        <h2 className="border-b border-slate-200 px-4 py-3 font-bold text-slate-900 text-sm bg-slate-50/50">{title}</h2>
       ) : null}
-      <div className="overflow-x-auto">
+      <div className="max-h-[60vh] overflow-auto">
         {children}
       </div>
     </div>
   )
 }
 
-function StatCard({ label, tone, value, icon }: { label: string; tone?: 'amber' | 'emerald' | 'red' | 'blue' | 'slate'; value: number | string; icon?: string }) {
+function StatCard({ label, tone, value, icon }: { label: string; tone?: 'amber' | 'emerald' | 'red' | 'blue'; value: number | string; icon?: string }) {
   const isZero = isZeroDisplayValue(value)
   const labelColor = isZero ? 'text-slate-500' : tone === 'amber' ? 'text-amber-600' : tone === 'emerald' ? 'text-emerald-600' : tone === 'red' ? 'text-red-600' : tone === 'blue' ? 'text-blue-600' : 'text-slate-500'
   const iconBgColor = isZero ? 'bg-slate-100 text-slate-500' : tone === 'amber' ? 'bg-amber-50 text-amber-600' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-600' : tone === 'red' ? 'bg-red-50 text-red-600' : tone === 'blue' ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-600'
   return (
-    <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-md shadow-sm flex items-center gap-2.5 sm:gap-4">
+    <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
       {icon && (
         <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${iconBgColor} flex items-center justify-center text-xl shrink-0`}>
           {icon}
@@ -2076,6 +2151,15 @@ function isZeroDisplayValue(value: number | string) {
   return Number.isFinite(numericValue) && numericValue === 0
 }
 
+function MiniStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-2 border border-slate-100">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="font-bold text-slate-900 text-xs">{value}</div>
+    </div>
+  )
+}
+
 function Bar({ label, max, value }: { label: string; max: number; value: number }) {
   const width = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0
   return (
@@ -2091,8 +2175,10 @@ function Bar({ label, max, value }: { label: string; max: number; value: number 
   )
 }
 
-function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: DepreciationPayload['pendingAssets'] }) {
+function MiniAssetTable({ isLoading, rows, summary }: { isLoading: boolean; rows: DepreciationPayload['pendingAssets']; summary?: ReactNode }) {
   const columnResize = useResizableColumns('finance-accounting.depreciation.pending-assets.v1', pendingAssetColumns)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [sortKey, setSortKey] = useState<PendingAssetSortKey | null>(null)
 
@@ -2113,22 +2199,65 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
     setSortDirection('asc')
   }
 
+  const totalRows = sortedRows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return sortedRows.slice(start, start + pageSize)
+  }, [sortedRows, currentPage, pageSize])
+
+  useEffect(() => {
+    setPage(1)
+  }, [rows, pageSize])
+
   return (
     <div>
       {/* Desktop view */}
-      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        {columnResize.hasCustomWidths ? (
-          <div className="flex justify-end border-b border-slate-100 bg-white px-3 py-2">
+      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        {summary || columnResize.hasCustomWidths ? (
+          <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-3 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <div>{summary}</div>
+            <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="จำนวนรายการต่อหน้า"
+              className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              value={pageSize}
+              onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}
+            >
+              {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+            </select>
             <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              disabled={currentPage <= 1}
+              type="button"
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              disabled={currentPage >= totalPages}
+              type="button"
+              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+            >
+              ถัดไป
+            </button>
+            {columnResize.hasCustomWidths ? (
+              <button
               className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50"
               type="button"
               onClick={columnResize.resetColumnWidths}
-            >
+              >
               คืนค่าเดิมตาราง
-            </button>
+              </button>
+            ) : null}
+            </div>
           </div>
         ) : null}
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {pendingAssetColumns.map((column, index) => {
               if (index === pendingAssetColumns.length - 1) {
@@ -2150,7 +2279,7 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
           </thead>
           <tbody className="divide-y divide-slate-100">
             <LoadingOrEmpty colSpan={7} isLoading={isLoading} rows={rows.length} />
-            {sortedRows.map((row) => (
+            {pagedRows.map((row) => (
               <tr key={row.id} className="transition-colors hover:bg-slate-50">
                 <td className="whitespace-nowrap px-3 py-3 font-mono font-bold text-amber-700">{row.code}</td>
                 <td className="px-3 py-3 font-semibold text-slate-800">{row.name}</td>
@@ -2162,9 +2291,40 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
+      <div className="flex flex-col gap-3 px-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between lg:hidden">
+        <div>{summary}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            value={pageSize}
+            onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage <= 1}
+            type="button"
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            type="button"
+            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
       {/* Mobile view */}
       <div className="block lg:hidden space-y-2.5">
         {isLoading ? (
@@ -2172,7 +2332,7 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
         ) : sortedRows.length === 0 ? (
           <div className="text-center text-xs text-slate-400 py-6">ไม่มีรายการทรัพย์สินที่ต้องประมวลผล</div>
         ) : (
-          sortedRows.map((row) => (
+          pagedRows.map((row) => (
             <div key={row.id} className="bg-slate-50 rounded-lg p-3 border border-slate-100 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="font-mono text-xs text-amber-700 font-bold">{row.code}</span>
@@ -2215,8 +2375,8 @@ function AssetRegisterEmptyState({
   hasFilters: boolean
 }) {
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center rounded-md border border-dashed border-slate-200 bg-slate-50/70 px-5 py-6 text-center">
-      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg text-slate-500 shadow-sm"></div>
+    <div className="mx-auto flex max-w-lg flex-col items-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-6 text-center">
+      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg text-slate-500 shadow-sm">🏢</div>
       <div className="mt-3 text-sm font-semibold text-slate-800">
         {hasFilters ? 'ไม่พบทรัพย์สินตามตัวกรอง' : 'ยังไม่มีทรัพย์สินในระบบ'}
       </div>
@@ -2262,7 +2422,7 @@ function StatusPill({ status }: { status: string }) {
     color = 'bg-amber-50 text-amber-700'
     text = 'ซ่อมบำรุง'
   }
-  
+
   return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{text}</span>
 }
 

@@ -15,10 +15,10 @@ import {
   DualCostingCountRow,
   DualCostingErrorBox,
   DualCostingFilterCard,
+  DualCostingHint,
   DualCostingPageSection,
   DualCostingPanel,
   DualCostingStatCard,
-  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type Mode = 'ledger' | 'report' | 'waiting'
@@ -295,23 +295,24 @@ function WaitingAllocationsView() {
   return (
     <DualCostingPageSection>
       <DualCostingErrorBox error={error} />
-      <DualCostingWorkflowStrip active="waiting" />
-      
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <DualCostingStatCard icon="❌" label="ยังไม่ส่งจัดสรร" tone="red" value={String(data?.summary.fullyPending ?? 0)} />
-        <DualCostingStatCard icon="🔗" label="บางส่วน" tone="amber" value={String(data?.summary.partial ?? 0)} />
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <DualCostingStatCard icon="⏳" label="รายการที่รอส่งต่อ" tone="amber" value={String(data?.summary.count ?? 0)} />
         <DualCostingStatCard icon="⚖️" label="น้ำหนักรอจัดสรร" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
-        <DualCostingStatCard icon="💰" label="มูลค่ารอจัดสรร" tone="emerald" value={formatMoney(data?.summary.totalRevenue ?? 0)} />
+        <div className="col-span-2 md:col-span-1">
+          <DualCostingStatCard icon="💰" label="มูลค่ารอจัดสรร" tone="emerald" value={formatMoney(data?.summary.totalRevenue ?? 0)} />
+        </div>
       </div>
 
       <DualCostingPanel title="สรุปตามหมวด">
-        {summaryResize.hasCustomWidths ? (
-          <div className="mb-2 hidden justify-end lg:flex">
-            <Button size="sm" type="button" variant="outline" onClick={summaryResize.resetColumnWidths}>คืนค่าเดิมตารางสรุป</Button>
-          </div>
-        ) : null}
         {/* Desktop View */}
-        <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+          {summaryResize.hasCustomWidths ? (
+            <div className="flex justify-end border-b border-slate-100 px-3 py-3">
+              <Button size="sm" type="button" variant="outline" onClick={summaryResize.resetColumnWidths}>คืนค่าเดิมตารางสรุป</Button>
+            </div>
+          ) : null}
+          <div className="overflow-x-auto">
           <Table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: summaryResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {waitingSummaryColumns.map((column, index) => {
@@ -349,6 +350,7 @@ function WaitingAllocationsView() {
               {!isLoading && summaryRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-400" colSpan={waitingSummaryColumns.length}>ไม่มีรายการรอ allocate ตามตัวกรอง</TableCell></TableRow> : null}
             </TableBody>
           </Table>
+          </div>
         </div>
 
         {/* Mobile View */}
@@ -749,16 +751,6 @@ function AllocationLedgerView() {
   return (
     <DualCostingPageSection>
       <DualCostingErrorBox error={error} />
-      <DualCostingWorkflowStrip active="ledger" />
-      
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <DualCostingStatCard icon="📊" label="รวม Allocations" tone="slate" value={String(data?.summary.active ?? 0)}>
-          <span className="text-xs font-semibold text-slate-500 mt-0.5 block">PO {data?.summary.poCount ?? 0} · Spot {data?.summary.spotCount ?? 0}</span>
-        </DualCostingStatCard>
-        <DualCostingStatCard icon="⚖️" label="น้ำหนัก allocate" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
-        <DualCostingStatCard icon="💳" label="ต้นทุนรวม" tone="red" value={formatMoney(data?.summary.cost ?? 0)} />
-        <DualCostingStatCard icon="📈" label="กำไรรวม (Deal Cost)" tone={(data?.summary.gp ?? 0) >= 0 ? 'emerald' : 'red'} value={formatMoney(data?.summary.gp ?? 0)} />
-      </div>
 
       <DualCostingFilterCard>
         {/* Desktop View */}
@@ -1053,6 +1045,9 @@ function DualCostingReportView() {
 
   return (
     <DualCostingPageSection>
+      <DualCostingHint tone="emerald">
+        รายงานนี้ใช้ Deal Cost เพื่อให้ผู้บริหารดูกำไรต่อดีล/ลอตที่ allocate เท่านั้น ไม่ใช้ปิดงบ และ P&L ยังใช้ WAC ตามหลักบัญชี
+      </DualCostingHint>
       <DualCostingErrorBox error={error} />
       {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">กำลังโหลดข้อมูล...</div> : null}
       
@@ -1074,13 +1069,14 @@ function DualCostingReportView() {
             <DualCostingStatCard icon="💰" label="มูลค่าขายค้าง" tone="emerald" value={formatMoney(report?.waiting.revenue ?? 0)} />
           </div>
           <DualCostingPanel title="สรุปตามหมวดสินค้า">
-            {reportResize.hasCustomWidths ? (
-              <div className="mb-2 hidden justify-end lg:flex">
-                <Button size="sm" type="button" variant="outline" onClick={reportResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button>
-              </div>
-            ) : null}
             {/* Desktop View */}
-            <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+            <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+              {reportResize.hasCustomWidths ? (
+                <div className="flex justify-end border-b border-slate-100 px-3 py-3">
+                  <Button size="sm" type="button" variant="outline" onClick={reportResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button>
+                </div>
+              ) : null}
+              <div className="overflow-x-auto">
               <Table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: reportResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
                   {reportColumns.map((column, index) => {
@@ -1122,6 +1118,7 @@ function DualCostingReportView() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </div>
 
             {/* Mobile View */}
