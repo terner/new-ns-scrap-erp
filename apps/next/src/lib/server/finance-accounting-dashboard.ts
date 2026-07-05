@@ -41,10 +41,10 @@ function monthLabel(date: Date) {
 
 function sourceState() {
   return {
-    basis: 'Financial Dashboard management/read baseline assembled from operational finance helpers. Not a statutory GL dashboard.',
+    basis: 'Financial Dashboard management source assembled from operational finance helpers. Not a statutory GL dashboard.',
     limitations: [
       'ยังไม่มี GL close/COA/retained earnings roll-forward จึงเป็น management dashboard เท่านั้น',
-      'Cash need/inflow reuses AR/AP/loan schedule forecast baseline from operational documents',
+      'Cash need/inflow reuses AR/AP/loan schedule forecast source from operational documents',
       'No payment, receipt, transfer, financing, reclass, posting, or statutory statement write action is enabled',
     ],
     writeActionsEnabled: false,
@@ -143,7 +143,7 @@ export async function buildFinancialDashboard(filter: FinancialDashboardFilter) 
     filters: { asOf: dateOnly(asOf), branchId: filter.branchId ?? 'ALL', monthStart: dateOnly(currentMonthStart) },
     insights: [
       { detail: `จาก Cash & Bank ÷ Avg Daily Out (${avgDailyOut.toFixed(2)}/วัน)`, title: 'เงินสดพอจ่ายกี่วัน', type: runway < 30 ? 'danger' : runway < 60 ? 'warn' : 'ok', value: runway >= 999 ? '∞' : `${Math.round(runway)} วัน` },
-      { detail: 'รวมภาระ AP/Loan ที่ครบกำหนดจาก forecast baseline', title: 'วันนี้ต้องเตรียมเงิน', type: cashNeedToday > split.cashAndBank ? 'danger' : 'ok', value: cashNeedToday },
+      { detail: 'รวมภาระ AP/Loan ที่ครบกำหนดจาก forecast source', title: 'วันนี้ต้องเตรียมเงิน', type: cashNeedToday > split.cashAndBank ? 'danger' : 'ok', value: cashNeedToday },
       { detail: `Net cash 7 วัน = ${split.cashAndBank + cashIn7 - cashNeed7}`, title: '7 วันข้างหน้าภาระอะไรบ้าง', type: cashNeed7 > split.cashAndBank + cashIn7 ? 'danger' : cashNeed7 > split.cashAndBank ? 'warn' : 'ok', value: cashNeed7 },
       { detail: `AR คงค้างทั้งหมด ${balanceSheet.summary.ar}`, title: 'ลูกหนี้ที่จะเก็บได้ (30 วัน)', type: 'ok', value: cashIn30 },
       { detail: `AP คงค้าง ${balanceSheet.summary.ap} + Loan ${balanceSheet.summary.currentLoan + balanceSheet.summary.longTermLoan}`, title: 'เจ้าหนี้/สินเชื่อต้องจ่าย (30 วัน)', type: cashNeed30 > split.cashAndBank + cashIn30 ? 'danger' : 'warn', value: cashNeed30 },

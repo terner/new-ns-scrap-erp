@@ -874,3 +874,90 @@ aside a:visited {
 .dark :where(tr[class*="bg-indigo-50"], td[class*="bg-indigo-50"], th[class*="bg-indigo-50"], tr[class*="bg-violet-50"], td[class*="bg-violet-50"], th[class*="bg-violet-50"], tr[class*="bg-purple-50"], td[class*="bg-purple-50"], th[class*="bg-purple-50"], tr[class*="bg-fuchsia-50"], td[class*="bg-fuchsia-50"], th[class*="bg-fuchsia-50"]) {
   background-color: rgba(91, 33, 182, 0.12) !important;
 }
+
+@media (max-width: 639px) {
+  [data-ns-dialog-content="app"] {
+    inset: 0 auto auto 0 !important;
+    width: 100vw !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    --tw-translate-x: 0 !important;
+    --tw-translate-y: 0 !important;
+    translate: none !important;
+    transform: none !important;
+    border-radius: 0 !important;
+  }
+
+  [data-ns-dialog-content="app"] [data-ns-dialog-header] {
+    border-radius: 0 !important;
+    padding-top: calc(env(safe-area-inset-top) + 1rem) !important;
+    padding-right: 1rem !important;
+    padding-left: 1rem !important;
+  }
+
+  [data-ns-dialog-content="app"] > :where(form.bg-slate-900, .bg-slate-900) {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  [data-ns-dialog-content="app"] > :where(form.bg-slate-900, .bg-slate-900) > .bg-slate-900:first-child {
+    flex-shrink: 0 !important;
+    border-radius: 0 !important;
+    padding-top: calc(env(safe-area-inset-top) + 1rem) !important;
+    padding-right: 1rem !important;
+    padding-left: 1rem !important;
+  }
+
+  [data-ns-dialog-content="app"] > :where(form.bg-slate-900, .bg-slate-900) > :where(.bg-slate-50, .overflow-auto, .overflow-y-auto) {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+  }
+
+  .fixed.inset-0.z-50:has(> .bg-slate-900:not([data-ns-modal-shell="dialog"])),
+  .fixed.inset-0.z-50:has(> form.bg-slate-900:not([data-ns-modal-shell="dialog"])) {
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+  }
+
+  .fixed.inset-0.z-50 > .bg-slate-900:not([data-ns-modal-shell="dialog"]),
+  .fixed.inset-0.z-50 > form.bg-slate-900:not([data-ns-modal-shell="dialog"]) {
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    width: 100vw !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    min-height: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .fixed.inset-0.z-50 > .bg-slate-900:not([data-ns-modal-shell="dialog"]) > .bg-slate-900:first-child,
+  .fixed.inset-0.z-50 > form.bg-slate-900:not([data-ns-modal-shell="dialog"]) > .bg-slate-900:first-child {
+    flex-shrink: 0 !important;
+    border-radius: 0 !important;
+    padding-top: calc(env(safe-area-inset-top) + 1rem) !important;
+    padding-right: 1rem !important;
+    padding-left: 1rem !important;
+  }
+
+  .fixed.inset-0.z-50 > .bg-slate-900:not([data-ns-modal-shell="dialog"]) > :where(.bg-slate-50, form.bg-slate-50, .overflow-auto, .overflow-y-auto),
+  .fixed.inset-0.z-50 > form.bg-slate-900:not([data-ns-modal-shell="dialog"]) > :where(.bg-slate-50, form.bg-slate-50, .overflow-auto, .overflow-y-auto) {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+  }
+}

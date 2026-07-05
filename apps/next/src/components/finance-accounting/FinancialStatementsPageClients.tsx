@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
@@ -131,19 +132,17 @@ export function PlStatementPageClient() {
 
   return (
     <section className="space-y-4">
-      <BaselineNotice sourceState={data?.sourceState} />
       {error ? <ErrorBox message={error} /> : null}
       {/* Desktop Filter Panel */}
       <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
-        <Segment active>📅 ช่วงวันที่</Segment><Segment>📆 รายเดือน</Segment><Segment>📊 ตารางรายปี (12 เดือน)</Segment>
-        <QuickButton onClick={() => { const now = new Date(); setFrom(new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10)); setTo(today()) }}>📊 ปีนี้</QuickButton>
+        <Segment active> ช่วงวันที่</Segment><Segment> รายเดือน</Segment><Segment> ตารางรายปี (12 เดือน)</Segment>
+        <QuickButton onClick={() => { const now = new Date(); setFrom(new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10)); setTo(today()) }}> ปีนี้</QuickButton>
         <QuickButton onClick={() => setFrom(monthStart())}>เดือนนี้</QuickButton>
         <DateInput label="จาก" value={from} onChange={setFrom} /><DateInput label="ถึง" value={to} onChange={setTo} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
         <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={mode} onChange={(event) => setMode(event.target.value)}>
           <option value="ALL">All (Stock+Trading)</option><option value="STOCK">Stock Only</option><option value="TRADING">Trading Only</option>
         </select>
-        <DisabledButton>📥 Excel</DisabledButton>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
@@ -194,94 +193,72 @@ export function PlStatementPageClient() {
         </div>
       </div>
 
-      {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h4 className="font-bold text-slate-800 text-sm">ตัวกรองเพิ่มเติม</h4>
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-2xl font-bold focus:outline-none"
-                onClick={() => setShowMobileFilters(false)}
-                type="button"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
-                <select
-                  aria-label="Branch select"
-                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-                  value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                >
-                  <option value="">ทุกสาขา</option>
-                  {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">ประเภทรายการ</label>
-                <select
-                  aria-label="Mode select"
-                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-                  value={mode}
-                  onChange={(event) => setMode(event.target.value)}
-                >
-                  <option value="ALL">All (Stock+Trading)</option>
-                  <option value="STOCK">Stock Only</option>
-                  <option value="TRADING">Trading Only</option>
-                </select>
-              </div>
-
-              <div className="border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  disabled
-                  className="w-full h-10 rounded-lg bg-slate-100 text-slate-400 font-semibold text-sm cursor-not-allowed flex items-center justify-center gap-1.5 opacity-60"
-                >
-                  📥 Export Excel
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex gap-2">
+        <MobileFilterSheet
+          title="ตัวกรองเพิ่มเติม"
+          onClose={() => setShowMobileFilters(false)}
+          footer={
+            <>
               <button
                 type="button"
                 onClick={() => {
                   setBranchId('')
                   setMode('ALL')
                 }}
-                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowMobileFilters(false)}
-                className="flex-1 h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 ตกลง
               </button>
-            </div>
+            </>
+          }
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="Branch select"
+              className="h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none transition focus:border-slate-400"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
           </div>
-        </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">ประเภทรายการ</label>
+            <select
+              aria-label="Mode select"
+              className="h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none transition focus:border-slate-400"
+              value={mode}
+              onChange={(event) => setMode(event.target.value)}
+            >
+              <option value="ALL">ทั้งหมด (Stock + Trading)</option>
+              <option value="STOCK">Stock เท่านั้น</option>
+              <option value="TRADING">Trading เท่านั้น</option>
+            </select>
+          </div>
+        </MobileFilterSheet>
       ) : null}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <MegaCard footer={`Gross ${money(data?.summary.grossProfit)} · OPEX ${money((data?.summary.expenses ?? 0) + (data?.summary.depreciation ?? 0))}`} label="Net Profit Before Tax" tone="pl" value={money(data?.summary.netProfitBeforeTax)} />
-        <Panel title="🌊 Waterfall"><Waterfall rows={[['Revenue', data?.summary.revenue ?? 0], ['COGS', -(data?.summary.cogs ?? 0)], ['OPEX', -(data?.summary.expenses ?? 0)], ['Dep', -(data?.summary.depreciation ?? 0)], ['Interest', -(data?.summary.interest ?? 0)], ['FX', data?.summary.fxNet ?? 0]]} /></Panel>
+        <MegaCard footer={`กำไรขั้นต้น ${money(data?.summary.grossProfit)} · OPEX ${money((data?.summary.expenses ?? 0) + (data?.summary.depreciation ?? 0))}`} label="กำไรก่อนภาษี" tone="pl" value={money(data?.summary.netProfitBeforeTax)} />
+        <Panel title="สะพานกำไรขาดทุน"><Waterfall rows={[['รายได้', data?.summary.revenue ?? 0], ['COGS', -(data?.summary.cogs ?? 0)], ['OPEX', -(data?.summary.expenses ?? 0)], ['ค่าเสื่อม', -(data?.summary.depreciation ?? 0)], ['ดอกเบี้ย', -(data?.summary.interest ?? 0)], ['FX', data?.summary.fxNet ?? 0]]} /></Panel>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Revenue" value={money(data?.summary.revenue)} tone="emerald" />
+        <StatCard label="รายได้" value={money(data?.summary.revenue)} tone="emerald" />
         <StatCard label="COGS" value={money(data?.summary.cogs)} tone="red" />
-        <StatCard label="Operating Profit" value={money(data?.summary.operatingProfit)} tone="cyan" />
-        <StatCard label="FX Gain/(Loss)" value={money(data?.summary.fxNet)} tone={(data?.summary.fxNet ?? 0) >= 0 ? 'emerald' : 'red'} />
+        <StatCard label="กำไรจากการดำเนินงาน" value={money(data?.summary.operatingProfit)} tone="cyan" />
+        <StatCard label="กำไร/(ขาดทุน) FX" value={money(data?.summary.fxNet)} tone={(data?.summary.fxNet ?? 0) > 0 ? 'emerald' : (data?.summary.fxNet ?? 0) < 0 ? 'red' : 'slate'} />
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <SplitCard label="Stock" revenue={data?.split.stock.revenue ?? 0} cogs={data?.split.stock.cogs ?? 0} tone="emerald" />
+        <SplitCard label="สต็อก" revenue={data?.split.stock.revenue ?? 0} cogs={data?.split.stock.cogs ?? 0} tone="emerald" />
         <SplitCard label="Trading" revenue={data?.split.trading.revenue ?? 0} cogs={data?.split.trading.cogs ?? 0} tone="purple" />
       </div>
       <StatementTable isLoading={isLoading} rows={data?.sections ?? []} tableKey="pl-statement" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
@@ -300,22 +277,20 @@ export function BalanceSheetPageClient() {
 
   return (
     <section className="space-y-4">
-      <BaselineNotice sourceState={data?.sourceState} />
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
       <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
-        <DateInput label="As of" value={asOf} onChange={setAsOf} />
+        <DateInput label="ณ วันที่" value={asOf} onChange={setAsOf} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
-        <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${data?.balanceCheck.balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{data?.balanceCheck.balanced ? 'BALANCED' : `OFF BY ${money(data?.balanceCheck.difference)}`}</span>
-        <DisabledButton>📥 Excel</DisabledButton>
+        <BalanceCheckPill balanced={data?.balanceCheck.balanced} difference={data?.balanceCheck.difference} />
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
       <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
         <div className="flex gap-2 items-center">
           <div className="flex-1 flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-semibold shrink-0">As of</span>
+            <span className="text-xs text-slate-500 font-semibold shrink-0">ณ วันที่</span>
             <DatePickerInput className="w-full" value={asOf} onChange={setAsOf} />
           </div>
           <button
@@ -330,85 +305,64 @@ export function BalanceSheetPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h4 className="font-bold text-slate-800 text-sm">ตัวกรองเพิ่มเติม</h4>
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-2xl font-bold focus:outline-none"
-                onClick={() => setShowMobileFilters(false)}
-                type="button"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
-                <select
-                  aria-label="Branch select"
-                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-                  value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                >
-                  <option value="">ทุกสาขา</option>
-                  {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                </select>
-              </div>
-
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-600">สถานะงบแสดงฐานะการเงิน</span>
-                <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${data?.balanceCheck.balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{data?.balanceCheck.balanced ? 'BALANCED' : `OFF BY ${money(data?.balanceCheck.difference)}`}</span>
-              </div>
-
-              <div className="border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  disabled
-                  className="w-full h-10 rounded-lg bg-slate-100 text-slate-400 font-semibold text-sm cursor-not-allowed flex items-center justify-center gap-1.5 opacity-60"
-                >
-                  📥 Export Excel
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex gap-2">
+        <MobileFilterSheet
+          title="ตัวกรองเพิ่มเติม"
+          onClose={() => setShowMobileFilters(false)}
+          footer={
+            <>
               <button
                 type="button"
                 onClick={() => {
                   setBranchId('')
                 }}
-                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowMobileFilters(false)}
-                className="flex-1 h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 ตกลง
               </button>
-            </div>
+            </>
+          }
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="Branch select"
+              className="h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none transition focus:border-slate-400"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
           </div>
-        </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-xs font-semibold text-slate-600">สถานะงบแสดงฐานะการเงิน</span>
+            <BalanceCheckPill balanced={data?.balanceCheck.balanced} difference={data?.balanceCheck.difference} />
+          </div>
+        </MobileFilterSheet>
       ) : null}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <MegaCard footer={`Liabilities + Equity ${money(data?.summary.liabilitiesAndEquity)}`} label="Total Assets" tone="bs" value={money(data?.summary.totalAssets)} />
-        <Panel title="🥧 Assets Breakdown"><Waterfall rows={[['Cash', data?.summary.cash ?? 0], ['AR', data?.summary.ar ?? 0], ['Inventory', data?.summary.inventory ?? 0], ['Fixed Asset', data?.summary.fixedAssetNet ?? 0]]} /></Panel>
-        <Panel title="🥧 Liab + Equity"><Waterfall rows={[['AP', data?.summary.ap ?? 0], ['Current Loan', data?.summary.currentLoan ?? 0], ['Long-term Loan', data?.summary.longTermLoan ?? 0], ['Equity', data?.summary.totalEquity ?? 0]]} /></Panel>
+        <MegaCard footer={`หนี้สิน + ส่วนทุน ${money(data?.summary.liabilitiesAndEquity)}`} label="สินทรัพย์รวม" tone="bs" value={money(data?.summary.totalAssets)} />
+        <Panel title="สัดส่วนสินทรัพย์"><Waterfall rows={[['เงินสด', data?.summary.cash ?? 0], ['ลูกหนี้ (AR)', data?.summary.ar ?? 0], ['สต็อก', data?.summary.inventory ?? 0], ['ทรัพย์สินถาวร', data?.summary.fixedAssetNet ?? 0]]} /></Panel>
+        <Panel title="หนี้สิน + ส่วนทุน"><Waterfall rows={[['เจ้าหนี้ (AP)', data?.summary.ap ?? 0], ['เงินกู้ระยะสั้น', data?.summary.currentLoan ?? 0], ['เงินกู้ระยะยาว', data?.summary.longTermLoan ?? 0], ['ส่วนทุน', data?.summary.totalEquity ?? 0]]} /></Panel>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <StatCard label="Working Capital" value={money(data?.ratios.workingCapital)} tone="blue" />
-        <StatCard label="Current Ratio" value={(data?.ratios.currentRatio ?? 0).toFixed(2)} tone="cyan" />
+        <StatCard label="เงินทุนหมุนเวียน" value={money(data?.ratios.workingCapital)} tone="blue" />
+        <StatCard label="อัตราส่วนทุนหมุนเวียน" value={(data?.ratios.currentRatio ?? 0).toFixed(2)} tone="cyan" />
         <div className="col-span-2 md:col-span-1">
-          <StatCard label="Debt / Equity" value={(data?.ratios.debtToEquity ?? 0).toFixed(2)} tone="purple" />
+          <StatCard label="หนี้สิน/ส่วนทุน" value={(data?.ratios.debtToEquity ?? 0).toFixed(2)} tone="purple" />
         </div>
       </div>
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <StatementTable isLoading={isLoading} rows={data?.sections.assets ?? []} tableKey="balance-sheet-assets" title="Assets" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
-        <StatementTable isLoading={isLoading} rows={[...(data?.sections.liabilities ?? []), ...(data?.sections.equity ?? [])]} tableKey="balance-sheet-liabilities-equity" title="Liabilities + Equity" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
+        <StatementTable isLoading={isLoading} rows={data?.sections.assets ?? []} tableKey="balance-sheet-assets" title="สินทรัพย์" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
+        <StatementTable isLoading={isLoading} rows={[...(data?.sections.liabilities ?? []), ...(data?.sections.equity ?? [])]} tableKey="balance-sheet-liabilities-equity" title="หนี้สิน + ส่วนทุน" onDrill={(line) => line.details?.length ? setDrill({ rows: line.details, title: line.label }) : undefined} />
       </div>
       {drill ? <DrillModal rows={drill.rows} title={drill.title} onClose={() => setDrill(null)} /> : null}
     </section>
@@ -426,14 +380,12 @@ export function CashFlowStatementPageClient() {
 
   return (
     <section className="space-y-4">
-      <BaselineNotice sourceState={data?.sourceState} />
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
       <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <DateInput label="จาก" value={from} onChange={setFrom} /><DateInput label="ถึง" value={to} onChange={setTo} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
-        <DisabledButton>📥 Excel</DisabledButton>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
@@ -486,69 +438,48 @@ export function CashFlowStatementPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h4 className="font-bold text-slate-800 text-sm">ตัวกรองเพิ่มเติม</h4>
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-2xl font-bold focus:outline-none"
-                onClick={() => setShowMobileFilters(false)}
-                type="button"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
-                <select
-                  aria-label="Branch select"
-                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-                  value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                >
-                  <option value="">ทุกสาขา</option>
-                  {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                </select>
-              </div>
-
-              <div className="border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  disabled
-                  className="w-full h-10 rounded-lg bg-slate-100 text-slate-400 font-semibold text-sm cursor-not-allowed flex items-center justify-center gap-1.5 opacity-60"
-                >
-                  📥 Export Excel
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex gap-2">
+        <MobileFilterSheet
+          title="ตัวกรองเพิ่มเติม"
+          onClose={() => setShowMobileFilters(false)}
+          footer={
+            <>
               <button
                 type="button"
                 onClick={() => {
                   setBranchId('')
                 }}
-                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowMobileFilters(false)}
-                className="flex-1 h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 ตกลง
               </button>
-            </div>
+            </>
+          }
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="Branch select"
+              className="h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none transition focus:border-slate-400"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
           </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <MegaCard footer={`Beginning ${money(data?.summary.openingCash)} · Ending ${money(data?.summary.endingCash)}`} label="Net Change in Cash" tone="cf" value={money(data?.summary.netChange)} />
-        <Panel title="🥧 Activity Inflow"><Waterfall rows={[['Operating', data?.activities.operating.inflow ?? 0], ['Investing', data?.activities.investing.inflow ?? 0], ['Financing', data?.activities.financing.inflow ?? 0]]} /></Panel>
-        <Panel title="📊 Activity Net"><Waterfall rows={[['Operating', data?.summary.operating ?? 0], ['Investing', data?.summary.investing ?? 0], ['Financing', data?.summary.financing ?? 0]]} /></Panel>
+        <Panel title=" Activity Inflow"><Waterfall rows={[['Operating', data?.activities.operating.inflow ?? 0], ['Investing', data?.activities.investing.inflow ?? 0], ['Financing', data?.activities.financing.inflow ?? 0]]} /></Panel>
+        <Panel title=" Activity Net"><Waterfall rows={[['Operating', data?.summary.operating ?? 0], ['Investing', data?.summary.investing ?? 0], ['Financing', data?.summary.financing ?? 0]]} /></Panel>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Cash In" value={money(data?.summary.totalInflow)} tone="emerald" />
@@ -581,16 +512,6 @@ function money(value?: number) {
   return amount < 0 ? `(${formatMoney(Math.abs(amount))})` : formatMoney(amount)
 }
 
-function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
-  return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 text-xs text-amber-900 shadow-sm">
-      <span className="font-bold">⚠️ Management statement / read baseline</span>
-      <span className="ml-2">รายงานเพื่อผู้บริหารจากข้อมูลธุรกรรม ยังไม่ใช่งบการเงินตามบัญชี GL</span>
-      {sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}
-    </div>
-  )
-}
-
 function FilterPanel({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">{children}</div>
 }
@@ -615,22 +536,23 @@ function QuickButton({ children, onClick }: { children: ReactNode; onClick: () =
   return <button className="rounded-md bg-slate-50 border border-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition outline-none focus:ring-0" type="button" onClick={onClick}>{children}</button>
 }
 
-function DisabledButton({ children }: { children: ReactNode }) {
-  return <button className="rounded-lg bg-slate-100 border border-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 opacity-60 cursor-not-allowed outline-none focus:ring-0" disabled type="button">{children}</button>
+function BalanceCheckPill({ balanced, difference }: { balanced?: boolean; difference?: number }) {
+  return (
+    <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+      {balanced ? 'สมดุล' : `ต่าง ${money(difference)}`}
+    </span>
+  )
 }
 
 function MegaCard({ footer, label, tone, value }: { footer: string; label: string; tone: 'bs' | 'cf' | 'pl'; value: string }) {
   const toneColors = {
-    pl: { text: 'text-emerald-600', bg: 'bg-emerald-50 text-emerald-600', icon: '📈' },
-    bs: { text: 'text-blue-600', bg: 'bg-blue-50 text-blue-600', icon: '🏢' },
-    cf: { text: 'text-cyan-600', bg: 'bg-cyan-50 text-cyan-600', icon: '🌊' }
+    pl: { text: 'text-emerald-600', bg: 'bg-emerald-50 text-emerald-600', icon: '' },
+    bs: { text: 'text-blue-600', bg: 'bg-blue-50 text-blue-600', icon: '' },
+    cf: { text: 'text-cyan-600', bg: 'bg-cyan-50 text-cyan-600', icon: '' }
   }
   const current = toneColors[tone]
   return (
-    <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-4 lg:col-span-2">
-      <div className={`w-12 h-12 rounded-full ${current.bg} flex items-center justify-center text-xl shrink-0`}>
-        {current.icon}
-      </div>
+    <div className="bg-white p-5 border border-slate-100 rounded-md shadow-sm flex items-center gap-4 lg:col-span-2">
       <div className="min-w-0 flex-1">
         <div className={`text-xs font-semibold ${current.text} uppercase`}>{label}</div>
         <div className="mt-0.5 text-2xl font-extrabold text-slate-900 tracking-tight">{value}</div>
@@ -641,23 +563,21 @@ function MegaCard({ footer, label, tone, value }: { footer: string; label: strin
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"><h2 className="mb-3 text-xs font-bold text-slate-800">{title}</h2>{children}</div>
+  return <div className="rounded-md border border-slate-100 bg-white p-4 shadow-sm"><h2 className="mb-3 text-xs font-bold text-slate-800">{title}</h2>{children}</div>
 }
 
-function StatCard({ label, tone, value }: { label: string; tone: 'blue' | 'cyan' | 'emerald' | 'purple' | 'red'; value: string }) {
+function StatCard({ label, tone, value }: { label: string; tone: 'blue' | 'cyan' | 'emerald' | 'purple' | 'red' | 'slate'; value: string }) {
   const toneStyles = {
-    blue: { text: 'text-blue-600', bg: 'bg-blue-50', icon: '💰' },
-    cyan: { text: 'text-cyan-600', bg: 'bg-cyan-50', icon: '📊' },
-    emerald: { text: 'text-emerald-600', bg: 'bg-emerald-50', icon: '💵' },
-    purple: { text: 'text-purple-600', bg: 'bg-purple-50', icon: '📈' },
-    red: { text: 'text-red-600', bg: 'bg-red-50', icon: '📉' }
+    blue: { text: 'text-blue-600', bg: 'bg-blue-50', icon: '' },
+    cyan: { text: 'text-cyan-600', bg: 'bg-cyan-50', icon: '' },
+    emerald: { text: 'text-emerald-600', bg: 'bg-emerald-50', icon: '' },
+    purple: { text: 'text-purple-600', bg: 'bg-purple-50', icon: '' },
+    red: { text: 'text-red-600', bg: 'bg-red-50', icon: '' },
+    slate: { text: 'text-slate-600', bg: 'bg-slate-100', icon: '' }
   }
   const current = toneStyles[tone]
   return (
-    <div className="bg-white p-3.5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-full ${current.bg} ${current.text} flex items-center justify-center text-lg shrink-0`}>
-        {current.icon}
-      </div>
+    <div className="bg-white p-3.5 border border-slate-100 rounded-md shadow-sm flex items-center gap-3">
       <div className="min-w-0 flex-1">
         <div className="text-xs sm:text-xs font-semibold text-slate-500 truncate">{label}</div>
         <div className="mt-0.5 text-sm sm:text-base font-bold text-slate-900 tracking-tight">{value}</div>
@@ -669,12 +589,12 @@ function StatCard({ label, tone, value }: { label: string; tone: 'blue' | 'cyan'
 function SplitCard({ cogs, label, revenue, tone }: { cogs: number; label: string; revenue: number; tone: 'emerald' | 'purple' }) {
   const color = tone === 'emerald' ? 'border-emerald-100 bg-emerald-50/20 text-emerald-800' : 'border-purple-100 bg-purple-50/20 text-purple-800'
   return (
-    <div className={`rounded-xl border ${color} p-4 shadow-sm`}>
-      <div className="text-xs font-bold">{label} Split</div>
+    <div className={`rounded-md border ${color} p-4 shadow-sm`}>
+      <div className="text-xs font-bold">แยกตาม {label}</div>
       <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-        <div><div className="text-slate-400 text-xs">Revenue</div><b className="text-slate-800">{money(revenue)}</b></div>
+        <div><div className="text-slate-400 text-xs">รายได้</div><b className="text-slate-800">{money(revenue)}</b></div>
         <div><div className="text-slate-400 text-xs">COGS</div><b className="text-slate-800">{money(cogs)}</b></div>
-        <div><div className="text-slate-400 text-xs">Gross Profit</div><b className={tone === 'emerald' ? 'text-emerald-700' : 'text-purple-700'}>{money(revenue - cogs)}</b></div>
+        <div><div className="text-slate-400 text-xs">กำไรขั้นต้น</div><b className={tone === 'emerald' ? 'text-emerald-700' : 'text-purple-700'}>{money(revenue - cogs)}</b></div>
       </div>
     </div>
   )
@@ -709,15 +629,15 @@ function StatementTable({ isLoading, onDrill, rows, tableKey, title = 'Statement
         <div className="text-sm font-bold text-slate-700">{title}</div>
         {columnResize.hasCustomWidths ? (
           <button
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
+            className="h-8 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200"
             type="button"
             onClick={columnResize.resetColumnWidths}
           >
-            คืนค่าเดิมตาราง
+            รีเซ็ตความกว้างตาราง
           </button>
         ) : null}
       </div>
-      <div className="max-h-[62vh] overflow-auto">
+      <div className="overflow-x-auto">
         {/* Desktop Table View */}
         <table className="hidden min-w-full divide-y divide-slate-200 text-sm lg:table" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
@@ -749,7 +669,7 @@ function StatementTable({ isLoading, onDrill, rows, tableKey, title = 'Statement
                 </td>
                 <td className="px-3 py-3 text-center">
                   {line.details?.length ? (
-                    <button className="font-semibold text-blue-600 hover:underline outline-none focus:ring-0" type="button" onClick={() => onDrill(line)}>🔍 {line.details.length}</button>
+                    <button className="font-semibold text-blue-600 hover:underline outline-none focus:ring-0" type="button" onClick={() => onDrill(line)}> {line.details.length}</button>
                   ) : (
                     <span className="text-slate-300">-</span>
                   )}
@@ -780,7 +700,7 @@ function StatementTable({ isLoading, onDrill, rows, tableKey, title = 'Statement
                     {money(line.amount)}
                   </span>
                   {line.details?.length ? (
-                    <button className="text-xs font-semibold text-blue-600 hover:underline outline-none focus:ring-0" type="button" onClick={() => onDrill(line)}>🔍 ดูรายละเอียด ({line.details.length})</button>
+                    <button className="text-xs font-semibold text-blue-600 hover:underline outline-none focus:ring-0" type="button" onClick={() => onDrill(line)}> ดูรายละเอียด ({line.details.length})</button>
                   ) : null}
                 </div>
               </div>
@@ -797,26 +717,26 @@ function DrillModal({ onClose, rows, title }: { onClose: () => void; rows: Detai
   const { handleSort, sortDirection, sortedRows, sortKey } = useLocalTableSort<DetailRow, DrillColumnKey>(rows, getDrillSortValue)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-md bg-slate-900 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-md border-0 bg-slate-900 shadow-xl">
         <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
-          <h2 className="text-sm font-bold">🔍 {title}</h2>
-          <button className="text-slate-300 hover:text-white text-xs font-semibold outline-none focus:ring-0" type="button" onClick={onClose}>
+          <h2 className="text-sm font-bold"> {title}</h2>
+          <button className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white outline-none hover:bg-red-700 focus:ring-0" type="button" onClick={onClose}>
             ปิด
           </button>
         </div>
         {columnResize.hasCustomWidths ? (
           <div className="hidden justify-end border-b border-slate-100 bg-white px-3 py-2 lg:flex">
             <button
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
+              className="h-8 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200"
               type="button"
               onClick={columnResize.resetColumnWidths}
             >
-              คืนค่าเดิมตาราง
+              รีเซ็ตความกว้างตาราง
             </button>
           </div>
         ) : null}
-        <div className="max-h-[60vh] overflow-auto">
+        <div className="flex-1 overflow-auto bg-white">
           {/* Desktop Table View */}
           <table className="hidden min-w-full divide-y divide-slate-200 text-sm lg:table" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>

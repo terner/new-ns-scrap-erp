@@ -9,6 +9,7 @@ import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input as UiInput } from '@/components/ui/Input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select as UiSelect } from '@/components/ui/Select'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
@@ -877,20 +878,31 @@ export function PoBuyPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองรายการจองซื้อ</h4>
+        <MobileFilterSheet
+          title="ตัวกรองรายการจองซื้อ"
+          onClose={() => setShowMobileFilters(false)}
+          footer={(
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  resetFilters()
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4">
+              <button
+                type="button"
+                className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          )}
+        >
               <div>
                 <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                 <div className="flex items-center gap-2">
@@ -940,29 +952,7 @@ export function PoBuyPageClient() {
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  resetFilters()
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       {/* Mobile Card List (Hidden on Desktop) */}
@@ -1109,7 +1099,7 @@ export function PoBuyPageClient() {
         </Table>
       </div>
 
-      <div className="fixed bottom-6 right-6 lg:hidden">
+      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 lg:hidden">
         <button
           className="flex size-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
           onClick={openCreateForm}
@@ -1679,8 +1669,14 @@ function PoBuyFormModal({
       if (!open && !isSaving) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 shadow-2xl !p-0 flex flex-col outline-none focus:outline-none" data-combobox-portal-root="true" hideClose>
-        <DialogHeader className="px-5 py-4 bg-slate-900 text-white flex flex-row items-center rounded-t-md shrink-0">
-          <DialogTitle id="po-buy-form-title" className="text-white font-bold">{heading}</DialogTitle>
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-md shrink-0">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <DialogTitle id="po-buy-form-title" className="truncate text-white font-bold">{heading}</DialogTitle>
+            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+              <UiButton className="h-9 border-emerald-600 bg-emerald-600 px-4 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white disabled:opacity-60" disabled={isSaving} type="button" variant="outline" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</UiButton>
+              <UiButton className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" disabled={isSaving} type="button" variant="outline" onClick={onClose}>ยกเลิก</UiButton>
+            </div>
+          </div>
         </DialogHeader>
         <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-5 text-sm">
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1779,10 +1775,6 @@ function PoBuyFormModal({
             {fieldError('notes')}
           </div>
         </div>
-        <DialogFooter className="px-5 border-t border-slate-100 bg-white py-3 flex justify-end gap-2 rounded-b-md shrink-0">
-          <UiButton className="font-normal" disabled={isSaving} type="button" variant="outline" onClick={onClose}>ยกเลิก</UiButton>
-          <UiButton className="bg-slate-900 font-normal hover:bg-slate-800 text-white rounded-md h-9 transition-colors px-4" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</UiButton>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -1810,10 +1802,59 @@ function PoBuyDetailModal({
       if (!open) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-detail-title" className="max-h-[90vh] max-w-3xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 dark:bg-[#0f172a] border-0 shadow-2xl outline-none focus:outline-none" hideClose>
-        <DialogHeader className="p-4 bg-slate-900 dark:bg-[#0f172a] text-white shrink-0 flex flex-row items-start gap-3 rounded-t-md">
-          <div>
-            <DialogTitle id="po-buy-detail-title" className="text-white text-base font-bold">รายละเอียด {row.docNo}</DialogTitle>
-            <DialogDescription className="text-slate-300">{row.supplierName}</DialogDescription>
+        <DialogHeader className="p-4 bg-slate-900 dark:bg-[#0f172a] text-white shrink-0 rounded-t-md">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
+            <DialogTitle id="po-buy-detail-title" className="truncate text-white text-base font-bold">รายละเอียด {row.docNo}</DialogTitle>
+            <DialogDescription className="truncate text-slate-300">{row.supplierName}</DialogDescription>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {onEdit && onCancel && row.status === 'Open' && row.qty === row.remainingQty ? (
+              <>
+                <UiButton
+                  className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white"
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    onClose()
+                    onCancel(row)
+                  }}
+                >
+                  ยกเลิก PO
+                </UiButton>
+                <UiButton
+                  className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white"
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    onClose()
+                    onEdit(row)
+                  }}
+                >
+                  แก้ไข
+                </UiButton>
+              </>
+            ) : null}
+            {onShortClose && shouldShowShortCloseButton(row) ? (
+              <UiButton
+                className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white"
+                disabled={!canShortClosePoBuy(row)}
+                title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อรับสินค้าบางส่วนแล้ว'}
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onClose()
+                  onShortClose(row)
+                }}
+              >
+                ปิดรับไม่ครบ
+              </UiButton>
+            ) : null}
+            <UiButton className="h-9 border-emerald-600 bg-emerald-600 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(row)}>
+              {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}
+            </UiButton>
+            <UiButton className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={onClose}>ปิด</UiButton>
+          </div>
           </div>
         </DialogHeader>
 
@@ -1916,53 +1957,6 @@ function PoBuyDetailModal({
           </div>
         </div>
 
-        <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t border-slate-100 bg-white shrink-0 rounded-b-md">
-          {onEdit && onCancel && row.status === 'Open' && row.qty === row.remainingQty ? (
-            <>
-              <UiButton
-                className="font-normal border-red-200 text-red-700 hover:bg-red-50"
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  onClose()
-                  onCancel(row)
-                }}
-              >
-                ยกเลิก PO
-              </UiButton>
-              <UiButton
-                className="font-normal"
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  onClose()
-                  onEdit(row)
-                }}
-              >
-                แก้ไข
-              </UiButton>
-            </>
-          ) : null}
-          {onShortClose && shouldShowShortCloseButton(row) ? (
-            <UiButton
-              className="font-normal border-amber-200 text-amber-700 hover:bg-amber-50"
-              disabled={!canShortClosePoBuy(row)}
-              title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อรับสินค้าบางส่วนแล้ว'}
-              type="button"
-              variant="outline"
-              onClick={() => {
-                onClose()
-                onShortClose(row)
-              }}
-            >
-              ปิดรับไม่ครบ
-            </UiButton>
-          ) : null}
-          <UiButton className="font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(row)}>
-            {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์ PO Buy'}
-          </UiButton>
-          <UiButton className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</UiButton>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

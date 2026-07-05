@@ -103,6 +103,7 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
   const afterDiscount = Math.max(0, bill.subtotal - bill.discount)
   const qtySummaryText = totalsByUnit(bill).map((item) => `${money(item.qty)} ${item.unit}`).join(' / ') || '-'
   const amountSummaryText = totalsByUnit(bill).map((item) => `${money(item.amount)} บาท`).join(' / ') || '-'
+  const lineDiscountTotal = bill.items.reduce((sum, item) => sum + (item.discount ?? 0), 0)
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)} ${escapeHtml(bill.docNo)}</title>
     <style>
@@ -140,6 +141,8 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
       .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
       .items tr { break-inside: avoid; page-break-inside: avoid; }
       .items .empty td { height: 24px; color: transparent; }
+      .items tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .items tfoot .final-amount { color: #0f766e; }
       .item-name { font-weight: 850; color: #0f172a; }
       .muted { color: #64748b; font-size: 12px; margin-top: 1px; }
       .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -185,6 +188,7 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
         .items { font-size: 12px; margin-top: 7px; page-break-before: auto; }
         .items th { padding: 3px 3px; }
         .items td { padding: 3px 3px; }
+        .items .empty td { height: 18px; }
         .muted { font-size: 12px; }
         .summary-grid { gap: 6px; margin-top: 6px; }
         .summary-card { padding: 5px; }
@@ -263,6 +267,15 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
           ${itemRows(bill)}
           ${emptyRows(fillerRowCount(bill.items.length))}
         </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" class="num">รวมทั้งสิ้น</td>
+            <td class="num">${escapeHtml(qtySummaryText)}</td>
+            <td></td>
+            <td class="num">${money(lineDiscountTotal)}</td>
+            <td class="num final-amount">${money(bill.subtotal)}</td>
+          </tr>
+        </tfoot>
       </table>
 
       <div class="summary-grid">

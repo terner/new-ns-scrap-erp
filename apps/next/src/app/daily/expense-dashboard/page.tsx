@@ -10,7 +10,6 @@ export default function DailyExpenseDashboardPage() {
   return (
     <>
       <PageTitleOverride
-        subtitle="สรุปแต่ละหมวดเทียบเดือนย้อนหลัง และตรวจหาความผิดปกติเทียบค่าเฉลี่ย"
         title="Dashboard ค่าใช้จ่าย"
       />
       <DailyExpensePageClient dashboardOnly />

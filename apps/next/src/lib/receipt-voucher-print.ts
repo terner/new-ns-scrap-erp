@@ -144,6 +144,7 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
     ? 'เอกสารนี้เป็นหลักฐานรับเงินจาก Supplier ตามบัญชีที่ระบุในเอกสาร'
     : 'เอกสารนี้เป็นหลักฐานรับเงินสดจาก Supplier เท่านั้น ไม่ใช่เอกสารโอนเงินหรือรายการธนาคาร'
 
+  const tableRowTarget = 7
   const itemsHtml = printItems.map((item, index) => {
     return `
       <tr>
@@ -155,6 +156,15 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
       </tr>
     `
   }).join('')
+  const emptyRowsHtml = Array.from({ length: Math.max(0, tableRowTarget - printItems.length) }).map(() => `
+      <tr class="empty-row">
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+      </tr>
+    `).join('')
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ใบสำคัญรับเงิน ${escapeHtml(row.docNo)}</title>
     <style>
@@ -190,12 +200,15 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
       .field-value { font-weight: bold; color: #0f172a; margin-top: 1px; overflow-wrap: anywhere; }
       .field-wide { grid-span: 2; grid-column: span 2; }
       table { width: 100%; border-collapse: collapse; }
-      .items { margin-top: 12px; font-size: 12px; break-inside: auto; page-break-inside: auto; table-layout: fixed; }
+      .items { margin-top: 12px; font-size: 11px; break-inside: auto; page-break-inside: auto; table-layout: fixed; }
       .items thead { display: table-header-group; }
       .items tbody { break-inside: auto; page-break-inside: auto; }
-      .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 6px 6px; text-align: left; font-weight: 900; }
-      .items td { border: 1px solid #cbd5e1; padding: 6px 6px; vertical-align: top; }
+      .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 4px 4px; text-align: left; font-weight: 900; }
+      .items td { border: 1px solid #dbe3ea; padding: 4px 4px; vertical-align: top; }
       .items tr { break-inside: avoid; page-break-inside: avoid; }
+      .items .empty-row td { height: 24px; color: transparent; }
+      .items tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .items tfoot .final-amount { color: #059669; font-size: 11.5px; }
       .item-name { font-weight: bold; color: #0f172a; }
       .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
       .center { text-align: center; }
@@ -205,7 +218,7 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
       .note-box { border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; }
       .note-box-header { background: #f1f5f9; padding: 4px 8px; font-weight: 900; color: #475569; font-size: 12px; }
       .note-content { padding: 8px; font-size: 12px; font-weight: bold; color: #0f172a; min-height: 32px; }
-      .note-content-small { padding: 8px 10px; font-size: 12px; line-height: 1.55; color: #334155; min-height: 64px; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .note-content-small { padding: 6px 8px; font-size: 12px; color: #475569; min-height: 40px; white-space: pre-wrap; }
       .summary-box { border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
       .summary-row { display: grid; grid-template-columns: 1fr 32mm; gap: 8px; border-bottom: 1px solid #cbd5e1; padding: 6px 8px; font-size: 12px; }
       .summary-row:last-child { border-bottom: 0; }
@@ -350,7 +363,16 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
         </thead>
         <tbody>
           ${itemsHtml}
+          ${emptyRowsHtml}
         </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" class="num">รวมทั้งสิ้น</td>
+            <td class="num">${escapeHtml(quantitySummary || '-')}</td>
+            <td></td>
+            <td class="num final-amount">${money(row.totalAmount)}</td>
+          </tr>
+        </tfoot>
       </table>
       
       <section class="bottom-grid">

@@ -11,7 +11,7 @@ tags:
   - business-flow
 status: draft
 created: 2026-06-09
-updated: 2026-06-12
+updated: 2026-07-03
 ---
 
 # Printable Documents / เอกสารที่ต้องพิมพ์
@@ -33,7 +33,7 @@ updated: 2026-06-12
 | P0 | `POB` PO Buy / ใบสั่งซื้อ | `/purchase/po-buy` | Implemented | Legacy PO Buy อยู่ใน flow จองซื้อ/สั่งซื้อก่อนรับของ; active target ใช้เลข `POB...` เป็นเอกสารซื้อหลักก่อน PB | ใช้ corporate A4 portrait ที่อ้างอิง design บิลซื้อ, Company Profile header, พิมพ์จาก list/detail modal, แสดง Supplier พร้อมที่อยู่, รายการสินค้าครบพร้อมหน่วยจริง, ยอดสั่งซื้อ/คงเหลือ, หมายเหตุ, ช่องลงนาม และลายน้ำเฉพาะกรณียกเลิก |
 | P0 | `PB` บิลรับซื้อ / ใบรับสินค้า | `/purchase/bills` | Implemented | `erp.printDocument('receipt', row.raw.id)` ที่ `old-apps/legacy/index.html:15119`, helper ที่ `old-apps/legacy/index.html:6449` | ใช้ corporate A4 portrait, Company Profile header, พิมพ์จาก list/detail/direct detail, รองรับ multi-page สำหรับ 30+ รายการ |
 | P0 | `SB` บิลขาย / ใบส่งของ | `/sales/bills` | Implemented print, allocation hardening follow-up | `erp.printDocument('delivery', b.id)` ที่ `old-apps/legacy/index.html:20390`, helper เดียวกับ PB ที่ `old-apps/legacy/index.html:6449` | ใช้ flow `WTO -> SB` ตาม [[Sales Bills Page Flow]], A4 portrait/multi-page/totals baseline เดียวกับ PB, Company Profile ตามสาขา, แสดง Customer, WTO trace, VAT, หักมัดจำ Customer, และยอดลูกหนี้สุทธิ; follow-up คือแสดง `PO Sell`/`Spot Sale` จาก line-level allocation facts เมื่อ write flow แยก allocation ครบ |
-| P0 | `WTI/WTO` ใบรับของ/ใบส่งของจากงานชั่ง | `/daily/weight-ticket-list` | Implemented print, share/audit follow-up | `printWeighingTicket(ticket)` และปุ่ม `ใบชั่ง` ที่ `old-apps/legacy/index.html:52560` ถึง `old-apps/legacy/index.html:52985` | Active helper รองรับ WTI/WTO แล้ว; ต้องคง template ที่เน้นน้ำหนัก/สิ่งเจือปน/รูป/ทะเบียนรถ |
+| P0 | `WTI/WTO` ใบรับของ/ใบส่งของจากงานชั่ง | `/daily/weight-ticket-list` | Implemented print, share/audit follow-up | `printWeighingTicket(ticket)` และปุ่ม `ใบชั่ง` ที่ `old-apps/legacy/index.html:52560` ถึง `old-apps/legacy/index.html:52985` | Active helper รองรับ WTI/WTO แล้ว; PDF ต้องให้หน้าแรกเป็นใบพิมพ์ A4 ที่ตรงกับตัวพิมพ์และจบใน 1 หน้าเมื่อเป็นเอกสารความหนาแน่นปกติ โดยเน้นน้ำหนัก/สิ่งเจือปน/ทะเบียนรถ/ลายเซ็น จากนั้นต่อหน้า 2+ เป็นหน้าอัลบั้มรูปหลักฐานจากรูปรถและรูปสินค้า |
 | P1 | `PMA` ใบอนุมัติจ่ายเงิน / ส่ง Cashier | `/daily/payment-approval`, `/purchase/payments` | Required follow-up | `printApprovalSheet` และปุ่ม `พิมพ์ใบอนุมัติส่ง Cashier` ที่ `old-apps/legacy/index.html:27680` ถึง `old-apps/legacy/index.html:27773` | ต้องพิมพ์จาก approval snapshot หลังเกิด PMA แล้ว ไม่พิมพ์จาก pending source live row |
 | P1 | `PMT` Payment Voucher / ใบสำคัญจ่าย | `/purchase/payments?tab=history` | Partial: daily report implemented, per-voucher print follow-up | Legacy payment-history evidence ไม่ชัดเท่า PB/SB/PMA แต่ active UI มี shell `ดู/พิมพ์` ใน history | ต้องอยู่ในแท็บประวัติเท่านั้น เพราะ PMT เป็นเอกสารหลังจ่ายจริงหรือหลังยกเลิก |
 | P1 | `RV` ใบสำคัญรับเงิน Supplier | `/purchase/receipt-vouchers` | Partial: manual create/edit/print implemented, cancel/status follow-up | legacy `view-receiptVoucher` ที่ `old-apps/legacy/index.html:42799` ถึง `old-apps/legacy/index.html:43240` | ใช้ให้ Supplier/ผู้รับเงินเซ็นรับเงินสดจากบริษัทเท่านั้น active modal เลือก Supplier เพื่อเติมข้อมูลผู้รับเงิน และเลือก PB optional เพื่อเติมรายการ/ยอดอัตโนมัติ ไม่ใช่ payment posting owner และไม่ใช้กับโอนเงิน/เช็ค; active print ใช้ compact A4 template ที่ใกล้ legacy print density พร้อม Company Profile header, receiver/company text blocks, item table, unit-separated quantity summary, amount text, signer blocks; ยังต้อง harden signer/payment method policy และ status/cancel watermark |
@@ -71,3 +71,20 @@ updated: 2026-06-12
 3. `PMA` approval sheet: ทำจาก `payment_approvals` snapshot สำหรับส่ง Cashier/approval record
 4. `RV` hardening: ปรับ receipt voucher print ให้ใช้ Company Profile และ snapshot fields ครบ พร้อมคง boundary ว่า RV เฉพาะเงินสดและไม่สร้าง PMT/BST/stock ledger
 5. `RCP` customer receipt print: ทำจาก sales receipt history หลัง receipt สำเร็จ
+
+## 2026-07-03 RV Print Table Baseline
+
+- `RV` ใบสำคัญรับเงินต้องยึดตารางจากปุ่มพิมพ์ `/daily/weight-ticket-list` เป็น visual baseline สำหรับเอกสารพิมพ์: soft lined table, header เทา, body border อ่อน, แถวว่างเติมพื้นที่, และแถว `รวมทั้งสิ้น` ในท้ายตาราง
+- เหตุผล: RV เป็นเอกสารให้คู่ค้าเซ็นรับเงิน จึงต้องดูเป็นฟอร์มพิมพ์ A4 จริง ไม่ใช่ตารางรายการสั้นลอยอยู่กลางหน้า
+
+## 2026-07-03 Print Table Baseline Follow-up
+
+- Business document print tables must use `/daily/weight-ticket-list` print output as the table baseline: fixed layout, soft grey header, light cell borders, dense padding, blank filler rows where the document is form-like, and an in-table total/footer row where the table represents money or quantity lines.
+- Checked and aligned the active print-table templates for WTI/WTO, RV, PB, SB, PO Buy, PO Sell, Advance Payment allocation history, Payment Approval summary, Expense, and Money Movement PMT/RCP daily/customer receipt prints.
+- Browser page/dashboard print actions that print the current screen are not treated as corporate business-document templates unless the flow later promotes them to formal printable documents.
+
+## 2026-07-03 WTI/WTO PDF Blank-Page Fix
+
+- WTI/WTO PDF share output must keep the first page as a true A4 print form and place photo evidence on page 2+ without an empty page between them.
+- The `WTI012607-0006` regression case reproduced a blank page 2 because the final print-form content overflowed the A4 height by a small amount before the album page. The fix keeps normal A4 pagination and tightens only the print-form vertical spacing, especially page padding and signature spacing.
+- Verification target: real `WTI012607-0006` renders as 2 A4 pages, page 1 print form and page 2 album, while the fixture harness still asserts 1 print page + 1 album page.

@@ -89,30 +89,57 @@ export function SearchCombobox({
       const input = inputRef.current
       if (!input) return
       const inputRect = input.getBoundingClientRect()
+      const viewport = window.visualViewport
+      const viewportLeft = viewport?.offsetLeft ?? 0
+      const viewportWidth = viewport?.width ?? window.innerWidth
+      const gutter = 8
+      const clampToViewport = (left: number, right: number, width: number) => {
+        const availableWidth = Math.max(160, right - left)
+        const nextWidth = Math.min(width, availableWidth)
+        const nextLeft = Math.min(Math.max(inputRect.left, left), right - nextWidth)
+        return {
+          left: nextLeft,
+          width: nextWidth,
+        }
+      }
       const host = portalHostRef.current
       if (!host || host === document.body) {
+        const clamped = clampToViewport(
+          viewportLeft + gutter,
+          viewportLeft + viewportWidth - gutter,
+          inputRect.width,
+        )
         setPanelRect({
-          left: inputRect.left,
+          left: clamped.left,
           top: inputRect.bottom + 4,
-          width: inputRect.width,
+          width: clamped.width,
         })
         return
       }
 
       const hostRect = host.getBoundingClientRect()
+      const clamped = clampToViewport(
+        Math.max(hostRect.left, viewportLeft + gutter),
+        Math.min(hostRect.right, viewportLeft + viewportWidth - gutter),
+        inputRect.width,
+      )
       setPanelRect({
-        left: inputRect.left - hostRect.left + host.scrollLeft,
+        left: clamped.left - hostRect.left + host.scrollLeft,
         top: inputRect.bottom - hostRect.top + host.scrollTop + 4,
-        width: inputRect.width,
+        width: clamped.width,
       })
     }
 
     updatePanelRect()
     window.addEventListener('resize', updatePanelRect)
     window.addEventListener('scroll', updatePanelRect, true)
+    window.visualViewport?.addEventListener('resize', updatePanelRect)
+    window.visualViewport?.addEventListener('scroll', updatePanelRect)
     return () => {
       window.removeEventListener('resize', updatePanelRect)
       window.removeEventListener('scroll', updatePanelRect, true)
+      window.visualViewport?.removeEventListener('resize', updatePanelRect)
+      window.visualViewport?.removeEventListener('scroll', updatePanelRect)
     }
   }, [open])
 
@@ -306,7 +333,7 @@ export function SearchCombobox({
                   }}
                   id={`${inputId}-option-${index}`}
                   aria-selected={option.id === value}
-                  className={`block w-full px-3 py-2 text-left text-slate-800 hover:bg-blue-50 dark:text-slate-100 dark:hover:bg-slate-700/70 ${option.id === value ? 'bg-blue-100 text-blue-800 dark:bg-slate-700 dark:text-white' : highlightedIndex === index ? 'bg-slate-100 text-slate-900 dark:bg-slate-700/70 dark:text-white' : ''}`}
+                  className={`block w-full overflow-hidden px-3 py-2 text-left text-slate-800 hover:bg-blue-50 dark:text-slate-100 dark:hover:bg-slate-700/70 ${option.id === value ? 'bg-blue-100 text-blue-800 dark:bg-slate-700 dark:text-white' : highlightedIndex === index ? 'bg-slate-100 text-slate-900 dark:bg-slate-700/70 dark:text-white' : ''}`}
                   role="option"
                   type="button"
                   onMouseDownCapture={(event) => {
@@ -340,8 +367,8 @@ export function SearchCombobox({
                     event.preventDefault()
                   }}
                 >
-                  <span className="block font-medium">{option.label}</span>
-                  {option.description ? <span className="block text-sm text-slate-500 sm:text-xs dark:text-slate-400">{option.description}</span> : null}
+                  <span className="block break-words font-medium">{option.label}</span>
+                  {option.description ? <span className="block break-words text-sm text-slate-500 sm:text-xs dark:text-slate-400">{option.description}</span> : null}
                 </button>
               )) : <div className="px-3 py-2 text-base text-slate-500 sm:text-sm dark:text-slate-400">ไม่พบข้อมูลที่ตรงกับคำค้นหา</div>}
             </div>,

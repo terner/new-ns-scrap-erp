@@ -72,9 +72,6 @@ export function CashOthersSummaryPageClient() {
         <label className="text-xs font-bold text-slate-500">As of</label>
         <DatePickerInput className="w-[140px]" value={asOf} onChange={setAsOf} />
         <span className="flex-1" />
-        <button className="rounded-lg bg-slate-100 border border-slate-100 px-3 py-1.5 text-xs font-bold text-slate-400 cursor-not-allowed outline-none focus:outline-none" disabled type="button">
-          ส่งออก (ปิดการใช้งาน)
-        </button>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Grand icon="💰" label="Total Asset" value={summary.totalAsset} />
@@ -94,7 +91,7 @@ export function CashOthersSummaryPageClient() {
         <StockTable row={data?.rows.stock ?? {}} />
         <DebtTable row={data?.rows.debt ?? {}} />
       </div>
-      <Notice text={data?.sourceState.limitations[0]} />{error ? <ErrorBox text={error} /> : null}
+      {error ? <ErrorBox text={error} /> : null}
     </section>
   )
 }
@@ -420,18 +417,6 @@ function KeyRows({ rows }: { rows: Array<[string, number | string | undefined, s
   )
 }
 
-
-function Notice({ text }: { text?: string }) {
-  return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-3.5 text-sm text-amber-900 shadow-sm flex items-start gap-2">
-      <span>⚠️</span>
-      <div>
-        <b className="font-bold">Read-only baseline</b>
-        <span className="ml-2 leading-relaxed">{text ?? 'ไม่มี write action ใน baseline นี้'}</span>
-      </div>
-    </div>
-  )
-}
 
 function ErrorBox({ text }: { text: string }) {
   return (

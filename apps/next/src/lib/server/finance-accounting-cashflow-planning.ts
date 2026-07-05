@@ -76,11 +76,11 @@ function branchWhere(branchId?: bigint | null) {
 
 function sourceState() {
   return {
-    basis: 'Cash flow planning/read baseline from operational transactions. Not a statutory cash flow statement.',
+    basis: 'Cash flow planning/source from operational transactions. Not a statutory cash flow statement.',
     limitations: [
-      'ยังไม่มี GL/COA/closing-period design จึงเป็น forecast/management baseline เท่านั้น',
+      'ยังไม่มี GL/COA/closing-period design จึงเป็น forecast/management source เท่านั้น',
       'AR/AP forecast ใช้ due_date หรือ credit term fallback จาก operational bills',
-      'Tax due เป็น estimate จาก transaction-derived Tax/VAT/WHT baseline ไม่ใช่ filing state',
+      'Tax due เป็น estimate จาก transaction-derived Tax/VAT/WHT source ไม่ใช่ filing state',
     ],
     writeActionsEnabled: false,
   }
@@ -363,49 +363,6 @@ function eventDate(date: Date, start: Date) {
   return date < start ? start : date
 }
 
-async function appendTaxForecastEvents(events: ForecastEvent[], filter: ForecastFilter, end: Date) {
-  const dueMonth = new Date(filter.startDate.getFullYear(), filter.startDate.getMonth(), 1)
-  const lastDueMonth = new Date(end.getFullYear(), end.getMonth(), 1)
-  const loadedPeriods = new Set<string>()
-
-  while (dueMonth <= lastDueMonth) {
-    const periodDate = new Date(dueMonth.getFullYear(), dueMonth.getMonth() - 1, 1)
-    const periodYear = periodDate.getFullYear()
-    const periodMonth = periodDate.getMonth() + 1
-    const periodLabel = `${periodYear}-${String(periodMonth).padStart(2, '0')}`
-
-    if (!loadedPeriods.has(periodLabel)) {
-      loadedPeriods.add(periodLabel)
-      const tax = await buildTaxVatWht({ branchId: filter.branchId, month: periodMonth, year: periodYear })
-      const whtDue = new Date(dueMonth.getFullYear(), dueMonth.getMonth(), 7)
-      const vatDue = new Date(dueMonth.getFullYear(), dueMonth.getMonth(), 15)
-
-      if (whtDue >= filter.startDate && whtDue <= end && tax.summary.whtChargedNet > 0) {
-        events.push({
-          amount: tax.summary.whtChargedNet,
-          date: dateOnly(whtDue),
-          inOut: 'OUT',
-          label: `WHT นำส่งงวด ${periodLabel}`,
-          refNo: `WHT-${periodLabel}`,
-          type: 'TAX',
-        })
-      }
-      if (vatDue >= filter.startDate && vatDue <= end && tax.summary.vatPayable > 0) {
-        events.push({
-          amount: tax.summary.vatPayable,
-          date: dateOnly(vatDue),
-          inOut: 'OUT',
-          label: `VAT Payable งวด ${periodLabel}`,
-          refNo: `VAT-${periodLabel}`,
-          type: 'TAX',
-        })
-      }
-    }
-
-    dueMonth.setMonth(dueMonth.getMonth() + 1)
-  }
-}
-
 export async function buildCashFlowForecastCalendar(filter: ForecastFilter) {
   const [[salesBills, purchaseBills], expenses, loanSchedules, cash, branches] = await loadForecastInputs(filter)
   const end = addDays(filter.startDate, filter.horizon)
@@ -450,7 +407,11 @@ export async function buildCashFlowForecastCalendar(filter: ForecastFilter) {
     })).filter((event) => event.amount > 0),
   ]
 
-  await appendTaxForecastEvents(events, filter, end)
+  const currentTax = await buildTaxVatWht({ branchId: filter.branchId, month: filter.startDate.getMonth() + 1, year: filter.startDate.getFullYear() })
+  const taxDue = new Date(currentTax.taxCalendar.at(-1)?.vatDue ?? filter.startDate)
+  if (taxDue >= filter.startDate && taxDue <= end && currentTax.summary.vatPayable > 0) {
+    events.push({ amount: currentTax.summary.vatPayable, date: dateOnly(taxDue), inOut: 'OUT', label: 'VAT Payable estimate', refNo: currentTax.filters.year + currentTax.filters.month, type: 'TAX' })
+  }
 
   const dailyProjection = []
   let runningBal = cash.balance

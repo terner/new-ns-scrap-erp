@@ -57,8 +57,8 @@ type SupplierAdvancePayload = {
   }
 }
 
-type SupplierAdvanceColumnKey = 'action' | 'amount' | 'amountThb' | 'currency' | 'date' | 'docNo' | 'fxRate' | 'remainingAmount' | 'status' | 'supplierName' | 'usedAmount'
-type SupplierAdvanceSortKey = Exclude<SupplierAdvanceColumnKey, 'action'>
+type SupplierAdvanceColumnKey = 'amount' | 'amountThb' | 'currency' | 'date' | 'docNo' | 'fxRate' | 'remainingAmount' | 'status' | 'supplierName' | 'usedAmount'
+type SupplierAdvanceSortKey = SupplierAdvanceColumnKey
 type SortDirection = 'asc' | 'desc'
 
 const supplierAdvanceColumns: Array<ResizableColumnDefinition<SupplierAdvanceColumnKey>> = [
@@ -72,7 +72,6 @@ const supplierAdvanceColumns: Array<ResizableColumnDefinition<SupplierAdvanceCol
   { key: 'usedAmount', defaultWidth: 100, minWidth: 95 },
   { key: 'remainingAmount', defaultWidth: 100, minWidth: 95 },
   { key: 'status', defaultWidth: 110, minWidth: 95 },
-  { key: 'action', defaultWidth: 80, minWidth: 75 },
 ]
 
 function compareSortValues(left: string | number, right: string | number) {
@@ -136,9 +135,6 @@ export function SupplierAdvancePageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-        <strong>Supplier Advance</strong> = จ่ายเงินล่วงหน้าให้ Supplier ก่อนมีบิลรับซื้อ — ยอดที่เหลือสามารถใช้หักกับบิลในอนาคตได้
-      </div>
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
@@ -147,7 +143,6 @@ export function SupplierAdvancePageClient() {
         <Metric label="จำนวนรายการ Active" value={`${data?.summary.activeCount ?? 0}`} />
         <div className="flex items-center justify-end gap-2">
           <a className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50" href={exportHref}>Export XLSX</a>
-          <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white opacity-60" disabled type="button">+ จ่ายล่วงหน้าใหม่</button>
         </div>
       </div>
 
@@ -177,12 +172,11 @@ export function SupplierAdvancePageClient() {
               <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="ใช้แล้ว" resizeProps={columnResize.getResizeHandleProps('usedAmount', 'ใช้แล้ว')} sortKey="usedAmount" onSort={changeSort} />
               <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="คงเหลือ" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'คงเหลือ')} sortKey="remainingAmount" onSort={changeSort} />
               <ResizableTableHead activeSortKey={sortKey ?? undefined} align="center" direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
-              <ResizableTableHead label="" resizeProps={columnResize.getResizeHandleProps('action', '')} />
             </tr>
           </thead>
           <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ยังไม่มี Supplier Advance</td></tr> : null}
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={supplierAdvanceColumns.length}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={supplierAdvanceColumns.length}>ยังไม่มี Supplier Advance</td></tr> : null}
             {!isLoading && sortedRows.map((row) => (
               <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
                 <td className="px-4 py-3.5 font-mono text-xs overflow-hidden truncate">{row.docNo}</td>
@@ -195,7 +189,6 @@ export function SupplierAdvancePageClient() {
                 <td className="px-4 py-3.5 text-right text-slate-600 overflow-hidden truncate">{formatMoney(row.usedAmount)}</td>
                 <td className="px-4 py-3.5 text-right font-bold text-amber-700 overflow-hidden truncate">{formatMoney(row.remainingAmount)}</td>
                 <td className="px-4 py-3.5 text-center overflow-hidden truncate"><StatusBadge status={row.status} /></td>
-                <td className="px-4 py-3.5 text-right overflow-hidden truncate"><button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled type="button">ยกเลิก</button></td>
               </tr>
             ))}
           </tbody>
@@ -254,7 +247,6 @@ export function SupplierAdvancePageClient() {
         ))}
       </div>
 
-      <div className="text-xs text-slate-500">Source: {data?.schemaState.sourceTable ?? 'bank_statement'} / missing: {(data?.schemaState.missingTables ?? []).join(', ') || '-'}</div>
     </section>
   )
 }

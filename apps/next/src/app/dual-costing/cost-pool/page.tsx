@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function CostPoolPage() {
   return (
     <>
-      <PageTitleOverride subtitle="ติดตามต้นทุนคงเหลือต่อ lot ที่รอ match กับดีลขาย" title="Cost Pool" />
+      <PageTitleOverride title="Cost Pool" />
       <CostPoolPageClient />
     </>
   )

@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import type { SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
@@ -12,14 +13,14 @@ import { formatDateDisplay } from '@/lib/format'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { stockAdjustReasonOptions, statusConvertFormSchema, stockConvertFormSchema, stockAdjustFormSchema } from '@/lib/stock'
-import type { StatusConvertFormValues, StockAdjustFormValues, StockBalanceOption, StockConvertFormValues, StockCostPoolOption, StockOption } from '@/lib/stock'
+import type { StatusConvertFormValues, StockAdjustFormValues, StockConvertFormValues, StockCostPoolOption, StockOption } from '@/lib/stock'
 import { z } from 'zod'
 import { ApiError } from '@/lib/api-client'
 
 type Mode = 'adjust' | 'convert' | 'status-convert'
 type Payload = {
   reasonOptions?: string[]
-  reference: { branches: StockOption[]; costPoolEntries?: StockCostPoolOption[]; customers?: StockOption[]; products: StockOption[]; stockBalanceEntries?: StockBalanceOption[]; warehouses: StockOption[] }
+  reference: { branches: StockOption[]; costPoolEntries?: StockCostPoolOption[]; customers?: StockOption[]; products: StockOption[]; warehouses: StockOption[] }
   rows: Array<Record<string, string | number | boolean | null>>
 }
 type OperationColumn = {
@@ -46,7 +47,6 @@ type StatusConvertSortKey =
   | 'value'
 
 const OPERATION_PAGE_SIZES = [10, 20, 50, 100]
-const SOURCE_PRODUCT_METAL_GROUPS = new Set(['ทองแดง', 'ทองเหลือง'])
 
 type StockAdjustSnapshot = {
   adjustType: 'NONE' | 'LOSS' | 'GAIN'
@@ -745,20 +745,32 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-md bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto animate-slide-up">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองรายการ</h4>
+        <MobileFilterSheet
+          title="ตัวกรองรายการ"
+          onClose={() => setShowMobileFilters(false)}
+          bodyClassName="text-sm"
+          footer={(
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  resetFilters()
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4 text-sm">
+              <button
+                type="button"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          )}
+        >
               {mode === 'convert' ? (
                 <>
                   <label className="block">
@@ -862,39 +874,137 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
                   </div>
                 </>
               ) : null}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  resetFilters()
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       {/* FAB for Mobile Creation */}
       <a
         aria-label="สร้างรายการใหม่"
-        className="h-14 w-14 rounded-full bg-slate-900 text-white shadow-lg fixed bottom-6 right-6 z-40 lg:hidden flex items-center justify-center hover:bg-slate-800"
+        className="h-14 w-14 rounded-full bg-slate-900 text-white shadow-lg fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 lg:hidden flex items-center justify-center hover:bg-slate-800"
         href={`${pathname}?new=1`}
       >
         <Plus className="h-6 w-6" />
       </a>
+      {mode === 'status-convert' ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+          <span>พบทั้งหมด {rows.length} รายการ</span>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <select
+              className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
+              value={String(statusConvertPageSize)}
+              onChange={(event) => {
+                setStatusConvertPageSize(Number(event.target.value))
+                setStatusConvertPage(1)
+              }}
+            >
+              {OPERATION_PAGE_SIZES.map((pageSize) => (
+                <option key={pageSize} value={pageSize}>
+                  {pageSize} / หน้า
+                </option>
+              ))}
+            </select>
+            <button
+              className="h-9 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={statusConvertPage <= 1}
+              type="button"
+              onClick={() => setStatusConvertPage((currentPage) => Math.max(1, currentPage - 1))}
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-1">หน้า {statusConvertPage} / {statusConvertTotalPages}</span>
+            <button
+              className="h-9 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={statusConvertPage >= statusConvertTotalPages}
+              type="button"
+              onClick={() => setStatusConvertPage((currentPage) => Math.min(statusConvertTotalPages, currentPage + 1))}
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {mode === 'adjust' ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-normal text-slate-600">
+          <span>
+            พบทั้งหมด {rows.length} รายการ
+            {rows.length > 0 ? `  แสดง ${(adjustPage - 1) * adjustPageSize + 1}-${Math.min(adjustPage * adjustPageSize, rows.length)}` : ''}
+          </span>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <select
+              className="h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-normal text-slate-700"
+              value={String(adjustPageSize)}
+              onChange={(event) => {
+                setAdjustPageSize(Number(event.target.value))
+                setAdjustPage(1)
+              }}
+            >
+              {OPERATION_PAGE_SIZES.map((pageSize) => (
+                <option key={pageSize} value={pageSize}>
+                  {pageSize} / หน้า
+                </option>
+              ))}
+            </select>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={adjustPage <= 1}
+              type="button"
+              onClick={() => setAdjustPage((currentPage) => Math.max(1, currentPage - 1))}
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-1 text-sm font-normal text-slate-600">หน้า {adjustPage} / {adjustTotalPages}</span>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={adjustPage >= adjustTotalPages}
+              type="button"
+              onClick={() => setAdjustPage((currentPage) => Math.min(adjustTotalPages, currentPage + 1))}
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {mode === 'convert' ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-normal text-slate-600">
+          <span>
+            พบทั้งหมด {rows.length} รายการ
+            {rows.length > 0 ? `  แสดง ${(convertPage - 1) * convertPageSize + 1}-${Math.min(convertPage * convertPageSize, rows.length)}` : ''}
+          </span>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <select
+              className="h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-normal text-slate-700"
+              value={String(convertPageSize)}
+              onChange={(event) => {
+                setConvertPageSize(Number(event.target.value))
+                setConvertPage(1)
+              }}
+            >
+              {OPERATION_PAGE_SIZES.map((pageSize) => (
+                <option key={pageSize} value={pageSize}>
+                  {pageSize} / หน้า
+                </option>
+              ))}
+            </select>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={convertPage <= 1}
+              type="button"
+              onClick={() => setConvertPage((currentPage) => Math.max(1, currentPage - 1))}
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-1 text-sm font-normal text-slate-600">หน้า {convertPage} / {convertTotalPages}</span>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={convertPage >= convertTotalPages}
+              type="button"
+              onClick={() => setConvertPage((currentPage) => Math.min(convertTotalPages, currentPage + 1))}
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
+      ) : null}
       <Dialog
         open={formOpen}
         onOpenChange={(open) => {
@@ -910,8 +1020,30 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
           hideClose
         >
           <DialogHeader className="shrink-0 rounded-t-md bg-slate-900 px-5 py-4 text-white">
-            <DialogTitle className="text-base font-bold text-white">{meta.title}</DialogTitle>
-            <DialogDescription className="mt-1 text-xs text-slate-300">{descriptionFor(mode)}</DialogDescription>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+              <div className="min-w-0">
+                <DialogTitle className="truncate text-base font-bold text-white">{meta.title}</DialogTitle>
+                <DialogDescription className="truncate text-xs text-slate-300">{descriptionFor(mode)}</DialogDescription>
+              </div>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <button
+                  className="h-9 rounded-md border border-emerald-600 bg-emerald-600 px-5 text-sm font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 disabled:opacity-60"
+                  disabled={isSaving}
+                  form="stock-operation-form"
+                  type="submit"
+                >
+                  บันทึก
+                </button>
+                <button
+                  className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700 disabled:opacity-60"
+                  disabled={isSaving}
+                  type="button"
+                  onClick={closeForm}
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
           </DialogHeader>
           {mode === 'status-convert' ? <StatusConvertForm isSaving={isSaving} error={error} reference={data.reference} onCancel={closeForm} onSubmit={submit} /> : null}
           {mode === 'convert' ? <ConvertForm isSaving={isSaving} error={error} reference={data.reference} onCancel={closeForm} onSubmit={submit} /> : null}
@@ -930,46 +1062,6 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
         onSortChange={mode === 'status-convert' ? (key) => toggleStatusConvertSort(key as StatusConvertSortKey) : mode === 'adjust' || mode === 'convert' ? toggleOperationSort : undefined}
         onConvertReverse={mode === 'convert' ? reverseConvert : undefined}
         onStatusConvertReverse={mode === 'status-convert' ? reverseStatusConvert : undefined}
-        paginationControls={mode === 'status-convert' ? (
-          <OperationPaginationControls
-            currentPage={statusConvertPage}
-            pageSize={statusConvertPageSize}
-            totalLabel={`พบทั้งหมด ${rows.length} รายการ`}
-            totalPages={statusConvertTotalPages}
-            onNext={() => setStatusConvertPage((currentPage) => Math.min(statusConvertTotalPages, currentPage + 1))}
-            onPageSizeChange={(nextPageSize) => {
-              setStatusConvertPageSize(nextPageSize)
-              setStatusConvertPage(1)
-            }}
-            onPrevious={() => setStatusConvertPage((currentPage) => Math.max(1, currentPage - 1))}
-          />
-        ) : mode === 'adjust' ? (
-          <OperationPaginationControls
-            currentPage={adjustPage}
-            pageSize={adjustPageSize}
-            totalLabel={`พบทั้งหมด ${rows.length} รายการ${rows.length > 0 ? `  แสดง ${(adjustPage - 1) * adjustPageSize + 1}-${Math.min(adjustPage * adjustPageSize, rows.length)}` : ''}`}
-            totalPages={adjustTotalPages}
-            onNext={() => setAdjustPage((currentPage) => Math.min(adjustTotalPages, currentPage + 1))}
-            onPageSizeChange={(nextPageSize) => {
-              setAdjustPageSize(nextPageSize)
-              setAdjustPage(1)
-            }}
-            onPrevious={() => setAdjustPage((currentPage) => Math.max(1, currentPage - 1))}
-          />
-        ) : (
-          <OperationPaginationControls
-            currentPage={convertPage}
-            pageSize={convertPageSize}
-            totalLabel={`พบทั้งหมด ${rows.length} รายการ${rows.length > 0 ? `  แสดง ${(convertPage - 1) * convertPageSize + 1}-${Math.min(convertPage * convertPageSize, rows.length)}` : ''}`}
-            totalPages={convertTotalPages}
-            onNext={() => setConvertPage((currentPage) => Math.min(convertTotalPages, currentPage + 1))}
-            onPageSizeChange={(nextPageSize) => {
-              setConvertPageSize(nextPageSize)
-              setConvertPage(1)
-            }}
-            onPrevious={() => setConvertPage((currentPage) => Math.max(1, currentPage - 1))}
-          />
-        )}
       />
 
       {convertDetail ? (
@@ -998,18 +1090,19 @@ function descriptionFor(mode: Mode) {
 }
 
 function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
-  const totalQty = rows.reduce((sum, row) => sum + Number(row.qty ?? row.sourceQty ?? row.diffQty ?? 0), 0)
-  const totalValue = rows.reduce((sum, row) => sum + Number(row.value ?? row.valueNote ?? 0), 0)
   if (mode === 'convert') {
+    const posted = rows.filter((row) => row.status === 'posted').length
+    const pendingCost = rows.filter((row) => row.costStatus === 'pending_cost').length
     const manualCount = rows.filter((row) => row.sourceType === 'Manual').length
     const autoCount = rows.filter((row) => String(row.sourceType ?? '').startsWith('Auto')).length
     const reversed = rows.filter((row) => row.status === 'reversed').length
     return (
-      <div className="grid grid-cols-1 gap-2.5 text-sm sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-          <Metric emoji="📝" iconBg="bg-blue-100 text-blue-700" label="Manual" value={String(manualCount)} valueClassName="text-blue-700" />
-          <Metric emoji="🏭" iconBg="bg-purple-100 text-purple-700" label="Auto Cost Pool" value={String(autoCount)} valueClassName="text-purple-700" />
-          <Metric emoji="⚖️" iconBg="bg-slate-100" label="น้ำหนักรวม" value={`${formatMoney(totalQty)} กก.`} valueClassName="text-slate-900" />
-          <Metric emoji="🔄" iconBg="bg-slate-100 text-slate-500" label="Reversed" value={String(reversed)} valueClassName="text-slate-500" />
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-5 text-sm">
+        <Metric emoji="✅" iconBg="bg-emerald-100 text-emerald-700" label="Posted" value={String(posted)} valueClassName="text-emerald-700" />
+        <Metric emoji="⏳" iconBg="bg-amber-100 text-amber-700" label="Pending Cost" value={String(pendingCost)} valueClassName="text-amber-700" />
+        <Metric emoji="📝" iconBg="bg-blue-100 text-blue-700" label="Manual" value={String(manualCount)} valueClassName="text-blue-700" />
+        <Metric emoji="🏭" iconBg="bg-purple-100 text-purple-700" label="Auto Cost Pool" value={String(autoCount)} valueClassName="text-purple-700" />
+        <Metric emoji="🔄" iconBg="bg-slate-100 text-slate-500" label="Reversed" value={String(reversed)} valueClassName="text-slate-500" className="col-span-2 md:col-span-1" />
       </div>
     )
   }
@@ -1021,24 +1114,15 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
     const lossValue = lossRows.reduce((sum, row) => sum + signedAdjustValue(row), 0)
     const gainValue = gainRows.reduce((sum, row) => sum + signedAdjustValue(row), 0)
     return (
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5 text-sm">
-        <Metric emoji="📋" iconBg="bg-slate-100" label="รายการทั้งหมด" value={String(rows.length)} valueClassName="text-slate-900" />
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 text-sm">
         <Metric emoji="📉" iconBg="bg-red-100 text-red-700" label="นับขาด (LOSS)" value={`-${formatMoney(lossQty)} กก.`} valueClassName="text-red-600" />
         <Metric emoji="💸" iconBg="bg-red-100 text-red-700" label="มูลค่าขาด (รวม)" value={formatMoney(lossValue)} valueClassName="text-red-600" />
         <Metric emoji="📈" iconBg="bg-emerald-100 text-emerald-700" label="นับเกิน (GAIN)" value={`+${formatMoney(gainQty)} กก.`} valueClassName="text-emerald-700" />
-        <Metric emoji="💰" iconBg="bg-emerald-100 text-emerald-700" label="มูลค่าเกิน (รวม)" value={formatMoney(gainValue)} valueClassName="text-emerald-700" className="col-span-2 lg:col-span-1" />
+        <Metric emoji="💰" iconBg="bg-emerald-100 text-emerald-700" label="มูลค่าเกิน (รวม)" value={formatMoney(gainValue)} valueClassName="text-emerald-700" />
       </div>
     )
   }
-  if (mode === 'status-convert') return null
-  return (
-    <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm">
-      <Metric emoji="📋" iconBg="bg-slate-100" label="รายการ" value={String(rows.length)} />
-      <Metric emoji="⚖️" iconBg="bg-slate-100" label="น้ำหนักรวม" value={`${formatMoney(totalQty)} กก.`} />
-      <Metric emoji="💰" iconBg="bg-slate-100" label="มูลค่า" value={formatMoney(totalValue)} />
-      <Metric emoji="🔗" iconBg="bg-slate-100" label="สถานะ" value="DB-connected" />
-    </div>
-  )
+  return null
 }
 
 function OperationTable({
@@ -1050,7 +1134,6 @@ function OperationTable({
   onConvertReverse,
   onStatusConvertReverse,
   onSortChange,
-  paginationControls,
   rows,
   sortDirection,
   sortKey,
@@ -1063,7 +1146,6 @@ function OperationTable({
   onConvertReverse?: (refNo: string) => void
   onStatusConvertReverse?: (refNo: string) => void
   onSortChange?: (key: string) => void
-  paginationControls?: ReactNode
   rows: Payload['rows']
   sortDirection?: SortDirection
   sortKey?: string
@@ -1076,12 +1158,6 @@ function OperationTable({
   const columns = columnsFor(mode)
   return (
     <>
-      {paginationControls ? (
-        <div className="flex flex-col gap-3 rounded-md bg-white p-3 text-sm text-slate-600 shadow sm:flex-row sm:items-center sm:justify-between lg:hidden">
-          {paginationControls}
-        </div>
-      ) : null}
-
       {/* Mobile Card List (Hidden on Desktop) */}
       <div className="block space-y-3 lg:hidden">
         {isLoading ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
@@ -1273,23 +1349,15 @@ function OperationTable({
       </div>
 
       {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        {paginationControls || columnResize.hasCustomWidths ? (
-          <div className="flex flex-col gap-3 border-b border-slate-100 px-3 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-            {paginationControls}
-            {columnResize.hasCustomWidths ? (
-              <button
-                className="h-9 rounded-md bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-200"
-                type="button"
-                onClick={columnResize.resetColumnWidths}
-              >
-                คืนค่าเดิมตาราง
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+      <div className="hidden overflow-x-auto rounded-md bg-white shadow lg:block overflow-hidden">
+        <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
+          {columnResize.hasCustomWidths ? (
+            <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
+              คืนค่าเดิมตาราง
+            </button>
+          ) : null}
+        </div>
+        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {columns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -1325,61 +1393,6 @@ function OperationTable({
             {!isLoading && !rows.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
           </tbody>
         </table>
-        </div>
-      </div>
-    </>
-  )
-}
-
-function OperationPaginationControls({
-  currentPage,
-  onNext,
-  onPageSizeChange,
-  onPrevious,
-  pageSize,
-  totalLabel,
-  totalPages,
-}: {
-  currentPage: number
-  onNext: () => void
-  onPageSizeChange: (pageSize: number) => void
-  onPrevious: () => void
-  pageSize: number
-  totalLabel: string
-  totalPages: number
-}) {
-  return (
-    <>
-      <span>{totalLabel}</span>
-      <div className="flex flex-wrap items-center justify-end gap-2 sm:ml-auto">
-        <select
-          className="h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-normal text-slate-700"
-          value={String(pageSize)}
-          onChange={(event) => onPageSizeChange(Number(event.target.value))}
-        >
-          {OPERATION_PAGE_SIZES.map((option) => (
-            <option key={option} value={option}>
-              {option} / หน้า
-            </option>
-          ))}
-        </select>
-        <button
-          className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={currentPage <= 1}
-          type="button"
-          onClick={onPrevious}
-        >
-          ก่อนหน้า
-        </button>
-        <span className="px-1 text-sm font-normal text-slate-600">หน้า {currentPage} / {totalPages}</span>
-        <button
-          className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={currentPage >= totalPages}
-          type="button"
-          onClick={onNext}
-        >
-          ถัดไป
-        </button>
       </div>
     </>
   )
@@ -1663,15 +1676,27 @@ function AdjustDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-10">
       <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-md border-0 bg-slate-900 shadow-2xl outline-none">
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-md bg-slate-900 px-5 py-4 text-white">
-          <div>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+          <div className="min-w-0">
             <h3 className="text-base font-bold text-white">รายละเอียดปรับสต๊อก · {formatCell(detail.docNo)}</h3>
             <div className="mt-1 text-xs text-slate-400">{formatDateDisplay(String(detail.date ?? ''))} · {formatCell(detail.branchWarehouse)} · {formatCell(detail.status)}</div>
           </div>
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
-            <span className={`size-1.5 rounded-full ${dotClass}`} />
-            {statusLabel}
-          </span>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <span className={`inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold ${statusClass}`}>
+              <span className={`size-1.5 rounded-full ${dotClass}`} />
+              {statusLabel}
+            </span>
+            <button
+              className="h-9 rounded-md border border-slate-700 bg-slate-800 px-4 text-sm font-normal text-white hover:bg-slate-700 disabled:opacity-60"
+              disabled={!canEdit || !onCorrect}
+              title={canEdit ? 'แก้ไขได้ภายใน 7 วัน' : 'หมดช่วงแก้ไข 7 วันแล้ว'}
+              type="button"
+              onClick={() => onCorrect?.(detail)}
+            >
+              แก้ไข
+            </button>
+            <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={onClose}>ปิด</button>
+          </div>
         </div>
         <div className="overflow-y-auto bg-slate-50 p-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1709,18 +1734,6 @@ function AdjustDetailModal({
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 rounded-b-md border-t border-slate-200 bg-white px-5 py-4">
-          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={onClose}>ปิด</button>
-          <button
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            disabled={!canEdit || !onCorrect}
-            title={canEdit ? 'แก้ไขได้ภายใน 7 วัน' : 'หมดช่วงแก้ไข 7 วันแล้ว'}
-            type="button"
-            onClick={() => onCorrect?.(detail)}
-          >
-            แก้ไข
-          </button>
-        </div>
       </div>
     </div>
   )
@@ -1742,12 +1755,15 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-10">
       <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-md border-0 bg-slate-900 shadow-2xl outline-none">
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-md bg-slate-900 px-5 py-4 text-white">
-          <div>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+          <div className="min-w-0">
             <h3 className="font-bold text-white text-base">Cost Allocation Detail · {detail.refNo}</h3>
             <div className="mt-1 text-xs text-slate-400">{detail.date} · {detail.branchWarehouse || '-'} · {detail.status}</div>
           </div>
-          <button className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100 disabled:opacity-50" disabled={isLoading} type="button" onClick={onExport}>ส่งออก CSV</button>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <button className="h-9 rounded-md border border-emerald-600 bg-emerald-600 px-4 text-sm font-normal text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 disabled:opacity-50" disabled={isLoading} type="button" onClick={onExport}>ส่งออก CSV</button>
+            <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={onClose}>ปิด</button>
+          </div>
         </div>
         <div className="overflow-y-auto bg-slate-50">
           <div className="grid grid-cols-2 gap-3 border-b border-slate-100 p-4 md:grid-cols-4 lg:grid-cols-5">
@@ -1761,16 +1777,15 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
             <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Variance" value={formatMoney(detail.targetCostVariance)} />
           </div>
           <div className="p-4">
-            <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-              <div className="flex justify-end border-b border-slate-100 bg-white px-3 py-3">
+            <div className="overflow-auto rounded-md bg-white shadow overflow-hidden">
+              <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
                 {columnResize.hasCustomWidths ? (
-                  <button className="h-9 rounded-md bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={columnResize.resetColumnWidths}>
+                  <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
                     คืนค่าเดิมตาราง
                   </button>
                 ) : null}
               </div>
-              <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+              <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
                   {detailColumns.map((col) => (
                     <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -1814,15 +1829,11 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
                   {!detail.lines.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่พบ allocation lines สำหรับเอกสารนี้</td></tr> : null}
                 </tbody>
               </table>
-              </div>
+            </div>
+            <div className="mt-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 shadow-sm">
+              เหตุผล: {detail.reason || '-'} · หมายเหตุ: {detail.notes || '-'} · เหตุผล override: {detail.targetCostReason || '-'}
             </div>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-b-md border-t border-slate-200 bg-white px-5 py-4">
-          <div className="text-xs text-slate-500">
-            เหตุผล: {detail.reason || '-'} · หมายเหตุ: {detail.notes || '-'} · เหตุผล override: {detail.targetCostReason || '-'}
-          </div>
-          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
     </div>
@@ -1883,50 +1894,6 @@ function Field(props: { disabled?: boolean; label: string; onChange: (value: str
           onChange={(event) => props.onChange(event.target.value)}
         />
       )}
-    </label>
-  )
-}
-
-function formatDecimalInput(value: number) {
-  return value.toFixed(2)
-}
-
-function DecimalField(props: { disabled?: boolean; label: string; onChange: (value: number) => void; value: number }) {
-  const [text, setText] = useState(() => formatDecimalInput(props.value))
-  const [isFocused, setIsFocused] = useState(false)
-
-  useEffect(() => {
-    if (isFocused) return
-    setText(formatDecimalInput(props.value))
-  }, [isFocused, props.value])
-
-  return (
-    <label className="block text-xs font-semibold text-slate-600">
-      {props.label}
-      <input
-        className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-        disabled={props.disabled}
-        inputMode="decimal"
-        min={0}
-        step="0.01"
-        type="text"
-        value={text}
-        onBlur={() => {
-          setIsFocused(false)
-          const numericValue = Number(text || 0)
-          const safeValue = Number.isFinite(numericValue) ? numericValue : 0
-          setText(formatDecimalInput(safeValue))
-          props.onChange(safeValue)
-        }}
-        onChange={(event) => {
-          const nextValue = event.target.value
-          if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return
-          setText(nextValue)
-          const numericValue = Number(nextValue)
-          props.onChange(Number.isFinite(numericValue) ? numericValue : 0)
-        }}
-        onFocus={() => setIsFocused(true)}
-      />
     </label>
   )
 }
@@ -2217,7 +2184,7 @@ function CostPoolPreview({
                   <td className="p-2 text-right font-mono">{formatMoney(line.qty * line.entry.unitCost)}</td>
                 </tr>
               ))}
-              {!previewRows.length ? <tr><td className="p-3 text-center text-slate-400" colSpan={4}>ตารางนี้แสดงเฉพาะ lot จาก Cost Pool จริง เลือกสินค้า/สาขาและน้ำหนักเพื่อ preview</td></tr> : null}
+              {!previewRows.length ? <tr><td className="p-3 text-center text-slate-400" colSpan={4}>เลือกสินค้า/สาขา/คลังและน้ำหนักเพื่อ preview Cost Pool</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -2250,67 +2217,16 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
   const targetProduct = props.reference.products.find((item) => item.id === values.targetProductId)
   const lossQty = Math.max(0, Number(values.sourceQty) - Number(values.targetQty))
   const yieldPct = Number(values.sourceQty) > 0 ? (Number(values.targetQty) / Number(values.sourceQty)) * 100 : 0
-  const availableCostPoolEntries = useMemo(() => {
+  const sourceCostPoolEntries = useMemo(() => {
     const entries = props.reference.costPoolEntries ?? []
-    return entries.filter((entry) => entry.availableQty > 0)
-  }, [props.reference.costPoolEntries])
-  const locationCostPoolEntries = useMemo(() => {
-    return availableCostPoolEntries
-      .filter((entry) => !values.branchId || entry.branchId === values.branchId)
-  }, [availableCostPoolEntries, values.branchId])
-  const availableStockEntries = useMemo(() => {
-    const entries = props.reference.stockBalanceEntries ?? []
-    return entries.filter((entry) => entry.onHandQty > 0 && SOURCE_PRODUCT_METAL_GROUPS.has(entry.metalGroup ?? ''))
-  }, [props.reference.stockBalanceEntries])
-  const locationStockEntries = useMemo(() => {
-    return availableStockEntries
+    return entries
       .filter((entry) => !values.branchId || entry.branchId === values.branchId)
       .filter((entry) => !values.warehouseId || entry.warehouseId === values.warehouseId)
-  }, [availableStockEntries, values.branchId, values.warehouseId])
-  const sourceProductSearchOptions = useMemo<SearchComboboxOption[]>(() => {
-    const byProduct = new Map<string, { onHandQty: number; readyQty: number }>()
-    for (const entry of locationStockEntries.length ? locationStockEntries : availableStockEntries) {
-      if (!entry.productId) continue
-      const current = byProduct.get(entry.productId) ?? { onHandQty: 0, readyQty: 0 }
-      current.onHandQty += entry.onHandQty
-      current.readyQty += entry.readyQty
-      byProduct.set(entry.productId, current)
-    }
-    return [...byProduct.entries()]
-      .map(([productId, stock]) => {
-        const product = props.reference.products.find((item) => item.id === productId)
-        return {
-          id: productId,
-          label: product?.code ? `${product.code} - ${product.name} · พร้อมใช้ ${formatMoney(stock.readyQty)} กก.` : `${product?.name ?? productId} · พร้อมใช้ ${formatMoney(stock.readyQty)} กก.`,
-          searchText: `${product?.code ?? ''} ${product?.name ?? ''} ${productId}`.toLowerCase(),
-        }
-      })
-      .sort((left, right) => left.label.localeCompare(right.label, 'th'))
-  }, [availableStockEntries, locationStockEntries, props.reference.products])
-  const branchWarehousePoolEntries = useMemo(() => {
-    return locationCostPoolEntries
       .filter((entry) => !values.sourceProductId || entry.productId === values.sourceProductId)
-  }, [locationCostPoolEntries, values.sourceProductId])
-  const sourceLotOptions = useMemo<StockOption[]>(() => {
-    const seen = new Set<string>()
-    return branchWarehousePoolEntries
-      .filter((entry) => {
-        if (!entry.lotNo || seen.has(entry.lotNo)) return false
-        seen.add(entry.lotNo)
-        return true
-      })
-      .map((entry) => ({
-        active: true,
-        id: entry.lotNo ?? '',
-        name: `${entry.lotNo} · ${formatMoney(entry.availableQty)} กก. · ${formatMoney(entry.unitCost)} ฿/กก.`,
-      }))
-      .sort((left, right) => left.id.localeCompare(right.id, 'th'))
-  }, [branchWarehousePoolEntries])
-  const sourceCostPoolEntries = useMemo(() => {
-    return branchWarehousePoolEntries
       .filter((entry) => !values.lotNo || entry.lotNo === values.lotNo)
+      .filter((entry) => entry.availableQty > 0)
       .sort((left, right) => sortCostPoolEntries(left, right, values.allocationMethod))
-  }, [branchWarehousePoolEntries, values.allocationMethod, values.lotNo])
+  }, [props.reference.costPoolEntries, values.allocationMethod, values.branchId, values.lotNo, values.sourceProductId, values.warehouseId])
   const autoPreview = useMemo(() => previewCostPoolAllocation(sourceCostPoolEntries, Number(values.sourceQty)), [sourceCostPoolEntries, values.sourceQty])
   const manualTotalQty = values.manualAllocations.reduce((sum, line) => sum + Number(line.qty || 0), 0)
   const costPreviewRows = values.allocationMethod === 'MANUAL'
@@ -2332,26 +2248,6 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
     setValues({ ...values, manualAllocations: qty > 0 ? [...existing, { poolEntryId, qty }] : existing })
   }
 
-  function findPreferredSourcePool(productId: string) {
-    const productStockEntries = availableStockEntries.filter((entry) => entry.productId === productId)
-    return productStockEntries.find((entry) => entry.branchId === values.branchId && entry.warehouseId === values.warehouseId)
-      ?? productStockEntries.find((entry) => entry.branchId === values.branchId)
-      ?? productStockEntries[0]
-      ?? null
-  }
-
-  function selectSourceProduct(sourceProductId: string) {
-    const preferredPool = findPreferredSourcePool(sourceProductId)
-    setValues({
-      ...values,
-      branchId: preferredPool?.branchId ?? values.branchId,
-      warehouseId: preferredPool?.warehouseId ?? values.warehouseId,
-      sourceProductId,
-      lotNo: null,
-      manualAllocations: [],
-    })
-  }
-
   const productSearchOptions = useMemo<SearchComboboxOption[]>(() => {
     return props.reference.products
       .filter((option) => option.active !== false)
@@ -2362,27 +2258,10 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
       }))
   }, [props.reference.products])
 
-  useEffect(() => {
-    if (!values.lotNo) return
-    if (sourceLotOptions.some((option) => option.id === values.lotNo)) return
-    setValues((current) => ({ ...current, lotNo: null, manualAllocations: [] }))
-  }, [sourceLotOptions, values.lotNo])
-  useEffect(() => {
-    if (!values.sourceProductId) return
-    if (sourceProductSearchOptions.some((option) => option.id === values.sourceProductId)) return
-    setValues((current) => ({ ...current, sourceProductId: '', lotNo: null, manualAllocations: [] }))
-  }, [sourceProductSearchOptions, values.sourceProductId])
-
   return <FormShell isSaving={props.isSaving} error={props.error} onCancel={props.onCancel} onSubmit={() => props.onSubmit(values)}>
     <div className="md:col-span-2 rounded-md border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2 animate-fade-in">
       <BaseDateDoc values={values} setValues={setValues} />
-      <BranchWarehouseFields
-        branchId={values.branchId}
-        reference={props.reference}
-        setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '', sourceProductId: '', lotNo: null, manualAllocations: [] })}
-        setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId, lotNo: null, manualAllocations: [] })}
-        warehouseId={values.warehouseId}
-      />
+      <BranchWarehouseFields branchId={values.branchId} reference={props.reference} setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '' })} setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId })} warehouseId={values.warehouseId} />
     </div>
     <div className="rounded-md border border-red-200 bg-red-50/40 p-5 shadow-sm md:col-span-2">
       <div className="mb-3 text-sm font-bold text-red-700">Source (ออก)</div>
@@ -2391,22 +2270,14 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
           <SearchCombobox
             inputId="stock-convert-source-product"
             label="สินค้าต้นทาง *"
-            disabled={!sourceProductSearchOptions.length}
-            options={sourceProductSearchOptions}
-            placeholder={sourceProductSearchOptions.length ? 'เลือกสินค้าหมวดทองแดง/ทองเหลือง...' : 'ไม่มีสินค้าหมวดทองแดง/ทองเหลืองพร้อมใช้'}
+            options={productSearchOptions}
+            placeholder="พิมพ์รหัส/ชื่อสินค้า..."
             value={values.sourceProductId}
-            onChange={selectSourceProduct}
+            onChange={(sourceProductId) => setValues({ ...values, sourceProductId })}
           />
         </div>
-        <DecimalField label="น้ำหนักต้นทาง (กก.)" value={values.sourceQty} onChange={(sourceQty) => setValues({ ...values, sourceQty })} />
-        <Select
-          disabled={!values.sourceProductId}
-          label="Lot ต้นทาง"
-          options={sourceLotOptions}
-          placeholder={values.sourceProductId ? 'ทุก Lot ใน Cost Pool ตามสาขา' : 'เลือกสินค้าต้นทางก่อน'}
-          value={values.lotNo ?? ''}
-          onChange={(lotNo) => setValues({ ...values, lotNo: lotNo || null, manualAllocations: [] })}
-        />
+        <Field label="น้ำหนักต้นทาง (กก.)" type="number" value={String(values.sourceQty)} onChange={(sourceQty) => setValues({ ...values, sourceQty: Number(sourceQty) })} />
+        <Field label="Lot ต้นทาง" value={values.lotNo ?? ''} onChange={(lotNo) => setValues({ ...values, lotNo })} />
         <ReadOnlyBox label="Source Product" value={sourceProduct ? `${sourceProduct.code ? `${sourceProduct.code} - ` : ''}${sourceProduct.name}` : '-'} />
         <label className="block text-sm font-medium md:col-span-2">วิธีตัดต้นทุน
           <select
@@ -2447,7 +2318,7 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
             onChange={(targetProductId) => setValues({ ...values, targetProductId })}
           />
         </div>
-        <DecimalField label="น้ำหนักปลายทาง (กก.)" value={values.targetQty} onChange={(targetQty) => setValues({ ...values, targetQty })} />
+        <Field label="น้ำหนักปลายทาง (กก.)" type="number" value={String(values.targetQty)} onChange={(targetQty) => setValues({ ...values, targetQty: Number(targetQty) })} />
         <Field label="Lot ปลายทาง" value={values.targetLotNo ?? ''} onChange={(targetLotNo) => setValues({ ...values, targetLotNo })} />
         <ReadOnlyBox label="Target Product" value={targetProduct ? `${targetProduct.code ? `${targetProduct.code} - ` : ''}${targetProduct.name}` : '-'} />
         <label className="block text-sm font-medium md:col-span-2">Target Cost Policy
@@ -2605,9 +2476,9 @@ function ReadOnlyBox({ label, value, valueClassName = 'text-slate-800' }: { labe
   return <div className="rounded-md border border-slate-200 bg-white px-3 py-2"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-sm font-semibold ${valueClassName}`}>{value}</div></div>
 }
 
-function FormShell({ children, isSaving, error, onCancel, onSubmit }: { children: React.ReactNode; isSaving: boolean; error?: string | null; onCancel: () => void; onSubmit: () => void }) {
+function FormShell({ children, error, onSubmit }: { children: React.ReactNode; isSaving: boolean; error?: string | null; onCancel: () => void; onSubmit: () => void }) {
   return (
-    <form className="flex-1 flex flex-col overflow-hidden" onSubmit={(event) => { event.preventDefault(); onSubmit() }}>
+    <form className="flex-1 flex flex-col overflow-hidden" id="stock-operation-form" onSubmit={(event) => { event.preventDefault(); onSubmit() }}>
       <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 sm:p-5">
         {error ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 whitespace-pre-line">
@@ -2616,23 +2487,6 @@ function FormShell({ children, isSaving, error, onCancel, onSubmit }: { children
         ) : null}
         <div className="grid gap-3 md:grid-cols-2">{children}</div>
       </div>
-      <DialogFooter className="shrink-0 rounded-b-md border-t border-slate-100 bg-white px-5 py-4">
-        <button
-          className="h-9 rounded-md border border-slate-300 bg-white px-4 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isSaving}
-          type="button"
-          onClick={onCancel}
-        >
-          ยกเลิก
-        </button>
-        <button
-          className="h-9 rounded-md bg-slate-900 px-5 text-sm font-normal text-white hover:bg-slate-800 disabled:opacity-60"
-          disabled={isSaving}
-          type="submit"
-        >
-          บันทึก
-        </button>
-      </DialogFooter>
     </form>
   )
 }

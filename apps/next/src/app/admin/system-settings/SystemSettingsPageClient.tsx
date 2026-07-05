@@ -24,7 +24,6 @@ type WhtSortKey = Exclude<WhtColumnKey, 'action'>
 type TaxSettingConfig = {
   apiPath: string
   fallbackName: string
-  helper: string
   kind: SettingKind
   label: string
 }
@@ -42,7 +41,6 @@ type PendingSave = {
 const vatSetting: TaxSettingConfig = {
   apiPath: '/api/master-data/vat-settings',
   fallbackName: 'VAT',
-  helper: 'ใช้กับบิลซื้อ/ขายที่เลือก VAT',
   kind: 'vat',
   label: 'VAT',
 }
@@ -50,7 +48,6 @@ const vatSetting: TaxSettingConfig = {
 const whtSetting: TaxSettingConfig = {
   apiPath: '/api/master-data/wht-settings',
   fallbackName: 'WHT',
-  helper: 'ใช้กับรายการหัก ณ ที่จ่าย',
   kind: 'wht',
   label: 'WHT',
 }
@@ -212,9 +209,6 @@ export function SystemSettingsPageClient() {
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900">ข้อมูลบริษัทสำหรับใบพิมพ์</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              จัดการชื่อบริษัท ที่อยู่ เลขภาษี โลโก้ และข้อความท้ายเอกสารสำหรับใบพิมพ์จากจุดเดียว
-            </p>
           </div>
           <Button asChild className="w-full md:w-auto font-semibold shrink-0" size="sm">
             <Link href="/admin/company-profile">เปิดหน้าข้อมูลบริษัท</Link>
@@ -235,7 +229,6 @@ export function SystemSettingsPageClient() {
           <section className="rounded-md border border-slate-100 bg-white p-4 shadow-sm h-fit">
             <div className="mb-4">
               <h2 className="text-base font-bold text-slate-900">{vatSetting.label}</h2>
-              <p className="mt-1 text-xs text-slate-500">{vatSetting.helper}</p>
             </div>
 
             <label className="block text-sm font-medium text-slate-700">
@@ -273,7 +266,6 @@ export function SystemSettingsPageClient() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">{whtSetting.label}</h2>
-                  <p className="mt-1 text-xs text-slate-500">{whtSetting.helper}</p>
                 </div>
                 <div className="rounded bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                   ใช้งาน {activeWhtCount} / {whtRecords.length}
@@ -425,13 +417,12 @@ export function SystemSettingsPageClient() {
 
       {pendingSave ? (
         <Dialog open={!!pendingSave} onOpenChange={() => setPendingSave(null)}>
-          <DialogContent className="max-w-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
+          <DialogContent className="max-w-md rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
             <div className="border-b border-slate-800 px-5 py-4 bg-slate-900 shrink-0 flex items-center justify-between">
               <div>
                 <DialogTitle className="text-lg font-bold text-slate-100">ยืนยันการเปลี่ยนค่าระบบ</DialogTitle>
                 <p className="mt-1 text-xs text-slate-400">{pendingSave.record.name}</p>
               </div>
-              <button className="text-2xl text-slate-400 hover:text-slate-200 ml-2" type="button" onClick={() => setPendingSave(null)}>&times;</button>
             </div>
 
             <div className="space-y-4 px-5 py-5 text-sm bg-slate-50 flex-1 overflow-y-auto">

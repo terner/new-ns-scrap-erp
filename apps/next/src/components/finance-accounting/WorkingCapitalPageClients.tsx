@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { RotateCcw } from 'lucide-react'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
@@ -156,7 +157,6 @@ export function WorkingCapitalPageClient() {
 
   return (
     <section className="space-y-4">
-      <BaselineNotice sourceState={data?.sourceState} />
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
@@ -191,71 +191,56 @@ export function WorkingCapitalPageClient() {
         </div>
       </div>
 
-      {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h4 className="font-bold text-slate-800 text-sm">ตัวกรองเพิ่มเติม</h4>
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-2xl font-bold focus:outline-none"
-                onClick={() => setShowMobileFilters(false)}
-                type="button"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">ถึงวันที่</label>
-                <DatePickerInput className="w-full text-sm" value={asOf} onChange={setAsOf} />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
-                <select
-                  aria-label="Branch select"
-                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-                  value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                >
-                  <option value="">ทุกสาขา</option>
-                  {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                </select>
-              </div>
-
-              <div className="pt-2 text-xs text-slate-500 border-t border-slate-100">
-                ช่วงวิเคราะห์: <span className="font-semibold">{data?.filters.from ?? '-'} ถึง {data?.filters.asOf ?? asOf}</span>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex gap-2">
+        <MobileFilterSheet
+          title="ตัวกรองเพิ่มเติม"
+          onClose={() => setShowMobileFilters(false)}
+          footer={
+            <>
               <button
                 type="button"
                 onClick={() => {
                   setBranchId('')
                 }}
-                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowMobileFilters(false)}
-                className="flex-1 h-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 ตกลง
               </button>
-            </div>
+            </>
+          }
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">ถึงวันที่</label>
+            <DatePickerInput className="w-full text-sm" value={asOf} onChange={setAsOf} />
           </div>
-        </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="Branch select"
+              className="h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none transition focus:border-slate-400"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </div>
+
+          <div className="border-t border-slate-100 pt-2 text-xs text-slate-500">
+            ช่วงวิเคราะห์: <span className="font-semibold">{data?.filters.from ?? '-'} ถึง {data?.filters.asOf ?? asOf}</span>
+          </div>
+        </MobileFilterSheet>
       ) : null}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-full ${(s?.ccc ?? 0) < 60 ? 'bg-emerald-50 text-emerald-600' : (s?.ccc ?? 0) < 90 ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'} flex items-center justify-center text-xl shrink-0`}>
-            ⏱
-          </div>
+        <div className="bg-white p-5 border border-slate-100 rounded-md shadow-sm flex items-center gap-4">
           <div className="min-w-0 flex-1">
             <div className={`text-xs font-semibold ${(s?.ccc ?? 0) < 60 ? 'text-emerald-600' : (s?.ccc ?? 0) < 90 ? 'text-amber-600' : 'text-red-600'} truncate`}>
               {(s?.ccc ?? 0) < 60 ? 'Cash Conversion Cycle (ดี)' : (s?.ccc ?? 0) < 90 ? 'Cash Conversion Cycle (พอใช้)' : 'Cash Conversion Cycle (เสี่ยง)'}
@@ -266,33 +251,33 @@ export function WorkingCapitalPageClient() {
             </div>
           </div>
         </div>
-        <Panel className="md:col-span-2" title="📊 CCC Breakdown — แสดงเงินจมแต่ละขั้น">
-          <BreakdownBar label="📥 AR Days (เก็บเงินลูกค้า)" tone="blue" value={s?.arDays ?? 0} max={maxDays} amount={s?.ar ?? 0} />
-          <BreakdownBar label="📦 Inventory Days (Stock จมในมือ)" tone="amber" value={s?.invDays ?? 0} max={maxDays} amount={s?.inv ?? 0} />
-          <BreakdownBar label="📤 AP Days (จ่าย Supplier ช้า = ดี)" tone="emerald" value={s?.apDays ?? 0} max={maxDays} amount={s?.ap ?? 0} />
+        <Panel className="md:col-span-2" title="รอบเงินสด (CCC) — แสดงเงินจมแต่ละขั้น">
+          <BreakdownBar label="วันเก็บลูกหนี้ (AR)" tone="blue" value={s?.arDays ?? 0} max={maxDays} amount={s?.ar ?? 0} />
+          <BreakdownBar label="วันสต็อกค้างในมือ" tone="amber" value={s?.invDays ?? 0} max={maxDays} amount={s?.inv ?? 0} />
+          <BreakdownBar label="วันจ่ายเจ้าหนี้ (AP)" tone="emerald" value={s?.apDays ?? 0} max={maxDays} amount={s?.ap ?? 0} />
         </Panel>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Gauge title="💧 Current Ratio" value={s?.currentRatio ?? 0} kind="current" footer="(Current Asset ÷ Current Liab)" />
-        <Gauge title="⚡ Quick Ratio" value={s?.quickRatio ?? 0} kind="quick" footer="((Cash + AR) ÷ Current Liab)" />
-        <Panel title="🔄 Stock Turnover">
-          <div className="py-4 text-center"><div className="text-5xl font-bold text-purple-700">{(s?.stockTurnover ?? 0).toFixed(2)}<span className="text-xl">x</span></div><div className="mt-1 text-sm text-slate-500">ใน {periodDays} วัน</div><div className="mt-2 text-xs text-slate-400">= <b className="text-purple-600">{(s?.annualizedTurnover ?? 0).toFixed(1)}x</b> ต่อปี</div><div className={`mt-1 text-xs ${(s?.annualizedTurnover ?? 0) >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>{(s?.annualizedTurnover ?? 0) >= 12 ? '✓ Stock หมุนดี' : (s?.annualizedTurnover ?? 0) >= 6 ? 'พอใช้' : '⚠ Stock หมุนช้า'}</div></div>
+        <Gauge title="อัตราส่วนทุนหมุนเวียน" value={s?.currentRatio ?? 0} kind="current" footer="(สินทรัพย์หมุนเวียน ÷ หนี้สินหมุนเวียน)" />
+        <Gauge title="อัตราส่วนสภาพคล่องเร็ว" value={s?.quickRatio ?? 0} kind="quick" footer="((เงินสด + AR) ÷ หนี้สินหมุนเวียน)" />
+        <Panel title="รอบหมุนสต็อก">
+          <div className="py-4 text-center"><div className="text-5xl font-bold text-purple-700">{(s?.stockTurnover ?? 0).toFixed(2)}<span className="text-xl">x</span></div><div className="mt-1 text-sm text-slate-500">ใน {periodDays} วัน</div><div className="mt-2 text-xs text-slate-400">= <b className="text-purple-600">{(s?.annualizedTurnover ?? 0).toFixed(1)}x</b> ต่อปี</div><div className={`mt-1 text-xs ${(s?.annualizedTurnover ?? 0) >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>{(s?.annualizedTurnover ?? 0) >= 12 ? 'สต็อกหมุนดี' : (s?.annualizedTurnover ?? 0) >= 6 ? 'พอใช้' : 'สต็อกหมุนช้า'}</div></div>
         </Panel>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
-        <Kpi label="Cash Conversion Cycle" value={`${(s?.ccc ?? 0).toFixed(1)} วัน`} tone={(s?.ccc ?? 0) < 60 ? 'emerald' : (s?.ccc ?? 0) < 90 ? 'amber' : 'red'} />
-        <Kpi label="AR Days" value={(s?.arDays ?? 0).toFixed(1)} tone="blue" />
-        <Kpi label="AP Days" value={(s?.apDays ?? 0).toFixed(1)} tone="emerald" />
-        <Kpi label="Inventory Days" value={(s?.invDays ?? 0).toFixed(1)} tone="amber" />
-        <Kpi label="Stock Turnover" value={`${(s?.stockTurnover ?? 0).toFixed(2)}x`} tone="slate" />
-        <Kpi label="Current Ratio" value={(s?.currentRatio ?? 0).toFixed(2)} tone={(s?.currentRatio ?? 0) >= 1 ? 'emerald' : 'red'} />
-        <Kpi label="Quick Ratio" value={(s?.quickRatio ?? 0).toFixed(2)} tone={(s?.quickRatio ?? 0) >= 0.5 ? 'emerald' : 'red'} />
+        <Kpi label="รอบเงินสด (CCC)" value={`${(s?.ccc ?? 0).toFixed(1)} วัน`} tone={(s?.ccc ?? 0) < 60 ? 'emerald' : (s?.ccc ?? 0) < 90 ? 'amber' : 'red'} />
+        <Kpi label="วันเก็บ AR" value={(s?.arDays ?? 0).toFixed(1)} tone="blue" />
+        <Kpi label="วันจ่าย AP" value={(s?.apDays ?? 0).toFixed(1)} tone="emerald" />
+        <Kpi label="วันสต็อกค้าง" value={(s?.invDays ?? 0).toFixed(1)} tone="amber" />
+        <Kpi label="รอบหมุนสต็อก" value={`${(s?.stockTurnover ?? 0).toFixed(2)}x`} tone="slate" />
+        <Kpi label="อัตราส่วนทุนหมุนเวียน" value={(s?.currentRatio ?? 0).toFixed(2)} tone={(s?.currentRatio ?? 0) >= 1 ? 'emerald' : 'red'} />
+        <Kpi label="อัตราส่วนสภาพคล่องเร็ว" value={(s?.quickRatio ?? 0).toFixed(2)} tone={(s?.quickRatio ?? 0) >= 0.5 ? 'emerald' : 'red'} />
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Insight tone="amber" title="📦 เงินจมใน Stock กี่วัน" value={`${(s?.invDays ?? 0).toFixed(0)} วัน`} body={`Stock มูลค่า ${money(s?.inv)} ÷ COGS เฉลี่ย/วัน ${money((s?.cogs ?? 0) / periodDays)}`} />
-        <Insight tone="blue" title="💰 ลูกหนี้เก็บเงินกี่วัน" value={`${(s?.arDays ?? 0).toFixed(0)} วัน`} body={`AR ${money(s?.ar)} ÷ Sales เฉลี่ย/วัน ${money((s?.revenue ?? 0) / periodDays)}`} />
-        <Insight tone="emerald" title="🏭 เจ้าหนี้จ่ายเงินกี่วัน" value={`${(s?.apDays ?? 0).toFixed(0)} วัน`} body={`AP ${money(s?.ap)} ÷ Purchases เฉลี่ย/วัน ${money((s?.purchases ?? 0) / periodDays)}`} />
-        <Insight tone="purple" title="🔄 ซื้อของแล้วขายออกเร็วไหม?" value={`${(s?.annualizedTurnover ?? 0).toFixed(1)}x/ปี`} body="Stock Turnover (Annualized): COGS/Avg Inventory" />
+        <Insight tone="amber" title=" เงินจมใน Stock กี่วัน" value={`${(s?.invDays ?? 0).toFixed(0)} วัน`} body={`Stock มูลค่า ${money(s?.inv)} ÷ COGS เฉลี่ย/วัน ${money((s?.cogs ?? 0) / periodDays)}`} />
+        <Insight tone="blue" title=" ลูกหนี้เก็บเงินกี่วัน" value={`${(s?.arDays ?? 0).toFixed(0)} วัน`} body={`AR ${money(s?.ar)} ÷ Sales เฉลี่ย/วัน ${money((s?.revenue ?? 0) / periodDays)}`} />
+        <Insight tone="emerald" title=" เจ้าหนี้จ่ายเงินกี่วัน" value={`${(s?.apDays ?? 0).toFixed(0)} วัน`} body={`AP ${money(s?.ap)} ÷ Purchases เฉลี่ย/วัน ${money((s?.purchases ?? 0) / periodDays)}`} />
+        <Insight tone="purple" title=" ซื้อของแล้วขายออกเร็วไหม?" value={`${(s?.annualizedTurnover ?? 0).toFixed(1)}x/ปี`} body="Stock Turnover (Annualized): COGS/Avg Inventory" />
       </div>
       <DetailTable isLoading={isLoading} rows={data?.calculationRows ?? []} />
     </section>
@@ -309,7 +294,6 @@ export function StockFinancePageClient() {
 
   return (
     <section className="space-y-4">
-      <BaselineNotice sourceState={data?.sourceState} />
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
@@ -335,82 +319,67 @@ export function StockFinancePageClient() {
         </div>
       </div>
 
-      {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h4 className="font-bold text-slate-800 text-sm">ตัวกรองเพิ่มเติม</h4>
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-2xl font-bold focus:outline-none"
-                onClick={() => setShowMobileFilters(false)}
-                type="button"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
-                <select
-                  aria-label="Branch select"
-                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-                  value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                >
-                  <option value="">ทุกสาขา</option>
-                  {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex gap-2">
+        <MobileFilterSheet
+          title="ตัวกรองเพิ่มเติม"
+          onClose={() => setShowMobileFilters(false)}
+          footer={
+            <>
               <button
                 type="button"
                 onClick={() => {
                   setBranchId('')
                 }}
-                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowMobileFilters(false)}
-                className="flex-1 h-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 ตกลง
               </button>
-            </div>
+            </>
+          }
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="Branch select"
+              className="h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none transition focus:border-slate-400"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
           </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-4 lg:col-span-2">
-          <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xl shrink-0">
-            📦
-          </div>
+        <div className="bg-white p-5 border border-slate-100 rounded-md shadow-sm flex items-center gap-4 lg:col-span-2">
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-amber-600 uppercase">มูลค่า Stock รวม (WAC)</div>
             <div className="mt-0.5 text-2xl font-extrabold text-slate-900 tracking-tight">{money(data?.summary.totalValue)} <span className="text-xs font-medium text-slate-500">({data?.summary.itemCount ?? 0} รายการ)</span></div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs pt-3 border-t border-slate-100">
-              <Mini label="✓ จ่ายแล้ว (Paid)" value={money(data?.summary.paidValue)} />
-              <Mini label="⚠ ยังไม่จ่าย (Unpaid)" value={money(data?.summary.unpaidValue)} />
-              <Mini label="💰 Margin Potential" value={money(data?.summary.marginPotential)} />
+              <Mini label="จ่ายแล้ว (Paid)" value={money(data?.summary.paidValue)} />
+              <Mini label=" ยังไม่จ่าย (Unpaid)" value={money(data?.summary.unpaidValue)} />
+              <Mini label=" Margin Potential" value={money(data?.summary.marginPotential)} />
             </div>
           </div>
         </div>
-        <Panel title="🥧 RM / WIP / FG"><Donut values={[data?.byStatus.RM ?? 0, data?.byStatus.WIP ?? 0, data?.byStatus.FG ?? 0]} colors={['#3b82f6', '#f59e0b', '#10b981']} total={total} /><div className="mt-1 grid grid-cols-2 gap-1 text-xs"><div>RM: {money(data?.byStatus.RM)}</div><div>WIP: {money(data?.byStatus.WIP)}</div><div>FG: {money(data?.byStatus.FG)}</div><div>อื่นๆ: {money(data?.byStatus.OTHER)}</div></div></Panel>
+        <Panel title=" RM / WIP / FG"><Donut values={[data?.byStatus.RM ?? 0, data?.byStatus.WIP ?? 0, data?.byStatus.FG ?? 0]} colors={['#3b82f6', '#f59e0b', '#10b981']} total={total} /><div className="mt-1 grid grid-cols-2 gap-1 text-xs"><div>RM: {money(data?.byStatus.RM)}</div><div>WIP: {money(data?.byStatus.WIP)}</div><div>FG: {money(data?.byStatus.FG)}</div><div>อื่นๆ: {money(data?.byStatus.OTHER)}</div></div></Panel>
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <Panel title="⏳ Stock Aging (มูลค่าตามอายุ)">{(data?.aging ?? []).map((row) => <AgingBar key={row.key} row={row} total={total} />)}</Panel>
-        <Panel title="🏆 Top 10 สินค้า มูลค่า Stock สูงสุด">{(data?.topProducts ?? []).map((row, index) => <TopProduct key={row.id} index={index} max={data?.topProducts[0]?.value ?? 1} row={row} />)}{isLoading ? <Loading /> : null}</Panel>
+        <Panel title=" Stock Aging (มูลค่าตามอายุ)">{(data?.aging ?? []).map((row) => <AgingBar key={row.key} row={row} total={total} />)}</Panel>
+        <Panel title="Top 10 สินค้ามูลค่าสต็อกสูงสุด">{(data?.topProducts ?? []).map((row, index) => <TopProduct key={row.id} index={index} max={data?.topProducts[0]?.value ?? 1} row={row} />)}{isLoading ? <Loading /> : null}</Panel>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Insight tone="emerald" title="✓ FG พร้อมขาย" value={money(data?.byStatus.FG)} body={`${percent(data?.byStatus.FG ?? 0, total)}% ของ Stock รวม · ปั่นเป็นเงินสดได้ทันที`} />
-        <Insight tone="blue" title="🏭 RM ที่ต้องเอาไปผลิต" value={money(data?.byStatus.RM)} body={`${percent(data?.byStatus.RM ?? 0, total)}% ของ Stock รวม · ต้องเข้า Production`} />
-        <Insight tone="red" title="⚠ Stock จมเงิน (90+ วัน)" value={money(data?.aging.find((row) => row.key === '90+')?.value)} body={`${data?.aging.find((row) => row.key === '90+')?.count ?? 0} รายการ — เร่งระบาย หรือลด price`} />
+        <Insight tone="emerald" title="FG พร้อมขาย" value={money(data?.byStatus.FG)} body={`${percent(data?.byStatus.FG ?? 0, total)}% ของ Stock รวม · ปั่นเป็นเงินสดได้ทันที`} />
+        <Insight tone="blue" title=" RM ที่ต้องเอาไปผลิต" value={money(data?.byStatus.RM)} body={`${percent(data?.byStatus.RM ?? 0, total)}% ของ Stock รวม · ต้องเข้า Production`} />
+        <Insight tone="red" title=" Stock จมเงิน (90+ วัน)" value={money(data?.aging.find((row) => row.key === '90+')?.value)} body={`${data?.aging.find((row) => row.key === '90+')?.count ?? 0} รายการ — เร่งระบาย หรือลด price`} />
       </div>
       <ProductTable rows={data?.slowMoving ?? []} />
     </section>
@@ -429,15 +398,14 @@ export function ProfitLeakPageClient() {
 
   return (
     <section className="space-y-4">
-      <BaselineNotice sourceState={data?.sourceState} />
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
       <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
-        <DateInput label="From" value={from} onChange={setFrom} />
-        <DateInput label="To" value={to} onChange={setTo} />
+        <DateInput label="จาก" value={from} onChange={setFrom} />
+        <DateInput label="ถึง" value={to} onChange={setTo} />
         <label className="flex items-center gap-2 text-xs text-slate-600 font-semibold">
-          <span>Target GP %</span>
+          <span>เป้าหมาย GP %</span>
           <input className="w-20 rounded-md border border-slate-300 px-3 py-1.5 text-right text-xs outline-none focus:border-slate-400 transition h-9 bg-white" step="0.1" type="number" value={targetMargin} onChange={(event) => setTargetMargin(Number(event.target.value))} />
         </label>
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
@@ -449,11 +417,11 @@ export function ProfitLeakPageClient() {
         <div className="flex gap-2 items-center">
           <div className="flex-1 grid grid-cols-2 gap-2">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-500 font-semibold shrink-0">From</span>
+              <span className="text-xs text-slate-500 font-semibold shrink-0">จาก</span>
               <DatePickerInput className="w-full text-xs" value={from} onChange={setFrom} />
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-500 font-semibold shrink-0">To</span>
+              <span className="text-xs text-slate-500 font-semibold shrink-0">ถึง</span>
               <DatePickerInput className="w-full text-xs" value={to} onChange={setTo} />
             </div>
           </div>
@@ -467,103 +435,88 @@ export function ProfitLeakPageClient() {
         </div>
       </div>
 
-      {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h4 className="font-bold text-slate-800 text-sm">ตัวกรองเพิ่มเติม</h4>
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-2xl font-bold focus:outline-none"
-                onClick={() => setShowMobileFilters(false)}
-                type="button"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">Target GP %</label>
-                <input 
-                  className="w-full h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-400 bg-white text-slate-900"
-                  step="0.1" 
-                  type="number" 
-                  value={targetMargin} 
-                  onChange={(event) => setTargetMargin(Number(event.target.value))} 
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
-                <select
-                  aria-label="Branch select"
-                  className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none focus:border-slate-400 transition cursor-pointer"
-                  value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                >
-                  <option value="">ทุกสาขา</option>
-                  {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                </select>
-              </div>
-
-              <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                <span className="text-xs font-semibold text-slate-600">รวมเงินที่รั่วไหล</span>
-                <span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-bold text-red-700">{money(data?.summary.totalLeak)}</span>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex gap-2">
+        <MobileFilterSheet
+          title="ตัวกรองเพิ่มเติม"
+          onClose={() => setShowMobileFilters(false)}
+          footer={
+            <>
               <button
                 type="button"
                 onClick={() => {
                   setBranchId('')
                   setTargetMargin(5)
                 }}
-                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowMobileFilters(false)}
-                className="flex-1 h-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 ตกลง
               </button>
-            </div>
+            </>
+          }
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">เป้าหมาย GP %</label>
+            <input
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400"
+              step="0.1"
+              type="number"
+              value={targetMargin}
+              onChange={(event) => setTargetMargin(Number(event.target.value))}
+            />
           </div>
-        </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="Branch select"
+              className="h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none transition focus:border-slate-400"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+            <span className="text-xs font-semibold text-slate-600">รวมเงินที่รั่วไหล</span>
+            <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-700">{money(data?.summary.totalLeak)}</span>
+          </div>
+        </MobileFilterSheet>
       ) : null}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="bg-white p-5 border border-red-200 rounded-xl shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center text-xl shrink-0">
-            🔻
-          </div>
+        <div className="bg-white p-5 border border-red-200 rounded-md shadow-sm flex items-center gap-4">
           <div className="min-w-0 flex-1">
-            <div className="text-xs font-semibold text-red-600 uppercase">💔 รวมเงินที่รั่วไหล (Profit Leak)</div>
+            <div className="text-xs font-semibold text-red-600">รวมเงินที่รั่วไหล</div>
             <div className="mt-0.5 text-2xl font-extrabold text-red-700 tracking-tight">{money(data?.summary.totalLeak)}</div>
             <div className="mt-3 space-y-1 text-xs pt-3 border-t border-slate-100">
-              <div className="flex justify-between text-slate-500"><span>📉 ขายต่ำกว่า WAC:</span> <b className="text-slate-800">{money(data?.summary.negTotal)}</b></div>
-              <div className="flex justify-between text-slate-500"><span>⚠ ค่าใช้จ่ายผิดปกติ:</span> <b className="text-slate-800">{data?.summary.outlierCount ?? 0} รายการ</b></div>
-              <div className="flex justify-between text-slate-500"><span>📦 Stock Loss:</span> <b className="text-slate-800">{money(data?.summary.stockLoss)}</b></div>
-              <div className="flex justify-between text-slate-500"><span>🏭 Production Loss:</span> <b className="text-slate-800">{money(data?.summary.productionLoss)}</b></div>
+              <div className="flex justify-between text-slate-500"><span> ขายต่ำกว่า WAC:</span> <b className="text-slate-800">{money(data?.summary.negTotal)}</b></div>
+              <div className="flex justify-between text-slate-500"><span> ค่าใช้จ่ายผิดปกติ:</span> <b className="text-slate-800">{data?.summary.outlierCount ?? 0} รายการ</b></div>
+              <div className="flex justify-between text-slate-500"><span>ขาดทุนสต็อก:</span> <b className="text-slate-800">{money(data?.summary.stockLoss)}</b></div>
+              <div className="flex justify-between text-slate-500"><span>ขาดทุนผลิต:</span> <b className="text-slate-800">{money(data?.summary.productionLoss)}</b></div>
             </div>
           </div>
         </div>
-        <Panel className="md:col-span-2" title="🥧 องค์ประกอบของเงินรั่วไหล"><div className="flex flex-wrap items-center gap-4"><Donut values={(data?.leakSegments ?? []).map((row) => row.value)} colors={['#dc2626', '#a855f7', '#f43f5e', '#ec4899', '#06b6d4', '#0891b2']} total={totalLeak} /> <div className="flex-1 space-y-1 text-xs">{(data?.leakSegments ?? []).map((row, index) => <div className="flex items-center gap-2" key={row.label}><span className="h-3 w-3 rounded-md" style={{ background: ['#dc2626', '#a855f7', '#f43f5e', '#ec4899', '#06b6d4', '#0891b2'][index] }} />{row.label}<span className="ml-auto font-bold">{money(row.value)}</span></div>)}</div></div></Panel>
+        <Panel className="md:col-span-2" title=" องค์ประกอบของเงินรั่วไหล"><div className="flex flex-wrap items-center gap-4"><Donut values={(data?.leakSegments ?? []).map((row) => row.value)} colors={['#dc2626', '#a855f7', '#f43f5e', '#ec4899', '#06b6d4', '#0891b2']} total={totalLeak} /> <div className="flex-1 space-y-1 text-xs">{(data?.leakSegments ?? []).map((row, index) => <div className="flex items-center gap-2" key={row.label}><span className="h-3 w-3 rounded-md" style={{ background: ['#dc2626', '#a855f7', '#f43f5e', '#ec4899', '#06b6d4', '#0891b2'][index] }} />{row.label}<span className="ml-auto font-bold">{money(row.value)}</span></div>)}</div></div></Panel>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">
-        <Kpi label="📉 ขายต่ำกว่า WAC" value={money(data?.summary.negTotal)} tone="red" />
-        <Kpi label="⬇ GP ต่ำกว่า Target" value={String(data?.lowMarginBills.length ?? 0)} tone="amber" />
-        <Kpi label="⚠ ค่าใช้จ่ายผิดปกติ" value={String(data?.summary.outlierCount ?? 0)} tone="orange" />
-        <Kpi label="💸 ดอกเบี้ย" value={money(data?.summary.interestExpense)} tone="purple" />
-        <Kpi label="📦 Stock Loss" value={money(data?.summary.stockLoss)} tone="red" />
-        <Kpi label="🏭 Production Loss" value={money(data?.summary.productionLoss)} tone="rose" />
-        <Kpi label="💱 FX Loss" value={money(data?.summary.fxLoss)} tone="cyan" />
-        <Kpi label="🏦 Bank Fee" value={money(data?.summary.bankFee)} tone="slate" />
-        <Kpi label="👥 ลูกค้ากำไรต่ำ" value={String(data?.lowCustomers.length ?? 0)} tone="yellow" />
-        <Kpi label="🏭 Supplier ราคาแพง" value={String(data?.highSuppliers.length ?? 0)} tone="emerald" />
+        <Kpi label=" ขายต่ำกว่า WAC" value={money(data?.summary.negTotal)} tone="red" />
+        <Kpi label=" GP ต่ำกว่าเป้า" value={String(data?.lowMarginBills.length ?? 0)} tone="amber" />
+        <Kpi label=" ค่าใช้จ่ายผิดปกติ" value={String(data?.summary.outlierCount ?? 0)} tone="orange" />
+        <Kpi label=" ดอกเบี้ย" value={money(data?.summary.interestExpense)} tone="purple" />
+        <Kpi label="ขาดทุนสต็อก" value={money(data?.summary.stockLoss)} tone="red" />
+        <Kpi label="ขาดทุนผลิต" value={money(data?.summary.productionLoss)} tone="rose" />
+        <Kpi label="ขาดทุน FX" value={money(data?.summary.fxLoss)} tone="cyan" />
+        <Kpi label=" Bank Fee" value={money(data?.summary.bankFee)} tone="slate" />
+        <Kpi label=" ลูกค้ากำไรต่ำ" value={String(data?.lowCustomers.length ?? 0)} tone="yellow" />
+        <Kpi label=" Supplier ราคาแพง" value={String(data?.highSuppliers.length ?? 0)} tone="emerald" />
       </div>
       <NegativeMarginTable rows={data?.negMarginItems ?? []} total={data?.summary.negTotal ?? 0} />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3"><LowMarginTable rows={data?.lowMarginBills ?? []} targetMargin={targetMargin} /><LowCustomerTable rows={data?.lowCustomers ?? []} /><HighSupplierTable rows={data?.highSuppliers ?? []} /></div>
@@ -595,16 +548,6 @@ function percent(value: number, total: number) {
   return total > 0 ? (value / total * 100).toFixed(1) : '0.0'
 }
 
-function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
-  return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 text-xs text-amber-900 shadow-sm">
-      <span className="font-bold">⚠️ Finance analysis read baseline</span>
-      <span className="ml-2">คำนวณจากข้อมูลธุรกรรม ยังไม่ใช่ GL/statutory report และไม่มี write action</span>
-      {sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}
-    </div>
-  )
-}
-
 function FilterPanel({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">{children}</div>
 }
@@ -618,7 +561,7 @@ function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; on
 }
 
 function Panel({ children, className = '', title }: { children: ReactNode; className?: string; title: string }) {
-  return <div className={`rounded-xl border border-slate-100 bg-white p-4 shadow-sm ${className}`}><div className="mb-3 text-xs font-bold text-slate-800">{title}</div>{children}</div>
+  return <div className={`rounded-md border border-slate-100 bg-white p-4 shadow-sm ${className}`}><div className="mb-3 text-xs font-bold text-slate-800">{title}</div>{children}</div>
 }
 
 function BreakdownBar({ amount, label, max, tone, value }: { amount: number; label: string; max: number; tone: 'amber' | 'blue' | 'emerald'; value: number }) {
@@ -639,7 +582,7 @@ function BreakdownBar({ amount, label, max, tone, value }: { amount: number; lab
 function Gauge({ footer, kind, title, value }: { footer: string; kind: 'current' | 'quick'; title: string; value: number }) {
   const threshold = kind === 'current' ? [1.5, 1] : [1, 0.5]
   const color = value >= threshold[0] ? '#10b981' : value >= threshold[1] ? '#f59e0b' : '#ef4444'
-  const text = value >= threshold[0] ? 'ดี' : value >= threshold[1] ? 'พอใช้' : '⚠ เสี่ยง'
+  const text = value >= threshold[0] ? 'ดี' : value >= threshold[1] ? 'พอใช้' : ' เสี่ยง'
   const dash = Math.min(220, value * (kind === 'current' ? 73 : 110))
   return <Panel title={title}><svg viewBox="0 0 200 110" className="h-[100px] w-full"><path d="M 30 90 A 70 70 0 0 1 170 90" stroke="#e2e8f0" strokeLinecap="round" strokeWidth="14" fill="none" /><path d="M 30 90 A 70 70 0 0 1 170 90" stroke={color} strokeDasharray={`${dash} 220`} strokeLinecap="round" strokeWidth="14" fill="none" /><text fill={color} fontSize="28" fontWeight="bold" textAnchor="middle" x="100" y="80">{value.toFixed(2)}</text><text fill="#64748b" fontSize="12" textAnchor="middle" x="100" y="100">{text}</text></svg><div className="mt-1 text-center text-xs text-slate-500">{footer}</div></Panel>
 }
@@ -659,7 +602,7 @@ function Kpi({ label, tone, value }: { label: string; tone: string; value: strin
   }
   const cls = map[tone] ?? map.slate
   return (
-    <div className={`rounded-xl border p-3 shadow-sm ${cls}`}>
+    <div className={`rounded-md border p-3 shadow-sm ${cls}`}>
       <div className="text-xs text-slate-500 font-semibold uppercase">{label}</div>
       <div className="text-sm font-bold tracking-tight mt-0.5">{value}</div>
     </div>
@@ -675,7 +618,7 @@ function Insight({ body, title, tone, value }: { body: string; title: string; to
     red: 'border-red-200 bg-red-50/40 text-red-800'
   }
   return (
-    <div className={`rounded-xl border p-4 shadow-sm ${map[tone] ?? map.blue}`}>
+    <div className={`rounded-md border p-4 shadow-sm ${map[tone] ?? map.blue}`}>
       <h3 className="mb-1 text-xs font-bold text-slate-800">{title}</h3>
       <div className="mb-1 text-xl font-bold tracking-tight">{value}</div>
       <div className="text-xs text-slate-500">{body}</div>
@@ -721,14 +664,14 @@ function DetailTable({ isLoading, rows }: { isLoading: boolean; rows: WorkingPay
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex justify-between items-center border-b border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700 text-sm">
-        <span>📋 ตารางคำนวณ</span>
+        <span> ตารางคำนวณ</span>
         {columnResize.hasCustomWidths && (
           <button
-            className="hidden h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 transition hover:bg-slate-50 lg:inline-flex outline-none"
+            className="hidden lg:inline-flex items-center gap-1 h-7 rounded bg-white border border-slate-200 px-2.5 text-xs text-slate-700 hover:bg-slate-50 font-normal transition outline-none"
             type="button"
             onClick={columnResize.resetColumnWidths}
           >
-            <RotateCcw className="h-4 w-4" /> คืนค่าเดิมตาราง
+            <RotateCcw className="h-3 w-3" /> คืนค่าเดิมตาราง
           </button>
         )}
       </div>
@@ -866,14 +809,14 @@ function ProductTable({ rows }: { rows: StockProduct[] }) {
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex justify-between items-center border-b border-red-100 bg-red-50/50 px-4 py-3 font-bold text-red-700 text-sm">
-        <span>Slow Moving / สินค้าที่ควรรีบขาย (Top 15 — ไม่ขาย &gt; 60 วัน)</span>
+        <span>สินค้าหมุนช้า / ควรรีบขาย (Top 15 — ไม่ขาย &gt; 60 วัน)</span>
         {columnResize.hasCustomWidths && (
           <button
-            className="hidden h-9 items-center gap-1 rounded-md border border-red-200 bg-white px-3 text-sm font-normal text-red-700 transition hover:bg-red-50 lg:inline-flex outline-none"
+            className="hidden lg:inline-flex items-center gap-1 h-7 rounded bg-white border border-red-200 px-2.5 text-xs text-red-700 hover:bg-red-50 font-normal transition outline-none"
             type="button"
             onClick={columnResize.resetColumnWidths}
           >
-            <RotateCcw className="h-4 w-4" /> คืนค่าเดิมตาราง
+            <RotateCcw className="h-3 w-3" /> คืนค่าเดิมตาราง
           </button>
         )}
       </div>
@@ -913,7 +856,7 @@ function ProductTable({ rows }: { rows: StockProduct[] }) {
                 <Td align="right" className="text-emerald-700 font-semibold">{money(row.marginPotential)}</Td>
               </tr>
             ))}
-            {!sortedRows.length ? <tr><td className="py-8 text-center text-slate-400" colSpan={9}>ไม่มี Slow Moving ✓</td></tr> : null}
+            {!sortedRows.length ? <tr><td className="py-8 text-center text-slate-400" colSpan={9}>ไม่มี Slow Moving</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -921,7 +864,7 @@ function ProductTable({ rows }: { rows: StockProduct[] }) {
       {/* Mobile View */}
       <div className="block lg:hidden divide-y divide-slate-100">
         {!sortedRows.length ? (
-          <div className="py-8 text-center text-slate-400 text-xs">ไม่มี Slow Moving ✓</div>
+          <div className="py-8 text-center text-slate-400 text-xs">ไม่มี Slow Moving</div>
         ) : (
           sortedRows.map((row) => (
             <div key={row.id} className="p-4 space-y-2 text-xs hover:bg-slate-50/50 transition">
@@ -987,16 +930,16 @@ function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginIt
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex justify-between items-center border-b border-red-100 bg-red-50/50 px-4 py-3 font-bold text-red-700 text-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <span>📉 ขายต่ำกว่า WAC ({rows.length} รายการ)</span>
+          <span> ขายต่ำกว่า WAC ({rows.length} รายการ)</span>
           <span className="font-semibold">รวมขาดทุน {money(total)}</span>
         </div>
         {columnResize.hasCustomWidths && (
           <button
-            className="hidden h-9 items-center gap-1 rounded-md border border-red-200 bg-white px-3 text-sm font-normal text-red-700 transition hover:bg-red-50 lg:inline-flex outline-none"
+            className="hidden lg:inline-flex items-center gap-1 h-7 rounded bg-white border border-red-200 px-2.5 text-xs text-red-700 hover:bg-red-50 font-normal transition outline-none"
             type="button"
             onClick={columnResize.resetColumnWidths}
           >
-            <RotateCcw className="h-4 w-4" /> คืนค่าเดิมตาราง
+            <RotateCcw className="h-3 w-3" /> คืนค่าเดิมตาราง
           </button>
         )}
       </div>
@@ -1034,7 +977,7 @@ function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginIt
                 <Td align="right" className="font-bold text-red-700">{money(row.loss)}</Td>
               </tr>
             ))}
-            {!sortedRows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={8}>ไม่มี ✓</td></tr> : null}
+            {!sortedRows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={8}>ไม่มี</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -1042,7 +985,7 @@ function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginIt
       {/* Mobile View */}
       <div className="block lg:hidden divide-y divide-slate-100">
         {!sortedRows.length ? (
-          <div className="py-8 text-center text-slate-400 text-xs">ไม่มี ✓</div>
+          <div className="py-8 text-center text-slate-400 text-xs">ไม่มี</div>
         ) : (
           sortedRows.map((row) => (
             <div key={row.id} className="p-4 space-y-2 text-xs hover:bg-slate-50/50 transition">
@@ -1105,20 +1048,20 @@ function LowMarginTable({ rows, targetMargin }: { rows: ProfitPayload['lowMargin
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex justify-between items-center border-b border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700 text-xs">
-        <span>⬇ บิลที่ GP &lt; {targetMargin}%</span>
+        <span> บิลที่ GP &lt; {targetMargin}%</span>
         {columnResize.hasCustomWidths && (
           <button
-            className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 transition hover:bg-slate-50 outline-none"
+            className="inline-flex items-center gap-1 h-5 rounded bg-white border border-slate-200 px-1.5 text-xs text-slate-700 hover:bg-slate-50 font-normal transition outline-none"
             type="button"
             onClick={columnResize.resetColumnWidths}
           >
-            <RotateCcw className="h-4 w-4" /> คืนค่าเดิมตาราง
+            <RotateCcw className="h-2.5 w-2.5" /> รีเซ็ต
           </button>
         )}
       </div>
       
       {/* Desktop View */}
-      <div className="hidden lg:block max-h-64 overflow-auto">
+      <div className="hidden lg:block overflow-x-auto">
         <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {lowMarginColumns.map((column) => (
@@ -1148,9 +1091,9 @@ function LowMarginTable({ rows, targetMargin }: { rows: ProfitPayload['lowMargin
       </div>
 
       {/* Mobile View */}
-      <div className="block lg:hidden divide-y divide-slate-100 max-h-64 overflow-auto">
+      <div className="block lg:hidden divide-y divide-slate-100">
         {!sortedRows.length ? (
-          <div className="py-4 text-center text-slate-400 text-xs">ไม่มี ✓</div>
+          <div className="py-4 text-center text-slate-400 text-xs">ไม่มี</div>
         ) : (
           sortedRows.map((row) => (
             <div key={row.id} className="p-3 space-y-1 text-xs">
@@ -1208,20 +1151,20 @@ function LowCustomerTable({ rows }: { rows: ProfitPayload['lowCustomers'] }) {
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex justify-between items-center border-b border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700 text-xs">
-        <span>👥 ลูกค้ากำไรต่ำ (Top 10)</span>
+        <span> ลูกค้ากำไรต่ำ (Top 10)</span>
         {columnResize.hasCustomWidths && (
           <button
-            className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 transition hover:bg-slate-50 outline-none"
+            className="inline-flex items-center gap-1 h-5 rounded bg-white border border-slate-200 px-1.5 text-xs text-slate-700 hover:bg-slate-50 font-normal transition outline-none"
             type="button"
             onClick={columnResize.resetColumnWidths}
           >
-            <RotateCcw className="h-4 w-4" /> คืนค่าเดิมตาราง
+            <RotateCcw className="h-2.5 w-2.5" /> รีเซ็ต
           </button>
         )}
       </div>
       
       {/* Desktop View */}
-      <div className="hidden lg:block max-h-64 overflow-auto">
+      <div className="hidden lg:block overflow-x-auto">
         <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {lowCustomerColumns.map((column) => (
@@ -1249,9 +1192,9 @@ function LowCustomerTable({ rows }: { rows: ProfitPayload['lowCustomers'] }) {
       </div>
 
       {/* Mobile View */}
-      <div className="block lg:hidden divide-y divide-slate-100 max-h-64 overflow-auto">
+      <div className="block lg:hidden divide-y divide-slate-100">
         {!sortedRows.length ? (
-          <div className="py-4 text-center text-slate-400 text-xs">ไม่มี ✓</div>
+          <div className="py-4 text-center text-slate-400 text-xs">ไม่มี</div>
         ) : (
           sortedRows.map((row) => (
             <div key={row.id} className="p-3 flex justify-between items-center text-xs">
@@ -1314,20 +1257,20 @@ function HighSupplierTable({ rows }: { rows: ProfitPayload['highSuppliers'] }) {
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex justify-between items-center border-b border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700 text-xs">
-        <span>🏭 Supplier ต้นทุนสูง (Top 10)</span>
+        <span> ซัพพลายเออร์ต้นทุนสูง (Top 10)</span>
         {columnResize.hasCustomWidths && (
           <button
-            className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 transition hover:bg-slate-50 outline-none"
+            className="inline-flex items-center gap-1 h-5 rounded bg-white border border-slate-200 px-1.5 text-xs text-slate-700 hover:bg-slate-50 font-normal transition outline-none"
             type="button"
             onClick={columnResize.resetColumnWidths}
           >
-            <RotateCcw className="h-4 w-4" /> คืนค่าเดิมตาราง
+            <RotateCcw className="h-2.5 w-2.5" /> รีเซ็ต
           </button>
         )}
       </div>
       
       {/* Desktop View */}
-      <div className="hidden lg:block max-h-64 overflow-auto">
+      <div className="hidden lg:block overflow-x-auto">
         <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {highSupplierColumns.map((column) => (
@@ -1357,9 +1300,9 @@ function HighSupplierTable({ rows }: { rows: ProfitPayload['highSuppliers'] }) {
       </div>
 
       {/* Mobile View */}
-      <div className="block lg:hidden divide-y divide-slate-100 max-h-64 overflow-auto">
+      <div className="block lg:hidden divide-y divide-slate-100">
         {!sortedRows.length ? (
-          <div className="py-4 text-center text-slate-400 text-xs">ไม่มี ✓</div>
+          <div className="py-4 text-center text-slate-400 text-xs">ไม่มี</div>
         ) : (
           sortedRows.map((row) => (
             <div key={row.id} className="p-3 space-y-1 text-xs">
@@ -1417,14 +1360,14 @@ function OutlierTable({ rows }: { rows: ProfitPayload['outliers'] }) {
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex justify-between items-center border-b border-orange-100 bg-orange-50/50 px-4 py-3 font-bold text-orange-700 text-sm">
-        <span>⚠ ค่าใช้จ่ายผิดปกติ ({rows.length}) — สูงเกิน mean + 1.5×stddev</span>
+        <span> ค่าใช้จ่ายผิดปกติ ({rows.length}) — สูงเกิน mean + 1.5×stddev</span>
         {columnResize.hasCustomWidths && (
           <button
-            className="hidden h-9 items-center gap-1 rounded-md border border-orange-200 bg-white px-3 text-sm font-normal text-orange-700 transition hover:bg-orange-50 lg:inline-flex outline-none"
+            className="hidden lg:inline-flex items-center gap-1 h-7 rounded bg-white border border-orange-200 px-2.5 text-xs text-orange-700 hover:bg-orange-50 font-normal transition outline-none"
             type="button"
             onClick={columnResize.resetColumnWidths}
           >
-            <RotateCcw className="h-4 w-4" /> คืนค่าเดิมตาราง
+            <RotateCcw className="h-3 w-3" /> คืนค่าเดิมตาราง
           </button>
         )}
       </div>
@@ -1456,14 +1399,14 @@ function OutlierTable({ rows }: { rows: ProfitPayload['outliers'] }) {
                 <Td align="right" className="font-bold text-red-700">{money(row.over)}</Td>
               </tr>
             ))}
-            {!sortedRows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={7}>ไม่มี ✓</td></tr> : null}
+            {!sortedRows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={7}>ไม่มี</td></tr> : null}
           </tbody>
         </table>
 
         {/* Mobile View */}
         <div className="block lg:hidden divide-y divide-slate-100">
           {!sortedRows.length ? (
-            <div className="py-4 text-center text-slate-400 text-xs">ไม่มี ✓</div>
+            <div className="py-4 text-center text-slate-400 text-xs">ไม่มี</div>
           ) : (
             sortedRows.map((row) => (
               <div key={row.id} className="p-4 space-y-2 text-xs hover:bg-slate-50/50 transition">
@@ -1489,7 +1432,7 @@ function OutlierTable({ rows }: { rows: ProfitPayload['outliers'] }) {
 }
 
 function Empty({ colSpan }: { colSpan: number }) {
-  return <tr><td className="py-4 text-center text-slate-400" colSpan={colSpan}>ไม่มี ✓</td></tr>
+  return <tr><td className="py-4 text-center text-slate-400" colSpan={colSpan}>ไม่มี</td></tr>
 }
 
 function Th({ align = 'left', children }: { align?: 'center' | 'left' | 'right'; children: ReactNode }) {

@@ -139,6 +139,8 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
       .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
       .items tr { break-inside: avoid; page-break-inside: avoid; }
       .items .empty td { height: 24px; color: transparent; }
+      .items tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .items tfoot .final-amount { color: #14532d; }
       .item-name { font-weight: 850; color: #0f172a; }
       .muted { color: #64748b; font-size: 12px; margin-top: 1px; }
       .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -184,6 +186,7 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
         .items { font-size: 12px; margin-top: 7px; page-break-before: auto; }
         .items th { padding: 3px 3px; }
         .items td { padding: 3px 3px; }
+        .items .empty td { height: 18px; }
         .muted { font-size: 12px; }
         .weight-summary { gap: 6px; margin-top: 6px; }
         .weight-card { padding: 5px; }
@@ -260,6 +263,16 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
           ${itemRows(bill)}
           ${emptyRows(fillerRowCount(bill.allocationRows.length))}
         </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="num">รวมทั้งสิ้น</td>
+            <td class="num">${escapeHtml(grossSummaryText)}</td>
+            <td class="num">${escapeHtml(deductSummaryText)}</td>
+            <td class="num">${escapeHtml(totalSummaryText)}</td>
+            <td></td>
+            <td class="num final-amount">${money(bill.subtotal)}</td>
+          </tr>
+        </tfoot>
       </table>
 
       <div class="weight-summary">

@@ -53,9 +53,9 @@ function branchWhere(branchId?: bigint | null) {
 
 function sourceState(extra: string[] = []) {
   return {
-    basis: 'Working-capital/profit-leak read baseline from operational transactions. Not a GL close or statutory report.',
+    basis: 'Working-capital/profit-leak source from operational transactions. Not a GL close or statutory report.',
     limitations: [
-      'Inventory value uses stock_ledger movement value as WAC-style operational baseline.',
+      'Inventory value uses stock_ledger movement value as WAC-style operational source.',
       'Profit leak flags use sales/purchase item JSON where available and header totals as fallback.',
       'No financing, reclass, stock adjustment, production loss posting, payment, receipt, or GL write is enabled.',
       ...extra,

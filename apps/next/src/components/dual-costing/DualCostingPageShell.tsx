@@ -11,25 +11,10 @@ export function DualCostingFilterCard({ children, className }: { children: React
   return <div className={cn('rounded-xl bg-white p-3.5 border border-slate-200/80 shadow-sm', className)}>{children}</div>
 }
 
-export function DualCostingPanel({
-  children,
-  className,
-  title,
-  titleAction,
-}: {
-  children: ReactNode
-  className?: string
-  title?: ReactNode
-  titleAction?: ReactNode
-}) {
+export function DualCostingPanel({ children, className, title }: { children: ReactNode; className?: string; title?: string }) {
   return (
     <div className={cn('min-w-0 rounded-xl bg-white p-4 border border-slate-200/80 shadow-sm', className)}>
-      {title || titleAction ? (
-        <div className="mb-3 flex items-center justify-between gap-3">
-          {title ? <h3 className="text-sm font-bold text-slate-800">{title}</h3> : <div />}
-          {titleAction}
-        </div>
-      ) : null}
+      {title ? <h3 className="mb-3 text-sm font-bold text-slate-800">{title}</h3> : null}
       {children}
     </div>
   )
@@ -129,23 +114,4 @@ export function DualCostingWorkflowStrip({ active }: { active: 'allocator' | 'le
       ))}
     </div>
   )
-}
-
-export function DualCostingHint({
-  children,
-  tone = 'slate',
-}: {
-  children: ReactNode
-  tone?: 'amber' | 'blue' | 'emerald' | 'indigo' | 'purple' | 'slate'
-}) {
-  const tones = {
-    amber: 'border-amber-200/70 bg-amber-50/50 text-amber-800',
-    blue: 'border-blue-200/70 bg-blue-50/50 text-blue-800',
-    emerald: 'border-emerald-200/70 bg-emerald-50/50 text-emerald-800',
-    indigo: 'border-indigo-200/70 bg-indigo-50/50 text-indigo-800',
-    purple: 'border-purple-200/70 bg-purple-50/50 text-purple-800',
-    slate: 'border-slate-200 bg-slate-50 text-slate-700',
-  }[tone]
-
-  return <div className={cn('rounded-xl border p-3.5 text-sm leading-relaxed shadow-xs', tones)}>{children}</div>
 }

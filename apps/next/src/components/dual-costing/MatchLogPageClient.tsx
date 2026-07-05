@@ -12,7 +12,6 @@ import {
   DualCostingCountRow,
   DualCostingErrorBox,
   DualCostingFilterCard,
-  DualCostingHint,
   DualCostingPageSection,
   DualCostingStatCard,
 } from './DualCostingPageShell'
@@ -211,10 +210,6 @@ export function MatchLogPageClient() {
 
   return (
     <DualCostingPageSection>
-      <DualCostingHint tone="slate">
-        <strong>Match Log</strong> เป็น audit trail ของการดึงต้นทุนจาก Cost Pool การย้อนรายการยังคงเป็น read-only shell ตาม design ปัจจุบันและต้องใช้ reverse flow แยกใน batch ถัดไป
-      </DualCostingHint>
-
       <DualCostingErrorBox error={error} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">

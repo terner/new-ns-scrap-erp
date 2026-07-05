@@ -6,7 +6,6 @@ export default function SitemapPage() {
     <section className="space-y-4">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Sitemap</h2>
-        <p className="mt-1 text-sm text-slate-600">โครง route หลักจาก sidebar เดิม ใช้เป็น checklist สำหรับย้ายแต่ละหน้าเข้า Next.js</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

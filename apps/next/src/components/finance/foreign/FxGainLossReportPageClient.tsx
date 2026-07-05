@@ -144,9 +144,6 @@ export function FxGainLossReportPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-        <strong>FX Gain/Loss</strong> - Realized FX Gain/Loss จากการรับ-จ่ายเงินต่างประเทศจริง (ส่วนต่างระหว่าง FX rate ตอนตั้ง AR/AP กับตอนรับ/จ่ายจริง)
-      </div>
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 

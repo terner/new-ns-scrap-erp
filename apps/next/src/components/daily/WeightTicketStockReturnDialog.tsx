@@ -2,20 +2,17 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { formatMoney } from '@/lib/daily'
 import { getErrorMessage } from '@/lib/api-client'
 
 export type StockReturnOption = {
   pendingOutKey: string
   pendingQty: number
-  productId: string
   productCode: string
   productName: string
   salesBillDocNos: string[]
-  sourceLineNos?: number[]
   sourceLineNo: number | null
-  warehouseId: string
   warehouseName: string
   weightTicketDocNo: string
 }
@@ -91,14 +88,12 @@ export function WeightTicketStockReturnDialog({
 
     setIsReturningPendingOutKey(option.pendingOutKey)
     try {
-      const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(ticketDocNo)}/stock-return`, {
+      const response = await fetch(`/api/sales/bills/${encodeURIComponent(salesBillDocNo)}/stock-return`, {
         body: JSON.stringify({
           note: null,
-          productId: option.productId,
+          pendingOutKey: option.pendingOutKey,
           reason: reason || null,
           returnedQty,
-          salesBillDocNo,
-          warehouseId: option.warehouseId,
         }),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
@@ -117,10 +112,15 @@ export function WeightTicketStockReturnDialog({
     <Dialog open={open} onOpenChange={(nextOpen) => {
       if (!nextOpen) onClose()
     }}>
-      <DialogContent aria-labelledby="wto-stock-return-title" className="max-h-[90vh] max-w-6xl overflow-hidden rounded-md p-0 flex flex-col">
-        <DialogHeader className="border-b border-slate-100 bg-slate-900 px-5 py-4 text-white">
-          <DialogTitle id="wto-stock-return-title" className="text-white">รับของคืนจากใบส่งของ</DialogTitle>
-          <DialogDescription className="font-mono text-xs text-slate-300">{ticketDocNo}</DialogDescription>
+      <DialogContent hideClose aria-labelledby="wto-stock-return-title" className="max-h-[90vh] max-w-6xl overflow-hidden rounded-md !p-0 flex flex-col bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none">
+        <DialogHeader className="rounded-t-md bg-slate-900 px-5 py-4 text-white">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div className="min-w-0">
+              <DialogTitle id="wto-stock-return-title" className="truncate text-white">รับของคืนจากใบส่งของ</DialogTitle>
+              <DialogDescription className="truncate font-mono text-xs text-slate-300">{ticketDocNo}</DialogDescription>
+            </div>
+            <Button className="h-9 shrink-0 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={onClose}>ปิด</Button>
+          </div>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4">
           {error ? <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div> : null}
@@ -129,7 +129,87 @@ export function WeightTicketStockReturnDialog({
           ) : options.length === 0 ? (
             <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">ไม่มี pending_out ที่ต้องรับคืน</div>
           ) : (
-            <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+            <>
+            <div className="space-y-3 lg:hidden">
+              {options.map((option) => {
+                const returnedQty = Number(qtyByPendingOut[option.pendingOutKey] ?? option.pendingQty)
+                const lossQty = Math.max(0, option.pendingQty - (Number.isFinite(returnedQty) ? returnedQty : 0))
+                const requiresReason = lossQty > 0.0001
+                return (
+                  <div key={option.pendingOutKey} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-slate-900">{option.productName}</div>
+                        <div className="mt-1 text-xs text-slate-500">{[option.productCode, option.sourceLineNo ? `line ${option.sourceLineNo}` : null].filter(Boolean).join(' · ')}</div>
+                      </div>
+                      <div className="shrink-0 text-right text-xs text-slate-500">{option.warehouseName || '-'}</div>
+                    </div>
+
+                    <div className="mt-3 space-y-3 text-sm">
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-600">บิลขาย</label>
+                        {option.salesBillDocNos.length > 1 ? (
+                          <select
+                            className="h-10 w-full rounded-md border border-slate-300 bg-white px-2"
+                            value={salesBillByPendingOut[option.pendingOutKey] ?? ''}
+                            onChange={(event) => setSalesBillByPendingOut((current) => ({ ...current, [option.pendingOutKey]: event.target.value }))}
+                          >
+                            {option.salesBillDocNos.map((docNo) => <option key={docNo} value={docNo}>{docNo}</option>)}
+                          </select>
+                        ) : (
+                          <div className="font-mono text-slate-700">{option.salesBillDocNos[0] ?? '-'}</div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="text-xs text-slate-500">pending_out</div>
+                          <div className="mt-1 font-semibold tabular-nums text-amber-700">{formatMoney(option.pendingQty)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500">ส่วนต่างขาด</div>
+                          <div className={`mt-1 font-semibold tabular-nums ${requiresReason ? 'text-red-700' : 'text-emerald-700'}`}>{formatMoney(lossQty)}</div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-600">น้ำหนักชั่งคืนจริง</label>
+                        <input
+                          className={`h-10 w-full rounded-md border px-2 text-right tabular-nums ${requiresReason ? 'border-amber-300 bg-amber-50' : 'border-slate-300 bg-white'}`}
+                          min="0"
+                          max={option.pendingQty}
+                          step="0.01"
+                          type="number"
+                          value={qtyByPendingOut[option.pendingOutKey] ?? ''}
+                          onChange={(event) => setQtyByPendingOut((current) => ({ ...current, [option.pendingOutKey]: event.target.value }))}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-600">เหตุผลส่วนต่าง <span className="text-red-600">*</span></label>
+                        <textarea
+                          className={`min-h-[88px] w-full resize-y rounded-md border px-2 py-2 ${requiresReason && !reasonByPendingOut[option.pendingOutKey]?.trim() ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white'}`}
+                          placeholder={requiresReason ? 'ระบุเหตุผลส่วนต่าง' : '-'}
+                          required={requiresReason}
+                          value={reasonByPendingOut[option.pendingOutKey] ?? ''}
+                          onChange={(event) => setReasonByPendingOut((current) => ({ ...current, [option.pendingOutKey]: event.target.value }))}
+                        />
+                      </div>
+
+                      <Button
+                        className="h-10 w-full text-sm font-normal"
+                        disabled={isReturningPendingOutKey === option.pendingOutKey}
+                        type="button"
+                        onClick={() => void submitReturn(option)}
+                      >
+                        {isReturningPendingOutKey === option.pendingOutKey ? 'กำลังบันทึก...' : 'บันทึกรับคืน'}
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white lg:block">
               <table className="w-full min-w-[900px] table-fixed text-xs">
                 <colgroup>
                   <col className="w-[18%]" />
@@ -158,21 +238,11 @@ export function WeightTicketStockReturnDialog({
                     const returnedQty = Number(qtyByPendingOut[option.pendingOutKey] ?? option.pendingQty)
                     const lossQty = Math.max(0, option.pendingQty - (Number.isFinite(returnedQty) ? returnedQty : 0))
                     const requiresReason = lossQty > 0.0001
-                    const sourceLineNos = option.sourceLineNos?.length
-                      ? option.sourceLineNos
-                      : option.sourceLineNo
-                        ? [option.sourceLineNo]
-                        : []
-                    const sourceLineLabel = sourceLineNos.length > 1
-                      ? `lines ${sourceLineNos.join(', ')}`
-                      : sourceLineNos.length === 1
-                        ? `line ${sourceLineNos[0]}`
-                        : null
                     return (
                       <tr key={option.pendingOutKey} className="border-t border-slate-100 align-top">
                         <td className="px-3 py-2">
                           <div className="font-medium text-slate-900">{option.productName}</div>
-                          <div className="text-slate-500">{[option.productCode, sourceLineLabel].filter(Boolean).join(' · ')}</div>
+                          <div className="text-slate-500">{[option.productCode, option.sourceLineNo ? `line ${option.sourceLineNo}` : null].filter(Boolean).join(' · ')}</div>
                         </td>
                         <td className="px-3 py-2 text-slate-700">{option.warehouseName || '-'}</td>
                         <td className="px-3 py-2">
@@ -226,11 +296,9 @@ export function WeightTicketStockReturnDialog({
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
-        <DialogFooter className="border-t border-slate-100 bg-white px-4 py-3">
-          <Button type="button" variant="outline" onClick={onClose}>ปิด</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

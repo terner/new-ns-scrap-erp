@@ -112,6 +112,8 @@ export function buildExpensePrintHtml(expense: any, profile: CompanyProfilePrint
       .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 6px 5px; text-align: left; font-weight: 900; }
       .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
       .items .empty td { height: 24px; color: transparent; }
+      .items tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .items tfoot .final-amount { color: #991b1b; }
       .item-name { font-weight: 850; color: #0f172a; }
       .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
       .center { text-align: center; }
@@ -216,6 +218,15 @@ export function buildExpensePrintHtml(expense: any, profile: CompanyProfilePrint
           ${rowsHtml}
           ${emptyRowsHtml}
         </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="num">รวมทั้งสิ้น</td>
+            <td class="num">${money(expense.amount)}</td>
+            <td class="num">${money(expense.vat)}</td>
+            <td class="num">${money(expense.wht)}</td>
+            <td class="num final-amount">${money(expense.netAmount)}</td>
+          </tr>
+        </tfoot>
       </table>
 
       <section class="bottom-grid">

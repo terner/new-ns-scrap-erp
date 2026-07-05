@@ -176,9 +176,6 @@ export function OverseasReceiptPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-        <strong>Overseas Receipt</strong> - รับเงินจากต่างประเทศ (Export Sales) เข้า FCD หรือ THB Bank พร้อมคำนวณ FX Gain/Loss อัตโนมัติ
-      </div>
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
@@ -296,12 +293,16 @@ export function OverseasReceiptPageClient() {
 
       {showForm ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" onClick={() => setShowForm(false)}>
-          <div className="w-full max-w-2xl overflow-hidden rounded-md bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-5 py-4">
+          <div className="w-full max-w-2xl overflow-hidden rounded-md bg-slate-900 shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4">
               <h3 className="font-bold text-white">รับเงินจากต่างประเทศ</h3>
-              <button className="text-2xl text-white/80 hover:text-white" type="button" onClick={() => setShowForm(false)}>&times;</button>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
+                <button className="h-9 rounded-md border border-slate-700 bg-slate-800 px-4 text-sm font-normal text-white opacity-60 transition-colors" disabled type="button">บันทึกร่าง</button>
+                <button className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-semibold text-white opacity-60 transition-colors hover:bg-emerald-700" disabled type="button">รับเงิน + เพิ่ม Bank/FCD</button>
+              </div>
             </div>
-            <div className="space-y-3 p-5 text-sm">
+            <div className="space-y-3 bg-slate-50 p-5 text-sm">
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="เลขที่"><input className="w-full rounded-md border bg-slate-50 px-2 py-1.5 font-mono" readOnly value="ORC-DRAFT" /></Field>
                 <Field label="วันที่"><DatePickerInput className="w-full" value={form.date} onChange={(value) => setForm({ ...form, date: value })} /></Field>
@@ -344,11 +345,6 @@ export function OverseasReceiptPageClient() {
                 <Field label="Value Date"><DatePickerInput className="w-full" value={form.valueDate} onChange={(value) => setForm({ ...form, valueDate: value })} /></Field>
               </div>
               <Field label="หมายเหตุ"><textarea className="w-full rounded-md border px-2 py-1.5" rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
-              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
-              <button className="rounded-md bg-slate-600 px-4 py-2 text-sm text-white opacity-60 transition-colors" disabled type="button">บันทึกร่าง</button>
-              <button className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white opacity-60 transition-colors" disabled type="button">รับเงิน + เพิ่ม Bank/FCD</button>
             </div>
           </div>
         </div>

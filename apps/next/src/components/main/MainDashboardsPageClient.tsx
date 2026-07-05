@@ -102,14 +102,14 @@ type DailyGroupProductSortKey = keyof DailyGroupProductRow | 'spread'
 type CashAccountRow = MainPayload['dailyReport']['cashMovement']['accounts'][number]
 type CashAccountSortKey = keyof CashAccountRow | 'net'
 
-const dashboardAgingColumns: ResizableColumnDefinition<string>[] = [
-  { key: 'label', defaultWidth: 170, minWidth: 140 },
-  { key: 'current', defaultWidth: 110, minWidth: 90 },
-  { key: 'd1_30', defaultWidth: 110, minWidth: 90 },
-  { key: 'd31_60', defaultWidth: 110, minWidth: 90 },
-  { key: 'd61_90', defaultWidth: 110, minWidth: 90 },
-  { key: 'over90', defaultWidth: 110, minWidth: 90 },
-  { key: 'total', defaultWidth: 120, minWidth: 100 },
+const dashboardAgingColumns: ResizableColumnDefinition<DashboardAgingSortKey>[] = [
+  { key: 'label', defaultWidth: 150, minWidth: 110 },
+  { key: 'current', defaultWidth: 100, minWidth: 90 },
+  { key: 'd1_30', defaultWidth: 95, minWidth: 85 },
+  { key: 'd31_60', defaultWidth: 95, minWidth: 85 },
+  { key: 'd61_90', defaultWidth: 95, minWidth: 85 },
+  { key: 'over90', defaultWidth: 95, minWidth: 85 },
+  { key: 'total', defaultWidth: 110, minWidth: 95 },
 ]
 
 const dashboardStockGroupColumns: ResizableColumnDefinition<string>[] = [
@@ -229,9 +229,6 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
       {mode === 'owner-daily' ? <OwnerDailyView data={data} /> : null}
       {mode === 'daily-report' ? <DailyReportView data={data} date={date} setDate={setDate} /> : null}
       {mode === 'analytics-dashboard' ? <AnalyticsDashboardView data={data} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
-      <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
-        <b>Main dashboard read baseline</b><span className="ml-2">{data?.sourceState?.limitations?.[0] ?? 'ไม่มี write action ใน baseline นี้'}</span>
-      </div>
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       {isLoading ? <div className="rounded-md bg-white p-4 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
     </section>
@@ -304,9 +301,24 @@ function DashboardView(props: {
   const stockValue = section?.stock.value ?? 0
   const gpPct = salesAmount > 0 ? (gp / salesAmount) * 100 : 0
   const filteredCount = `${money(section?.purchase.count)} ซื้อ · ${money(section?.sales.count)} ขาย`
+  const hasAdvancedFilters = Boolean(dashboardBranchId || dashboardGroup || dashboardSupplierId || dashboardCustomerId || dashboardProductId)
+  const hasDashboardData = Boolean(
+    (k.revenue ?? 0)
+    || (k.expenses ?? 0)
+    || (k.netProfit ?? 0)
+    || (k.cashBalance ?? 0)
+    || (k.ar ?? 0)
+    || (k.ap ?? 0)
+    || purchaseAmount
+    || salesAmount
+    || stockValue
+    || (data?.dashboard.historical.rows ?? 0)
+    || (analytics?.topSuppliers.length ?? 0)
+    || (analytics?.topCustomers.length ?? 0),
+  )
   const agingRows = useMemo<DashboardAgingRow[]>(() => [
-    buildDashboardAgingRow('ar', '📥 AR ลูกหนี้', 'emerald', data?.dashboard.agingBuckets.ar, k.ar ?? 0),
-    buildDashboardAgingRow('ap', '📤 AP เจ้าหนี้', 'red', data?.dashboard.agingBuckets.ap, k.ap ?? 0),
+    buildDashboardAgingRow('ar', 'AR ลูกหนี้', 'emerald', data?.dashboard.agingBuckets.ar, k.ar ?? 0),
+    buildDashboardAgingRow('ap', 'AP เจ้าหนี้', 'red', data?.dashboard.agingBuckets.ap, k.ap ?? 0),
   ], [data?.dashboard.agingBuckets.ap, data?.dashboard.agingBuckets.ar, k.ap, k.ar])
   const sortedAgingRows = useMemo(() => {
     return [...agingRows].sort((left, right) => compareDashboardValues(dashboardAgingValue(left, agingSortKey), dashboardAgingValue(right, agingSortKey), agingSortDirection))
@@ -402,80 +414,83 @@ function DashboardView(props: {
   }
   return (
     <>
-      <div className="rounded-md bg-gradient-to-r from-slate-800 to-slate-900 p-4 text-white shadow-xl">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold opacity-80">📅 ช่วงเวลา:</span>
+      <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500">ช่วงเวลา</span>
           {[
-            ['year', '📊 ปีนี้'],
+            ['year', 'ปีนี้'],
             ['quarter', 'ไตรมาส'],
             ['month', 'เดือนนี้'],
             ['week', '7 วัน'],
             ['today', 'วันนี้'],
           ].map(([key, label]) => (
-            <button className={`rounded-md px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-400 ${rangeMode === key ? 'bg-amber-400 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
+            <button className={`h-8 rounded-md px-3 text-xs font-semibold outline-none transition focus:ring-2 focus:ring-blue-100 ${rangeMode === key ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
           ))}
-          <span className="mx-2 opacity-30">|</span>
-          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white outline-none focus:ring-2 focus:ring-amber-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
-          <span>→</span>
-          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white outline-none focus:ring-2 focus:ring-amber-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
-          <span className="ml-auto rounded-md bg-white/10 px-2 py-1 text-xs">📊 {filteredCount}</span>
+          <DatePickerInput className="h-8 w-[130px] bg-white text-slate-700" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+          <span className="text-xs text-slate-400">ถึง</span>
+          <DatePickerInput className="h-8 w-[130px] bg-white text-slate-700" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+          <span className="ml-auto rounded-md bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600">{filteredCount}</span>
+          <button className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100" onClick={clearFilters} type="button">ล้างตัวกรอง</button>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-amber-400" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option className="text-slate-900" value="">🏢 ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
-          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-amber-400" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option className="text-slate-900" value="">📦 ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option className="text-slate-900" key={group} value={group}>{group}</option>)}</select>
-          <div className="w-[180px] text-slate-800 text-sm">
+        <details className="mt-2" {...(hasAdvancedFilters ? { open: true } : {})}>
+          <summary className="inline-flex cursor-pointer select-none items-center rounded-md px-1 text-xs font-semibold text-slate-500 hover:text-slate-800">
+            ตัวกรองเพิ่มเติม{hasAdvancedFilters ? ' (มี)' : ''}
+          </summary>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(130px,0.8fr)_minmax(130px,0.8fr)_minmax(170px,1fr)_minmax(170px,1fr)_minmax(170px,1fr)]">
+            <select className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+            <select className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
             <SearchCombobox
               inputId="dashboard-supplier-filter"
               label="Supplier"
               hideLabel
-              placeholder="🏭 ทุก Supplier"
+              placeholder="ทุก Supplier"
               options={supplierSearchOptions}
               value={dashboardSupplierId}
               onChange={setDashboardSupplierId}
             />
-          </div>
-          <div className="w-[180px] text-slate-800 text-sm">
             <SearchCombobox
               inputId="dashboard-customer-filter"
               label="Customer"
               hideLabel
-              placeholder="👥 ทุก Customer"
+              placeholder="ทุก Customer"
               options={customerSearchOptions}
               value={dashboardCustomerId}
               onChange={setDashboardCustomerId}
             />
-          </div>
-          <div className="w-[180px] text-slate-800 text-sm">
             <SearchCombobox
               inputId="dashboard-product-filter"
               label="สินค้า"
               hideLabel
-              placeholder="🏷 ทุกสินค้า"
+              placeholder="ทุกสินค้า"
               options={productSearchOptions}
               value={dashboardProductId}
               onChange={setDashboardProductId}
             />
           </div>
-          <button className="ml-auto rounded-md bg-amber-500 px-3 py-1 font-bold text-slate-900 hover:bg-amber-600 outline-none focus:ring-2 focus:ring-amber-400" onClick={clearFilters} type="button">✕ ล้าง Filter</button>
-        </div>
+        </details>
       </div>
       <div>
         {(data?.dashboard.historical.rows ?? 0) > 0 ? (
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs">
-            <span className="font-bold text-amber-800">📅 รวมยอด Historical:</span>
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-100 bg-amber-50/70 p-2 text-xs">
+            <span className="font-bold text-amber-800">รวมยอด Historical:</span>
             <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Revenue <b className="text-emerald-700">{money(data?.dashboard.historical.revenue)}</b></span>
             <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">COGS <b className="text-red-700">{money(data?.dashboard.historical.cogs)}</b></span>
             <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Expenses <b className="text-amber-700">{money(data?.dashboard.historical.expenses)}</b></span>
             <span className="text-slate-500">({data?.dashboard.historical.rows ?? 0} rows)</span>
           </div>
-        ) : <div className="mb-3 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-500">ℹ️ ยังไม่มีข้อมูล Historical — ไปที่เมนู <b>📅 ข้อมูลย้อนหลัง</b> เพื่อคีย์ยอด ม.ค.-เม.ย. 2026</div>}
+        ) : <div className="mb-3 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-500">ยังไม่มีข้อมูล Historical สำหรับช่วงนี้</div>}
+        {!hasDashboardData ? (
+          <div className="mb-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800">
+            ยังไม่มีข้อมูลในช่วงเวลาหรือตัวกรองนี้ ลองเปลี่ยนช่วงเวลา หรือล้างตัวกรองเพื่อดูภาพรวมทั้งหมด
+          </div>
+        ) : null}
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <DashboardKpi icon="📈" label="Revenue" sub="ยอดขาย" tone="from-blue-500 to-blue-700" value={money(k.revenue)} />
-          <DashboardKpi icon="💸" label="Expenses" sub="ค่าใช้จ่าย + COGS" tone="from-rose-500 to-red-600" value={money(k.expenses)} />
-          <DashboardKpi icon="🥧" label="Net Profit" sub="กำไรสุทธิ" tone={(k.netProfit ?? 0) >= 0 ? 'from-emerald-500 to-teal-600' : 'from-red-500 to-rose-700'} value={money(k.netProfit)} />
-          <DashboardKpi icon="💵" label="Cash Balance" sub="เงินสด/ธนาคาร" tone="from-cyan-500 to-blue-600" value={money(k.cashBalance)} />
-          <DashboardKpi icon="👤" label="AR ลูกหนี้" sub="Receivable" tone="from-purple-500 to-fuchsia-600" value={money(k.ar)} />
-          <DashboardKpi icon="📋" label="AP เจ้าหนี้" sub="Payable" tone="from-orange-500 to-red-600" value={money(k.ap)} />
+          <DashboardKpi label="Revenue" sub="ยอดขาย" tone="blue" value={money(k.revenue)} />
+          <DashboardKpi label="Expenses" sub="ค่าใช้จ่าย + COGS" tone="red" value={money(k.expenses)} />
+          <DashboardKpi label="Net Profit" sub="กำไรสุทธิ" tone={(k.netProfit ?? 0) >= 0 ? 'emerald' : 'red'} value={money(k.netProfit)} />
+          <DashboardKpi label="Cash Balance" sub="เงินสด/ธนาคาร" tone="cyan" value={money(k.cashBalance)} />
+          <DashboardKpi label="AR ลูกหนี้" sub="Receivable" tone="purple" value={money(k.ar)} />
+          <DashboardKpi label="AP เจ้าหนี้" sub="Payable" tone="orange" value={money(k.ap)} />
         </div>
         <div className="mb-4 grid gap-3 lg:grid-cols-3">
           <DashboardChartCard title="Revenue vs Expense (Monthly)">
@@ -500,8 +515,8 @@ function DashboardView(props: {
             <div className="hidden overflow-x-auto sm:block">
               <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: agingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
-                  {dashboardAgingColumns.map((column, index) => (
-                    <col key={column.key} style={index === dashboardAgingColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : agingResize.getColumnStyle(column.key)} />
+                  {dashboardAgingColumns.map((column) => (
+                    <col key={column.key} style={agingResize.getColumnStyle(column.key)} />
                   ))}
                 </colgroup>
                 <thead className="bg-slate-50 text-slate-500">
@@ -555,9 +570,9 @@ function DashboardView(props: {
             </div>
           </DashboardChartCard>
           <DashboardChartCard title="Channel Performance">
-            <MiniLine label="📥 Purchase" value={`${money(purchaseWeight)} กก. · ${money(purchaseAmount)}`} />
-            <MiniLine label="📤 Sales" value={`${money(salesWeight)} กก. · ${money(salesAmount)}`} />
-            <MiniLine label="📦 Stock" value={`${money(stockQty)} กก. · ${money(stockValue)}`} />
+            <MiniLine label="Purchase" value={`${money(purchaseWeight)} กก. · ${money(purchaseAmount)}`} />
+            <MiniLine label="Sales" value={`${money(salesWeight)} กก. · ${money(salesAmount)}`} />
+            <MiniLine label="Stock" value={`${money(stockQty)} กก. · ${money(stockValue)}`} />
           </DashboardChartCard>
           <DashboardChartCard title="Quick Insights">
             <MiniLine label="Gross Margin" value={`${money(gpPct)}%`} />
@@ -567,13 +582,13 @@ function DashboardView(props: {
         </div>
       </div>
 
-      {alerts.length ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{alerts.map((alert) => <span className="mr-2 inline-flex rounded-md bg-white px-2 py-1 font-semibold border border-slate-100" key={alert.text}>⚠ {alert.text}</span>)}</div> : null}
+      {alerts.length ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{alerts.map((alert) => <span className="mr-2 inline-flex rounded-md bg-white px-2 py-1 font-semibold border border-slate-100" key={alert.text}>{alert.text}</span>)}</div> : null}
 
-      <div className="grid gap-4 lg:grid-cols-2"><RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="🥇 Top Suppliers" /><RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="🥇 Top Customers" /></div>
+      <div className="grid gap-4 lg:grid-cols-2"><RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="Top Suppliers" /><RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="Top Customers" /></div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <DashboardChartCard title="📈 แนวโน้มซื้อ-ขาย 30 วัน"><BarRows rows={(analytics?.dailyTrend ?? []).slice(-10).flatMap((row) => [{ label: `${row.label} ซื้อ`, value: row.purchase }, { label: `${row.label} ขาย`, value: row.sales }])} /></DashboardChartCard>
-        <DashboardChartCard title="📦 มูลค่าสินค้าตามหมวด">
+        <DashboardChartCard title="แนวโน้มซื้อ-ขาย 30 วัน"><BarRows rows={(analytics?.dailyTrend ?? []).slice(-10).flatMap((row) => [{ label: `${row.label} ซื้อ`, value: row.purchase }, { label: `${row.label} ขาย`, value: row.sales }])} /></DashboardChartCard>
+        <DashboardChartCard title="มูลค่าสินค้าตามหมวด">
           <div className="mb-2 flex justify-end">
             {stockGroupResize.hasCustomWidths ? (
               <button className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50" type="button" onClick={stockGroupResize.resetColumnWidths}>
@@ -622,30 +637,30 @@ function DashboardView(props: {
         </DashboardChartCard>
       </div>
 
-      <Section title={`📥 ฝั่งซื้อ (${periodInfo.buySection}) — Purchase / Supplier`}>
+      <Section title={`ฝั่งซื้อ (${periodInfo.buySection}) — Purchase / Supplier`}>
         <Metric label={periodInfo.buyLabel} tone="blue" value={money(section?.purchase.amount)} />
         <Metric label="น้ำหนักซื้อ" value={`${money(section?.purchase.qty)} กก.`} />
         <Metric label="ราคาซื้อเฉลี่ย" value={`${money(purchaseWeight > 0 ? purchaseAmount / purchaseWeight : 0)} ฿/กก.`} />
         <Metric label="เจ้าหนี้รวม" tone="red" value={money(k.ap)} />
       </Section>
-      <Section title={`📤 ฝั่งขาย (${periodInfo.sellSection}) — Sales / Customer`}>
+      <Section title={`ฝั่งขาย (${periodInfo.sellSection}) — Sales / Customer`}>
         <Metric label={periodInfo.sellLabel} tone="emerald" value={money(section?.sales.amount)} />
         <Metric label="น้ำหนักขาย" value={`${money(section?.sales.qty)} กก.`} />
         <Metric label="Gross Profit" tone="emerald" value={money(section?.sales.gp)} />
         <Metric label="Margin %" tone={(gpPct ?? 0) >= 0 ? 'emerald' : 'red'} value={`${money(gpPct)}%`} />
       </Section>
-      <Section title="💰 ฝั่งการเงิน — Cash / Bank / OD">
-        <Metric label="💵 เงินสดรวม" tone="emerald" value={money(section?.cash.cash)} />
-        <Metric label="🏦 ธนาคารรวม" tone="blue" value={money(section?.cash.bank)} />
-        <Metric label="💱 FCD" tone="purple" value={money(section?.cash.fcd)} />
-        <Metric label="⚠ OD ใช้ / เหลือ" tone="orange" value={`${money(section?.cash.odUsed)} / ${money(section?.cash.odLimit)}`} />
-        <Metric label="💎 Net Cash Position" tone="purple" value={money(section?.cash.netCash)} />
+      <Section title="ฝั่งการเงิน — Cash / Bank / OD">
+        <Metric label="เงินสดรวม" tone="emerald" value={money(section?.cash.cash)} />
+        <Metric label="ธนาคารรวม" tone="blue" value={money(section?.cash.bank)} />
+        <Metric label="FCD" tone="purple" value={money(section?.cash.fcd)} />
+        <Metric label="OD ใช้ / เหลือ" tone="orange" value={`${money(section?.cash.odUsed)} / ${money(section?.cash.odLimit)}`} />
+        <Metric label="Net Cash Position" tone="purple" value={money(section?.cash.netCash)} />
       </Section>
-      <Section title="📦 ฝั่ง Stock — Inventory / WAC">
-        <Metric label="⚖ น้ำหนักรวม" value={`${money(section?.stock.qty)} กก.`} />
-        <Metric label="💰 มูลค่าสต๊อกรวม" tone="orange" value={money(section?.stock.value)} />
-        <Metric label="📊 ราคาต่อหน่วยเฉลี่ย" value={`${money(stockQty > 0 ? stockValue / stockQty : 0)} ฿/กก.`} />
-        {(data?.dashboard.stockByBranch ?? []).slice(0, 3).map((row) => <Metric key={row.name} label={`🏢 ${row.name}`} value={`${money(row.qty)} กก. · ${money(row.value)}`} />)}
+      <Section title="ฝั่ง Stock — Inventory / WAC">
+        <Metric label="น้ำหนักรวม" value={`${money(section?.stock.qty)} กก.`} />
+        <Metric label="มูลค่าสต๊อกรวม" tone="orange" value={money(section?.stock.value)} />
+        <Metric label="ราคาต่อหน่วยเฉลี่ย" value={`${money(stockQty > 0 ? stockValue / stockQty : 0)} ฿/กก.`} />
+        {(data?.dashboard.stockByBranch ?? []).slice(0, 3).map((row) => <Metric key={row.name} label={row.name} value={`${money(row.qty)} กก. · ${money(row.value)}`} />)}
       </Section>
     </>
   )
@@ -710,33 +725,33 @@ function cashAccountValue(row: CashAccountRow, key: CashAccountSortKey) {
   return row[key]
 }
 
-function DashboardKpi({ icon, label, sub, tone, value }: { icon: string; label: string; sub: string; tone: string; value: string }) {
-  const toneMap: Record<string, { bg: string; text: string }> = {
-    'from-blue-500 to-blue-700': { bg: 'bg-blue-50', text: 'text-blue-600' },
-    'from-rose-500 to-red-600': { bg: 'bg-red-50', text: 'text-red-600' },
-    'from-emerald-500 to-teal-600': { bg: 'bg-emerald-50', text: 'text-emerald-600' },
-    'from-cyan-500 to-blue-600': { bg: 'bg-cyan-50', text: 'text-cyan-600' },
-    'from-purple-500 to-fuchsia-600': { bg: 'bg-purple-50', text: 'text-purple-600' },
-    'from-orange-500 to-red-600': { bg: 'bg-orange-50', text: 'text-orange-600' },
+function DashboardKpi({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
+  const toneMap: Record<string, { dot: string; value: string }> = {
+    blue: { dot: 'bg-blue-500', value: 'text-slate-950' },
+    cyan: { dot: 'bg-cyan-500', value: 'text-slate-950' },
+    emerald: { dot: 'bg-emerald-500', value: 'text-emerald-700' },
+    orange: { dot: 'bg-orange-500', value: 'text-slate-950' },
+    purple: { dot: 'bg-purple-500', value: 'text-slate-950' },
+    red: { dot: 'bg-red-500', value: 'text-slate-950' },
   }
-  const style = toneMap[tone] || { bg: 'bg-slate-50', text: 'text-slate-600' }
+  const style = toneMap[tone] || { dot: 'bg-slate-400', value: 'text-slate-950' }
 
   return (
-    <div className="flex items-center gap-3 bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${style.bg} ${style.text} text-2xl`}>
-        {icon}
-      </div>
+    <div className="flex min-w-0 flex-col justify-between rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold text-slate-500">{label}</div>
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <span className={`h-2 w-2 rounded-full ${style.dot}`} />
+          {label}
+        </div>
         {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
-        <div className="mt-0.5 font-mono text-lg font-bold text-slate-900 truncate">{value}</div>
+        <div className={`mt-1 font-mono text-lg font-bold tabular-nums truncate ${style.value}`}>{value}</div>
       </div>
     </div>
   )
 }
 
 function DashboardChartCard({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-700">{title}</div>{children}</div>
+  return <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-800">{title}</div>{children}</div>
 }
 
 function OwnerDailyView({ data }: { data: MainPayload | null }) {
@@ -849,7 +864,7 @@ function AnalyticsDashboardView({ data, rangeFrom, rangeMode, rangeTo, setRangeF
     <div className="pt-2 animate-fade-in pb-16">
       <div className="mb-4 rounded-xl bg-gradient-to-r from-violet-900 to-indigo-950 p-5 text-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 className="text-xl font-bold">📊 Analytics Dashboard</h2><p className="mt-1 text-xs opacity-85">รายงานสรุปแบบช่วงเวลา · วิเคราะห์ยอดซื้อ ยอดขาย อันดับสินค้า และผลงานทีมขาย</p></div>
+          <div><h2 className="text-xl font-bold">📊 Analytics Dashboard</h2></div>
           <div className="flex flex-wrap items-center gap-2">
             {['today', 'yesterday', 'last7', 'last30', 'last90', 'month'].map((mode) => (
               <button key={mode} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all outline-none focus:ring-0 ${rangeMode === mode ? 'bg-white text-slate-900' : 'bg-white/10 text-white hover:bg-white/20'}`} type="button" onClick={() => applyRange(mode)}>{rangeLabel(mode)}</button>
@@ -889,7 +904,7 @@ function AnalyticsDashboardView({ data, rangeFrom, rangeMode, rangeTo, setRangeF
       </div>
 
       {/* Floating Action Buttons */}
-      <div className="fixed bottom-6 right-6 flex flex-row gap-2 z-50">
+      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-50 flex flex-row gap-2">
         <button
           className="shadow-lg rounded-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 text-sm font-semibold transition-all hover:scale-105 active:scale-95 outline-none"
           type="button"
@@ -1696,7 +1711,7 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
   const columns = color === 'blue' ? rankColumnsBlue : rankColumnsEmerald
   const columnResize = useResizableColumns(`reports.analytics.rank-table.${title}`, columns)
 
-  const header = color === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+  const header = 'bg-white text-slate-800 border-slate-100'
   const hover = color === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
   const text = color === 'blue' ? 'text-blue-700' : 'text-emerald-700'
 
@@ -1731,7 +1746,7 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
   }, [rows, sortKey, sortDirection])
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="min-w-0 overflow-hidden rounded-md bg-white shadow-sm border border-slate-200">
       <div className={`border-b p-3 font-bold text-sm ${header} flex items-center justify-between`}>
         <h3 className="font-bold">{title}</h3>
         {columnResize.hasCustomWidths ? (
@@ -2183,10 +2198,14 @@ function Section({ children, title }: { children: ReactNode; title: string }) {
 }
 
 function BarRows({ rows }: { rows: { label: string; value: number }[] }) {
+  const visibleRows = rows.filter((row) => Number(row.value) !== 0)
+  if (visibleRows.length === 0) {
+    return <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-xs font-medium text-slate-400">ไม่มีข้อมูลในช่วงนี้</div>
+  }
   const max = Math.max(1, ...rows.map((row) => Math.abs(row.value)))
   return (
     <div className="space-y-2">
-      {rows.map((row) => (
+      {visibleRows.map((row) => (
         <div key={row.label}>
           <div className="mb-1 flex justify-between text-xs text-slate-600">
             <span>{row.label}</span>

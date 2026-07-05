@@ -1,0 +1,14 @@
+
+> @ns-scrap-erp/next@1.0.0 dev
+> next dev --hostname 0.0.0.0 --port 3000
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+- Environments: .env.local
+✓ Ready in 1241ms
+
+ GET /api/health 200 in 905ms (next.js: 600ms, proxy.ts: 276ms, application-code: 29ms)
+○ Compiling /api/health ...
+ GET /login?redirect=%2F 200 in 4.7s (next.js: 4.0s, proxy.ts: 271ms, application-code: 359ms)
+ GET /api/health 200 in 30ms (next.js: 14ms, proxy.ts: 6ms, application-code: 9ms)

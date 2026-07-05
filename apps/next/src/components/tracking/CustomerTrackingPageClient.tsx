@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
@@ -266,7 +266,6 @@ export function CustomerTrackingPageClient() {
     <section className="space-y-4">
       <PageTitleOverride
         title="Customer Tracking 360°"
-        subtitle="วิเคราะห์ลูกค้า — เลือก ปี/เดือน/สินค้า/หมวด · รายปี สลับ น้ำหนัก/ยอดขาย"
       />
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
@@ -556,11 +555,16 @@ export function CustomerTrackingPageClient() {
   return (
     <Dialog open={detail !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 !p-0 shadow-2xl outline-none focus:outline-none flex flex-col" fallbackTitle="Customer Tracking Detail" hideClose>
-        <DialogHeader className="shrink-0 rounded-t-md bg-slate-900 px-5 py-4 text-white flex flex-col space-y-1">
-          <DialogTitle className="text-xl font-bold text-white">{detail?.customer.name ?? 'รายละเอียด Customer'}</DialogTitle>
-          <DialogDescription className="text-xs text-slate-300 mt-0.5">
-            {detail?.customer.code ? `${detail.customer.code} · ` : ''}Sales Bills / Receipts / Monthly movement / Product breakdown
-          </DialogDescription>
+        <DialogHeader className="shrink-0 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div className="min-w-0 space-y-1">
+              <DialogTitle className="truncate text-xl font-bold text-white">{detail?.customer.name ?? 'รายละเอียด Customer'}</DialogTitle>
+              <DialogDescription className="truncate text-xs text-slate-300">
+                {detail?.customer.code ? `${detail.customer.code} · ` : ''}Sales Bills / Receipts / Monthly movement / Product breakdown
+              </DialogDescription>
+            </div>
+            <Button className="h-9 shrink-0 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</Button>
+          </div>
         </DialogHeader>
         <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 text-sm sm:p-5">
           {isLoading ? <div className="rounded-md bg-white p-8 text-center text-sm text-slate-500 border border-slate-100">กำลังโหลดรายละเอียด...</div> : null}
@@ -663,9 +667,6 @@ export function CustomerTrackingPageClient() {
             </>
           ) : null}
         </div>
-        <DialogFooter className="shrink-0 rounded-b-md border-t border-slate-100 bg-white px-5 py-3.5 flex justify-end gap-2">
-          <Button className="font-normal" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

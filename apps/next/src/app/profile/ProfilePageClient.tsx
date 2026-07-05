@@ -215,13 +215,11 @@ export function ProfilePageClient() {
       {/* Desktop Header */}
       <div className="hidden lg:block rounded-md bg-white p-4 shadow border border-slate-200/60">
         <h2 className="text-xl font-bold text-slate-900">โปรไฟล์ & ตั้งค่าบัญชี</h2>
-        <p className="mt-1 text-sm text-slate-500">จัดการข้อมูลส่วนตัว ชื่อแสดงผล และความปลอดภัยของบัญชีผู้ใช้งาน</p>
       </div>
 
       {/* Mobile Header */}
       <div className="lg:hidden rounded-md bg-white p-3.5 shadow border border-slate-200/60 animate-fade-in">
         <h2 className="text-lg font-bold text-slate-900">โปรไฟล์ & ตั้งค่าบัญชี</h2>
-        <p className="mt-0.5 text-xs text-slate-500">จัดการโปรไฟล์และรหัสผ่านของคุณ</p>
       </div>
 
       {/* Main Tabs Container */}

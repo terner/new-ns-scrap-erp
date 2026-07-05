@@ -44,12 +44,11 @@ export function AccountingPeriodsLockImpactTable({ rows }: { rows: readonly (rea
   }
 
   return (
-    <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-md bg-white shadow">
       <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Close / freeze impact matrix</h3>
-            <p className="mt-1 text-xs text-slate-500">การ lock ต้องอิง document/business date ไม่ใช่ created_at</p>
+            <h3 className="text-sm font-bold text-slate-900">ผลกระทบเมื่อปิดงวด</h3>
           </div>
           {columnResize.hasCustomWidths ? (
             <button
@@ -72,8 +71,8 @@ export function AccountingPeriodsLockImpactTable({ rows }: { rows: readonly (rea
           </colgroup>
           <thead className="bg-slate-100">
             <tr>
-              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Area" resizeProps={columnResize.getResizeHandleProps('area', 'Area')} sortKey="area" onSort={handleSort} />
-              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Target lock impact" resizeProps={columnResize.getResizeHandleProps('impact', 'Target lock impact')} sortKey="impact" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="หมวดงาน" resizeProps={columnResize.getResizeHandleProps('area', 'หมวดงาน')} sortKey="area" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="ผลกระทบที่ต้องล็อก" resizeProps={columnResize.getResizeHandleProps('impact', 'ผลกระทบที่ต้องล็อก')} sortKey="impact" onSort={handleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white">

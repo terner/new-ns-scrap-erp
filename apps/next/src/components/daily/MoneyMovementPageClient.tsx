@@ -11,6 +11,7 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input as UiInput } from '@/components/ui/Input'
 import { CollapsedList } from '@/components/ui/CollapsedList'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select as UiSelect } from '@/components/ui/Select'
@@ -399,6 +400,11 @@ function companyInfoForPrint(profile: CompanyProfilePrintValues) {
   ].filter(Boolean).map(escapeHtml).join('<br>')
 }
 
+function printEmptyRows(columnCount: number, count: number) {
+  const cells = Array.from({ length: columnCount }, (_, index) => (index === 0 ? '<td>&nbsp;</td>' : '<td></td>')).join('')
+  return Array.from({ length: Math.max(0, count) }, () => `<tr class="empty-row">${cells}</tr>`).join('')
+}
+
 function paymentDailyReportDateRangeLabel(dateFrom: string, dateTo: string) {
   const today = todayDateInput()
   const from = dateFrom || today
@@ -434,7 +440,7 @@ function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfilePr
     const accounts = (row.accountSummaries?.length ? row.accountSummaries : [row.accountName || '-'])
       .map(escapeHtml)
       .join('<br>')
-    return `<tr>
+    return `<tr class="${row.status === 'cancelled' ? 'cancelled' : ''}">
       <td class="c">${index + 1}</td>
       <td class="mono">${escapeHtml(row.docNo)}</td>
       <td>${escapeHtml(formatDateDisplay(row.date))}</td>
@@ -448,7 +454,7 @@ function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfilePr
       <td>${escapeHtml(row.notes || '-')}</td>
     </tr>`
   }).join('')
-  const emptyRow = `<tr><td class="empty" colspan="11">${escapeHtml(emptyText)}</td></tr>`
+  const emptyRow = `<tr class="empty-row"><td class="empty" colspan="11">${escapeHtml(emptyText)}</td></tr>`
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(reportTitle)}</title>
     <style>
       @page { size: A4 landscape; margin: 10mm; }
@@ -470,9 +476,10 @@ function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfilePr
       .card .value { font-size: 16px; font-weight: 800; margin-top: 2px; }
       .green { color: #047857; }
       .rose { color: #be123c; }
-      table { width: 100%; border-collapse: collapse; }
-      th { background: #334155; color: #fff; font-size: 12px; padding: 6px; text-align: left; }
-      td { border-bottom: 1px solid #e2e8f0; padding: 6px; vertical-align: top; }
+      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; font-size: 12px; font-weight: 900; padding: 6px 5px; text-align: left; }
+      td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
+      tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
       tr.cancelled td { color: #64748b; }
       .r { text-align: right; }
       .c { text-align: center; }
@@ -480,6 +487,8 @@ function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfilePr
       .small { font-size: 12px; }
       .strong { font-weight: 800; }
       .empty { color: #64748b; padding: 24px; text-align: center; }
+      .empty-row td { height: 24px; }
+      .final-amount { color: #047857; font-weight: 900; }
       .footer { border-top: 1px dashed #cbd5e1; color: #64748b; font-size: 12px; margin-top: 12px; padding-top: 8px; }
       @media print { .toolbar { display: none; } .page { padding: 0; } }
     </style>
@@ -531,6 +540,16 @@ function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfilePr
           </tr>
         </thead>
         <tbody>${rowHtml || emptyRow}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="6" class="r">รวมทั้งสิ้น</td>
+            <td class="r">${escapeHtml(formatMoney(paidAmount))}</td>
+            <td class="r">${escapeHtml(formatMoney(paidFee))}</td>
+            <td class="r final-amount">${escapeHtml(formatMoney(paidNet))}</td>
+            <td></td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
       <div class="footer">${escapeHtml(footerText)}</div>
     </div>
@@ -540,19 +559,21 @@ function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfilePr
 function buildCustomerReceiptPrintHtml(row: MoneyRow) {
   const billDocNos = row.billDocNos?.length ? row.billDocNos : [row.billDocNo || row.billId || '-']
   const accountSummaries = row.accountSummaries?.length ? row.accountSummaries : [row.accountName || '-']
-  const lineRows = (row.receiptLines?.length ? row.receiptLines : billDocNos.map((docNo, index) => ({
+  const receiptLines = row.receiptLines?.length ? row.receiptLines : billDocNos.map((docNo, index) => ({
     discountAmount: index === 0 ? row.discount ?? 0 : 0,
     lineNo: index + 1,
     receiptAmount: index === 0 ? row.amount : 0,
     salesBillDocNo: docNo,
     withholdingTaxAmount: index === 0 ? row.withholdingTax ?? 0 : 0,
-  }))).map((line, index) => `<tr>
+  }))
+  const lineRows = receiptLines.map((line, index) => `<tr>
     <td class="c">${index + 1}</td>
     <td class="mono">${escapeHtml(line.salesBillDocNo || '-')}</td>
     <td class="r">${escapeHtml(formatMoney(line.receiptAmount))}</td>
     <td class="r">${escapeHtml(formatMoney(line.withholdingTaxAmount))}</td>
     <td class="r">${escapeHtml(formatMoney(line.discountAmount))}</td>
   </tr>`).join('')
+  const fillerRows = printEmptyRows(5, 10 - receiptLines.length)
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(row.docNo)}</title>
     <style>
       @page { size: A4; margin: 12mm; }
@@ -567,14 +588,17 @@ function buildCustomerReceiptPrintHtml(row: MoneyRow) {
       .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; }
       .label { color: #64748b; font-size: 12px; }
       .value { font-weight: 800; margin-top: 2px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-      th { background: #334155; color: white; padding: 7px; text-align: left; }
-      td { border-bottom: 1px solid #e2e8f0; padding: 7px; vertical-align: top; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+      th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; font-weight: 900; padding: 6px 5px; text-align: left; }
+      td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
+      tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .empty-row td { height: 24px; color: transparent; }
       .r { text-align: right; }
       .c { text-align: center; }
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
       .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
       .green { color: #047857; }
+      .final-amount { color: #047857; font-weight: 900; }
       @media print { .toolbar { display: none; } .page { padding: 0; } }
     </style>
   </head><body>
@@ -603,7 +627,15 @@ function buildCustomerReceiptPrintHtml(row: MoneyRow) {
       </div>
       <table>
         <thead><tr><th class="c">#</th><th>บิลขาย</th><th class="r">ยอดรับ</th><th class="r">WHT</th><th class="r">ส่วนลด</th></tr></thead>
-        <tbody>${lineRows}</tbody>
+        <tbody>${lineRows}${fillerRows}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" class="r">รวมทั้งสิ้น</td>
+            <td class="r final-amount">${escapeHtml(formatMoney(row.amount))}</td>
+            <td class="r">${escapeHtml(formatMoney(row.withholdingTax ?? 0))}</td>
+            <td class="r">${escapeHtml(formatMoney(row.discount ?? 0))}</td>
+          </tr>
+        </tfoot>
       </table>
       <div class="summary">
         <div class="box"><div class="label">ยอดรับ</div><div class="value">${escapeHtml(formatMoney(row.amount))}</div></div>
@@ -620,19 +652,21 @@ function buildBatchReceiptPrintHtml(rows: MoneyRow[]) {
   const pagesHtml = rows.map((row) => {
     const billDocNos = row.billDocNos?.length ? row.billDocNos : [row.billDocNo || row.billId || '-']
     const accountSummaries = row.accountSummaries?.length ? row.accountSummaries : [row.accountName || '-']
-    const lineRows = (row.receiptLines?.length ? row.receiptLines : billDocNos.map((docNo, index) => ({
+    const receiptLines = row.receiptLines?.length ? row.receiptLines : billDocNos.map((docNo, index) => ({
       discountAmount: index === 0 ? row.discount ?? 0 : 0,
       lineNo: index + 1,
       receiptAmount: index === 0 ? row.amount : 0,
       salesBillDocNo: docNo,
       withholdingTaxAmount: index === 0 ? row.withholdingTax ?? 0 : 0,
-    }))).map((line, index) => `<tr>
+    }))
+    const lineRows = receiptLines.map((line, index) => `<tr>
       <td class="c">${index + 1}</td>
       <td class="mono">${escapeHtml(line.salesBillDocNo || '-')}</td>
       <td class="r">${escapeHtml(formatMoney(line.receiptAmount))}</td>
       <td class="r">${escapeHtml(formatMoney(line.withholdingTaxAmount))}</td>
       <td class="r">${escapeHtml(formatMoney(line.discountAmount))}</td>
     </tr>`).join('')
+    const fillerRows = printEmptyRows(5, 10 - receiptLines.length)
 
     return `<div class="page">
       <div class="header">
@@ -655,7 +689,15 @@ function buildBatchReceiptPrintHtml(rows: MoneyRow[]) {
       </div>
       <table>
         <thead><tr><th class="c">#</th><th>บิลขาย</th><th class="r">ยอดรับ</th><th class="r">WHT</th><th class="r">ส่วนลด</th></tr></thead>
-        <tbody>${lineRows}</tbody>
+        <tbody>${lineRows}${fillerRows}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" class="r">รวมทั้งสิ้น</td>
+            <td class="r final-amount">${escapeHtml(formatMoney(row.amount))}</td>
+            <td class="r">${escapeHtml(formatMoney(row.withholdingTax ?? 0))}</td>
+            <td class="r">${escapeHtml(formatMoney(row.discount ?? 0))}</td>
+          </tr>
+        </tfoot>
       </table>
       <div class="summary">
         <div class="box"><div class="label">ยอดรับ</div><div class="value">${escapeHtml(formatMoney(row.amount))}</div></div>
@@ -682,14 +724,17 @@ function buildBatchReceiptPrintHtml(rows: MoneyRow[]) {
       .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; }
       .label { color: #64748b; font-size: 12px; }
       .value { font-weight: 800; margin-top: 2px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-      th { background: #334155; color: white; padding: 7px; text-align: left; }
-      td { border-bottom: 1px solid #e2e8f0; padding: 7px; vertical-align: top; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+      th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; font-weight: 900; padding: 6px 5px; text-align: left; }
+      td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
+      tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .empty-row td { height: 24px; color: transparent; }
       .r { text-align: right; }
       .c { text-align: center; }
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
       .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
       .green { color: #047857; }
+      .final-amount { color: #047857; font-weight: 900; }
       @media print { .toolbar { display: none; } .page { padding: 0; } }
     </style>
   </head>
@@ -2131,16 +2176,13 @@ export function MoneyMovementPageClient({
     <section className="space-y-5">
       {error && !formOpen ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5 text-sm">
-        <KpiCard label={mode === 'payment' ? 'จำนวนรายการ' : 'จำนวน Voucher'} value={rows.length.toLocaleString('th-TH')} tone="slate" />
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 text-sm">
         <KpiCard label={amountLabel} value={formatMoney(metrics.rowAmount)} tone={mode === 'payment' ? 'rose' : 'emerald'} />
         <KpiCard label="ยอดสุทธิ" value={formatMoney(metrics.rowNet)} tone="blue" />
         {mode === 'payment'
           ? <KpiCard label="Bank Fee" value={formatMoney(metrics.rowFee)} tone="amber" />
           : <KpiCard label="WHT / Fee" value={`${formatMoney(metrics.rowWht)} / ${formatMoney(metrics.rowFee)}`} tone="amber" />}
-        <div className="col-span-2 lg:col-span-1">
-          <KpiCard label={balanceLabel} value={formatMoney(metrics.outstanding)} tone="violet" />
-        </div>
+        <KpiCard label={balanceLabel} value={formatMoney(metrics.outstanding)} tone="violet" />
       </div>
 
       {showMoneyTabs ? (
@@ -2619,12 +2661,21 @@ export function MoneyMovementPageClient({
         }}>
           <DialogContent className="top-[max(2rem,50%)] max-h-[90vh] max-w-5xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" hideClose>
             <form noValidate onSubmit={save} className="flex flex-col max-h-[90vh]">
-            <DialogHeader className="flex-row items-center px-5 py-4 shrink-0 bg-slate-900 text-white rounded-t-md">
-              <div>
+            <DialogHeader className="px-5 py-4 shrink-0 bg-slate-900 text-white rounded-t-md">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+              <div className="min-w-0">
                 <DialogTitle className="font-bold text-white">
                   {mode === 'payment' ? 'สร้าง Payment Voucher' : (form.id ? 'แก้ไข Receipt Voucher' : title)}
                 </DialogTitle>
                 {mode === 'payment' ? null : <p className="text-xs text-slate-300 opacity-80">{subtitle}</p>}
+              </div>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <UiButton className="h-9 gap-2 border-emerald-600 bg-emerald-600 px-4 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white disabled:opacity-60" disabled={isSaving} type="submit" variant="outline">
+                  <Check className="h-4 w-4" />
+                  {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+                </UiButton>
+                <UiButton className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</UiButton>
+              </div>
               </div>
             </DialogHeader>
             {error ? <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 shrink-0">{error}</div> : null}
@@ -2957,10 +3008,6 @@ export function MoneyMovementPageClient({
                 </div>
               </>
             )}
-            <DialogFooter className="border-t border-slate-200 bg-white px-5 py-4">
-              <UiButton className="font-normal" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</UiButton>
-              <UiButton className="bg-slate-900 px-5 font-normal text-white hover:bg-slate-800 disabled:opacity-60" disabled={isSaving} type="submit" variant="default">บันทึก</UiButton>
-            </DialogFooter>
           </form>
         </DialogContent>
         </Dialog>
@@ -3037,20 +3084,31 @@ export function MoneyMovementPageClient({
 
           {/* Bottom Sheet Filter for History (Mobile) */}
           {showMobileFilters ? (
-            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-              <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                  <h4 className="font-bold text-slate-800">ตัวกรองประวัติ</h4>
+            <MobileFilterSheet
+              title="ตัวกรองประวัติ"
+              onClose={() => setShowMobileFilters(false)}
+              footer={(
+                <>
                   <button
-                    className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                    onClick={() => setShowMobileFilters(false)}
                     type="button"
+                    className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    onClick={() => {
+                      clearFilters()
+                      setShowMobileFilters(false)
+                    }}
                   >
-                    &times;
+                    ล้างตัวกรอง
                   </button>
-                </div>
-
-                <div className="space-y-4">
+                  <button
+                    type="button"
+                    className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
+                    onClick={() => setShowMobileFilters(false)}
+                  >
+                    ใช้ตัวกรอง
+                  </button>
+                </>
+              )}
+            >
                   <div>
                     <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                     <div className="flex items-center gap-2">
@@ -3086,31 +3144,7 @@ export function MoneyMovementPageClient({
                       })}
                     </div>
                   </div>
-
-
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    onClick={() => {
-                      clearFilters()
-                      setShowMobileFilters(false)
-                    }}
-                  >
-                    ล้างตัวกรอง
-                  </button>
-                  <button
-                    type="button"
-                    className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
-                    onClick={() => setShowMobileFilters(false)}
-                  >
-                    ใช้ตัวกรอง
-                  </button>
-                </div>
-              </div>
-            </div>
+            </MobileFilterSheet>
           ) : null}
 
           <div>
@@ -3494,7 +3528,7 @@ export function MoneyMovementPageClient({
         <Dialog open onOpenChange={(open) => {
           if (!open && !isCancellingReceipt) setCancelReceiptTarget(null)
         }}>
-          <DialogContent className="max-w-md rounded-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" hideClose>
+          <DialogContent className="max-w-md rounded-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" hideClose mobileAppShell={false}>
             <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-md">
               <DialogTitle className="font-bold text-white">ยกเลิก Receipt Voucher</DialogTitle>
             </DialogHeader>
@@ -3524,7 +3558,7 @@ export function MoneyMovementPageClient({
         <Dialog open onOpenChange={(open) => {
           if (!open && !isCancellingPayment) setCancelPaymentTarget(null)
         }}>
-          <DialogContent className="max-w-md rounded-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" hideClose>
+          <DialogContent className="max-w-md rounded-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" hideClose mobileAppShell={false}>
             <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-md">
               <DialogTitle className="font-bold text-white">ยกเลิกรายการจ่ายเงิน</DialogTitle>
             </DialogHeader>
@@ -3557,7 +3591,7 @@ export function MoneyMovementPageClient({
             setCancelApprovalReason('')
           }
         }}>
-          <DialogContent className="max-w-lg rounded-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" hideClose>
+          <DialogContent className="max-w-lg rounded-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" hideClose mobileAppShell={false}>
             <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-md">
               <DialogTitle className="font-bold text-white">ยกเลิกรายการรอจ่าย</DialogTitle>
             </DialogHeader>
@@ -3609,7 +3643,7 @@ export function MoneyMovementPageClient({
 
       {/* Floating Action Button (FAB) for Mobile (Receipt Mode) */}
       {mode === 'receipt' && showEntrySection ? (
-        <div className="fixed bottom-6 right-6 z-40 lg:hidden">
+        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 lg:hidden">
           <button
             className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg active:scale-95 transition-transform"
             onClick={openForm}
@@ -3648,10 +3682,26 @@ function PaymentHistoryDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-6xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" fallbackTitle="รายละเอียดการจ่ายเงิน" hideClose>
-        <DialogHeader className="flex-row items-center gap-3 px-5 py-4 bg-slate-900 text-white rounded-t-md">
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-md">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="min-w-0">
             <DialogTitle className="truncate text-base font-bold text-white">รายละเอียด {detailDocNo}</DialogTitle>
             <div className="mt-1 truncate text-xs text-slate-300">{detailPartyName}</div>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {row && row.status !== 'cancelled' ? (
+              <UiButton
+                className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white"
+                title="ยกเลิกรายการจ่ายเงิน"
+                type="button"
+                variant="outline"
+                onClick={() => onCancel(row)}
+              >
+                ยกเลิก
+              </UiButton>
+            ) : null}
+            <UiButton className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</UiButton>
+          </div>
           </div>
         </DialogHeader>
 
@@ -3802,20 +3852,6 @@ function PaymentHistoryDetailDialog({
             </>
           ) : null}
         </div>
-        <DialogFooter className="border-t border-slate-200 bg-white px-5 py-4">
-          {row && row.status !== 'cancelled' ? (
-            <UiButton
-              className="font-normal border-red-200 text-red-700 hover:bg-red-50"
-              title="ยกเลิกรายการจ่ายเงิน"
-              type="button"
-              variant="outline"
-              onClick={() => onCancel(row)}
-            >
-              ยกเลิก
-            </UiButton>
-          ) : null}
-          <UiButton className="font-normal" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</UiButton>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -3847,9 +3883,30 @@ function ReceivableBillDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden rounded-md !p-0 flex flex-col bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" fallbackTitle="รายละเอียดใบรับเงิน Customer" hideClose>
         <DialogHeader className="bg-slate-900 px-5 py-4 text-white rounded-t-md">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="min-w-0">
             <DialogTitle className="truncate text-base font-bold text-white">{receiptDocNo}</DialogTitle>
             <DialogDescription className="mt-1 truncate text-xs text-slate-300">{customerName || '-'}</DialogDescription>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <UiButton className="h-9 gap-2 border-emerald-600 bg-emerald-600 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white" disabled={!bill} type="button" variant="outline" onClick={() => bill && onPrint(bill)}>
+              <Printer className="h-4 w-4" />
+              พิมพ์
+            </UiButton>
+            <UiButton className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white" disabled={!bill} type="button" variant="outline" onClick={() => bill && onEdit(bill)}>แก้ไข</UiButton>
+            {cancelableReceipt ? (
+              <UiButton
+                className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white"
+                title={`ยกเลิกใบรับเงิน ${cancelableReceipt.docNo}`}
+                type="button"
+                variant="outline"
+                onClick={() => onCancel(cancelableReceipt)}
+              >
+                ยกเลิก
+              </UiButton>
+            ) : null}
+            <UiButton className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</UiButton>
+          </div>
           </div>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50 p-5 text-sm">
@@ -3887,22 +3944,6 @@ function ReceivableBillDetailDialog({
             </>
           )}
         </div>
-        <DialogFooter className="border-t border-slate-200 bg-white px-5 py-4">
-          <UiButton className="font-normal border-emerald-200 text-emerald-700 hover:bg-emerald-50" disabled={!bill} type="button" variant="outline" onClick={() => bill && onPrint(bill)}>พิมพ์</UiButton>
-          <UiButton className="font-normal" disabled={!bill} type="button" variant="outline" onClick={() => bill && onEdit(bill)}>แก้ไข</UiButton>
-          {cancelableReceipt ? (
-            <UiButton
-              className="font-normal border-red-200 text-red-700"
-              title={`ยกเลิกใบรับเงิน ${cancelableReceipt.docNo}`}
-              type="button"
-              variant="outline"
-              onClick={() => onCancel(cancelableReceipt)}
-            >
-              ยกเลิก
-            </UiButton>
-          ) : null}
-          <UiButton className="font-normal" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</UiButton>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -3941,9 +3982,28 @@ function ReceiptDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden rounded-md !p-0 flex flex-col bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" fallbackTitle="รายละเอียดรับเงิน Customer" hideClose>
         <DialogHeader className="bg-slate-900 px-5 py-4 text-white rounded-t-md">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="min-w-0">
             <DialogTitle className="truncate text-base font-bold text-white">{row?.docNo ?? '-'}</DialogTitle>
             <DialogDescription className="mt-1 truncate text-xs text-slate-300">{row?.partyName || '-'}</DialogDescription>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {!readOnly ? (
+              <>
+                <UiButton className="h-9 gap-2 border-emerald-600 bg-emerald-600 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white" disabled={!row} type="button" variant="outline" onClick={() => row && onPrint(row)}>
+                  <Printer className="h-4 w-4" />
+                  พิมพ์
+                </UiButton>
+                {row && !isCancelled ? (
+                  <>
+                    <UiButton className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white" type="button" variant="outline" onClick={() => onEdit(row)}>แก้ไข</UiButton>
+                    <UiButton className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => onCancel(row)}>ยกเลิก</UiButton>
+                  </>
+                ) : null}
+              </>
+            ) : null}
+            <UiButton className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</UiButton>
+          </div>
           </div>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50 p-5 text-sm">
@@ -4015,20 +4075,6 @@ function ReceiptDetailDialog({
             </>
           )}
         </div>
-        <DialogFooter className="border-t border-slate-200 bg-white px-5 py-4">
-          {!readOnly ? (
-            <>
-              <UiButton className="font-normal border-emerald-200 text-emerald-700 hover:bg-emerald-50" disabled={!row} type="button" variant="outline" onClick={() => row && onPrint(row)}>พิมพ์</UiButton>
-              {row && !isCancelled ? (
-                <>
-                  <UiButton className="font-normal" type="button" variant="outline" onClick={() => onEdit(row)}>แก้ไข</UiButton>
-                  <UiButton className="font-normal border-red-200 text-red-700 hover:bg-red-50" type="button" variant="outline" onClick={() => onCancel(row)}>ยกเลิก</UiButton>
-                </>
-              ) : null}
-            </>
-          ) : null}
-          <UiButton className="font-normal" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</UiButton>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

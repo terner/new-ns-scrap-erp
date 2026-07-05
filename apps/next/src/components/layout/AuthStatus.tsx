@@ -177,16 +177,21 @@ export function AuthStatus({ compact = false, onMenuOpenChange, variant = 'defau
           <ChevronDown className={`size-4 shrink-0 text-slate-400 ${compact && isSidebar ? 'lg:hidden' : ''}`} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={isSidebar ? 'start' : 'end'} className="w-64" side={isSidebar ? 'right' : 'bottom'} sideOffset={8}>
-        <DropdownMenuItem asChild>
+      <DropdownMenuContent
+        align={isSidebar ? 'start' : 'end'}
+        className="w-64 rounded-md border border-slate-700 bg-slate-900 p-1.5 text-slate-100 shadow-2xl shadow-black/30"
+        side={isSidebar ? 'right' : 'bottom'}
+        sideOffset={10}
+      >
+        <DropdownMenuItem asChild className="h-9 cursor-pointer text-slate-100 focus:bg-slate-800 focus:text-white">
           <Link className="flex items-center gap-2" href="/profile">
-            <UserRound className="size-4 text-slate-500" />
+            <UserRound className="size-4 text-slate-300" />
             <span>ตั้งค่าโปรไฟล์ & บัญชี</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700" onClick={logout}>
-          <LogOut className="mr-2 size-4" />
+        <DropdownMenuSeparator className="my-1 bg-slate-700" />
+        <DropdownMenuItem className="h-9 cursor-pointer text-red-300 focus:bg-red-950/45 focus:text-red-100" onClick={logout}>
+          <LogOut className="mr-2 size-4 text-red-300" />
           <span>ออกจากระบบ</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

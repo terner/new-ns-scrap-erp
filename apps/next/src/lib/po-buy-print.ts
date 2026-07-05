@@ -182,6 +182,7 @@ export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProf
   const title = 'ใบสั่งซื้อ / PO Buy'
   const cancelled = po.status.trim().toLowerCase().includes('cancel')
   const totalQtyText = qtySummaryByUnit(po.items, 'qty')
+  const remainingQtyText = qtySummaryByUnit(po.items, 'remainingQty')
   const pages = itemPages(po.items)
   const pageCount = pages.length
   const companyHeader = (pageNo: number) => `
@@ -282,6 +283,17 @@ export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProf
           ${itemRows(page.items, page.startIndex)}
           ${emptyRows(page.capacity - page.items.length)}
         </tbody>
+        ${isFinalPage ? `
+        <tfoot>
+          <tr>
+            <td colspan="2" class="num">รวมทั้งสิ้น</td>
+            <td class="num">${escapeHtml(totalQtyText)}</td>
+            <td></td>
+            <td class="num final-amount">${money(po.totalAmount)}</td>
+            <td class="num">${escapeHtml(remainingQtyText)}</td>
+          </tr>
+        </tfoot>
+        ` : ''}
       </table>
       ${isFinalPage ? `<div class="final-block">${finalSummary}</div>` : ''}
       </div>
@@ -330,6 +342,8 @@ export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProf
       .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
       .items tr { break-inside: avoid; page-break-inside: avoid; }
       .items .empty td { height: 23px; color: transparent; }
+      .items tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .items tfoot .final-amount { color: #14532d; }
       .item-name { font-weight: 850; color: #0f172a; }
       .muted { color: #64748b; font-size: 12px; margin-top: 1px; }
       .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -377,6 +391,7 @@ export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProf
         .items { font-size: 12px; margin-top: 7px; page-break-before: auto; }
         .items th { padding: 3px; }
         .items td { padding: 3px; }
+        .items .empty td { height: 18px; }
         .muted { font-size: 12px; }
         .summary-cards { gap: 6px; margin-top: 6px; }
         .summary-card { padding: 5px; }

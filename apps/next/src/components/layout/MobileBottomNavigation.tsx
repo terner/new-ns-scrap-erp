@@ -4,22 +4,31 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
-  ClipboardList,
-  BarChart3,
-  Factory,
   User,
-  Download,
-  Upload,
-  Package,
-  Truck,
   Menu,
   LayoutDashboard,
+  ClipboardList,
 } from 'lucide-react'
-import { canAccessPath } from '@/lib/navigation'
+import { canAccessPath, navigationItems, sidebarNavigationPath } from '@/lib/navigation'
 
 type MobileBottomNavigationProps = {
   onOpenSidebar?: () => void
 }
+
+const dailyCandidates = [
+  '/daily/weight-ticket-list',
+  '/daily-report',
+  '/daily/expense',
+]
+
+const dashboardCandidates = [
+  '/dashboard',
+  '/production/dashboard',
+  '/finance-accounting/financial-dashboard',
+  '/daily/expense-dashboard',
+  '/trading/dashboard',
+  '/analytics-dashboard',
+]
 
 export function MobileBottomNavigation({ onOpenSidebar }: MobileBottomNavigationProps) {
   const pathname = usePathname()
@@ -30,13 +39,15 @@ export function MobileBottomNavigation({ onOpenSidebar }: MobileBottomNavigation
     let mounted = true
     async function loadAuthContext() {
       try {
-        const response = await fetch('/api/auth/me', { cache: 'no-store' })
+        const response = await fetch('/api/auth/me', { cache: 'no-store', credentials: 'include' })
         const payload = await response.json().catch(() => null)
         if (mounted && response.ok) {
           setAuthContext({
             isAdmin: payload?.isAdmin === true,
             permissions: Array.isArray(payload?.permissions) ? payload.permissions : [],
           })
+        } else if (mounted) {
+          setAuthContext({ isAdmin: false, permissions: [] })
         }
       } catch (err) {
         console.error('Failed to load auth context in bottom navigation', err)
@@ -54,7 +65,7 @@ export function MobileBottomNavigation({ onOpenSidebar }: MobileBottomNavigation
 
   if (loading) {
     return (
-      <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-slate-200/80 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.03)] pb-safe md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-slate-200/80 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.03)] pb-safe lg:hidden">
         <div className="mx-auto flex h-full max-w-lg items-center justify-around px-2 animate-pulse">
           <div className="h-10 w-12 rounded bg-slate-100" />
           <div className="h-10 w-12 rounded bg-slate-100" />
@@ -65,82 +76,85 @@ export function MobileBottomNavigation({ onOpenSidebar }: MobileBottomNavigation
     )
   }
 
-  const candidateTabs = [
+  const dashboardHref = authContext
+    ? dashboardCandidates.find((href) => canAccessPath(href, authContext))
+    : null
+  const dailyHref = authContext
+    ? dailyCandidates.find((href) => canAccessPath(href, authContext))
+    : null
+  const activeNavigationPath = sidebarNavigationPath(pathname)
+  const activeSection = navigationItems.find((item) => (
+    item.href === activeNavigationPath || item.children?.some((child) => child.href === activeNavigationPath)
+  ))?.section
+
+  const rawTabs = [
     {
       icon: Menu,
+      key: 'menu',
       label: 'เมนู',
-      isMenuTrigger: true,
+      onClick: onOpenSidebar,
     },
-    {
-      href: '/daily/weight-ticket-list',
+    dailyHref ? {
+      href: dailyHref,
       icon: ClipboardList,
-      label: 'รับ-ส่งของ',
-    },
-    {
-      href: '/production/dashboard',
+      isActive: activeSection === 'daily' || activeNavigationPath === '/daily-report',
+      key: 'daily',
+      label: 'ประจำวัน',
+    } : null,
+    dashboardHref ? {
+      href: dashboardHref,
       icon: LayoutDashboard,
+      isActive: pathname === dashboardHref || pathname.startsWith(`${dashboardHref}/`),
+      key: 'dashboard',
       label: 'แดชบอร์ด',
-    },
-    {
-      href: '/production/orders',
-      icon: Factory,
-      label: 'สั่งผลิต',
-    },
-    {
-      href: '/production/report',
-      icon: BarChart3,
-      label: 'รายงาน',
-    },
+    } : null,
     {
       href: '/profile',
       icon: User,
+      isActive: pathname === '/profile' || pathname.startsWith('/profile/'),
+      key: 'account',
       label: 'บัญชี',
     },
   ]
-
-  // Filter allowed tabs based on permissions
-  const displayedTabs = candidateTabs.filter((tab) => {
-    if (tab.isMenuTrigger || tab.href === '/profile') return true
-    if (!authContext || !tab.href) return false
-    return canAccessPath(tab.href, authContext)
-  })
+  const displayedTabs = rawTabs.filter((tab): tab is Exclude<(typeof rawTabs)[number], null> => Boolean(tab)).slice(0, 4)
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-slate-200/80 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.03)] pb-safe md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-slate-200/80 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.03)] pb-safe lg:hidden">
       <div className="mx-auto flex h-full max-w-lg items-center justify-around px-2">
-        {displayedTabs.map((tab, idx) => {
+        {displayedTabs.map((tab) => {
           const Icon = tab.icon
           
-          if (tab.isMenuTrigger) {
+          if ('onClick' in tab) {
             return (
               <button
-                key="menu-trigger"
-                onClick={onOpenSidebar}
+                key={tab.key}
+                aria-label={tab.label}
+                onClick={tab.onClick}
                 type="button"
-                className="flex flex-col items-center justify-center gap-1 flex-1 h-full transition-all duration-200 outline-none text-slate-400 hover:text-slate-600"
+                className="flex h-full flex-1 flex-col items-center justify-center gap-1 text-slate-400 outline-none transition-all duration-200 hover:text-slate-600"
               >
                 <Icon className="size-[22px] transition-transform stroke-[2px]" />
-                <span className="text-[10px] sm:text-xs font-medium leading-none whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">
+                <span className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-xs font-medium leading-none">
                   {tab.label}
                 </span>
               </button>
             )
           }
 
-          const isActive = pathname === tab.href || pathname.startsWith(`${tab.href}/`)
+          const isActive = tab.isActive
 
           return (
             <Link
               href={tab.href!}
-              key={tab.href || idx}
-              className={`flex flex-col items-center justify-center gap-1 flex-1 h-full transition-all duration-200 outline-none ${
+              key={tab.key}
+              className={`flex h-full flex-1 flex-col items-center justify-center gap-1 outline-none transition-all duration-200 ${
                 isActive
                   ? 'text-blue-600 scale-105'
                   : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               <Icon className={`size-[22px] transition-transform ${isActive ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
-              <span className={`text-[10px] sm:text-xs font-medium leading-none whitespace-nowrap overflow-hidden text-ellipsis w-full text-center ${isActive ? 'font-bold' : ''}`}>
+              <span className={`w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-xs font-medium leading-none ${isActive ? 'font-bold' : ''}`}>
                 {tab.label}
               </span>
             </Link>

@@ -219,7 +219,7 @@ export function PoOutstandingPageClient() {
           PO ขาย คงเหลือ ({data?.summary.sellCount ?? 0})
         </button>
 
-        <div className="ml-auto flex items-center gap-2 py-2">
+        <div className="ml-auto flex items-center gap-2">
           {tab === 'buy' && buyResize.hasCustomWidths && (
             <button
               className="hidden h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50 outline-none focus:ring-0 lg:inline-flex"
@@ -249,9 +249,7 @@ export function PoOutstandingPageClient() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Metric label="รายการคงเหลือ" tone={tab === 'buy' ? 'blue' : 'emerald'} emoji="📄" value={`${totals.lines}`} />
-        <Metric label="น้ำหนักรวม" tone="slate" emoji="⚖️" value={`${formatMoney(totals.totalQty)} กก.`} />
+      <div className="grid grid-cols-2 gap-3">
         <Metric label={tab === 'buy' ? 'รอรับของ' : 'รอส่งของ'} tone="amber" emoji="📦" value={`${formatMoney(totals.remainingQty)} กก.`} />
         <Metric label={tab === 'buy' ? 'มูลค่ารอรับ' : 'มูลค่ารอส่ง'} tone={tab === 'buy' ? 'blue' : 'emerald'} emoji="💰" value={formatMoney(totals.remainingValue)} />
       </div>

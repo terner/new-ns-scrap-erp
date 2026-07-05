@@ -6,12 +6,24 @@
 - Do not use destructive git commands unless explicitly requested.
 - Keep commits focused by phase or module.
 - Push only to `new-origin` / `https://github.com/terner/new-ns-scrap-erp.git`.
-- Customer UAT promotion currently uses `nserpdev/uat` / `https://github.com/nserpdev-commits/ns-erp.git` when the user explicitly asks to promote to customer UAT.
-- Do not use `new-origin/uat` for current customer UAT promotion.
+- Use `new-origin/uat` as the Git UAT branch. The old remote branch `new-origin/staging` has been deleted to avoid confusion; do not recreate it or promote through it.
 - Treat `origin` / `https://github.com/sirimasth/ns-scrap-erp.git` as legacy read-only reference material only.
 - Never push, force-push, create branches, delete branches, open PRs, write tags, or otherwise mutate `origin` / `https://github.com/sirimasth/ns-scrap-erp.git`.
 - Use `origin` only for read operations such as fetch, log, diff, show, and checkout-to-inspect.
 - Do not commit local tool settings such as `.claude/settings.local.json` unless the user explicitly wants it.
+
+## Dirty Workspace Sync Rules
+
+Before any fetch/merge/pull/push/deploy check that may affect `dev`, `uat`, `main`, `peach`, or a shared feature branch:
+
+- Run and report `git status --short --branch`, `git remote -v`, and the intended source/destination branches.
+- If the main workspace has uncommitted or untracked app work, do not switch branches, pull, merge, or push from that dirty workspace until the exact files are classified as either user/local work, generated artifacts, or intended commit content.
+- Prefer a temporary worktree for sync/merge/conflict checks when the main workspace is dirty. Do not rely on an auto-stash as the primary safety mechanism.
+- If a stash is unavoidable, name it with the task and timestamp, verify both tracked and untracked entries, and restore/check required untracked files before declaring the app recovered.
+- Never push a branch as "updated" until the intended local UI/runtime changes are proven present in the commit to be pushed. Use `git diff --name-status <remote>/<branch>...HEAD` or `git show --name-status HEAD` for proof.
+- After pushing, verify the deploy target separately. A successful Git push is not the same as a successful Vercel/server deploy.
+
+Incident note: on 2026-07-05, local UI work disappeared from the visible workspace because sync work returned the checkout to clean `dev` while the real local changes were stored in a stash, including a required untracked component. The prevention rule is: protect dirty local work first, sync in a clean temp worktree, then commit/push only after verifying the intended files are actually in the branch.
 
 ## Communication Rules
 

@@ -10,7 +10,7 @@ import { useResizableColumns, type ResizableColumnDefinition } from '@/component
 type AnyRow = Record<string, number | string | boolean | null | undefined>
 type SortDirection = 'asc' | 'desc'
 type TableColumn<TKey extends string> = ResizableColumnDefinition<TKey> & { align?: 'center' | 'left' | 'right'; label: string }
-type SalesPlanColumnKey = 'action' | 'channel' | 'containers' | 'customerName' | 'fx' | 'kgPerContainer' | 'lme' | 'productName' | 'sellPctLme' | 'sellPrice' | 'status' | 'totalKg'
+type SalesPlanColumnKey = 'channel' | 'containers' | 'customerName' | 'fx' | 'kgPerContainer' | 'lme' | 'productName' | 'sellPctLme' | 'sellPrice' | 'status' | 'totalKg'
 type SalesPlanAnalysisColumnKey = 'bestPlanPct' | 'bestPlanPrice' | 'lockedKg' | 'metalGroup' | 'name' | 'projectedMarginPct' | 'projectedProfit' | 'recommendation' | 'remainingKg' | 'stock' | 'wac'
 type SalesPlanRemainingColumnKey = 'code' | 'lockedContainers' | 'lockedKg' | 'metalGroup' | 'name' | 'remainingContainers' | 'remainingKg' | 'stock' | 'value' | 'wac'
 type CommissionCategoryColumnKey = 'amount' | 'category' | 'qty'
@@ -86,7 +86,6 @@ const salesPlanColumns: Array<TableColumn<SalesPlanColumnKey>> = [
   { key: 'fx', label: 'FX', defaultWidth: 90, minWidth: 75, align: 'right' },
   { key: 'sellPrice', label: 'ราคา THB/kg', defaultWidth: 135, minWidth: 115, align: 'right' },
   { key: 'status', label: 'สถานะ', defaultWidth: 150, minWidth: 120, align: 'center' },
-  { key: 'action', label: 'จัดการ', defaultWidth: 80, minWidth: 70, align: 'right' },
 ]
 const salesPlanAnalysisColumns: Array<TableColumn<SalesPlanAnalysisColumnKey>> = [
   { key: 'name', label: 'สินค้า', defaultWidth: 230, minWidth: 165 },
@@ -165,7 +164,6 @@ function compareSortValues(left: string | number, right: string | number) {
 }
 
 function getAnySortValue(row: AnyRow, key: string): string | number {
-  if (key === 'action') return ''
   if (key === 'lockedContainers') return 0
   const value = row[key]
   return typeof value === 'number' || typeof value === 'string' ? value : ''
@@ -276,7 +274,6 @@ export function SalesPlanPageClient() {
   }
 
   function changePlanSort(key: SalesPlanColumnKey) {
-    if (key === 'action') return
     if (planSortKey === key) {
       setPlanSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
       return
@@ -326,7 +323,6 @@ export function SalesPlanPageClient() {
           <option value="domestic">🇹🇭 ในประเทศ</option>
         </select>
         <span className="flex-1" />
-        <button className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-400 outline-none focus:outline-none focus:ring-0 cursor-not-allowed opacity-60 h-10 flex items-center justify-center" disabled type="button">+ เพิ่มรายการ</button>
         <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center" onClick={exportPlan} type="button">📥 Export CSV</button>
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -400,7 +396,7 @@ export function SalesPlanPageClient() {
                     align={column.align}
                     direction={planSortDirection}
                     label={column.label}
-                    sortKey={column.key === 'action' ? undefined : column.key}
+                    sortKey={column.key}
                     onSort={changePlanSort}
                     resizeProps={planResize.getResizeHandleProps(column.key, column.label)}
                   />
@@ -420,11 +416,10 @@ export function SalesPlanPageClient() {
                   <td className="p-1.5 text-right text-xs text-slate-400 font-medium">{money(row.lme)}</td>
                   <td className="p-1.5 text-right text-xs text-slate-400 font-medium">{money(row.fx)}</td>
                   <td className="bg-emerald-50/20 p-1.5 text-right font-bold text-emerald-600">{money(row.sellPrice)}</td>
-                  <td className="p-1.5 text-center"><button className="w-full rounded-xl bg-amber-100/50 px-2.5 py-1 text-xs font-semibold text-amber-700 opacity-80 cursor-not-allowed" disabled type="button">⏳ Pending — กดล็อก</button></td>
-                  <td className="p-1.5 text-right"><button className="rounded-full w-6 h-6 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 opacity-60 transition-colors" disabled type="button">×</button></td>
+                  <td className="p-1.5 text-center"><span className="inline-flex rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{text(row.status) || 'Pending'}</span></td>
                 </tr>
               ))}
-              {!sortedPlanRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanColumns.length}>ยังไม่มีรายการในเดือนนี้ - กด + เพิ่มรายการ</td></tr> : null}
+              {!sortedPlanRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanColumns.length}>ยังไม่มีรายการในเดือนนี้</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -465,14 +460,11 @@ export function SalesPlanPageClient() {
               </div>
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-400 font-semibold">สถานะ:</span>
-                <div className="flex gap-2">
-                  <button className="rounded-xl bg-amber-100/50 px-2.5 py-1 text-xs font-semibold text-amber-700 opacity-80 cursor-not-allowed" disabled type="button">⏳ Pending — กดล็อก</button>
-                  <button className="rounded-full w-6 h-6 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 opacity-60 transition-colors" disabled type="button">×</button>
-                </div>
+                <span className="rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{text(row.status) || 'Pending'}</span>
               </div>
             </div>
           ))}
-          {!sortedPlanRows.length ? <div className="text-center text-slate-400 py-4 font-semibold text-xs">ยังไม่มีรายการในเดือนนี้ - กด + เพิ่มรายการ</div> : null}
+          {!sortedPlanRows.length ? <div className="text-center text-slate-400 py-4 font-semibold text-xs">ยังไม่มีรายการในเดือนนี้</div> : null}
         </div>
       </div>
 
@@ -481,7 +473,6 @@ export function SalesPlanPageClient() {
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4">
           <div>
             <h3 className="font-bold text-slate-800 text-sm">📊 วิเคราะห์แผนขาย vs สต๊อกว่างขาย — ผู้บริหารตัดสินใจ</h3>
-            <p className="text-xs text-slate-400 font-semibold mt-0.5">เปรียบเทียบราคาที่เสนอในแผนขาย vs WAC ของสต๊อกที่ยังว่างให้ขาย</p>
           </div>
         </div>
 
@@ -670,7 +661,6 @@ export function SalesPlanPageClient() {
         </div>
       </div>
 
-      <Notice text={data?.sourceState.limitations[0]} />
       {error ? <ErrorBox text={error} /> : null}
     </section>
   )
@@ -1457,7 +1447,6 @@ export function SalesCommissionPageClient() {
         </div>
       </Panel>
 
-      <Notice text={data?.sourceState.limitations[0]} />
       {error ? <ErrorBox text={error} /> : null}
     </section>
   )
@@ -1611,15 +1600,6 @@ function Mini({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-xs">
       <div className="text-xs text-slate-400 font-semibold">{label}</div>
       <div className="text-xs font-bold text-slate-800">{value}</div>
-    </div>
-  )
-}
-
-function Notice({ text: value }: { text?: string }) {
-  return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 text-xs font-semibold text-amber-800 shadow-sm leading-relaxed">
-      <span>💡 <b>Read/design baseline:</b></span>
-      <span className="ml-1.5">{value ?? 'ไม่มี write action ใน baseline นี้'}</span>
     </div>
   )
 }

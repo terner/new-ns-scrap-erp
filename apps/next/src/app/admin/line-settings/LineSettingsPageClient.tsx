@@ -1051,9 +1051,6 @@ export function LineSettingsPageClient() {
       <div className="rounded-xl bg-slate-900 px-6 py-5 text-white shadow-md flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold">🛠️ LINE Notification Control Center</h1>
-          <p className="mt-1 text-xs text-slate-400">
-            แผงควบคุมระบบกระจายข้อความแจ้งเตือนใบชั่ง WTI/WTO, จัดการสิทธิ์การรันคำสั่งบอท, กำหนด Routing Rules และตรวจสอบประวัติแบบ Realtime
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="px-2.5 py-1 rounded bg-[#0284c7] text-white font-bold text-xs uppercase select-none tracking-wider">
@@ -1209,7 +1206,6 @@ export function LineSettingsPageClient() {
                     <span className="text-base leading-none mt-0.5">{form.lineChannelAccessToken ? '✅' : '❌'}</span>
                     <div>
                       <div className="text-sm font-bold text-slate-800">Channel Access Token</div>
-                      <p className="text-xs text-slate-500 mt-0.5">ใช้เชื่อมต่อบริการยิงข้อมูล Flex Message จาก LINE Official Account ไปปลายทาง</p>
                     </div>
                   </div>
 
@@ -1217,7 +1213,6 @@ export function LineSettingsPageClient() {
                     <span className="text-base leading-none mt-0.5">{form.lineChannelSecret ? '✅' : '❌'}</span>
                     <div>
                       <div className="text-sm font-bold text-slate-800">Channel Secret</div>
-                      <p className="text-xs text-slate-500 mt-0.5">ใช้ตรวจสอบความปลอดภัยและยืนยันลายเซ็นบอทขารับ (Webhook Signature)</p>
                     </div>
                   </div>
 
@@ -1225,7 +1220,6 @@ export function LineSettingsPageClient() {
                     <span className="text-base leading-none mt-0.5">{targets.some(t => t.is_default) ? '✅' : '⚠️'}</span>
                     <div>
                       <div className="text-sm font-bold text-slate-800">Default Target (เป้าหมายดีฟอลต์)</div>
-                      <p className="text-xs text-slate-500 mt-0.5">ระบุเป้าหมายสำรองกรณีไม่มี Routing Rule ใดตรงเงื่อนไขของตั๋วชั่งนั้น</p>
                     </div>
                   </div>
                 </div>
@@ -1235,7 +1229,6 @@ export function LineSettingsPageClient() {
                     <span className="text-base leading-none mt-0.5">✅</span>
                     <div>
                       <div className="text-sm font-bold text-slate-800">PDF Generator & Fonts Status</div>
-                      <p className="text-xs text-slate-500 mt-0.5">ฟอนต์ NotoSansThai พร้อมใช้งานในโหมด PDF Rendering</p>
                     </div>
                   </div>
 
@@ -1243,7 +1236,6 @@ export function LineSettingsPageClient() {
                     <span className="text-base leading-none mt-0.5">{form.pdfBucket ? '✅' : '❌'}</span>
                     <div>
                       <div className="text-sm font-bold text-slate-800">Storage Bucket</div>
-                      <p className="text-xs text-slate-500 mt-0.5">ชื่อบัคเก็ตเก็บไฟล์ PDF: <span className="font-mono bg-slate-50 px-1 py-0.5 text-slate-600 rounded">{form.pdfBucket}</span></p>
                     </div>
                   </div>
                 </div>
@@ -1408,7 +1400,6 @@ export function LineSettingsPageClient() {
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">👥 ช่องทางรับข่าวสาร / LINE Targets (Groups & Users)</h3>
-                  <p className="text-xs text-slate-400 mt-1">ลงทะเบียนและตั้งค่ากลุ่มแชทไลน์เพื่อแยกประเภทการรับการแจ้งเตือนตามรหัสสาขา</p>
                 </div>
                 <div className="flex gap-2.5">
                   {targetResize.hasCustomWidths && (
@@ -1709,7 +1700,6 @@ export function LineSettingsPageClient() {
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">🔀 กฎการกระจายการแจ้งเตือน (Notification Routing Rules)</h3>
-                  <p className="text-xs text-slate-400 mt-1">กำหนดสิทธิ์และเงื่อนไขการส่งบิลตามประเภทและสาขาไปยังปลายทางต่างๆ ตามความสำคัญ</p>
                 </div>
                 <button
                   className="px-3.5 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition focus:outline-none h-8"
@@ -1920,7 +1910,6 @@ export function LineSettingsPageClient() {
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">📝 ปรับแต่งรูปแบบ Flex Message (Message Templates)</h3>
-                  <p className="text-xs text-slate-400 mt-1">สร้างรูปแบบการแสดงการ์ดบิลใน LINE ให้ตรงตามความพรีเมียม ปรับสี ธีม หรือแสดงข้อมูลเฉพาะที่จำเป็น</p>
                 </div>
                 <button
                   className="px-3.5 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition focus:outline-none h-8"
@@ -2002,7 +1991,6 @@ export function LineSettingsPageClient() {
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">📥 คิวรอส่งแจ้งเตือนย้อนหลัง (Outbox / Retry Job Queue)</h3>
-                  <p className="text-xs text-slate-400 mt-1">รายการบิลชั่งที่ตั้งค่าให้จัดส่งแบบ Asynchronous คอยเก็บบันทึกประวัติ Attempts เพื่อความเสถียรสูงสุด</p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs">
                   {/* Status filter buttons */}
@@ -2375,17 +2363,36 @@ export function LineSettingsPageClient() {
 
       {/* Target Add/Edit Modal */}
       {isTargetModalOpen && editingTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
-          <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-zoom-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in">
+          <div className="relative w-full max-w-md overflow-hidden rounded-md bg-slate-900 shadow-2xl animate-zoom-in">
             {/* Modal Header */}
-            <div className="bg-slate-900 px-5 py-4 text-white">
+            <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
               <h3 className="text-base font-bold">
                 {editingTarget.id ? '📝 แก้ไขรายละเอียดผู้รับ' : '👥 เพิ่มเป้าหมายรับแจ้งเตือนใหม่'}
               </h3>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white transition hover:border-rose-700 hover:bg-rose-700 focus:outline-none"
+                  onClick={() => {
+                    setIsTargetModalOpen(false)
+                    setEditingTarget(null)
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  form="line-target-form"
+                  className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-bold text-white transition hover:bg-emerald-700 focus:outline-none"
+                >
+                  บันทึกข้อมูล
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleSaveTarget} className="p-5 space-y-4 text-xs">
+            <form id="line-target-form" onSubmit={handleSaveTarget} className="space-y-4 bg-slate-50 p-5 text-xs">
               <div className="space-y-1">
                 <label className="block font-bold text-slate-700">ชื่อเป้าหมาย / Display Name *</label>
                 <input
@@ -2466,25 +2473,6 @@ export function LineSettingsPageClient() {
                 </label>
               </div>
 
-              {/* Modal Footer */}
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition focus:outline-none"
-                  onClick={() => {
-                    setIsTargetModalOpen(false)
-                    setEditingTarget(null)
-                  }}
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-sm font-bold text-white bg-[#0F172A] hover:bg-[#1E293B] rounded-lg transition focus:outline-none"
-                >
-                  บันทึกข้อมูล
-                </button>
-              </div>
             </form>
           </div>
         </div>
@@ -2492,17 +2480,36 @@ export function LineSettingsPageClient() {
 
       {/* Rule Add/Edit Modal */}
       {isRuleModalOpen && editingRule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
-          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden animate-zoom-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in">
+          <div className="relative w-full max-w-lg overflow-hidden rounded-md bg-slate-900 shadow-2xl animate-zoom-in">
             {/* Header */}
-            <div className="bg-slate-900 px-5 py-4 text-white">
+            <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
               <h3 className="text-base font-bold">
                 {editingRule.id ? '📝 แก้ไขกฎการกระจายข่าวสาร' : '🛣️ เพิ่มกฎส่งข้อความแจ้งเตือน'}
               </h3>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white transition hover:border-rose-700 hover:bg-rose-700 focus:outline-none"
+                  onClick={() => {
+                    setIsRuleModalOpen(false)
+                    setEditingRule(null)
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  form="line-rule-form"
+                  className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-bold text-white transition hover:bg-emerald-700 focus:outline-none"
+                >
+                  บันทึกกฎ
+                </button>
+              </div>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSaveRule} className="p-5 space-y-4 text-xs">
+            <form id="line-rule-form" onSubmit={handleSaveRule} className="space-y-4 bg-slate-50 p-5 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1 col-span-2">
                   <label className="block font-bold text-slate-700">ชื่อกฎ (ตั้งให้อ่านง่าย) *</label>
@@ -2673,25 +2680,6 @@ export function LineSettingsPageClient() {
                 </label>
               </div>
 
-              {/* Footer */}
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition focus:outline-none"
-                  onClick={() => {
-                    setIsRuleModalOpen(false)
-                    setEditingRule(null)
-                  }}
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-sm font-bold text-white bg-[#0F172A] hover:bg-[#1E293B] rounded-lg transition focus:outline-none"
-                >
-                  บันทึกกฎ
-                </button>
-              </div>
             </form>
           </div>
         </div>
@@ -2699,18 +2687,39 @@ export function LineSettingsPageClient() {
 
       {/* Template Add/Edit Modal & Live Preview */}
       {isTemplateModalOpen && editingTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
-          <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-zoom-in max-h-[90vh]">
-
-            {/* Settings Forms Left */}
-            <div className="w-full md:w-1/2 p-5 overflow-y-auto space-y-4 border-b md:border-b-0 md:border-r border-slate-200">
-              <div className="pb-2 border-b border-slate-100">
-                <h3 className="text-base font-bold text-slate-900">
-                  {editingTemplate.id ? '📝 แก้ไขเทมเพลตและ Preview' : '➕ เพิ่มเทมเพลตการ์ดใหม่'}
-                </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in">
+          <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-md border-0 bg-slate-900 shadow-2xl animate-zoom-in">
+            <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+              <h3 className="text-base font-bold">
+                {editingTemplate.id ? '📝 แก้ไขเทมเพลตและ Preview' : '➕ เพิ่มเทมเพลตการ์ดใหม่'}
+              </h3>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white transition hover:border-rose-700 hover:bg-rose-700 focus:outline-none"
+                  onClick={() => {
+                    setIsTemplateModalOpen(false)
+                    setEditingTemplate(null)
+                    setTemplatePreviewJson(null)
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  form="line-template-form"
+                  className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-bold text-white transition hover:bg-emerald-700 focus:outline-none"
+                >
+                  บันทึกเทมเพลต
+                </button>
               </div>
+            </div>
 
-              <form onSubmit={handleSaveTemplate} className="space-y-4 text-xs">
+            <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+              {/* Settings Forms Left */}
+              <div className="w-full md:w-1/2 p-5 overflow-y-auto space-y-4 border-b md:border-b-0 md:border-r border-slate-200 bg-slate-50">
+
+                <form id="line-template-form" onSubmit={handleSaveTemplate} className="space-y-4 text-xs">
                 <div className="space-y-1">
                   <label className="block font-bold text-slate-700">ชื่อเทมเพลต *</label>
                   <input
@@ -2745,7 +2754,6 @@ export function LineSettingsPageClient() {
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div>
                     <h4 className="font-bold text-slate-900">ข้อความบนการ์ด LINE</h4>
-                    <p className="mt-1 text-slate-500">ใช้ตัวแปรได้ เช่น {'{{documentNo}}'}, {'{{partyName}}'}, {'{{netWeight}}'}</p>
                   </div>
 
                   <div className="space-y-1">
@@ -2878,25 +2886,6 @@ export function LineSettingsPageClient() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition focus:outline-none"
-                    onClick={() => {
-                      setIsTemplateModalOpen(false)
-                      setEditingTemplate(null)
-                      setTemplatePreviewJson(null)
-                    }}
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-bold text-white bg-[#0F172A] hover:bg-[#1E293B] rounded-lg transition focus:outline-none"
-                  >
-                    บันทึกเทมเพลต
-                  </button>
-                </div>
               </form>
             </div>
 
@@ -2989,6 +2978,7 @@ export function LineSettingsPageClient() {
                   <div className="text-slate-500 text-center py-8 text-xs">ป้อนเลขใบชั่งแล้วกด &quot;เรียกพรีวิว&quot; เพื่อจำลองการ์ดที่ส่งเข้าไลน์แชท</div>
                 )}
               </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2996,22 +2986,22 @@ export function LineSettingsPageClient() {
 
       {/* Outbox Job Attempts Details Modal */}
       {selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
-          <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden animate-zoom-in max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in">
+          <div className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-md bg-slate-900 shadow-2xl animate-zoom-in">
             {/* Header */}
-            <div className="bg-slate-900 px-5 py-4 text-white flex justify-between items-center">
+            <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
               <h3 className="text-base font-bold">📋 ประวัติการยิงและการส่งของบิล {selectedJob.document_no}</h3>
               <button
                 type="button"
-                className="text-slate-400 hover:text-white transition focus:outline-none"
+                className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white transition hover:border-rose-700 hover:bg-rose-700 focus:outline-none"
                 onClick={() => setSelectedJob(null)}
               >
-                ✕
+                ปิด
               </button>
             </div>
 
             {/* Content */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+            <div className="space-y-4 overflow-y-auto bg-slate-50 p-5 text-xs">
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 grid grid-cols-2 gap-3">
                 <div>
                   <span className="text-slate-400 block">รหัสคิวงาน:</span>
@@ -3070,16 +3060,6 @@ export function LineSettingsPageClient() {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
-              <button
-                type="button"
-                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-md transition focus:outline-none"
-                onClick={() => setSelectedJob(null)}
-              >
-                ปิดหน้าต่างนี้
-              </button>
-            </div>
           </div>
         </div>
       )}

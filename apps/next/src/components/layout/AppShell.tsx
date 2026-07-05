@@ -4,11 +4,11 @@ import type { FocusEvent } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, Search, Sun, Moon } from 'lucide-react'
+import { Menu, Search, Sun, Moon, X } from 'lucide-react'
 import { AppNavigation } from '@/components/layout/AppNavigation'
 import { AuthStatus } from '@/components/layout/AuthStatus'
 import { MobileBottomNavigation } from '@/components/layout/MobileBottomNavigation'
-import { breadcrumbsForPath, canAccessPath, navigationItems, navigationSections, pageSubtitleForPath, pageTitleForPath, type NavigationItem } from '@/lib/navigation'
+import { breadcrumbsForPath, canAccessPath, navigationItems, navigationSections, pageTitleForPath, type NavigationItem } from '@/lib/navigation'
 
 type AppShellProps = {
   children: React.ReactNode
@@ -67,15 +67,9 @@ export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarUserMenuOpen, setSidebarUserMenuOpen] = useState(false)
   const [authContext, setAuthContext] = useState<AuthContextSummary | null>(null)
-  const showMobileBottomNav = useMemo(() => {
-    const isProductionRoute = pathname.startsWith('/production/') || pathname === '/daily/weight-ticket-list' || pathname === '/profile'
-    const isProductionDept = authContext?.roles.some((r) => r.code === 'production_department' || r.code === 'sorting_department')
-    return Boolean(isProductionDept || isProductionRoute)
-  }, [pathname, authContext])
   const [breadcrumbLabelOverride, setBreadcrumbLabelOverride] = useState<string | null>(null)
   const [menuSearch, setMenuSearch] = useState('')
   const [menuSearchFocused, setMenuSearchFocused] = useState(false)
-  const [subtitleOverride, setSubtitleOverride] = useState<string | null>(null)
   const [titleOverride, setTitleOverride] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
@@ -100,12 +94,12 @@ export function AppShell({ children }: AppShellProps) {
   }
   const lastActivityPathRef = useRef<string | null>(null)
   const title = titleOverride ?? pageTitleForPath(pathname)
-  const subtitle = subtitleOverride ?? pageSubtitleForPath(pathname)
   const breadcrumbs = breadcrumbsForPath(pathname)
   const renderedBreadcrumbs = breadcrumbLabelOverride && breadcrumbs.length > 0
     ? breadcrumbs.map((breadcrumb, index) => (index === breadcrumbs.length - 1 ? { ...breadcrumb, label: breadcrumbLabelOverride } : breadcrumb))
     : breadcrumbs
   const isAuthPage = pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
+  const showMobileBottomNav = !isAuthPage
   const menuSearchResults = useMemo(() => {
     const query = menuSearch.trim().toLowerCase()
     if (!query || !authContext) return []
@@ -117,18 +111,15 @@ export function AppShell({ children }: AppShellProps) {
 
   useEffect(() => {
     setBreadcrumbLabelOverride(null)
-    setSubtitleOverride(null)
     setTitleOverride(null)
   }, [pathname])
 
   useEffect(() => {
     function handlePageTitle(event: Event) {
-      const detail = (event as CustomEvent<{ breadcrumbLabel?: string | null; subtitle?: string | null; title?: string | null }>).detail
+      const detail = (event as CustomEvent<{ breadcrumbLabel?: string | null; title?: string | null }>).detail
       const nextBreadcrumbLabel = detail?.breadcrumbLabel
-      const nextSubtitle = detail?.subtitle
       const nextTitle = detail?.title
       setBreadcrumbLabelOverride(nextBreadcrumbLabel || null)
-      setSubtitleOverride(nextSubtitle || null)
       setTitleOverride(nextTitle || null)
     }
 
@@ -242,18 +233,26 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="flex h-dvh overflow-hidden bg-slate-100 text-slate-900">
       <aside
-        className={`${sidebarOpen ? 'fixed inset-y-0 left-0 z-40 flex w-64' : 'hidden'} flex-shrink-0 flex-col overflow-hidden bg-slate-900 text-slate-200 transition-[width] duration-200 ease-out lg:relative lg:flex ${desktopSidebarExpanded ? 'lg:w-64' : 'lg:w-16'}`}
+        className={`${sidebarOpen ? 'fixed inset-0 z-50 flex w-full' : 'hidden'} flex-shrink-0 flex-col overflow-hidden bg-slate-900 text-slate-200 transition-[width] duration-200 ease-out lg:relative lg:flex ${desktopSidebarExpanded ? 'lg:w-64' : 'lg:w-16'}`}
         onBlur={handleSidebarBlur}
         onFocus={() => setDesktopSidebarExpanded(true)}
         onMouseEnter={() => setDesktopSidebarExpanded(true)}
         onMouseLeave={handleSidebarMouseLeave}
       >
-        <div className={`flex items-center border-b border-slate-700 p-4 ${desktopSidebarExpanded ? 'gap-5' : 'lg:justify-center lg:gap-0'}`}>
+        <div className={`flex items-center border-b border-slate-700 p-4 ${desktopSidebarExpanded ? 'gap-5' : 'gap-3 lg:justify-center lg:gap-0'}`}>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white">NS</div>
-          <div className={`min-w-0 pl-1 ${desktopSidebarExpanded ? '' : 'lg:hidden'}`.trim()}>
+          <div className={`min-w-0 flex-1 pl-1 ${desktopSidebarExpanded ? '' : 'lg:hidden'}`.trim()}>
             <div className="truncate font-bold text-white">NS Scrap ERP</div>
             <div className="truncate text-xs text-slate-400">ระบบบริหารจัดการ</div>
           </div>
+          <button
+            aria-label="ปิดเมนู"
+            className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-700 bg-slate-800 text-slate-200 outline-none transition hover:bg-slate-700 focus:ring-2 focus:ring-blue-400/30 lg:hidden"
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="size-5" />
+          </button>
         </div>
 
         <div className="relative border-b border-slate-800 p-3 lg:hidden" onBlur={handleMenuSearchBlur}>
@@ -313,8 +312,6 @@ export function AppShell({ children }: AppShellProps) {
         </div>
       </aside>
 
-      {sidebarOpen ? <button aria-label="ปิดเมนู" className="fixed inset-0 z-30 bg-black/40 lg:hidden" type="button" onClick={() => setSidebarOpen(false)} /> : null}
-
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -330,7 +327,6 @@ export function AppShell({ children }: AppShellProps) {
             )}
             <div className="min-w-0">
               <h1 className="min-w-0 break-words text-sm font-semibold leading-snug text-slate-800 sm:text-base lg:text-lg">{title}</h1>
-              {subtitle ? <p className="mt-0.5 min-w-0 break-words text-xs leading-snug text-slate-500 sm:text-sm">{subtitle}</p> : null}
             </div>
           </div>
 
@@ -415,9 +411,11 @@ export function AppShell({ children }: AppShellProps) {
           </nav>
         ) : null}
 
-        <main className={`min-h-0 flex-1 overflow-y-auto p-4 lg:p-6 ${showMobileBottomNav ? 'pb-20 md:pb-6' : ''}`}>{children}</main>
+        <main className={`min-h-0 flex-1 overflow-y-auto p-4 lg:p-6 ${showMobileBottomNav ? 'pb-20 lg:pb-6' : ''}`}>{children}</main>
       </div>
-      {showMobileBottomNav && <MobileBottomNavigation onOpenSidebar={() => setSidebarOpen(true)} />}
+      {showMobileBottomNav && !sidebarOpen ? (
+        <MobileBottomNavigation onOpenSidebar={() => setSidebarOpen(true)} />
+      ) : null}
     </div>
   )
 }

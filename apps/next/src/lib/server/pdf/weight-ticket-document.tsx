@@ -101,33 +101,33 @@ const BG_PRODUCT_TOTAL = '#ecfdf5'
 const styles = StyleSheet.create({
   page: {
     fontFamily: PDF_FONT_FAMILY,
-    fontSize: 12,
-    paddingTop: 28,
-    paddingBottom: 28,
-    paddingLeft: 31,
-    paddingRight: 31,
+    fontSize: 10,
+    paddingTop: 20,
+    paddingBottom: 20,
+    paddingLeft: 26,
+    paddingRight: 26,
     color: TEXT_DARK,
-    lineHeight: 1.35,
+    lineHeight: 1.24,
   },
   accent: {
     height: 3,
     backgroundColor: ACCENT_GREEN,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   // Header
   headerRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
-    paddingBottom: 12,
-    marginBottom: 12,
+    paddingBottom: 8,
+    marginBottom: 8,
   },
   companyBlock: { flexDirection: 'row', flex: 1.3 },
-  logo: { width: 56, height: 56, marginRight: 10, objectFit: 'contain' },
+  logo: { width: 48, height: 48, marginRight: 8, objectFit: 'contain' },
   logoPlaceholder: {
-    width: 56,
-    height: 56,
-    marginRight: 10,
+    width: 48,
+    height: 48,
+    marginRight: 8,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: BORDER,
@@ -138,35 +138,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textAlignVertical: 'center',
   },
-  companyName: { fontSize: 13, fontWeight: 700, color: TEXT_DARK, lineHeight: 1.2 },
-  companyEn: { fontSize: 12.5, fontWeight: 700, color: TEXT_SECONDARY, marginTop: 1, lineHeight: 1.2 },
-  companyInfo: { fontSize: 7.5, color: TEXT_SECONDARY, marginTop: 1.2, lineHeight: 1.2 },
+  companyName: { fontSize: 12, fontWeight: 700, color: TEXT_DARK, lineHeight: 1.16 },
+  companyEn: { fontSize: 10, fontWeight: 700, color: TEXT_SECONDARY, marginTop: 1, lineHeight: 1.16 },
+  companyInfo: { fontSize: 7, color: TEXT_SECONDARY, marginTop: 1, lineHeight: 1.16 },
   docHead: { flex: 0.7, alignItems: 'flex-end' },
-  docTitle: { fontSize: 14, fontWeight: 700, color: DOC_TITLE_GREEN },
+  docTitle: { fontSize: 13, fontWeight: 700, color: DOC_TITLE_GREEN },
 
   // Section grid (party + doc info)
-  sectionGrid: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  sectionGrid: { flexDirection: 'row', gap: 7, marginBottom: 8 },
   panel: {
     flex: 1,
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   panelTitle: {
-    padding: 5,
+    padding: 4,
     backgroundColor: BG_PANEL_TITLE,
     color: '#334155',
     fontWeight: 700,
-    fontSize: 12,
+    fontSize: 9,
   },
-  panelBody: { padding: 6, flexDirection: 'row', flexWrap: 'wrap' },
-  field: { width: '50%', marginBottom: 3, paddingRight: 6 },
-  fieldLabel: { fontSize: 12, color: TEXT_SECONDARY, fontWeight: 500 },
-  fieldValue: { fontSize: 12, fontWeight: 600, color: TEXT_DARK, marginTop: 1 },
-  fieldValueStrong: { fontSize: 12, color: FINAL_WEIGHT_GREEN, fontWeight: 700, marginTop: 1 },
+  panelBody: { padding: 5, flexDirection: 'row', flexWrap: 'wrap' },
+  field: { width: '50%', marginBottom: 2, paddingRight: 5 },
+  fieldLabel: { fontSize: 8, color: TEXT_SECONDARY, fontWeight: 500 },
+  fieldValue: { fontSize: 9, fontWeight: 600, color: TEXT_DARK, marginTop: 0.5 },
+  fieldValueStrong: { fontSize: 9.5, color: FINAL_WEIGHT_GREEN, fontWeight: 700, marginTop: 0.5 },
 
   // Items table (flex rows)
-  tableContainer: { marginTop: 6 },
+  tableContainer: { marginTop: 5 },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: BG_HEADER,
@@ -174,22 +174,22 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
   },
   tableHeaderCell: {
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingLeft: 5,
-    paddingRight: 5,
-    fontSize: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 3,
+    paddingRight: 3,
+    fontSize: 9,
     fontWeight: 700,
     color: '#1e293b',
     borderRightWidth: 1,
     borderRightColor: BORDER,
   },
   tableHeaderCellLast: {
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingLeft: 5,
-    paddingRight: 5,
-    fontSize: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 3,
+    paddingRight: 3,
+    fontSize: 9,
     fontWeight: 700,
     color: '#1e293b',
   },
@@ -200,45 +200,45 @@ const styles = StyleSheet.create({
     borderColor: BORDER_LIGHT,
   },
   tableCell: {
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingLeft: 5,
-    paddingRight: 5,
-    fontSize: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 3,
+    paddingRight: 3,
+    fontSize: 9,
     borderRightWidth: 1,
     borderRightColor: BORDER_LIGHT,
   },
   tableCellLast: {
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingLeft: 5,
-    paddingRight: 5,
-    fontSize: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 3,
+    paddingRight: 3,
+    fontSize: 9,
   },
   tableCellRight: {
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingLeft: 5,
-    paddingRight: 5,
-    fontSize: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 3,
+    paddingRight: 3,
+    fontSize: 9,
     textAlign: 'right',
     borderRightWidth: 1,
     borderRightColor: BORDER_LIGHT,
   },
   tableCellRightLast: {
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingLeft: 5,
-    paddingRight: 5,
-    fontSize: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 3,
+    paddingRight: 3,
+    fontSize: 9,
     textAlign: 'right',
   },
   tableCellStrong: {
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingLeft: 5,
-    paddingRight: 5,
-    fontSize: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 3,
+    paddingRight: 3,
+    fontSize: 9,
     textAlign: 'right',
     fontWeight: 700,
     color: FINAL_WEIGHT_GREEN,
@@ -246,17 +246,17 @@ const styles = StyleSheet.create({
     borderRightColor: BORDER_LIGHT,
   },
   tableCellStrongLast: {
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingLeft: 5,
-    paddingRight: 5,
-    fontSize: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 3,
+    paddingRight: 3,
+    fontSize: 9,
     textAlign: 'right',
     fontWeight: 700,
     color: FINAL_WEIGHT_GREEN,
   },
-  itemName: { fontWeight: 700, color: TEXT_DARK, fontSize: 12 },
-  muted: { color: TEXT_MUTED, fontSize: 7, marginTop: 1 },
+  itemName: { fontWeight: 700, color: TEXT_DARK, fontSize: 9 },
+  muted: { color: TEXT_MUTED, fontSize: 6.4, marginTop: 0.5 },
 
   // Row backgrounds (by className)
   bgProductHeading: { backgroundColor: BG_PRODUCT_HEADING },
@@ -266,23 +266,34 @@ const styles = StyleSheet.create({
   bgProductTotal: { backgroundColor: BG_PRODUCT_TOTAL, fontWeight: 700 },
 
   // Bottom section
-  bottomGrid: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  noteText: { fontSize: 12, color: TEXT_DARK },
+  bottomGrid: { flexDirection: 'row', gap: 7, marginTop: 8 },
+  bottomPanelBody: { padding: 4, flexDirection: 'row', flexWrap: 'wrap' },
+  bottomField: { width: '50%', marginBottom: 1, paddingRight: 5 },
+  weightInfoBody: { paddingBottom: 7 },
+  weightInfoRightField: { alignItems: 'flex-end', paddingRight: 0 },
+  bottomNetField: {
+    width: '50%',
+    marginLeft: '50%',
+    marginBottom: 3,
+    paddingRight: 0,
+    alignItems: 'flex-end',
+  },
+  noteText: { fontSize: 9, color: TEXT_DARK },
 
   // Signatures
-  signatures: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  signatures: { flexDirection: 'row', gap: 12, marginTop: 18 },
   sig: { flex: 1 },
   sigLine: {
     borderTopWidth: 1,
     borderTopColor: '#94a3b8',
     paddingTop: 4,
-    marginTop: 24,
-    fontSize: 12,
+    marginTop: 18,
+    fontSize: 9,
     fontWeight: 700,
     textAlign: 'center',
   },
   sigDate: {
-    fontSize: 12,
+    fontSize: 8,
     color: TEXT_MUTED,
     marginTop: 2,
     textAlign: 'center',
@@ -292,24 +303,23 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 6,
+    marginTop: 8,
+    paddingTop: 4,
     borderTopWidth: 1,
     borderTopColor: BORDER,
     borderTopStyle: 'dashed' as any,
-    fontSize: 7,
+    fontSize: 7.2,
     color: TEXT_MUTED,
   },
 
   // Continued marker
   continued: {
     textAlign: 'right',
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: 700,
     color: TEXT_MUTED,
-    paddingTop: 12,
+    paddingTop: 8,
   },
-  // Album styles
   albumHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -326,23 +336,23 @@ const styles = StyleSheet.create({
     lineHeight: 1.25,
   },
   albumSubtitle: {
-    fontSize: 12.5,
+    fontSize: 10,
     color: TEXT_SECONDARY,
-    marginTop: 6,
+    marginTop: 5,
     lineHeight: 1.25,
   },
   albumPageBlock: {
     alignItems: 'flex-end',
   },
   albumPageText: {
-    fontSize: 12.5,
+    fontSize: 10,
     fontWeight: 700,
     color: TEXT_MUTED,
   },
   albumHeaderSeparator: {
     height: 1,
     backgroundColor: BORDER,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   albumGrid: {
     flexDirection: 'row',
@@ -379,7 +389,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   albumBadgeText: {
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: 700,
     color: '#ffffff',
   },
@@ -397,7 +407,7 @@ const styles = StyleSheet.create({
     height: 20,
   },
   albumFileName: {
-    fontSize: 12,
+    fontSize: 8,
     color: TEXT_SECONDARY,
     width: '60%',
     overflow: 'hidden',
@@ -423,10 +433,10 @@ const styles = StyleSheet.create({
 // Column widths (mm → pt approx: 1mm ≈ 2.83pt)
 // ตาม HTML: 7mm / auto / 21mm / 21mm / 32mm / 26mm / 21mm
 const COL_RANK = '4%'
-const COL_ITEM = '32%'
+const COL_ITEM = '30%'
 const COL_GROSS = '12%'
 const COL_CONTAINER = '12%'
-const COL_AFTER_CONTAINER = '14%'
+const COL_AFTER_CONTAINER = '16%'
 const COL_DEDUCTION = '12%'
 const COL_NET = '14%'
 
@@ -496,7 +506,7 @@ function ItemRow({ row, isReceipt }: { row: PrintWeightRow; isReceipt: boolean }
 
 function FillerRow({ isReceipt }: { isReceipt: boolean }) {
   return (
-    <View style={[styles.tableRow, { height: 18 }]}>
+    <View style={[styles.tableRow, { height: 14 }]}>
       <View style={[styles.tableCell, { width: COL_RANK }]}><Text> </Text></View>
       <View style={[styles.tableCell, { width: isReceipt ? COL_ITEM : `${100 - 4 - 12 - 12 - 26}%` }]}><Text> </Text></View>
       <View style={[styles.tableCellRight, { width: COL_GROSS }]}><Text> </Text></View>
@@ -540,7 +550,7 @@ function TableHeader({ isReceipt }: { isReceipt: boolean }) {
 
 function TableFooter({ ticket, isReceipt }: { ticket: WeightTicketRecord; isReceipt: boolean }) {
   const totalAfterContainer = Math.max(0, ticket.totals.grossWeight - ticket.totals.containerDeductionWeight)
-  const labelWidth = isReceipt ? '36%' : '50%'
+  const labelWidth = isReceipt ? '34%' : '50%'
   return (
     <View style={[styles.tableRow, styles.bgProductTotal]}>
       <View style={[styles.tableCellRight, { width: labelWidth }]}>
@@ -607,7 +617,6 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
   const lotGrossWeight = lotLines.reduce((sum, line) => sum + line.grossWeightValue, 0)
   const lotContainerWeight = lotLines.reduce((sum, line) => sum + line.containerDeductionWeightValue, 0)
 
-  // Photo Album logic
   const ticketImages = ticket.imageNames || []
   const decodedImages = ticketImages
     .map((img) => decodeStoredImageAsset(img))
@@ -750,22 +759,21 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
               {isLastPage ? <TableFooter ticket={ticket} isReceipt={isReceipt} /> : null}
             </View>
 
-            {/* Spacer to push signatures and footer to the bottom */}
-            <View style={styles.spacer} />
+            {!isLastPage ? <View style={styles.spacer} /> : null}
 
             {/* Bottom section (last page only) */}
             {isLastPage ? (
               <>
                 <View style={styles.bottomGrid}>
-                  <View style={[styles.panel, { flex: 1.2 }]}>
+                  <View style={[styles.panel, { flex: 1.15 }]}>
                     <Text style={styles.panelTitle}>{nt('สรุปตามหมวดสินค้า')}</Text>
-                    <View style={styles.panelBody}>
+                    <View style={styles.bottomPanelBody}>
                       {Array.from(ticket.productSummaries.reduce((map, summary) => {
                         const cat = summary.categoryName || 'อื่นๆ'
                         map.set(cat, (map.get(cat) || 0) + summary.netWeight)
                         return map
                       }, new Map<string, number>()).entries()).map(([cat, weight], idx) => (
-                        <View key={`cat-${idx}`} style={styles.field}>
+                        <View key={`cat-${idx}`} style={styles.bottomField}>
                           <Text style={styles.fieldLabel}>{nt(cat)}</Text>
                           <Text style={styles.fieldValue}>{formatPrintableNumber(weight)} kg</Text>
                         </View>
@@ -774,30 +782,30 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
                   </View>
                   <View style={[styles.panel, { flex: 0.8 }]}>
                     <Text style={styles.panelTitle}>{nt('หมายเหตุ')}</Text>
-                    <View style={styles.panelBody}>
+                    <View style={styles.bottomPanelBody}>
                       <Text style={styles.noteText}>{nt(ticket.remark || '-')}</Text>
                     </View>
                   </View>
-                  <View style={[styles.panel, { flex: 1 }]}>
+                  <View style={[styles.panel, { flex: 1.05 }]}>
                     <Text style={styles.panelTitle}>{nt('ข้อมูลน้ำหนัก / Weight Info')}</Text>
-                    <View style={styles.panelBody}>
-                      <View style={styles.field}>
+                    <View style={[styles.bottomPanelBody, styles.weightInfoBody]}>
+                      <View style={styles.bottomField}>
                         <Text style={styles.fieldLabel}>{nt('จำนวนรายการ')}</Text>
                         <Text style={styles.fieldValue}>{lotCount} {nt('รายการ')}</Text>
                       </View>
-                      <View style={styles.field}>
+                      <View style={[styles.bottomField, styles.weightInfoRightField]}>
                         <Text style={styles.fieldLabel}>{nt('น้ำหนักรวม')}</Text>
                         <Text style={styles.fieldValue}>{formatPrintableNumber(lotGrossWeight)} kg</Text>
                       </View>
-                      <View style={styles.field}>
+                      <View style={styles.bottomField}>
                         <Text style={styles.fieldLabel}>{nt('หักภาชนะ')}</Text>
                         <Text style={styles.fieldValue}>{formatPrintableNumber(lotContainerWeight)} kg</Text>
                       </View>
-                      <View style={styles.field}>
+                      <View style={[styles.bottomField, styles.weightInfoRightField]}>
                         <Text style={styles.fieldLabel}>{nt('หักสิ่งเจือปน')}</Text>
                         <Text style={styles.fieldValue}>{formatPrintableNumber(ticket.totals.deductionWeight)} kg</Text>
                       </View>
-                      <View style={styles.field}>
+                      <View style={styles.bottomNetField}>
                         <Text style={styles.fieldLabel}>{nt('น้ำหนักสุทธิ')}</Text>
                         <Text style={styles.fieldValueStrong}>{formatPrintableNumber(ticket.totals.netWeight)} kg</Text>
                       </View>
@@ -837,74 +845,63 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
           </Page>
         )
       })}
+      {albumChunks.map((chunk, chunkIdx) => (
+        <Page key={`album-${chunkIdx}`} size="A4" style={styles.page}>
+          <View style={styles.accent} />
 
-      {/* 2. Photo album pages (if any) */}
-      {albumChunks.map((chunk, chunkIdx) => {
-        return (
-          <Page key={`album-${chunkIdx}`} size="A4" style={styles.page}>
-            {/* Top green accent line */}
-            <View style={styles.accent} />
-
-            {/* Header of Album Page */}
-            <View style={styles.albumHeader}>
-              <View style={styles.albumTitleBlock}>
-                <Text style={styles.albumTitle}>{nt(isReceipt ? 'ใบรับสินค้า (รูปถ่ายแนบ)' : 'ใบส่งของ (รูปถ่ายแนบ)')}</Text>
-                <Text style={styles.albumSubtitle}>
-                  {nt(`เลขที่เอกสาร: ${ticket.documentNo} · คู่ค้า: ${ticket.partyName} · วันที่: ${ticket.documentDate || '-'}`)}
-                </Text>
-              </View>
-              <View style={styles.albumPageBlock}>
-                <Text
-                  style={styles.albumPageText}
-                  render={({ pageNumber, totalPages }) => nt(`${profile.nameEn || 'NS Scrap ERP'} · หน้า ${pageNumber} / ${totalPages}`)}
-                />
-              </View>
+          <View style={styles.albumHeader}>
+            <View style={styles.albumTitleBlock}>
+              <Text style={styles.albumTitle}>{nt(isReceipt ? 'ใบรับสินค้า (รูปถ่ายแนบ)' : 'ใบส่งของ (รูปถ่ายแนบ)')}</Text>
+              <Text style={styles.albumSubtitle}>
+                {nt(`เลขที่เอกสาร: ${ticket.documentNo} · คู่ค้า: ${ticket.partyName} · วันที่: ${ticket.documentDate || '-'}`)}
+              </Text>
             </View>
-            <View style={styles.albumHeaderSeparator} />
+            <View style={styles.albumPageBlock}>
+              <Text
+                style={styles.albumPageText}
+                render={({ pageNumber, totalPages }) => nt(`${profile.nameEn || 'NS Scrap ERP'} · หน้า ${pageNumber} / ${totalPages}`)}
+              />
+            </View>
+          </View>
+          <View style={styles.albumHeaderSeparator} />
 
-            {/* Album Grid (4 rows x 2 cols) */}
-            <View style={styles.albumGrid}>
-              {chunk.map((img: any, imgIdx: number) => {
-                const globalIdx = chunkIdx * albumChunkSize + imgIdx + 1
-                const isOut = img.fileName.toLowerCase().includes('out') ||
-                              img.fileName.toLowerCase().includes('exit') ||
-                              img.fileName.includes('ขาออก')
-                const badgeText = isOut ? 'ขาออก' : (isReceipt ? 'รับเข้า' : 'ขาออก')
-                const badgeColor = isOut ? '#10b981' : '#0ea5e9'
-                const photoTime = getPhotoTimestamp(img.fileName, ticket.createdAt)
+          <View style={styles.albumGrid}>
+            {chunk.map((img, imgIdx) => {
+              const globalIdx = chunkIdx * albumChunkSize + imgIdx + 1
+              const isOut = img.fileName.toLowerCase().includes('out') ||
+                img.fileName.toLowerCase().includes('exit') ||
+                img.fileName.includes('ขาออก')
+              const badgeText = isOut ? 'ขาออก' : (isReceipt ? 'รับเข้า' : 'ขาออก')
+              const badgeColor = isOut ? '#10b981' : '#0ea5e9'
+              const photoTime = getPhotoTimestamp(img.fileName, ticket.createdAt)
 
-                return (
-                  <View key={imgIdx} style={styles.albumCard}>
-                    {/* Image Area */}
-                    <View style={styles.albumImageWrapper}>
-                      <Image src={img.url} style={styles.albumImage} />
-                      {/* Top Left Badge */}
-                      <View style={[styles.albumBadge, { backgroundColor: badgeColor }]}>
-                        <Text style={styles.albumBadgeText}>{nt(badgeText)}</Text>
-                      </View>
-                    </View>
-
-                    {/* Bottom Info Bar */}
-                    <View style={styles.albumCardBar}>
-                      <Text style={styles.albumFileName}>{nt(img.fileName)}</Text>
-                      <View style={styles.albumIndexBadge}>
-                        <Text style={styles.albumIndexText}>{nt(`#${globalIdx} · ${photoTime}`)}</Text>
-                      </View>
+              return (
+                <View key={imgIdx} style={styles.albumCard}>
+                  <View style={styles.albumImageWrapper}>
+                    <Image src={img.url || ''} style={styles.albumImage} />
+                    <View style={[styles.albumBadge, { backgroundColor: badgeColor }]}>
+                      <Text style={styles.albumBadgeText}>{nt(badgeText)}</Text>
                     </View>
                   </View>
-                )
-              })}
-            </View>
 
-            {/* Bottom Footer */}
-            <View style={{ flexGrow: 1 }} />
-            <View style={styles.footer}>
-              <Text>{nt(profile.footerNote || '')}</Text>
-              <Text render={({ pageNumber, totalPages }) => `${nt('หน้า')} ${pageNumber} / ${totalPages}`} />
-            </View>
-          </Page>
-        )
-      })}
+                  <View style={styles.albumCardBar}>
+                    <Text style={styles.albumFileName}>{nt(img.fileName)}</Text>
+                    <View style={styles.albumIndexBadge}>
+                      <Text style={styles.albumIndexText}>{nt(`#${globalIdx} · ${photoTime}`)}</Text>
+                    </View>
+                  </View>
+                </View>
+              )
+            })}
+          </View>
+
+          <View style={styles.spacer} />
+          <View style={styles.footer}>
+            <Text>{nt(profile.footerNote || '')}</Text>
+            <Text render={({ pageNumber, totalPages }) => `${nt('หน้า')} ${pageNumber} / ${totalPages}`} />
+          </View>
+        </Page>
+      ))}
     </Document>
   )
 }

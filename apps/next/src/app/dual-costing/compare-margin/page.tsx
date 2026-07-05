@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function CompareMarginPage() {
   return (
     <>
-      <PageTitleOverride subtitle="เทียบผลกำไรจาก deal costing กับ stock costing เพื่อการบริหาร" title="Compare Deal vs Stock" />
+      <PageTitleOverride title="Compare Deal vs Stock" />
       <CompareMarginPageClient />
     </>
   )

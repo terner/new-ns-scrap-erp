@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function MatchLogPage() {
   return (
     <>
-      <PageTitleOverride subtitle="บันทึกการ match ต้นทุนเพื่อ audit และตรวจสอบย้อนหลัง" title="Match Log" />
+      <PageTitleOverride title="Match Log" />
       <MatchLogPageClient />
     </>
   )

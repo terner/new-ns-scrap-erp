@@ -168,6 +168,9 @@ export function buildPoSellPrintHtml(po: PoSellPrintDocument, profile: CompanyPr
   }
 
   const totalPages = pages.length
+  const tableQtySummaryText = totalsByUnit(po).map((item) => `${money(item.qty)} ${item.unit}`).join(' / ') || '-'
+  const tableSubtotal = po.items.reduce((sum, item) => sum + (item.qty * item.price), 0)
+  const tableDiscountTotal = po.items.reduce((sum, item) => sum + item.discount, 0)
 
   const pagesHtml = pages.map((pageItems, pageIndex) => {
     const isFirstPage = pageIndex === 0
@@ -183,6 +186,18 @@ export function buildPoSellPrintHtml(po: PoSellPrintDocument, profile: CompanyPr
 
     const startIndex = isFirstPage ? 0 : FIRST_PAGE_ITEM_ROWS + (pageIndex - 1) * CONTINUATION_PAGE_ITEM_ROWS
     const tableRows = itemRows(pageItems, pageIndex, startIndex) + emptyRows(padCount)
+    const tableFooter = isLastPage ? `
+            <tfoot>
+              <tr>
+                <td colspan="3" class="num">รวมทั้งสิ้น</td>
+                <td class="num">${escapeHtml(tableQtySummaryText)}</td>
+                <td></td>
+                <td></td>
+                <td class="num">${money(tableDiscountTotal)}</td>
+                <td class="num final-amount">${money(tableSubtotal - tableDiscountTotal)}</td>
+              </tr>
+            </tfoot>
+          ` : ''
 
     let bottomSectionHtml = ''
     if (isLastPage) {
@@ -354,6 +369,7 @@ export function buildPoSellPrintHtml(po: PoSellPrintDocument, profile: CompanyPr
             <tbody>
               ${tableRows}
             </tbody>
+            ${tableFooter}
           </table>
 
           ${bottomSectionHtml}
@@ -398,6 +414,8 @@ export function buildPoSellPrintHtml(po: PoSellPrintDocument, profile: CompanyPr
       .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
       .items tr { break-inside: avoid; page-break-inside: avoid; }
       .items .empty td { height: 24px; color: transparent; }
+      .items tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .items tfoot .final-amount { color: #6b21a8; }
       .item-name { font-weight: 850; color: #0f172a; }
       .muted { color: #64748b; font-size: 12px; margin-top: 1px; }
       .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -441,6 +459,7 @@ export function buildPoSellPrintHtml(po: PoSellPrintDocument, profile: CompanyPr
         .items { font-size: 12px; margin-top: 7px; page-break-before: auto; }
         .items th { padding: 3px; }
         .items td { padding: 3px; }
+        .items .empty td { height: 18px; }
         .muted { font-size: 12px; }
         .summary-cards { gap: 6px; margin-top: 6px; }
         .summary-card { padding: 5px; }

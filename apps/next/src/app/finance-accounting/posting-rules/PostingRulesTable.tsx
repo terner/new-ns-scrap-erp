@@ -47,12 +47,11 @@ export function PostingRulesTable({ rows }: { rows: readonly RuleGroup[] }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-md bg-white shadow">
       <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Target rule groups</h3>
-            <p className="mt-1 text-xs text-slate-500">รายการนี้เป็น readiness matrix ยังไม่ใช่ account mapping ที่บันทึกลง DB</p>
+            <h3 className="text-sm font-bold text-slate-900">กลุ่มกฎการลงบัญชี</h3>
           </div>
           {columnResize.hasCustomWidths ? (
             <button
@@ -75,10 +74,10 @@ export function PostingRulesTable({ rows }: { rows: readonly RuleGroup[] }) {
           </colgroup>
           <thead className="bg-slate-100">
             <tr>
-              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Group" resizeProps={columnResize.getResizeHandleProps('group', 'Group')} sortKey="group" onSort={handleSort} />
-              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Example source" resizeProps={columnResize.getResizeHandleProps('source', 'Example source')} sortKey="source" onSort={handleSort} />
-              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Target mapping concern" resizeProps={columnResize.getResizeHandleProps('concern', 'Target mapping concern')} sortKey="concern" onSort={handleSort} />
-              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="Readiness" resizeProps={columnResize.getResizeHandleProps('readiness', 'Readiness')} sortKey="readiness" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="กลุ่มงาน" resizeProps={columnResize.getResizeHandleProps('group', 'กลุ่มงาน')} sortKey="group" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="แหล่งข้อมูลตัวอย่าง" resizeProps={columnResize.getResizeHandleProps('source', 'แหล่งข้อมูลตัวอย่าง')} sortKey="source" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="ประเด็นการผูกบัญชี" resizeProps={columnResize.getResizeHandleProps('concern', 'ประเด็นการผูกบัญชี')} sortKey="concern" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="ความพร้อม" resizeProps={columnResize.getResizeHandleProps('readiness', 'ความพร้อม')} sortKey="readiness" onSort={handleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white">
@@ -107,7 +106,7 @@ export function PostingRulesTable({ rows }: { rows: readonly RuleGroup[] }) {
               <RuleStatusBadge>{rule.readiness}</RuleStatusBadge>
             </div>
             <div className="mt-3 text-xs leading-5 text-slate-700">
-              <span className="font-semibold text-slate-500">Target mapping concern: </span>
+              <span className="font-semibold text-slate-500">ประเด็นการผูกบัญชี: </span>
               {rule.concern}
             </div>
           </div>

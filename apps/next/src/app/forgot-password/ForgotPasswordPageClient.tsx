@@ -59,7 +59,6 @@ export function ForgotPasswordPageClient() {
             NS
           </div>
           <h1 className="text-2xl font-bold text-slate-800">ลืมรหัสผ่าน</h1>
-          <p className="text-sm text-slate-500">ระบบจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปที่อีเมล</p>
         </div>
 
         {!isSupabaseReady ? (

@@ -5,6 +5,7 @@ import { Edit3, Plus, Send, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
@@ -337,12 +338,6 @@ export function StockTransferPageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3 text-sm">
-        <MetricCard emoji="📄" label="รายการทั้งหมด" tone="blue" value={`${data.summary.totalRows.toLocaleString('th-TH')} รายการ`} />
-        <MetricCard emoji="⚖️" label="น้ำหนักรวม" tone="blue" value={`${formatMoney(data.summary.totalQty)} กก.`} />
-        <MetricCard className="col-span-2 lg:col-span-1" emoji="💰" label="มูลค่ารวม" tone="emerald" value={`${formatMoney(data.summary.totalValue)} บาท`} />
-      </div>
-
       {/* Desktop Toolbar (Hidden on Mobile) */}
       <div className="hidden md:block rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
@@ -404,20 +399,29 @@ export function StockTransferPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองรายการโอนสินค้า</h4>
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
+        <MobileFilterSheet
+          title="ตัวกรองรายการโอนสินค้า"
+          visibleClassName="md:hidden"
+          onClose={() => setShowMobileFilters(false)}
+          footer={(
+            <>
+              <Button
                 type="button"
+                variant="outline"
+                className="h-11 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  clearFilters()
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-4">
+                ล้างตัวกรอง
+              </Button>
+              <Button type="button" className="h-11 bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700" onClick={() => setShowMobileFilters(false)}>
+                ใช้ตัวกรอง
+              </Button>
+            </>
+          )}
+        >
               <div>
                 <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                 <div className="flex items-center gap-2">
@@ -447,32 +451,13 @@ export function StockTransferPageClient() {
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  clearFilters()
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </Button>
-              <Button type="button" className="h-11 bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700" onClick={() => setShowMobileFilters(false)}>
-                ใช้ตัวกรอง
-              </Button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       {/* FAB for mobile creation */}
       <button
         aria-label="โอนใหม่"
-        className="h-14 w-14 rounded-full bg-blue-600 text-white shadow-lg fixed bottom-6 right-6 z-40 md:hidden flex items-center justify-center hover:bg-blue-700"
+        className="h-14 w-14 rounded-full bg-blue-600 text-white shadow-lg fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 md:hidden flex items-center justify-center hover:bg-blue-700"
         type="button"
         onClick={openCreateForm}
       >
@@ -505,10 +490,14 @@ export function StockTransferPageClient() {
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
           <form noValidate data-combobox-portal-root="true" className="relative w-full max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 shadow-xl outline-none focus:outline-none flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
-            <div className="flex items-center justify-between rounded-t-md bg-slate-900 text-white px-5 py-4 shrink-0">
+            <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white shrink-0">
               <div>
                 <h3 className="font-bold text-slate-100 text-lg">{editingDocNo ? 'แก้ไขรายการโอนสินค้า' : 'โอนสินค้าระหว่างสาขา'}</h3>
-                <p className="mt-1 text-xs text-slate-400">ระบบจะตัด stock ต้นทางและรับเข้าปลายทางเมื่อส่งเข้าสต๊อกเท่านั้น</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <Button size="sm" type="button" variant="outline" className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
+                <Button disabled={isSaving} size="sm" type="button" variant="outline" className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white" onClick={() => submitForm('draft')}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</Button>
+                <Button disabled={isSaving} size="sm" type="button" className="h-9 bg-emerald-600 px-5 font-normal text-white hover:bg-emerald-700" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
               </div>
             </div>
 
@@ -781,11 +770,6 @@ export function StockTransferPageClient() {
               ) : null}
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-md">
-              <Button size="sm" type="button" variant="outline" className="font-normal" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
-              <Button disabled={isSaving} size="sm" type="button" variant="outline" className="font-normal" onClick={() => submitForm('draft')}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</Button>
-              <Button disabled={isSaving} size="sm" type="button" className="bg-slate-900 hover:bg-slate-800 text-white font-normal px-5" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
-            </div>
           </form>
         </div>
       ) : null}
@@ -885,23 +869,6 @@ function formatDateTime(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
-}
-
-function MetricCard(props: { className?: string; emoji: string; label: string; tone: 'blue' | 'emerald'; value: string }) {
-  const toneClass = props.tone === 'emerald'
-    ? { icon: 'bg-emerald-100 text-emerald-700', label: 'text-emerald-600' }
-    : { icon: 'bg-blue-100 text-blue-700', label: 'text-blue-600' }
-  return (
-    <div className={`bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 ${props.className ?? ''}`}>
-      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl shrink-0 ${toneClass.icon}`}>
-        {props.emoji}
-      </div>
-      <div className="min-w-0">
-        <div className={`text-xs ${toneClass.label}`}>{props.label}</div>
-        <div className="truncate font-bold text-slate-900">{props.value}</div>
-      </div>
-    </div>
-  )
 }
 
 function statusLabel(status: Row['status']) {

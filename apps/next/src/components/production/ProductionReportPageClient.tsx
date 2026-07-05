@@ -457,6 +457,14 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
     })
   }, [dashboardMachineSortDir, dashboardMachineSortKey, dashboardMachineUtil])
   const hasActiveFilters = Boolean(displayedDateFrom || displayedDateTo || productSearch || statusFilter)
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams({ format: 'xlsx' })
+    if (displayedDateFrom) params.set('dateFrom', displayedDateFrom)
+    if (displayedDateTo) params.set('dateTo', displayedDateTo)
+    if (productSearch.trim()) params.set('q', productSearch.trim())
+    if (mode === 'report' && statusFilter) params.set('status', statusFilter)
+    return `${config.apiPath}?${params.toString()}`
+  }, [config.apiPath, displayedDateFrom, displayedDateTo, mode, productSearch, statusFilter])
 
   function applyReportRange(range: Exclude<ReportRangeFilter, 'custom'>) {
     setReportRangeFilter(range)
@@ -497,19 +505,6 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
     setDateFrom(start.toISOString().slice(0, 10))
     setDateTo(end.toISOString().slice(0, 10))
     setRangeType(range)
-  }
-
-  function exportCsv() {
-    const header = config.columns.map((column) => column.label)
-    const body = filteredRows.map((row) => config.columns.map((column) => formatDisplayCell(row, column, mode)))
-    const csv = [header, ...body].map((line) => line.map((value) => `"${value.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${mode}-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
   }
 
   function toggleSort(nextKey: string) {
@@ -756,7 +751,6 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold">แดชบอร์ดการผลิต</h1>
-              <p className="mt-1 text-xs opacity-90">รายงานการผลิตแบบสรุป รายวัน / รายเดือน + Charts</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {[
@@ -802,7 +796,6 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
         <div className="lg:hidden flex flex-col gap-3">
           <div>
             <h1 className="text-xl font-bold text-slate-900">แดชบอร์ดการผลิต</h1>
-            <p className="text-xs text-slate-500 font-medium">รายงานการผลิตแบบสรุป รายวัน / รายเดือน</p>
           </div>
 
           {/* Horizontal scrollable range filter pills */}
@@ -1105,9 +1098,9 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
             ) : null}
           </div>
           {config.exportable ? (
-            <button className="rounded-md bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white focus:outline-none w-full sm:w-auto text-center shrink-0" type="button" onClick={exportCsv}>
-              ส่งออก CSV
-            </button>
+            <a className="rounded-md bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white focus:outline-none w-full sm:w-auto text-center shrink-0" href={exportHref}>
+              ส่งออก Excel
+            </a>
           ) : null}
         </div>
         {mode === 'report' ? (
@@ -1171,16 +1164,6 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       {mode === 'report' ? metricGrid : null}
       {mode === 'report' ? reportTabs : filterCard}
-      {mode === 'yieldLoss' ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          แสดง Yield/Loss + <b>P&amp;L Impact</b> — Output ขาดเกิน Normal = Loss สีแดง · Output เกินคาด = Gain สีเขียว · Net P&amp;L = Gain - Loss
-        </div>
-      ) : null}
-      {mode === 'machine' ? (
-        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-          <b>Machine Utilization</b> = ชั่วโมงประมาณการ / (8 ชม./วัน x จำนวนวัน) | <b>Yield Diff</b> = Actual Yield - Normal Yield
-        </div>
-      ) : null}
       {mode !== 'report' ? metricGrid : null}
       {mode === 'yieldLoss' ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-4 text-sm mt-4">

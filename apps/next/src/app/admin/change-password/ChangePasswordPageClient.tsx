@@ -160,7 +160,6 @@ export function ChangePasswordPageClient() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-slate-900">เปลี่ยนรหัสผ่าน</h2>
-            <p className="mt-1 text-sm text-slate-500">ยืนยันรหัสผ่านเดิมก่อนตั้งรหัสผ่านใหม่ของบัญชีผู้ใช้ปัจจุบัน</p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800 shrink-0">
             <ShieldCheck className="size-4" />
@@ -173,7 +172,6 @@ export function ChangePasswordPageClient() {
       <div className="lg:hidden rounded-md bg-white p-3.5 shadow space-y-2.5 border border-slate-100 animate-fade-in">
         <div>
           <h2 className="text-lg font-bold text-slate-900">เปลี่ยนรหัสผ่าน</h2>
-          <p className="mt-0.5 text-xs text-slate-500">ยืนยันรหัสผ่านเดิมก่อนตั้งรหัสผ่านใหม่</p>
         </div>
         <div className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800 w-fit shrink-0">
           <ShieldCheck className="size-3.5" />

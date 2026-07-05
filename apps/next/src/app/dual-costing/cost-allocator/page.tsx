@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function CostAllocatorPage() {
   return (
     <>
-      <PageTitleOverride subtitle="เลือกดีลขายและ preview การหยิบต้นทุนจาก Cost Pool" title="Cost Allocator" />
+      <PageTitleOverride title="Cost Allocator" />
       <Suspense fallback={<div className="p-8 text-center text-xs text-slate-500">กำลังโหลด...</div>}>
         <CostAllocatorPageClient />
       </Suspense>

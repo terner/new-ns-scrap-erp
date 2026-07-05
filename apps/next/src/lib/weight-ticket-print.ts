@@ -485,12 +485,12 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
             </div>
             <div class="panel">
               <div class="panel-title">ข้อมูลน้ำหนัก / Weight Info</div>
-              <div class="panel-body two-col">
+              <div class="panel-body two-col weight-info-grid">
                 <div><div class="field-label">จำนวนรายการ</div><div class="field-value">${lotCount} รายการ</div></div>
                 <div><div class="field-label">น้ำหนักรวม</div><div class="field-value">${formatPrintableNumber(lotGrossWeight)} kg</div></div>
                 <div><div class="field-label">หักภาชนะ</div><div class="field-value">${formatPrintableNumber(lotContainerWeight)} kg</div></div>
                 <div><div class="field-label">หักสิ่งเจือปน</div><div class="field-value">${formatPrintableNumber(ticket.totals.deductionWeight)} kg</div></div>
-                <div><div class="field-label">น้ำหนักสุทธิ</div><div class="field-value strong">${formatPrintableNumber(ticket.totals.netWeight)} kg</div></div>
+                <div class="weight-info-net"><div class="field-label">น้ำหนักสุทธิ</div><div class="field-value strong">${formatPrintableNumber(ticket.totals.netWeight)} kg</div></div>
               </div>
             </div>
           </section>
@@ -521,36 +521,40 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
     <style>
       @page { size: A4 portrait; margin: 10mm; }
       * { box-sizing: border-box; }
-      body { margin: 0; color: #0f172a; font-family: 'Noto Sans Thai', Arial, sans-serif; font-size: 12px; line-height: 1.35; background: #f8fafc; }
+      body { margin: 0; color: #0f172a; font-family: 'Noto Sans Thai', Arial, sans-serif; font-size: 11px; line-height: 1.25; background: #f8fafc; }
       .toolbar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; background: #0f172a; color: white; }
       .toolbar button { border: 0; border-radius: 6px; padding: 7px 14px; background: #15803d; color: white; font: inherit; cursor: pointer; }
       .toolbar button.secondary { background: #475569; }
-      .page { width: 190mm; min-height: 277mm; margin: 0 auto; padding: 7mm; background: white; position: relative; display: flex; flex-direction: column; break-after: page; page-break-after: always; }
+      .page { width: 190mm; min-height: 277mm; margin: 0 auto; padding: 6mm; background: white; position: relative; display: flex; flex-direction: column; break-after: page; page-break-after: always; }
       .page:last-child { break-after: auto; page-break-after: auto; }
-      .accent { height: 4px; background: linear-gradient(90deg, #166534, #65a30d, #cbd5e1); border-radius: 99px; margin-bottom: 12px; flex: 0 0 auto; }
-      .header { display: grid; grid-template-columns: 1fr .9fr; gap: 12px; align-items: start; border-bottom: 1px solid #cbd5e1; padding-bottom: 12px; flex: 0 0 auto; }
-      .company { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: start; min-width: 0; }
-      .logo, .logo-placeholder { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; }
-      .logo-placeholder { display: flex; align-items: center; justify-content: center; border: 1px dashed #cbd5e1; background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 700; text-align: center; }
-      .company-name { font-size: 16px; font-weight: 700; color: #0f172a; }
-      .company-en { font-size: 12px; font-weight: 700; color: #475569; margin-top: 1px; }
-      .company-info { margin-top: 4px; color: #475569; font-size: 12px; }
+      .accent { height: 3px; background: linear-gradient(90deg, #166534, #65a30d, #cbd5e1); border-radius: 99px; margin-bottom: 8px; flex: 0 0 auto; }
+      .header { display: grid; grid-template-columns: 1fr .9fr; gap: 10px; align-items: start; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px; flex: 0 0 auto; }
+      .company { display: grid; grid-template-columns: 52px 1fr; gap: 9px; align-items: start; min-width: 0; }
+      .logo, .logo-placeholder { width: 52px; height: 52px; object-fit: contain; border-radius: 8px; }
+      .logo-placeholder { display: flex; align-items: center; justify-content: center; border: 1px dashed #cbd5e1; background: #f8fafc; color: #64748b; font-size: 10px; font-weight: 700; text-align: center; }
+      .company-name { font-size: 14px; font-weight: 700; color: #0f172a; }
+      .company-en { font-size: 10.5px; font-weight: 700; color: #475569; margin-top: 1px; }
+      .company-info { margin-top: 2px; color: #475569; font-size: 10px; }
       .doc-head { text-align: right; }
-      .doc-title { font-size: 22px; font-weight: 700; color: #14532d; letter-spacing: 0; }
+      .doc-title { font-size: 18px; font-weight: 700; color: #14532d; letter-spacing: 0; }
       .doc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; text-align: left; }
-      .kv { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 7px; background: #f8fafc; }
-      .kv .label, .field-label, .summary-card .label { color: #475569; font-size: 12px; font-weight: 500; }
-      .kv .value, .field-value { font-size: 12.5px; font-weight: 600; color: #0f172a; margin-top: 1px; overflow-wrap: anywhere; }
-      .field-value.strong { font-size: 15.5px; color: #059669; font-weight: 700; }
-      .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; flex: 0 0 auto; }
+      .kv { border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 6px; background: #f8fafc; }
+      .kv .label, .field-label, .summary-card .label { color: #475569; font-size: 10px; font-weight: 500; }
+      .kv .value, .field-value { font-size: 10.5px; font-weight: 600; color: #0f172a; margin-top: 1px; overflow-wrap: anywhere; }
+      .field-value.strong { font-size: 12.5px; color: #059669; font-weight: 700; }
+      .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; flex: 0 0 auto; }
       .panel { border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
-      .panel-title { padding: 6px 9px; background: #f1f5f9; color: #334155; font-weight: 700; }
-      .panel-body { padding: 8px 9px; }
-      .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 12px; }
+      .panel-title { padding: 4px 7px; background: #f1f5f9; color: #334155; font-weight: 700; }
+      .panel-body { padding: 5px 7px; }
+      .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; }
+      .weight-info-grid { gap: 3px 8px; padding-bottom: 8px; }
+      .weight-info-grid > div:nth-child(even), .weight-info-net { text-align: right; }
+      .weight-info-net { grid-column: 2; min-width: 0; }
+      .weight-info-net .field-value { margin-top: 1px; white-space: nowrap; }
       table { width: 100%; border-collapse: collapse; }
-      .items { margin-top: 12px; font-size: 12px; table-layout: fixed; flex: 0 0 auto; }
-      .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 6px 5px; text-align: left; font-weight: 700; }
-      .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
+      .items { margin-top: 8px; font-size: 10.5px; table-layout: fixed; flex: 0 0 auto; }
+      .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 4px 3px; text-align: left; font-weight: 700; }
+      .items td { border: 1px solid #dbe3ea; padding: 4px 3px; vertical-align: top; }
       .items .empty td { height: 24px; color: transparent; }
       .items .product-heading td { background: #f1f5f9; }
       .items .lot-row td { background: #ffffff; }
@@ -558,30 +562,30 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       .items .purchase-row td { background: #eff6ff; }
       .items .product-total td { background: #ecfdf5; font-weight: 700; }
       .item-name { font-weight: 700; color: #0f172a; }
-      .muted { color: #64748b; font-size: 12px; margin-top: 1px; }
+      .muted { color: #64748b; font-size: 9.5px; margin-top: 1px; }
       .detail-line { margin-top: 1px; overflow-wrap: anywhere; }
       .source-row .detail-line:first-child,
       .purchase-row .detail-line:first-child { color: #334155; font-weight: 700; }
       .rank-cell { padding-left: 2px !important; padding-right: 2px !important; }
-      .final-weight { color: #059669; font-size: 13.5px; font-weight: 700; }
+      .final-weight { color: #059669; font-size: 11.5px; font-weight: 700; }
       .r { text-align: right; }
       .c { text-align: center; }
       .strong { font-weight: 700; }
-      .bottom-grid { display: grid; grid-template-columns: 1.2fr 0.8fr 1fr; gap: 10px; margin-top: 12px; align-items: start; break-inside: avoid; page-break-inside: avoid; }
-      .note { min-height: 42px; color: #334155; white-space: pre-wrap; }
+      .bottom-grid { display: grid; grid-template-columns: 1.15fr 0.8fr 1.05fr; gap: 8px; margin-top: 8px; align-items: start; break-inside: avoid; page-break-inside: avoid; }
+      .note { min-height: 28px; color: #334155; white-space: pre-wrap; }
       .summary-cards { display: grid; gap: 8px; }
-      .summary-card { border: 1px solid #dbe3ea; border-radius: 8px; padding: 7px; background: #f8fafc; }
-      .summary-card .value { font-size: 12px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+      .summary-card { border: 1px solid #dbe3ea; border-radius: 8px; padding: 5px; background: #f8fafc; }
+      .summary-card .value { font-size: 10.5px; font-weight: 700; color: #0f172a; margin-top: 2px; }
       .photos { margin-top: 12px; break-inside: avoid; page-break-inside: avoid; }
       .photos-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 8px; border: 1px solid #cbd5e1; border-top: 0; border-radius: 0 0 8px 8px; }
-      .signatures { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 16px; break-inside: avoid; page-break-inside: avoid; }
+      .signatures { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 20px; break-inside: avoid; page-break-inside: avoid; }
       .sig { text-align: center; color: #475569; }
-      .sig-line { border-top: 1px solid #94a3b8; padding-top: 5px; margin-top: 24px; font-weight: 700; color: #1e293b; }
-      .continued { margin-top: auto; padding-top: 12px; text-align: right; color: #64748b; font-weight: 700; }
-      .footer { margin-top: auto; padding-top: 8px; display: flex; justify-content: space-between; gap: 12px; border-top: 1px dashed #cbd5e1; color: #64748b; font-size: 12px; flex: 0 0 auto; }
+      .sig-line { border-top: 1px solid #94a3b8; padding-top: 4px; margin-top: 16px; font-weight: 700; color: #1e293b; }
+      .continued { margin-top: auto; padding-top: 8px; text-align: right; color: #64748b; font-weight: 700; }
+      .footer { margin-top: auto; padding-top: 5px; display: flex; justify-content: space-between; gap: 12px; border-top: 1px dashed #cbd5e1; color: #64748b; font-size: 10px; flex: 0 0 auto; }
       @media print {
         @page { size: A4 portrait; margin: 8mm; }
-        body { background: white; font-size: 12px; line-height: 1.2; }
+        body { background: white; font-size: 10.5px; line-height: 1.18; }
         .toolbar { display: none; }
         .page { width: auto; min-height: 281mm; margin: 0; padding: 0; box-shadow: none; break-after: page; page-break-after: always; }
         .page:last-child { break-after: auto; page-break-after: auto; }
@@ -589,30 +593,31 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
         .header { gap: 10px; padding-bottom: 7px; }
         .company { grid-template-columns: 48px 1fr; gap: 8px; }
         .logo, .logo-placeholder { width: 48px; height: 48px; }
-        .company-name { font-size: 14px; }
-        .company-info { font-size: 12px; line-height: 1.25; margin-top: 2px; }
-        .doc-title { font-size: 19px; }
+        .company-name { font-size: 13px; }
+        .company-info { font-size: 9.5px; line-height: 1.18; margin-top: 1px; }
+        .doc-title { font-size: 16.5px; }
         .doc-grid { gap: 6px 8px; }
         .kv { padding: 3px 5px; }
-        .kv .label, .field-label, .summary-card .label { font-size: 12px; }
-        .kv .value, .field-value { font-size: 12px; }
-        .field-value.strong { font-size: 13.5px; }
+        .kv .label, .field-label, .summary-card .label { font-size: 9.5px; }
+        .kv .value, .field-value { font-size: 10px; }
+        .field-value.strong { font-size: 11.5px; }
         .section-grid { gap: 8px; margin-top: 7px; }
         .panel-title { padding: 4px 7px; }
         .panel-body { padding: 5px 7px; }
         .two-col { gap: 4px 8px; }
-        .items { font-size: 12px; margin-top: 7px; }
-        .items th, .items td { padding: 3px; }
+        .weight-info-grid { gap: 3px 8px; padding-bottom: 6px; }
+        .items { font-size: 10px; margin-top: 6px; }
+        .items th, .items td { padding: 2.5px; }
         .items .empty td { height: 18px; }
-        .muted { font-size: 12px; }
+        .muted { font-size: 9px; }
         .detail-line { margin-top: 0; line-height: 1.25; }
         .bottom-grid { gap: 8px; margin-top: 7px; }
         .note { min-height: 24px; }
         .summary-card { padding: 5px; }
-        .summary-card .value { font-size: 12px; }
-        .signatures { gap: 14px; margin-top: 10px; }
-        .sig-line { margin-top: 16px; padding-top: 3px; }
-        .footer { padding-top: 4px; }
+        .summary-card .value { font-size: 10.5px; }
+        .signatures { gap: 12px; margin-top: 18px; }
+        .sig-line { margin-top: 12px; padding-top: 3px; }
+        .footer { padding-top: 3px; }
       }
     </style>
   </head><body>

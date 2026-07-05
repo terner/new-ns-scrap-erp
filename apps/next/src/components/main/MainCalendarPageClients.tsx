@@ -219,7 +219,7 @@ export function CashFlowCalendarPageClient() {
         {(data?.weeks ?? []).map((week, weekIndex) => <div key={weekIndex} className="grid grid-cols-7 border-t border-slate-100">{week.map((day, dayIndex) => day ? <button key={day.date} aria-label={`ดูรายการวันที่ ${day.date}`} className={`min-h-[110px] border-r border-slate-100 p-2 text-left text-xs transition hover:bg-slate-50/50 outline-none ${day.isNegative ? 'bg-red-50/30' : 'bg-white'} ${day.isToday ? 'ring-2 ring-amber-400 ring-inset' : ''}`} data-cash-day={day.date} type="button" onClick={() => setSelectedDayDate(day.date)} onPointerDown={() => setSelectedDayDate(day.date)}><div className="flex items-start justify-between"><span className={`font-bold ${day.weekday === 0 || day.weekday === 6 ? 'text-red-500' : 'text-slate-600'}`}>{day.day}</span>{day.entryCount ? <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-bold text-blue-700">{day.entryCount}</span> : null}</div><div className="mt-2 space-y-1 font-mono text-xs"><div className="text-emerald-700 font-semibold">↑ {money(day.cashIn)}</div><div className="text-red-700 font-semibold">↓ {money(day.cashOut)}</div><div className={`border-t border-slate-100 pt-1 font-bold ${day.ending < 0 ? 'text-red-600' : 'text-slate-700'}`}>{money(day.ending)}</div></div></button> : <div key={`empty-${weekIndex}-${dayIndex}`} className="min-h-[110px] border-r border-slate-100 bg-slate-50/50" />)}</div>)}
       </div>
       <div className="flex flex-wrap gap-3 text-xs text-slate-500"><Legend color="bg-emerald-500" text="เงินเข้า" /><Legend color="bg-red-500" text="เงินออก" /><Legend color="bg-red-100" text="ยอดติดลบ" /><Legend color="bg-amber-300" text="วันนี้" /><span>คลิกแต่ละวันเพื่อดูรายการละเอียด</span></div>
-      <Notice text={data?.sourceState.limitations[0]} />{error ? <ErrorBox text={error} /> : null}
+      {error ? <ErrorBox text={error} /> : null}
       {selectedDay ? <CashDayModal day={selectedDay} onClose={() => setSelectedDayDate('')} /> : null}
     </section>
   )
@@ -390,7 +390,7 @@ export function BusinessCalendarPageClient() {
         </Panel>
       </div>
       {mode === 'combined' ? <BusinessCombinedTable days={data?.days ?? []} /> : <BusinessModeTable days={data?.days ?? []} mode={mode} />}
-      <Notice text={data?.sourceState.limitations[0]} />{error ? <ErrorBox text={error} /> : null}
+      {error ? <ErrorBox text={error} /> : null}
     </section>
   )
 }
@@ -431,13 +431,12 @@ function BusinessCombinedTable({ days }: { days: BusinessDay[] }) {
   return (
     <>
       {/* Desktop view */}
-      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        {columnResize.hasCustomWidths ? (
-          <div className="flex justify-end border-b border-slate-100 px-3 py-3">
-            <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
-          </div>
-        ) : null}
-        <div className="overflow-x-auto">
+      {columnResize.hasCustomWidths ? (
+        <div className="mb-2 hidden justify-end lg:flex">
+          <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+        </div>
+      ) : null}
+      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
         <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {businessCombinedColumns.map((column) => (
@@ -477,7 +476,6 @@ function BusinessCombinedTable({ days }: { days: BusinessDay[] }) {
             </tr>)}
           </tbody>
         </table>
-        </div>
       </div>
 
       {/* Mobile view */}
@@ -551,13 +549,12 @@ function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<
   return (
     <Panel title={config.title}>
       {/* Desktop view */}
-      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        {columnResize.hasCustomWidths ? (
-          <div className="flex justify-end border-b border-slate-100 px-3 py-3">
-            <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
-          </div>
-        ) : null}
-        <div className="overflow-x-auto">
+      {columnResize.hasCustomWidths ? (
+        <div className="mb-2 hidden justify-end lg:flex">
+          <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+        </div>
+      ) : null}
+      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
         <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {columns.map((column) => (
@@ -591,7 +588,6 @@ function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<
             {sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400 text-xs" colSpan={columns.length}>ไม่มีข้อมูล</td></tr> : null}
           </tbody>
         </table>
-        </div>
       </div>
 
       {/* Mobile view */}
@@ -673,13 +669,13 @@ function CashDayModal({ day, onClose }: { day: CashDay; onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl border-none">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 p-4 text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-md bg-slate-900 shadow-2xl border-0">
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 p-4 text-white">
           <h2 className="font-bold text-sm sm:text-base">รายการวันที่ {day.date}</h2>
-          <button className="text-slate-400 hover:text-white font-semibold text-sm outline-none" type="button" onClick={onClose}>ปิด</button>
+          <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={onClose}>ปิด</button>
         </div>
-        <div className="space-y-4 overflow-y-auto p-4 max-h-[calc(85vh-80px)]">
+        <div className="space-y-4 overflow-y-auto bg-slate-50 p-4 max-h-[calc(85vh-80px)]">
           <div className="grid grid-cols-3 gap-3">
             <Metric label="เงินเข้า" value={money(day.cashIn)} tone="emerald" />
             <Metric label="เงินออก" value={money(day.cashOut)} tone="red" />
@@ -687,13 +683,12 @@ function CashDayModal({ day, onClose }: { day: CashDay; onClose: () => void }) {
           </div>
           
           {/* Desktop Table View */}
-          <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm sm:block">
-            {columnResize.hasCustomWidths ? (
-              <div className="flex justify-end border-b border-slate-100 px-3 py-3">
-                <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
-              </div>
-            ) : null}
-            <div className="overflow-x-auto">
+          {columnResize.hasCustomWidths ? (
+            <div className="mb-2 hidden justify-end sm:flex">
+              <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+            </div>
+          ) : null}
+          <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm sm:block">
             <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {cashEntryColumns.map((column) => (
@@ -727,7 +722,6 @@ function CashDayModal({ day, onClose }: { day: CashDay; onClose: () => void }) {
                 {sortedEntries.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={cashEntryColumns.length}>ไม่มีรายการ</td></tr> : null}
               </tbody>
             </table>
-            </div>
           </div>
 
           {/* Mobile view inside Modal */}
@@ -805,10 +799,6 @@ function ModeButton({ active, mode, onClick }: { active: boolean; mode: Mode; on
     sales: 'bg-emerald-600 border-emerald-600 text-white'
   }
   return <button className={`rounded-lg border px-3 py-2 text-sm font-bold outline-none ${active ? activeClass[mode] : 'bg-white border-slate-100 text-slate-600 hover:bg-slate-50'}`} type="button" onClick={onClick} onPointerDown={onClick}>{label[mode]}</button>
-}
-
-function Notice({ text }: { text?: string }) {
-  return <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3 text-sm text-amber-900"><b>Read-only baseline</b><span className="ml-2">{text ?? 'ไม่มี write action ใน baseline นี้'}</span></div>
 }
 
 function ErrorBox({ text }: { text: string }) {

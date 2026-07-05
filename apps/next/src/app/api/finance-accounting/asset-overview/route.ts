@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       sourceState: {
         ...cashPayload.sourceState,
         limitations: [
-          'Net Worth / Track Asset เป็น management/read baseline จาก Financial Dashboard + Cash & Others legacy surfaces; ยังไม่ใช่ statutory balance sheet หรือ GL close report.',
+          'Net Worth / Track Asset เป็น management source จาก Financial Dashboard + Cash & Others legacy surfaces; ยังไม่ใช่ statutory balance sheet หรือ GL close report.',
           ...cashPayload.sourceState.limitations,
         ],
       },

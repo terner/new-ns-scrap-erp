@@ -147,9 +147,6 @@ export function FcdLedgerPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
-        <strong>FCD Ledger</strong> - เดินบัญชีเงินตราต่างประเทศ แสดงทั้งยอดสกุลต่างประเทศและมูลค่า THB equivalent
-      </div>
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 

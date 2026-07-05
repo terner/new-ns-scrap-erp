@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Client } from 'pg'
 
-const csvPath = process.argv.find((arg) => arg.endsWith('.csv')) ?? 'nsscrap permission and master data   - ผู้ขาย.csv'
+const csvPath = process.argv.find((arg) => arg.endsWith('.csv')) ?? 'docs/tasks/assets/reference/nsscrap permission and master data   - ผู้ขาย.csv'
 const shouldApply = process.argv.includes('--apply')
 const defaultOwnerName = 'PLOY'
 const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)

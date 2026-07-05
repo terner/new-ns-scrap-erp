@@ -94,7 +94,6 @@ export function ResetPasswordPageClient() {
             NS
           </div>
           <h1 className="text-2xl font-bold text-slate-800">ตั้งรหัสผ่านใหม่</h1>
-          <p className="text-sm text-slate-500">กรอกรหัสผ่านใหม่จากลิงก์ reset password ที่ได้รับทางอีเมล</p>
         </div>
 
         {!isSupabaseReady ? (

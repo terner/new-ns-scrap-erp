@@ -156,7 +156,7 @@ export async function buildCashOthersSummary(asOfValue?: string | null, branchId
       stock: { paidVal: stock.value * paidRatio, qty: stock.qty, unpaidVal: stock.value * (1 - paidRatio), val: stock.value },
     },
     sourceState: {
-      limitations: ['Cash & Others Summary เป็น management/read baseline; customer/supplier advance target tables ยังไม่ยืนยันจึงแสดง 0 และไม่เปิด allocation/write/reclass/export actions.'],
+      limitations: ['Cash & Others Summary เป็น management source; customer/supplier advance target tables ยังไม่ยืนยันจึงแสดง 0 และไม่เปิด allocation/write/reclass/export actions.'],
       writeActionsEnabled: false,
     },
     summary: { cashNeededToday, netWorth: totalAsset - totalDebt, totalAsset, totalCash, totalDebt },

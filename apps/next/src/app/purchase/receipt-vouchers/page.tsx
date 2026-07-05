@@ -11,7 +11,6 @@ export default function ReceiptVouchersPage() {
     <>
       <PageTitleOverride
         title="ใบสำคัญรับเงิน (Receipt Voucher)"
-        subtitle="ใช้ออกให้ Supplier บุคคลธรรมดาเซ็นรับเงิน (กรณีไม่มีใบเสร็จของ Supplier) — ดึงข้อมูลจากบิลซื้อ + แก้ไขส่วนที่ขาดได้ + พิมพ์ออกได้"
       />
       <ReceiptVouchersPageClient />
     </>

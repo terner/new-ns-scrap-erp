@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ButtonHTMLAttributes } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Printer, RotateCcw, Search, Share2, SquarePen, XCircle, CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Download, Plus, Printer, RotateCcw, Search, Share2, SquarePen, XCircle } from 'lucide-react'
 import { getErrorMessage } from '@/lib/api-client'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Button } from '@/components/ui/Button'
@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Select } from '@/components/ui/Select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -223,6 +224,15 @@ export function WeightTicketListPageClient() {
   const safePage = Math.min(page, totalPages)
   const activeFilters = Boolean(query || statusFilter.length > 0 || branchFilter !== 'all' || dateFrom || dateTo)
   const statusOptions = useMemo(() => statusOptionsByType[typeFilter], [typeFilter])
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams({ format: 'xlsx', sortBy, sortDir, type: typeFilter })
+    if (branchFilter !== 'all') params.set('branchId', branchFilter)
+    if (dateFrom) params.set('dateFrom', dateFrom)
+    if (dateTo) params.set('dateTo', dateTo)
+    if (query.trim()) params.set('search', query.trim())
+    if (statusFilter.length > 0) params.set('status', statusFilter.join(','))
+    return `/api/daily/weight-tickets?${params.toString()}`
+  }, [branchFilter, dateFrom, dateTo, query, sortBy, sortDir, statusFilter, typeFilter])
 
   useEffect(() => {
     let cancelled = false
@@ -476,7 +486,13 @@ export function WeightTicketListPageClient() {
               }}
             />
             <Button disabled={!activeFilters} type="button" variant="secondary" onClick={clearFilters}>ล้างตัวกรอง</Button>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <Button asChild className="gap-2" variant="export">
+                <a href={exportHref}>
+                  <Download className="size-4" />
+                  <span>ส่งออก Excel</span>
+                </a>
+              </Button>
               <Button onClick={() => setActiveForm({ type: typeFilter })}>
                 <Plus className="mr-2 size-4" />
                 สร้างใบรับ-ส่งของ
@@ -524,71 +540,19 @@ export function WeightTicketListPageClient() {
             ตัวกรอง {activeFilters ? '(มี)' : ''}
           </button>
         </div>
+        <Button asChild className="w-full gap-2" size="sm" variant="export">
+          <a href={exportHref}>
+            <Download className="size-4" />
+            <span>ส่งออก Excel</span>
+          </a>
+        </Button>
       </div>
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองใบรับ-ส่งของ</h4>
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
-                type="button"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
-                <div className="flex items-center gap-2">
-                  <DatePickerInput className="flex-1" value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} />
-                  <span className="text-slate-400">→</span>
-                  <DatePickerInput className="flex-1" value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} />
-                </div>
-              </div>
-
-              <div>
-                <span className="mb-1 block text-xs font-semibold text-slate-600">สาขา</span>
-                <BranchSelectCombobox
-                  allOptionLabel="ทุกสาขา"
-                  branches={branches.map((branch) => ({ id: branch.id, name: branch.label }))}
-                  className="w-full"
-                  includeAllOption
-                  inputId="weight-ticket-branch-filter-mobile"
-                  label=""
-                  placeholder="เลือกสาขา"
-                  value={branchFilter === 'all' ? null : branchFilter}
-                  onChange={(branchId) => {
-                    setBranchFilter(branchId ?? 'all')
-                    setPage(1)
-                  }}
-                />
-              </div>
-
-              <div>
-                <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะเอกสาร</span>
-                <div className="flex flex-wrap gap-2">
-                  {statusOptions.map((option) => (
-                    <SegmentMulti
-                      current={statusFilter}
-                      key={`mobile-${typeFilter}-${option.label}`}
-                      label={option.label}
-                      onClick={(values) => {
-                        setStatusFilter(values as WeightTicketStatus[])
-                        setPage(1)
-                      }}
-                      values={option.values}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+        <MobileFilterSheet
+          footer={(
+            <>
               <button
                 type="button"
                 className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -606,9 +570,57 @@ export function WeightTicketListPageClient() {
               >
                 ใช้ตัวกรอง
               </button>
+            </>
+          )}
+          onClose={() => setShowMobileFilters(false)}
+          title="ตัวกรองใบรับ-ส่งของ"
+          visibleClassName="md:hidden"
+        >
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
+            <div className="flex items-center gap-2">
+              <DatePickerInput className="flex-1" value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} />
+              <span className="text-slate-400">→</span>
+              <DatePickerInput className="flex-1" value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} />
             </div>
           </div>
-        </div>
+
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">สาขา</span>
+            <BranchSelectCombobox
+              allOptionLabel="ทุกสาขา"
+              branches={branches.map((branch) => ({ id: branch.id, name: branch.label }))}
+              className="w-full"
+              includeAllOption
+              inputId="weight-ticket-branch-filter-mobile"
+              label=""
+              placeholder="เลือกสาขา"
+              value={branchFilter === 'all' ? null : branchFilter}
+              onChange={(branchId) => {
+                setBranchFilter(branchId ?? 'all')
+                setPage(1)
+              }}
+            />
+          </div>
+
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะเอกสาร</span>
+            <div className="flex flex-wrap gap-2">
+              {statusOptions.map((option) => (
+                <SegmentMulti
+                  current={statusFilter}
+                  key={`mobile-${typeFilter}-${option.label}`}
+                  label={option.label}
+                  onClick={(values) => {
+                    setStatusFilter(values as WeightTicketStatus[])
+                    setPage(1)
+                  }}
+                  values={option.values}
+                />
+              ))}
+            </div>
+          </div>
+        </MobileFilterSheet>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 text-sm text-slate-600">
@@ -644,10 +656,17 @@ export function WeightTicketListPageClient() {
         ) : tickets.length === 0 ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">ยังไม่มีรายการตามเงื่อนไข</div>
         ) : (
-          tickets.map((ticket) => (
+          tickets.map((ticket) => {
+            const isCancelled = ticket.status === 'cancelled'
+            return (
             <div
               key={ticket.id}
-              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors space-y-3"
+              className={cn(
+                'cursor-pointer space-y-3 rounded-md border p-4 shadow-sm transition-colors',
+                isCancelled
+                  ? 'border-red-300 border-l-8 border-l-red-600 bg-red-100/80 ring-1 ring-red-200 active:bg-red-200/70'
+                  : 'border-slate-200 bg-white active:bg-slate-50',
+              )}
               onClick={() => setActiveDetailId(ticket.id)}
             >
               <div className="flex justify-between items-start">
@@ -655,7 +674,10 @@ export function WeightTicketListPageClient() {
                 <span className="text-sm text-slate-500">{formatDateTime(ticket.createdAt)}</span>
               </div>
 
-              <div className="text-sm text-slate-700 space-y-1.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
+              <div className={cn(
+                'space-y-1.5 rounded-md border p-3 text-sm text-slate-700',
+                isCancelled ? 'border-red-200 bg-white/80' : 'border-slate-100 bg-slate-50',
+              )}>
                 <div>
                   <span className="font-semibold text-slate-500">{typeFilter === 'WTI' ? 'ผู้ขาย: ' : 'ลูกค้า: '}</span>
                   <span className="text-slate-900">{ticket.partyName}</span>
@@ -670,11 +692,16 @@ export function WeightTicketListPageClient() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-2.5 border-t border-slate-100">
+              <div className={cn(
+                'flex items-center justify-between border-t pt-2.5',
+                isCancelled ? 'border-red-200' : 'border-slate-100',
+              )}>
                 <div>
                   <span className={cn(
                     'inline-flex items-center gap-1.5 text-sm font-semibold px-2 py-0.5 rounded',
-                    weightTicketStatusBadgeClass(ticket.type, ticket.status),
+                    isCancelled
+                      ? 'bg-red-100 text-red-800 ring-1 ring-red-200'
+                      : weightTicketStatusBadgeClass(ticket.type, ticket.status),
                   )}
                   >
                     <span className="size-1.5 rounded-full bg-current" />
@@ -688,7 +715,10 @@ export function WeightTicketListPageClient() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap justify-end items-center gap-2 mt-3 pt-2.5 border-t border-slate-100/50" onClick={(e) => e.stopPropagation()}>
+              <div className={cn(
+                'mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-2.5',
+                isCancelled ? 'border-red-200' : 'border-slate-100/50',
+              )} onClick={(e) => e.stopPropagation()}>
                 {canOpenPurchaseBillFromTicket(ticket) ? (
                   <button
                     className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50"
@@ -769,7 +799,8 @@ export function WeightTicketListPageClient() {
                 ) : null}
               </div>
             </div>
-          ))
+          )
+          })
         )}
       </div>
 
@@ -815,13 +846,23 @@ export function WeightTicketListPageClient() {
                 </tr>
               ) : tickets.map((ticket) => {
                 const { date: ticketDate, time: ticketTime } = formatDateTimeSplit(ticket.createdAt)
+                const isCancelled = ticket.status === 'cancelled'
                 return (
                   <tr
-                    className="cursor-pointer hover:bg-slate-50"
+                    className={cn(
+                      'cursor-pointer transition-colors',
+                      isCancelled ? 'bg-red-100/70 hover:bg-red-200/70' : 'hover:bg-slate-50',
+                    )}
                     key={ticket.id}
                     onClick={() => setActiveDetailId(ticket.id)}
                   >
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-900">{ticket.documentNo}</td>
+                    <td className={cn(
+                      'relative whitespace-nowrap px-3 py-3 text-slate-900',
+                      isCancelled ? 'font-semibold text-red-900' : '',
+                    )}>
+                      {isCancelled ? <span aria-hidden className="absolute inset-y-0 left-0 w-2 bg-red-600" /> : null}
+                      <span className={isCancelled ? 'pl-2' : undefined}>{ticket.documentNo}</span>
+                    </td>
                     <td className="whitespace-nowrap px-3 py-3 text-slate-600">
                       <div>{ticketDate}</div>
                       {ticketTime ? <div className="text-xs text-slate-400 mt-0.5">{ticketTime}</div> : null}
@@ -835,7 +876,9 @@ export function WeightTicketListPageClient() {
                       <div className="flex min-h-[23px] flex-col items-start justify-center">
                         <span className={cn(
                           'inline-flex items-center gap-1.5 text-xs font-medium',
-                          weightTicketStatusBadgeClass(ticket.type, ticket.status),
+                          isCancelled
+                            ? 'rounded-md bg-red-100 px-2 py-0.5 font-semibold text-red-800 ring-1 ring-red-200'
+                            : weightTicketStatusBadgeClass(ticket.type, ticket.status),
                         )}
                         >
                           <span className="size-1.5 rounded-full bg-current" />
@@ -969,11 +1012,11 @@ export function WeightTicketListPageClient() {
         }
       }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent hideClose mobileAppShell={false} className="max-w-lg rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 outline-none focus:outline-none">
           <DialogHeader>
             <DialogTitle>แชร์ใบรับ-ส่งของ</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 px-4 pb-4">
+          <div className="space-y-3 bg-slate-50 p-4">
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
               <div className="font-semibold text-slate-900">{shareTicket?.documentNo}</div>
               <div className="mt-1 text-xs text-slate-500">{shareTicket?.partyName} · {shareTicket ? `${formatWeight(shareTicket.totals.netWeight)} กก.` : ''}</div>
@@ -1014,11 +1057,11 @@ export function WeightTicketListPageClient() {
         }
       }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent hideClose mobileAppShell={false} className="max-w-lg rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 outline-none focus:outline-none">
           <DialogHeader>
             <DialogTitle>ยกเลิกใบรับ-ส่งของ</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 px-4 pb-4">
+          <div className="space-y-3 bg-slate-50 p-4">
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
               <div className="text-sm text-slate-900">{cancelTicket?.documentNo}</div>
               {cancelTicket ? (
@@ -1084,16 +1127,12 @@ export function WeightTicketListPageClient() {
         <Dialog open onOpenChange={(open) => {
           if (!open) setActiveForm(null)
         }}>
-          <DialogContent hideClose aria-labelledby="weight-ticket-form-title" className="max-h-[95vh] max-w-7xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" data-combobox-portal-root="true">
-            <DialogHeader className="px-5 py-3 bg-slate-900 text-white shrink-0">
-              <DialogTitle id="weight-ticket-form-title">
-                {activeForm.id ? 'แก้ไขใบรับ-ส่งของ' : activeForm.type === 'WTI' ? 'สร้างใบรับของ WTI' : 'สร้างใบส่งของ WTO'}
-              </DialogTitle>
-            </DialogHeader>
+          <DialogContent hideClose aria-labelledby="weight-ticket-form-title" className="max-h-[95vh] max-w-7xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" data-combobox-portal-root="true">
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50 p-0">
               <WeightTicketsPageClient
+                embeddedModal
                 initialType={activeForm.type}
-                lockType={Boolean(activeForm.id)}
+                lockType
                 ticketId={activeForm.id}
                 onClose={() => setActiveForm(null)}
                 onSaveSuccess={() => {
@@ -1109,11 +1148,12 @@ export function WeightTicketListPageClient() {
       <Dialog open={!!successModalMessage}>
         <DialogContent
           hideClose
-          className="share-success-modal max-w-sm"
+          mobileAppShell={false}
+          className="share-success-modal max-w-sm rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 outline-none focus:outline-none"
           onEscapeKeyDown={(event) => event.preventDefault()}
           onInteractOutside={(event) => event.preventDefault()}
         >
-          <div className="flex flex-col items-center justify-center p-6 space-y-4">
+          <div className="flex flex-col items-center justify-center space-y-4 bg-white p-6">
             <div className="share-success-icon-wrap rounded-full bg-emerald-100 p-3">
               <CheckCircle2 className="share-success-icon h-8 w-8 text-emerald-600" />
             </div>

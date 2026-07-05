@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { z } from 'zod'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { getErrorMessage, readBlobResponse, readJsonResponse } from '@/lib/api-client'
@@ -272,7 +273,6 @@ export function TransactionLedgerPageClient() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-md bg-gradient-to-r from-cyan-700 to-blue-700 p-4 text-white shadow">
         <div>
           <h1 className="text-xl font-bold">📒 Transaction Ledger — เช็คเงินเข้า-ออกทุกบัญชี</h1>
-          <p className="mt-1 text-sm opacity-90">ตรวจสอบทุกการเคลื่อนไหวในบัญชีธนาคารจาก bank statement พร้อม source voucher และบิลที่เกี่ยวข้อง</p>
         </div>
         <button className="rounded-md bg-white/15 px-4 py-2 text-sm font-bold text-white shadow hover:bg-white/25 disabled:opacity-60 shrink-0 self-start md:self-auto" disabled={isLoading} type="button" onClick={() => void loadData()}>
           {isLoading ? 'กำลังโหลด...' : '🔄 รีเฟรช'}
@@ -412,20 +412,31 @@ export function TransactionLedgerPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองรายการ</h4>
+        <MobileFilterSheet
+          footer={
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  clearFilters()
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4">
+              <button
+                type="button"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          }
+          onClose={() => setShowMobileFilters(false)}
+          title="ตัวกรองรายการ"
+        >
               <div>
                 <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                 <div className="flex items-center gap-2">
@@ -450,29 +461,7 @@ export function TransactionLedgerPageClient() {
                   {refTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  clearFilters()
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       {duplicateGroups.length > 0 ? (
@@ -619,10 +608,6 @@ export function TransactionLedgerPageClient() {
           กำลังโหลด Transaction Ledger...
         </div>
       ) : null}
-
-      <div className="rounded-md border-l-4 border-amber-500 bg-amber-50 p-3 text-xs text-amber-800">
-        <b>💡 คำแนะนำ:</b> หน้านี้เป็น read-only ledger view สำหรับตรวจยอดเงินเข้า-ออกจาก `bank_statement` พร้อม source voucher และบิลที่เกี่ยวข้อง การแก้ไข/ลบรายการควรเปิดพร้อม audit log และ reconciliation rule.
-      </div>
     </section>
   )
 }

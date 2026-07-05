@@ -20,7 +20,6 @@ export default async function WeightTicketsPage({
   return (
     <>
       <PageTitleOverride
-        subtitle={editing ? 'แก้ไขได้จนกว่าจะถูกนำไปใช้กับบิลรับซื้อหรือบิลขาย' : 'ระบบจะออกเลขเอกสาร วันที่ เวลา และผู้กรอกหลังบันทึก'}
         title="ชั่งสินค้า / รับ-ส่งของ"
       />
       <WeightTicketsPageClient initialType={initialType} lockType={lockType} ticketId={ticketId ?? ''} />

@@ -80,8 +80,6 @@ function usageActionLabel(action: string) {
   if (action === 'released_from_purchase_bill') return 'คืนยอดจากบิลรับซื้อ'
   if (action === 'allocated_to_sales_bill') return 'นำไปออกบิลขาย'
   if (action === 'released_from_sales_bill') return 'คืนยอดจากบิลขาย'
-  if (action === 'returned_from_wto') return 'รับของคืนจาก WTO'
-  if (action === 'loss_from_wto_return') return 'ของขาดจากรับคืน WTO'
   return action || '-'
 }
 
@@ -289,7 +287,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
 
       <div className="space-y-4">
           <Card className="p-5">
-            <SectionTitle subtitle="ข้อมูลเอกสารและผู้ใช้งาน" title="ข้อมูลเอกสาร" />
+            <SectionTitle title="ข้อมูลเอกสาร" />
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <DetailItem
                 label={ticket.type === 'WTI' ? 'ใบรับของ' : 'ใบส่งของ'}
@@ -360,7 +358,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
           </div>
 
           <Card className="p-5">
-            <SectionTitle subtitle="ข้อมูลคู่ค้าและรถที่ใช้ส่งสินค้า" title={ticket.type === 'WTI' ? 'ข้อมูลผู้ขาย' : 'ข้อมูลลูกค้า'} />
+            <SectionTitle title={ticket.type === 'WTI' ? 'ข้อมูลผู้ขาย' : 'ข้อมูลลูกค้า'} />
             <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
               <div className="grid gap-4 md:grid-cols-2">
                 <DetailItem label={ticket.type === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} value={ticket.partyName} />
@@ -378,7 +376,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
             <div className="space-y-4">
               <Card className="overflow-hidden p-0">
                 <div className="border-b border-slate-100 px-5 py-4">
-                  <SectionTitle subtitle="เรียงตามสินค้า รวมเต๋าจริง สิ่งเจือปน และรายการซื้อเพิ่มไว้ในกลุ่มเดียว" title="รายละเอียดสินค้าและที่มา" />
+                  <SectionTitle title="รายละเอียดสินค้าและที่มา" />
                 </div>
                 <WeightTicketProductBreakdownTable
                   showBillingColumns
@@ -390,7 +388,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
             </div>
 
             <Card className="p-5">
-              <SectionTitle subtitle="สถานะปัจจุบันของเอกสาร" title="สถานะ" />
+              <SectionTitle title="สถานะ" />
               <div className="mt-4 space-y-3">
                 <div className="rounded-md bg-slate-50 px-4 py-3">
                   <div className="text-sm font-semibold text-slate-500">สถานะเอกสาร</div>
@@ -440,9 +438,55 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
         {ticket.type === 'WTI' ? (
           <Card className="overflow-hidden p-0">
             <div className="border-b border-slate-100 px-5 py-4">
-              <SectionTitle subtitle="บันทึกการนำใบรับของไปออกบิลและการคืนยอด" title="ประวัติการใช้งานใบรับของ" />
+              <SectionTitle title="ประวัติการใช้งานใบรับของ" />
             </div>
-            <div className="overflow-x-auto">
+            <div className="space-y-3 p-4 lg:hidden">
+              {ticket.usageTimeline.length === 0 ? (
+                <div className="rounded-md border border-slate-100 bg-white px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีประวัติการใช้งาน</div>
+              ) : ticket.usageTimeline.map((event) => (
+                <div key={event.id} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-slate-900">{usageActionLabel(event.action)}</div>
+                      <div className="mt-1 text-xs text-slate-500">{formatDateTime(event.createdAt)}</div>
+                    </div>
+                    <div className={cn('shrink-0 text-right text-sm font-semibold tabular-nums', usageWeightClass(event.action))}>
+                      {usageWeightLabel(event.action, event.allocatedNetWeight)}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div className="col-span-2">
+                      <div className="text-xs text-slate-500">สินค้า</div>
+                      <div className="mt-1 font-medium text-slate-900">{event.productName}</div>
+                      {event.productCode ? <div className="text-xs text-slate-500">{event.productCode}</div> : null}
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500">เอกสารปลายทาง</div>
+                      <div className="mt-1">
+                        {event.targetDocNo ? (
+                          <Link className="font-medium text-blue-700 hover:underline" href={`/purchase/bills/${encodeURIComponent(event.targetDocNo)}`}>
+                            {event.targetDocNo}
+                          </Link>
+                        ) : (
+                          '-'
+                        )}
+                      </div>
+                      {event.targetLineNo ? <div className="text-xs text-slate-500">รายการ {event.targetLineNo}</div> : null}
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500">คงเหลือหลังรายการ</div>
+                      <div className="mt-1 tabular-nums text-slate-900">{event.toRemainingWeight == null ? '-' : `${formatWeight(event.toRemainingWeight)} กก.`}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <div className="text-xs text-slate-500">ผู้ทำรายการ/หมายเหตุ</div>
+                      <div className="mt-1 text-slate-700">{event.createdBy || '-'}</div>
+                      {event.note ? <div className="mt-1 text-xs text-slate-500">{event.note}</div> : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto lg:block">
               <table className="min-w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold text-xs">
                   <tr>
@@ -501,11 +545,55 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
         <Card className="overflow-hidden p-0">
           <div className="border-b border-slate-100 px-5 py-4">
             <SectionTitle
-              subtitle={ticket.type === 'WTI' ? 'แสดงว่าใบรับของถูกนำไปใช้กับบิลรับซื้อไหนบ้าง' : 'แสดงว่าใบส่งของถูกนำไปใช้กับบิลขายไหนบ้าง'}
               title={ticket.type === 'WTI' ? 'ปลายทางการใช้งานใบรับของ' : 'ปลายทางการใช้งานใบส่งของ'}
             />
           </div>
-          <div className="overflow-x-auto">
+          <div className="space-y-3 p-4 lg:hidden">
+            {ticket.downstreamAllocations.length === 0 ? (
+              <div className="rounded-md border border-slate-100 bg-white px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีปลายทางการใช้งาน</div>
+            ) : ticket.downstreamAllocations.map((allocation) => (
+              <div key={allocation.id} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-900">{downstreamDocLabel(allocation.targetType)}</div>
+                    <div className="mt-1 text-xs text-slate-500">{formatDateTime(allocation.createdAt)}</div>
+                  </div>
+                  <Link className="shrink-0 font-medium text-blue-700 hover:underline" href={downstreamDocHref(allocation.targetType, allocation.targetDocNo)}>
+                    {allocation.targetDocNo}
+                  </Link>
+                </div>
+                {allocation.targetLineNo ? <div className="mt-1 text-xs text-slate-500">รายการ {allocation.targetLineNo}</div> : null}
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div className="col-span-2">
+                    <div className="text-xs text-slate-500">สินค้า</div>
+                    <div className="mt-1 font-medium text-slate-900">{allocation.productName}</div>
+                    {allocation.productCode ? <div className="text-xs text-slate-500">{allocation.productCode}</div> : null}
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">น้ำหนักรวม</div>
+                    <div className="mt-1 tabular-nums text-slate-900">{formatWeight(allocation.allocatedGrossWeight)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">หัก</div>
+                    <div className="mt-1 tabular-nums text-slate-900">{formatWeight(allocation.allocatedDeductWeight)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">น้ำหนักสุทธิ</div>
+                    <div className="mt-1 font-semibold tabular-nums text-slate-900">{formatWeight(allocation.allocatedNetWeight)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">สถานะ</div>
+                    <div className="mt-1 text-slate-700">{allocation.status || '-'}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-slate-500">ผู้ทำรายการ</div>
+                    <div className="mt-1 text-slate-700">{allocation.createdBy || '-'}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto lg:block">
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold text-xs">
                 <tr>
@@ -554,7 +642,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
         </Card>
 
         <Card className="p-5">
-          <SectionTitle subtitle="รวมสถานะเอกสารและประวัติการใช้งาน เรียงจากล่าสุดลงล่าง" title="Timeline เอกสาร" />
+          <SectionTitle title="Timeline เอกสาร" />
           <div className="mt-4 space-y-4">
             {ticket.timeline.length === 0 ? (
               <div className="text-sm text-slate-400">ยังไม่มี timeline เอกสาร</div>
@@ -628,7 +716,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
 
         {ticket.canCancel ? (
           <Card className="p-5">
-            <SectionTitle subtitle="ยกเลิกได้จนกว่าจะถูกนำไปใช้ออกบิล" title="ยกเลิกเอกสาร" />
+            <SectionTitle title="ยกเลิกเอกสาร" />
             <div className="mt-4 space-y-3 px-1">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-600">
@@ -652,12 +740,17 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
       </div>
 
       <Dialog open={Boolean(previewImage)} onOpenChange={(open) => setPreviewImage(open ? previewImage : null)}>
-        <DialogContent className="max-w-4xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
+        <DialogContent hideClose className="max-w-4xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
           {previewImage ? (
             <>
               <DialogHeader className="rounded-t-md">
-                <DialogTitle>รูปภาพแนบ</DialogTitle>
-                <DialogDescription>{previewImage.fileName}</DialogDescription>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <DialogTitle>รูปภาพแนบ</DialogTitle>
+                    <DialogDescription className="truncate">{previewImage.fileName}</DialogDescription>
+                  </div>
+                  <Button className="h-9 shrink-0 border-rose-600 bg-rose-600 px-4 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setPreviewImage(null)}>ปิด</Button>
+                </div>
               </DialogHeader>
               <div className="overflow-hidden bg-slate-950 p-4">
                 <Image
@@ -675,14 +768,19 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
       </Dialog>
 
       <Dialog open={Boolean(lineGallery)} onOpenChange={(open) => setLineGallery(open ? lineGallery : null)}>
-        <DialogContent className="max-w-5xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
+        <DialogContent hideClose className="max-w-5xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
           {lineGallery && activeGalleryImage ? (
             <>
               <DialogHeader className="rounded-t-md">
-                <DialogTitle>{lineGallery.title}</DialogTitle>
-                <DialogDescription>
-                  {activeGalleryImage.fileName} · รูป {lineGallery.activeIndex + 1} / {lineGallery.images.length}
-                </DialogDescription>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <DialogTitle>{lineGallery.title}</DialogTitle>
+                    <DialogDescription className="truncate">
+                      {activeGalleryImage.fileName} · รูป {lineGallery.activeIndex + 1} / {lineGallery.images.length}
+                    </DialogDescription>
+                  </div>
+                  <Button className="h-9 shrink-0 border-rose-600 bg-rose-600 px-4 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setLineGallery(null)}>ปิด</Button>
+                </div>
               </DialogHeader>
               <div className="space-y-4 p-4 bg-slate-950">
                 <div className="relative overflow-hidden rounded-md bg-slate-950">
@@ -755,11 +853,10 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
   )
 }
 
-function SectionTitle({ subtitle, title }: { subtitle: string; title: string }) {
+function SectionTitle({ title }: { title: string }) {
   return (
     <div>
       <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-      <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
     </div>
   )
 }

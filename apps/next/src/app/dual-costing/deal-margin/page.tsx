@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function DealMarginPage() {
   return (
     <>
-      <PageTitleOverride subtitle="วิเคราะห์กำไรต่อดีลจาก matched revenue และต้นทุนจริง" title="Deal Margin Report" />
+      <PageTitleOverride title="Deal Margin Report" />
       <DealMarginPageClient />
     </>
   )

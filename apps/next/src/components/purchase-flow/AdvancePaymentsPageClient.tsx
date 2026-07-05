@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
@@ -731,11 +732,12 @@ export function AdvancePaymentsPageClient() {
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm">
-            <KpiCard label="ยอดมัดจำในหน้านี้" tone="slate" value={formatMoney(data?.summary.totalAdvance ?? 0)} />
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 text-sm">
             <KpiCard label="ยังไม่อนุมัติ" tone="pending" value={`${data?.summary.pendingCount ?? 0}`} />
             <KpiCard label="ใช้หักบิลแล้ว" tone="allocated" value={formatMoney(data?.summary.totalAllocated ?? 0)} />
-            <KpiCard label="คงเหลือ" tone="amber" value={formatMoney(data?.summary.totalRemaining ?? 0)} />
+            <div className="col-span-2 md:col-span-1">
+              <KpiCard label="คงเหลือ" tone="amber" value={formatMoney(data?.summary.totalRemaining ?? 0)} />
+            </div>
           </div>
 
           <div className="space-y-2 rounded-md bg-white p-3 shadow">
@@ -791,7 +793,7 @@ export function AdvancePaymentsPageClient() {
           </div>
 
           {/* Floating Action Button (FAB) for Mobile */}
-          <div className="fixed bottom-6 right-6 z-40 md:hidden">
+          <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 md:hidden">
             <button
               className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg active:scale-95 transition-transform"
               onClick={openForm}
@@ -804,20 +806,32 @@ export function AdvancePaymentsPageClient() {
 
           {/* Bottom Sheet Filter for Mobile */}
           {showMobileFilters ? (
-            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
-              <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 animate-slide-up max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                  <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
+            <MobileFilterSheet
+              title="ตัวกรองเพิ่มเติม"
+              visibleClassName="md:hidden"
+              onClose={() => setShowMobileFilters(false)}
+              footer={(
+                <>
                   <button
-                    className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                    onClick={() => setShowMobileFilters(false)}
                     type="button"
+                    className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    onClick={() => {
+                      clearFilters()
+                      setShowMobileFilters(false)
+                    }}
                   >
-                    &times;
+                    ล้างตัวกรอง
                   </button>
-                </div>
-
-                <div className="space-y-4">
+                  <button
+                    type="button"
+                    className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
+                    onClick={() => setShowMobileFilters(false)}
+                  >
+                    ใช้ตัวกรอง
+                  </button>
+                </>
+              )}
+            >
                   <div>
                     <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                     <div className="flex items-center gap-2">
@@ -862,29 +876,7 @@ export function AdvancePaymentsPageClient() {
                       })}
                     </div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    onClick={() => {
-                      clearFilters()
-                      setShowMobileFilters(false)
-                    }}
-                  >
-                    ล้างตัวกรอง
-                  </button>
-                  <button
-                    type="button"
-                    className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
-                    onClick={() => setShowMobileFilters(false)}
-                  >
-                    ใช้ตัวกรอง
-                  </button>
-                </div>
-              </div>
-            </div>
+            </MobileFilterSheet>
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 md:hidden">
@@ -1029,12 +1021,43 @@ export function AdvancePaymentsPageClient() {
       }}>
         <DialogContent className="max-h-[90vh] max-w-5xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" fallbackTitle="รายละเอียด ADV" hideClose>
           <DialogHeader className="p-4 bg-slate-900 text-white shrink-0">
-            <div className="flex items-start justify-between gap-3 w-full">
-              <div>
-                <DialogTitle className="text-white">{detail?.docNo ? `รายละเอียด ${detail.docNo}` : 'รายละเอียด ADV'}</DialogTitle>
-                <DialogDescription className="text-slate-300">กดที่รายการเพื่อดูข้อมูลเอกสาร การหักบิลย้อนหลัง และ timeline ของรายการ ADV</DialogDescription>
+            <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+              <div className="min-w-0">
+                <DialogTitle className="truncate text-white">{detail?.docNo ? `รายละเอียด ${detail.docNo}` : 'รายละเอียด ADV'}</DialogTitle>
+                <DialogDescription className="truncate text-slate-300">กดที่รายการเพื่อดูข้อมูลเอกสาร การหักบิลย้อนหลัง และ timeline ของรายการ ADV</DialogDescription>
               </div>
-              <button className="rounded-md px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white transition-colors outline-none focus:outline-none focus:ring-0 cursor-pointer" type="button" onClick={() => setIsDetailOpen(false)}>✕</button>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <Button
+                  className="h-9 border-emerald-600 bg-emerald-600 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white"
+                  disabled={!detail}
+                  type="button"
+                  variant="outline"
+                  onClick={() => detail && handlePrint(detail)}
+                >
+                  พิมพ์
+                </Button>
+                <Button
+                  className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white"
+                  disabled={!detail?.canEdit}
+                  title={!detail?.canEdit ? detail?.lockedReason ?? 'รายการนี้ยังแก้ไขไม่ได้' : undefined}
+                  type="button"
+                  variant="outline"
+                  onClick={() => detail ? openEditForm(detail) : undefined}
+                >
+                  แก้ไข
+                </Button>
+                <Button
+                  className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white"
+                  disabled={!detail?.canCancel}
+                  title={!detail?.canCancel ? detail?.lockedReason ?? 'รายการนี้ยังยกเลิกไม่ได้' : undefined}
+                  type="button"
+                  variant="outline"
+                  onClick={() => detail ? openCancelDialog(detail) : undefined}
+                >
+                  ยกเลิก
+                </Button>
+                <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setIsDetailOpen(false)}>ปิด</Button>
+              </div>
             </div>
           </DialogHeader>
           {isDetailLoading ? <div className="flex-1 p-8 text-center text-sm text-slate-500 bg-white">กำลังโหลดรายละเอียด...</div> : null}
@@ -1144,34 +1167,6 @@ export function AdvancePaymentsPageClient() {
               </div>
             </div>
           ) : null}
-          <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t bg-slate-50 shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => detail && handlePrint(detail)}
-            >
-              พิมพ์เอกสาร
-            </Button>
-            <Button
-              disabled={!detail?.canEdit}
-              title={!detail?.canEdit ? detail?.lockedReason ?? 'รายการนี้ยังแก้ไขไม่ได้' : undefined}
-              type="button"
-              variant="outline"
-              onClick={() => detail ? openEditForm(detail) : undefined}
-            >
-              แก้ไข
-            </Button>
-            <Button
-              disabled={!detail?.canCancel}
-              title={!detail?.canCancel ? detail?.lockedReason ?? 'รายการนี้ยังยกเลิกไม่ได้' : undefined}
-              type="button"
-              variant="outline"
-              onClick={() => detail ? openCancelDialog(detail) : undefined}
-            >
-              ยกเลิก
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setIsDetailOpen(false)}>ปิด</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1179,12 +1174,12 @@ export function AdvancePaymentsPageClient() {
         setIsCancelDialogOpen(open)
         if (!open) closeCancelDialog()
       }}>
-        <DialogContent className="max-w-lg" fallbackTitle="ยกเลิกรายการ ADV">
+        <DialogContent hideClose mobileAppShell={false} className="max-w-lg rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 outline-none focus:outline-none" fallbackTitle="ยกเลิกรายการ ADV">
           <DialogHeader>
             <DialogTitle>ยกเลิกรายการ ADV {detail?.docNo ?? ''}</DialogTitle>
             <DialogDescription>ระบบจะเปลี่ยนสถานะเป็นยกเลิกและเก็บเหตุผลไว้ใน timeline</DialogDescription>
           </DialogHeader>
-          <div className="px-4 pb-4">
+          <div className="bg-slate-50 p-4">
             <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="advance-payment-cancel-note">เหตุผลการยกเลิก *</label>
             <textarea
               id="advance-payment-cancel-note"

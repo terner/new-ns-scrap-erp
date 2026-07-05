@@ -1,9 +1,5 @@
-import { DesignMockupPageClient } from '@/components/daily/DesignMockupPageClient'
-
-export const metadata = {
-  title: 'Design Mockup | NS Scrap ERP',
-}
+import { notFound } from 'next/navigation'
 
 export default function DesignMockupPage() {
-  return <DesignMockupPageClient />
+  notFound()
 }

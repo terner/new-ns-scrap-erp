@@ -319,13 +319,14 @@ export function buildPmaSummaryPrintHtml(rows: PrintPmaRow[], profile: CompanyPr
       .meta-info { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 12px; }
       .meta-info .total { color: #dc2626; }
       
-      .summary-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #cbd5e1; }
-      .summary-table th { background: #f8fafc; border: 1px solid #cbd5e1; color: #334155; font-weight: 800; padding: 10px; text-align: left; font-size: 12px; }
-      .summary-table td { border: 1px solid #e2e8f0; padding: 8px 10px; font-size: 12px; }
+      .summary-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #cbd5e1; table-layout: fixed; }
+      .summary-table th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; font-weight: 900; padding: 6px 5px; text-align: left; font-size: 12px; }
+      .summary-table td { border: 1px solid #dbe3ea; padding: 6px 5px; font-size: 12px; vertical-align: top; }
+      .summary-table tr { break-inside: avoid; page-break-inside: avoid; }
       .summary-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-      .summary-table .group-total td { background: #f1f5f9; border-top: 2px solid #94a3b8; border-bottom: 2px solid #cbd5e1; }
+      .summary-table .group-total td { background: #f1f5f9; border-top: 1px solid #94a3b8; border-bottom: 1px solid #cbd5e1; }
       
-      .summary-table tfoot td { background: #f8fafc; font-weight: 800; border-top: 2px solid #94a3b8; }
+      .summary-table tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; border-top: 1px solid #cbd5e1; }
       
       .text-red { color: #dc2626; }
       .text-slate-800 { color: #1e293b; }
@@ -340,9 +341,9 @@ export function buildPmaSummaryPrintHtml(rows: PrintPmaRow[], profile: CompanyPr
         @page { size: A4 landscape; margin: 10mm; }
         .toolbar { display: none; }
         .page { padding: 0; }
-        .summary-table th { background: #f8fafc !important; -webkit-print-color-adjust: exact; }
+        .summary-table th { background: #e2e8f0 !important; -webkit-print-color-adjust: exact; }
         .summary-table .group-total td { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; }
-        .summary-table tfoot td { background: #f8fafc !important; -webkit-print-color-adjust: exact; }
+        .summary-table tfoot td { background: #ecfdf5 !important; -webkit-print-color-adjust: exact; }
       }
     </style>
   </head><body>

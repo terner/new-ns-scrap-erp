@@ -309,9 +309,6 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
   const currentTab = mode ?? tab
   const isUsersPage = currentTab === 'users'
   const pageTitle = isUsersPage ? 'รายชื่อพนักงาน / Users' : 'Roles & Permissions'
-  const pageDescription = isUsersPage
-    ? `ผู้ใช้ ${data?.users.length ?? 0} รายการ · จัดการ profile, contact, role และสาขา`
-    : `Roles ${data?.roles.length ?? 0} รายการ · ตรวจชุดสิทธิ์และผู้ใช้ที่ผูกอยู่`
 
   const filteredUsers = useMemo(() => {
     const rows = data?.users ?? []
@@ -554,7 +551,6 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <h2 className="text-xl font-bold text-slate-900">{pageTitle}</h2>
-            <p className="text-sm text-slate-500">{pageDescription}</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <button
@@ -584,7 +580,6 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
       <div className="lg:hidden rounded-md bg-white p-3.5 shadow space-y-2.5">
         <div>
           <h2 className="text-lg font-bold text-slate-900">{pageTitle}</h2>
-          <p className="text-xs text-slate-500">{pageDescription}</p>
         </div>
         <div className="flex gap-2">
           <input
@@ -630,13 +625,16 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
 
       {formOpen ? (
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
-          <DialogContent className="max-w-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
+          <DialogContent className="max-w-2xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
             <form className="flex flex-col h-full overflow-hidden" onSubmit={saveUser}>
-              <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-5 py-4 shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900 px-5 py-4 shrink-0">
                 <DialogTitle className="text-lg font-bold text-slate-100">{editingUser ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้'}</DialogTitle>
-                <div className="flex items-center gap-4">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   <ActiveToggle checked={form.active} onChange={(checked) => setForm((current) => ({ ...current, active: checked }))} />
-                  <button className="text-2xl text-slate-400 hover:text-slate-200 ml-2" type="button" onClick={() => setFormOpen(false)}>&times;</button>
+                  <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
+                  <button className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50" disabled={isSaving} type="submit">
+                    {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+                  </button>
                 </div>
               </div>
 
@@ -729,12 +727,6 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4 shrink-0">
-                <button className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 font-medium" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
-                <button className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors" disabled={isSaving} type="submit">
-                  {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
-                </button>
-              </div>
             </form>
           </DialogContent>
         </Dialog>

@@ -471,12 +471,14 @@ export function WeightTicketsPageClient({
   initialType = 'WTI',
   lockType = false,
   ticketId = '',
+  embeddedModal = false,
   onClose,
   onSaveSuccess,
 }: {
   initialType?: WeightTicketType
   lockType?: boolean
   ticketId?: string
+  embeddedModal?: boolean
   onClose?: () => void
   onSaveSuccess?: (ticket: WeightTicketRecord) => void
 }) {
@@ -537,6 +539,12 @@ export function WeightTicketsPageClient({
     if (form.type !== 'WTO' || !form.branchId) return []
     return [...new Set(form.lines.map((line) => line.productId).filter(Boolean))]
   }, [form.branchId, form.lines, form.type])
+  const isEmbeddedModal = embeddedModal || Boolean(onClose)
+  const embeddedModalTitle = editingTicketId
+    ? 'แก้ไขใบรับ-ส่งของ'
+    : form.type === 'WTI'
+      ? 'สร้างใบรับของ WTI'
+      : 'สร้างใบส่งของ WTO'
   const activeLine = useMemo(
     () => {
       const parentLines = getMainParentLines(form.lines)
@@ -1229,9 +1237,32 @@ export function WeightTicketsPageClient({
   }
 
   return (
-    <div className={cn("min-w-0", onClose ? "flex flex-col h-full overflow-hidden" : "overflow-x-hidden")}>
-      <div className={cn("min-w-0", onClose ? "flex-1 overflow-y-auto p-4 sm:p-5 space-y-5" : "space-y-5 pb-32")}>
-        {!onClose && (
+    <div className={cn("min-w-0", isEmbeddedModal ? "flex h-full min-h-0 flex-col overflow-hidden bg-slate-50" : "overflow-x-hidden")}>
+      {isEmbeddedModal ? (
+        <DialogHeader className="shrink-0 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div className="min-w-0">
+              <DialogTitle id="weight-ticket-form-title" className="truncate text-base font-bold text-white">
+                {embeddedModalTitle}
+              </DialogTitle>
+              <DialogDescription className="truncate text-xs text-slate-300">
+                เลือกข้อมูลหน้างาน สินค้า น้ำหนัก และรูปภาพสำหรับใบรับ-ส่งของ
+              </DialogDescription>
+            </div>
+            <div className="flex max-w-[min(58vw,13rem)] shrink-0 justify-end gap-2 overflow-x-auto pb-0.5 sm:max-w-none sm:flex-wrap sm:overflow-visible sm:pb-0">
+              <Button className="h-10 w-10 shrink-0 gap-0 border-emerald-600 bg-emerald-600 px-0 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white disabled:opacity-60 sm:h-9 sm:w-auto sm:gap-2 sm:px-4" disabled={isLoadingTicket || isSaving} type="button" variant="outline" onClick={saveTicket}>
+                <Check className="size-4" />
+                <span className="sr-only sm:not-sr-only">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</span>
+              </Button>
+              <Button className="h-10 shrink-0 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white sm:h-9" disabled={isLoadingTicket || isSaving} type="button" variant="outline" onClick={backToList}>
+                {editingTicketId ? 'ปิด' : 'ยกเลิก'}
+              </Button>
+            </div>
+          </div>
+        </DialogHeader>
+      ) : null}
+      <div className={cn("min-w-0", isEmbeddedModal ? "flex-1 overflow-y-auto p-4 sm:p-5 space-y-5" : "space-y-5 pb-32")}>
+        {!isEmbeddedModal && (
         <div>
           <Button type="button" variant="outline" onClick={backToList}>
             <ArrowLeft className="mr-1 h-4 w-4" />
@@ -1239,12 +1270,14 @@ export function WeightTicketsPageClient({
           </Button>
         </div>
       )}
-      <div>
-        {typeSelectionLocked ? (
+      {isEmbeddedModal ? null : typeSelectionLocked ? (
+          <div>
           <div className={cn('inline-flex rounded-md px-3 py-1.5 text-sm font-semibold', ticketTheme.badge)}>
             {form.type === 'WTI' ? 'ใบรับของ WTI' : 'ใบส่งของ WTO'}
           </div>
-        ) : (
+          </div>
+      ) : (
+        <div>
           <Tabs value={form.type} onValueChange={(value) => setForm((current) => ({
             ...current,
             lines: current.lines.map((line) => ({ ...line, warehouseId: '', warehouseName: '', warehouseType: '' })),
@@ -1257,8 +1290,8 @@ export function WeightTicketsPageClient({
               <TabsTrigger value="WTO" variant="line">ใบส่งของ WTO</TabsTrigger>
             </TabsList>
           </Tabs>
-        )}
-      </div>
+        </div>
+      )}
 
       {loadError ? (
         <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -1270,18 +1303,35 @@ export function WeightTicketsPageClient({
           {mergeNotice}
         </div>
       ) : null}
-
+      {isEmbeddedModal ? (
+        <div className="rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          {savedTicket ? (
+            <div className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700">
+              <CheckCircle2 className="size-4" />
+              บันทึก {savedTicket.documentNo} แล้ว
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-5">
+              <MetricInline label="รายการ" value={`${getMainParentLines(form.lines).length} รายการ`} />
+              <MetricInline label="น้ำหนักรวม" value={`${formatWeight(totals.grossWeight)} กก.`} />
+              <MetricInline label="หักภาชนะ" value={`${formatWeight(totals.containerDeductionWeight)} กก.`} />
+              <MetricInline label="หักสิ่งเจือปน" value={`${formatWeight(totals.deductionWeight)} กก.`} />
+              <MetricInline emphasis label="สุทธิ" value={`${formatWeight(totals.netWeight)} กก.`} />
+            </div>
+          )}
+        </div>
+      ) : null}
       {isLoadingTicket ? (
-        <Card className={cn(onClose ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
-          <div className="p-16 text-center text-sm font-medium text-slate-500 bg-white rounded-xl border border-slate-200 shadow-sm animate-pulse">
+        <Card className={cn(isEmbeddedModal ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
+          <div className="p-16 text-center text-sm font-medium text-slate-500 bg-white rounded-md border border-slate-200 shadow-sm animate-pulse">
             กำลังโหลดข้อมูล...
           </div>
         </Card>
       ) : (
         <div>
           <div className="space-y-5">
-            <Card className={cn(onClose ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
-            <SectionHeader title="ข้อมูลหัวเอกสาร" subtitle="ผู้ใช้เลือกเฉพาะข้อมูลหน้างาน ส่วนวันที่ เวลา และผู้กรอกเป็นข้อมูลระบบ" />
+            <Card className={cn(isEmbeddedModal ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
+            <SectionHeader title="ข้อมูลหัวเอกสาร" />
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <BranchSelectCombobox
                 branches={branchOptionsForForm(branches, form).map((branch) => ({
@@ -1366,8 +1416,8 @@ export function WeightTicketsPageClient({
             </div>
           </Card>
 
-          <Card className={cn(onClose ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
-            <SectionHeader title="สินค้าและน้ำหนัก" subtitle="เลือกสินค้า กรอกน้ำหนัก และเลือกวิธีหักสิ่งเจือปนต่อรายการ" />
+          <Card className={cn(isEmbeddedModal ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
+            <SectionHeader title="สินค้าและน้ำหนัก" />
 
 
 
@@ -1376,7 +1426,7 @@ export function WeightTicketsPageClient({
               "mt-4 grid min-w-0 items-start gap-4 border-b border-slate-100 pb-6",
               activeLine ? "xl:grid-cols-[18rem_minmax(0,1fr)]" : "grid-cols-1"
             )}>
-              <div className="min-w-0 space-y-3 xl:max-h-[calc(100vh-16rem)] xl:overflow-hidden">
+              <div className="min-w-0 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm font-medium text-slate-700">รายการทั้งหมด {getMainParentLines(form.lines).length} รายการ</div>
                   <Button size="xs" type="button" onClick={addLine}>
@@ -1384,7 +1434,7 @@ export function WeightTicketsPageClient({
                     เพิ่มสินค้า
                   </Button>
                 </div>
-                <div className="space-y-2 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-1">
+                <div className="space-y-2">
                   {(() => {
                     const parentLines = getMainParentLines(form.lines)
                     return parentLines.map((line, index) => {
@@ -1453,7 +1503,7 @@ export function WeightTicketsPageClient({
                 })()
 
                 return (
-                  <div className="min-w-0 overflow-hidden rounded-md border border-slate-100 bg-slate-50 p-3 sm:p-4 xl:max-h-[calc(100vh-16rem)] xl:overflow-y-auto">
+                  <div className="min-w-0 rounded-md border border-slate-100 bg-slate-50 p-3 sm:p-4">
                     <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
                       <div className="inline-flex rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">รายการ {index + 1}</div>
                       <div className="flex items-center gap-2">
@@ -2070,8 +2120,8 @@ export function WeightTicketsPageClient({
             </div>
           </Card>
 
-          <Card className={cn(onClose ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
-            <SectionHeader title="หมายเหตุท้ายเอกสาร" subtitle="ใช้บันทึกข้อมูลหน้างานที่ office ต้องเห็นตอนเลือกเอกสารไปออกบิล" />
+          <Card className={cn(isEmbeddedModal ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
+            <SectionHeader title="หมายเหตุท้ายเอกสาร" />
             <textarea
               className="mt-4 min-h-28 w-full rounded-md border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-400"
               placeholder="ระบุหมายเหตุเพิ่มเติม"
@@ -2084,11 +2134,8 @@ export function WeightTicketsPageClient({
       )}
       </div>
 
-      <div className={cn(
-        onClose
-          ? "border-t border-slate-100 bg-slate-50 px-4 py-3 shrink-0 z-20"
-          : "fixed inset-x-0 bottom-0 z-20 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-sm lg:left-64"
-      )}>
+      {!isEmbeddedModal ? (
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-sm lg:left-64">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 w-full sm:w-auto flex justify-center sm:block">
             {savedTicket ? (
@@ -2117,14 +2164,20 @@ export function WeightTicketsPageClient({
           </div>
         </div>
       </div>
+      ) : null}
 
       <Dialog open={Boolean(previewImage)} onOpenChange={(open) => setPreviewImage(open ? previewImage : null)}>
-        <DialogContent className="max-w-4xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
+        <DialogContent hideClose className="max-w-4xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
           {previewImage ? (
             <>
               <DialogHeader className="rounded-t-md">
-                <DialogTitle>รูปภาพแนบ</DialogTitle>
-                <DialogDescription>{previewImage.fileName}</DialogDescription>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <DialogTitle>รูปภาพแนบ</DialogTitle>
+                    <DialogDescription className="truncate">{previewImage.fileName}</DialogDescription>
+                  </div>
+                  <Button className="h-9 shrink-0 border-rose-600 bg-rose-600 px-4 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setPreviewImage(null)}>ปิด</Button>
+                </div>
               </DialogHeader>
               <div className="overflow-hidden rounded-md bg-slate-950">
                 <Image
@@ -2145,11 +2198,10 @@ export function WeightTicketsPageClient({
   )
 }
 
-function SectionHeader({ subtitle, title }: { subtitle: string; title: string }) {
+function SectionHeader({ title }: { title: string }) {
   return (
     <div>
       <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
     </div>
   )
 }
@@ -2323,7 +2375,7 @@ function ProductImagePicker({
       ) : null}
 
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel() }}>
-        <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden rounded-md shadow-2xl flex flex-col max-h-[90vh]">
+        <DialogContent hideClose className="max-h-[90vh] max-w-2xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none">
           <DialogHeader className="px-5 pt-4 pb-4 rounded-t-md flex flex-row items-center justify-between bg-slate-900 border-none">
             <div className="flex items-center gap-2">
               <span className="text-lg">📦</span>
@@ -2331,7 +2383,7 @@ function ProductImagePicker({
             </div>
           </DialogHeader>
 
-          <div className="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4 min-h-0">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 sm:p-5">
             {/* Search input */}
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -2371,14 +2423,13 @@ function ProductImagePicker({
             </div>
 
             {/* Grid of products */}
-            <div className="max-h-[50vh] overflow-y-auto pr-1">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {filteredProducts.map((product) => {
                   const selected = product.id === tempSelectedId
                   return (
                     <button
                       className={cn(
-                        'overflow-hidden rounded-xl border bg-white text-left transition duration-150 flex flex-col group relative',
+                        'overflow-hidden rounded-md border bg-white text-left transition duration-150 flex flex-col group relative',
                         selected
                           ? 'border-blue-600 ring-2 ring-blue-100 bg-blue-50/20'
                           : 'border-slate-100 hover:border-slate-300 hover:shadow-md',
@@ -2407,13 +2458,12 @@ function ProductImagePicker({
                   )
                 })}
                 {filteredProducts.length === 0 ? (
-                  <div className="col-span-full rounded-xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">ไม่พบสินค้า</div>
+                  <div className="col-span-full rounded-md bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">ไม่พบสินค้า</div>
                 ) : null}
-              </div>
             </div>
           </div>
 
-          <DialogFooter className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-row justify-end gap-2.5">
+          <DialogFooter className="px-5 py-4 border-t border-slate-100 bg-white flex flex-row justify-end gap-2.5">
             <Button
               type="button"
               variant="outline"
@@ -2555,7 +2605,7 @@ function SummaryMetricCard({
   colorClass: { iconBg: string; iconText: string }
 }) {
   return (
-    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-4">
+    <div className="bg-white shadow-sm border border-slate-200 rounded-md p-4 flex items-center gap-4">
       <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-full", colorClass.iconBg, colorClass.iconText)}>
         <Icon className="h-6 w-6" />
       </div>

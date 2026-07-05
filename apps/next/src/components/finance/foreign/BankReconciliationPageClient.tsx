@@ -146,9 +146,6 @@ export function BankReconciliationPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-        <strong>Bank Reconciliation</strong> - Import Statement จากธนาคาร (CSV) แล้ว Auto-Match กับรายการใน ERP จากวันที่+จำนวนเงิน
-      </div>
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 

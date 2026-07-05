@@ -107,7 +107,7 @@ function lmeConfig() {
     lmeBrassUSD: 7000,
     lmeCopperUSD: 9000,
     updatedAt: '2026-05-19T00:00:00',
-    updatedBy: 'read-baseline',
+    updatedBy: 'source',
   }
 }
 
@@ -430,7 +430,7 @@ async function buildSalesPlanningSnapshot() {
     reconciliation,
     reconTotals,
     sourceState: {
-      basis: 'Sales planning read/design baseline from PO Sell, WTO pending_out, PO Buy, purchase bills, trading deals, stock ledger, and product master.',
+      basis: 'Sales planning design source from PO Sell, WTO pending_out, PO Buy, purchase bills, trading deals, stock ledger, and product master.',
       limitations: ['LME config, LME percent save, export, matching, and sales-plan locks are disabled until target schemas and audit rules are designed.'],
       writeActionsEnabled: false,
     },
@@ -479,7 +479,7 @@ export async function buildSalesPlan() {
     planRows: [],
     productAnalysis: remainRows,
     sourceState: {
-      basis: 'Sales Plan read/design baseline from current stock, WTO pending_out, and LME reference values.',
+      basis: 'Sales Plan design source from current stock, WTO pending_out, and LME reference values.',
       limitations: ['Add plan, remove plan, lock/unlock price, and export remain disabled until sales-plan persistence, stock reservation, permissions, and audit are designed.'],
       writeActionsEnabled: false,
     },
@@ -733,7 +733,7 @@ export async function buildSalesCommission(filters?: { dateFrom?: string; dateTo
     },
     salesRows,
     sourceState: {
-      basis: 'Sales Commission read/design baseline from purchase bills, salespersons, and supplier owner assignments.',
+      basis: 'Sales Commission design source from purchase bills, salespersons, and supplier owner assignments.',
       limitations: ['Period changes, CSV export, supplier assignment, bulk assignment, and persisted commission closing remain disabled until authorization and audit are designed.'],
       writeActionsEnabled: false,
     },

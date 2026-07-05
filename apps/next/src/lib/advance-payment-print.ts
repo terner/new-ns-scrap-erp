@@ -109,6 +109,7 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
       <td class="center" style="width:30mm">${dateDisplay(alloc.allocatedAt)}</td>
     </tr>
   `).join('')
+  const allocationEmptyRowsHtml = Array.from({ length: Math.max(0, 8 - (doc.allocations ?? []).length) }, () => '<tr class="empty"><td>&nbsp;</td><td></td><td></td><td></td></tr>').join('')
 
   const allocationsTable = (doc.allocations ?? []).length > 0 ? `
     <h3 style="margin-top: 15px; font-size: 12px; color: #1e293b;">ประวัติการหักล้างมัดจำ (Allocation History)</h3>
@@ -123,7 +124,15 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
       </thead>
       <tbody>
         ${allocationsHtml}
+        ${allocationEmptyRowsHtml}
       </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" class="num">รวมทั้งสิ้น</td>
+          <td class="num final-amount">${money(doc.allocatedAmount)}</td>
+          <td></td>
+        </tr>
+      </tfoot>
     </table>
   ` : '<div style="margin-top:15px;font-style:italic;color:#64748b;font-size: 12px">ยังไม่มีการนำไปหักล้างกับบิลซื้อ</div>'
 
@@ -157,9 +166,15 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
       .field-label { color: #64748b; font-size: 12px; }
       .field-value { font-weight: 750; color: #0f172a; margin-top: 1px; overflow-wrap: anywhere; }
       table { width: 100%; border-collapse: collapse; }
-      .items { margin-top: 12px; font-size: 12px; }
+      .items { margin-top: 12px; font-size: 12px; table-layout: fixed; }
+      .items thead { display: table-header-group; }
+      .items tbody { break-inside: auto; page-break-inside: auto; }
       .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 6px 5px; text-align: left; font-weight: 900; }
-      .items td { border: 1px solid #dbe3ea; padding: 6px 5px; }
+      .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
+      .items tr { break-inside: avoid; page-break-inside: avoid; }
+      .items .empty td { height: 24px; color: transparent; }
+      .items tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .items tfoot .final-amount { color: #1e3a8a; }
       .num { text-align: right; }
       .center { text-align: center; }
       .bottom-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 15px; align-items: start; }
@@ -177,6 +192,8 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
         body { background: white; font-size: 12px; line-height: 1.2; }
         .toolbar { display: none; }
         .page { width: auto; min-height: 281mm; margin: 0; padding: 0; box-shadow: none; }
+        .items th, .items td { padding: 3px; }
+        .items .empty td { height: 18px; }
       }
     </style>
   </head><body>

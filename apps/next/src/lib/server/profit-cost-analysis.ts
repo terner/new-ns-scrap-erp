@@ -412,10 +412,10 @@ export async function buildProfitCostAnalysis(filter: ProfitCostFilter) {
       trend: Array.from(trendAggs.entries()).map(([date, row]) => ({ date, ...row })).sort((left, right) => left.date.localeCompare(right.date)),
     },
     sourceState: {
-      basis: 'Profit & Cost read/report baseline from purchase bills, sales bills, item JSON, stock ledger, and party/channel masters.',
+      basis: 'Profit & Cost report source from purchase bills, sales bills, item JSON, stock ledger, and party/channel masters.',
       limitations: [
         'COGS/GP uses bill-level COGS with item-level proportional fallback where item cost is missing.',
-        'Export, drill-down write actions, posting, allocation, and planning changes remain disabled in this baseline.',
+        'Export, drill-down write actions, posting, allocation, and planning changes remain disabled in this source slice.',
         'Use a dedicated cost/profit permission in a later auth batch before final UAT exposure.',
       ],
       writeActionsEnabled: false,

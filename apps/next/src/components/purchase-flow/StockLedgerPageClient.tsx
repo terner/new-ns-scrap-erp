@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { AlertTriangle, Download, RotateCcw, Search } from 'lucide-react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -288,20 +289,38 @@ export function StockLedgerPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรอง Stock Ledger</h4>
+        <MobileFilterSheet
+          title="ตัวกรอง Stock Ledger"
+          onClose={() => setShowMobileFilters(false)}
+          footer={(
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  setBranchId('')
+                  setFromDate('')
+                  setMovementType('')
+                  setPage(1)
+                  setProductId('')
+                  setSearch('')
+                  setToDate('')
+                  setWarehouseType('')
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4">
+              <button
+                type="button"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          )}
+        >
               <div>
                 <span className="mb-1 block text-xs font-semibold text-slate-600">สินค้า</span>
                 <SearchCombobox
@@ -353,36 +372,7 @@ export function StockLedgerPageClient() {
                   <DatePickerInput className="w-full h-10 text-sm" title="ถึงวันที่" value={toDate} onChange={(value) => { setPage(1); setToDate(value) }} />
                 </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  setBranchId('')
-                  setFromDate('')
-                  setMovementType('')
-                  setPage(1)
-                  setProductId('')
-                  setSearch('')
-                  setToDate('')
-                  setWarehouseType('')
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       {movementType ? (
@@ -639,13 +629,14 @@ function StockLedgerDetailModal({ onClose, row }: { onClose: () => void; row: St
   return (
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col overflow-hidden rounded-md border-0 bg-slate-900 dark:bg-[#0f172a] !p-0 animate-fade-in" hideClose>
-        <div className="shrink-0 rounded-t-md border-b border-slate-800 dark:border-slate-200 bg-slate-900 dark:bg-[#0f172a] px-5 py-4 text-white">
+        <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-t-md border-b border-slate-800 bg-slate-900 px-5 py-4 text-white dark:border-slate-200 dark:bg-[#0f172a]">
           <div>
             <DialogTitle className="text-lg font-bold text-white">รายละเอียด {row.refNo || 'Stock Ledger'}</DialogTitle>
             <DialogDescription className="mt-0.5 text-xs text-slate-400">
               {productLabel} · {stockMovementTypeLabel(row.movementType)}
             </DialogDescription>
           </div>
+          <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={onClose}>ปิด</button>
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 text-sm sm:p-5">
@@ -701,15 +692,6 @@ function StockLedgerDetailModal({ onClose, row }: { onClose: () => void; row: St
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-          <button 
-            className="rounded-md border border-slate-300 bg-white px-5 py-2 text-sm font-normal text-slate-700 transition-colors hover:bg-slate-50 outline-none focus:ring-0 animate-fade-in"
-            type="button" 
-            onClick={onClose}
-          >
-            ปิด
-          </button>
-        </div>
       </DialogContent>
     </Dialog>
   )

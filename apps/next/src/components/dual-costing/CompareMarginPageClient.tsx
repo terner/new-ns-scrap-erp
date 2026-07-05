@@ -7,7 +7,6 @@ import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import {
   DualCostingErrorBox,
   DualCostingFilterCard,
-  DualCostingHint,
   DualCostingPageSection,
   DualCostingPanel,
   DualCostingStatCard,
@@ -70,10 +69,6 @@ export function CompareMarginPageClient() {
 
   return (
     <DualCostingPageSection>
-      <DualCostingHint tone="blue">
-        เปรียบเทียบ <strong>Deal Margin</strong> จาก matched deals กับ <strong>Stock Margin</strong> จากบิลขายจริงและ WAC เพื่อดูความต่างเชิงบริหาร ไม่ใช่งบทางการ
-      </DualCostingHint>
-
       <DualCostingErrorBox error={error} />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

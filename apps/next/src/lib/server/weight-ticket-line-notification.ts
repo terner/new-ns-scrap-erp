@@ -52,9 +52,9 @@ async function resolveNotificationConfigs() {
 
   const configMap = Object.fromEntries(dbSettings.map((s) => [s.key, s.value]))
 
-  const wtiDefaultTemplate = `ใบรับของ WTI [DocumentNo]\n━━━━━━━━━━━━━━━\nผู้ขาย: [PartyName]\nสาขา: [BranchName]\nวันที่/เวลาเอกสาร: [DocDateTime]\nหักภาชนะ: [ContainerWeight] กก.\nหักสิ่งเจือปน: [DeductionWeight] กก.\nน้ำหนักสุทธิ: [NetWeight] กก.\n━━━━━━━━━━━━━━━\nลิงค์โหลด pdf:\n[PdfUrl]`
+  const wtiDefaultTemplate = `ใบรับของ WTI [DocumentNo]\n━━━━━━━━━━━━━━━\nผู้ขาย: [PartyName]\nสาขา: [BranchName]\nวันที่/เวลาเอกสาร: [DocDateTime]\nน้ำหนักรวม: [GrossWeight] กก.\nหักภาชนะ: [ContainerWeight] กก.\nหักสิ่งเจือปน: [DeductionWeight] กก.\nน้ำหนักสุทธิ: [NetWeight] กก.\n━━━━━━━━━━━━━━━\nลิงค์โหลด pdf:\n[PdfUrl]`
 
-  const wtoDefaultTemplate = `ใบส่งของ WTO [DocumentNo]\n━━━━━━━━━━━━━━━\nลูกค้า: [PartyName]\nสาขา: [BranchName]\nวันที่/เวลาเอกสาร: [DocDateTime]\nหักภาชนะ: [ContainerWeight] กก.\nหักสิ่งเจือปน: [DeductionWeight] กก.\nน้ำหนักสุทธิ: [NetWeight] กก.\n━━━━━━━━━━━━━━━\nลิงค์โหลด pdf:\n[PdfUrl]`
+  const wtoDefaultTemplate = `ใบส่งของ WTO [DocumentNo]\n━━━━━━━━━━━━━━━\nลูกค้า: [PartyName]\nสาขา: [BranchName]\nวันที่/เวลาเอกสาร: [DocDateTime]\nน้ำหนักรวม: [GrossWeight] กก.\nหักภาชนะ: [ContainerWeight] กก.\nหักสิ่งเจือปน: [DeductionWeight] กก.\nน้ำหนักสุทธิ: [NetWeight] กก.\n━━━━━━━━━━━━━━━\nลิงค์โหลด pdf:\n[PdfUrl]`
 
   return {
     lineChannelAccessToken: configMap.LINE_CHANNEL_ACCESS_TOKEN || process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
@@ -857,6 +857,7 @@ function buildPhotoTile(
 }
 
 function formatCustomTemplate(template: string, ticket: WeightTicketRecord, pdfUrl: string) {
+  const normalizedTemplate = ensureGrossWeightLine(template)
   let docDateStr = ''
   try {
     const date = ticket.createdAt ? new Date(ticket.createdAt) : new Date()
@@ -876,15 +877,49 @@ function formatCustomTemplate(template: string, ticket: WeightTicketRecord, pdfU
     docDateStr = formatDateDisplay(ticket.documentDate)
   }
 
-  return template
+  return normalizedTemplate
     .replace(/\[DocumentNo\]/g, ticket.documentNo || '-')
     .replace(/\[PartyName\]/g, ticket.partyName || '-')
     .replace(/\[BranchName\]/g, ticket.branchName || '-')
     .replace(/\[DocDateTime\]/g, docDateStr)
+    .replace(/\[GrossWeight\]/g, formatWeight(ticket.totals.grossWeight))
     .replace(/\[ContainerWeight\]/g, formatWeight(ticket.totals.containerDeductionWeight))
     .replace(/\[DeductionWeight\]/g, formatWeight(ticket.totals.deductionWeight))
     .replace(/\[NetWeight\]/g, formatWeight(ticket.totals.netWeight))
     .replace(/\[PdfUrl\]/g, pdfUrl || '-')
+}
+
+function ensureGrossWeightLine(template: string) {
+  if (template.includes('[GrossWeight]')) return template
+
+  const grossLine = 'น้ำหนักรวม: [GrossWeight] กก.'
+  const lines = template.split(/\r?\n/)
+  const existingLabelIndex = lines.findIndex((line) => line.includes('น้ำหนักรวม'))
+  if (existingLabelIndex >= 0) {
+    lines[existingLabelIndex] = grossLine
+    return lines.join('\n')
+  }
+
+  const insertBeforeIndex = lines.findIndex((line) =>
+    line.includes('[ContainerWeight]') ||
+    line.includes('[DeductionWeight]') ||
+    line.includes('[NetWeight]') ||
+    line.includes('หักภาชนะ') ||
+    line.includes('หักสิ่งเจือปน') ||
+    line.includes('น้ำหนักสุทธิ')
+  )
+  if (insertBeforeIndex >= 0) {
+    lines.splice(insertBeforeIndex, 0, grossLine)
+    return lines.join('\n')
+  }
+
+  const insertAfterIndex = lines.findIndex((line) => line.includes('[DocDateTime]') || line.includes('วันที่/เวลาเอกสาร'))
+  if (insertAfterIndex >= 0) {
+    lines.splice(insertAfterIndex + 1, 0, grossLine)
+    return lines.join('\n')
+  }
+
+  return `${template}\n${grossLine}`
 }
 
 function buildTextMessageContent(ticket: WeightTicketRecord, pdfUrl: string) {
@@ -915,6 +950,7 @@ function buildTextMessageContent(ticket: WeightTicketRecord, pdfUrl: string) {
 ${partyLabel}: ${ticket.partyName}
 สาขา: ${ticket.branchName}
 วันที่/เวลาเอกสาร: ${docDateStr}
+น้ำหนักรวม: ${formatWeight(ticket.totals.grossWeight)} กก.
 หักภาชนะ: ${formatWeight(ticket.totals.containerDeductionWeight)} กก.
 หักสิ่งเจือปน: ${formatWeight(ticket.totals.deductionWeight)} กก.
 น้ำหนักสุทธิ: ${formatWeight(ticket.totals.netWeight)} กก.

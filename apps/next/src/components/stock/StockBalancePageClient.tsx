@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Dialog, DialogContent } from '@/components/ui/Dialog'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
@@ -743,20 +744,31 @@ export function StockBalancePageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto animate-slide-up">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองสต๊อก</h4>
+        <MobileFilterSheet
+          title="ตัวกรองสต๊อก"
+          onClose={() => setShowMobileFilters(false)}
+          footer={(
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-9 rounded-md border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  resetFilters()
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4">
+              <button
+                type="button"
+                className="h-9 rounded-md bg-slate-900 text-sm font-medium text-white hover:bg-slate-850"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          )}
+        >
               <div className="block">
                 <span className="mb-1 block text-xs text-slate-500">หมวดสินค้า</span>
                 <SearchCombobox
@@ -788,29 +800,7 @@ export function StockBalancePageClient() {
                   {data?.reference.branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-9 rounded-md border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  resetFilters()
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-9 rounded-md bg-slate-900 text-sm font-medium text-white hover:bg-slate-850"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       {productId && selectedProductInfo ? (
@@ -854,9 +844,15 @@ export function StockBalancePageClient() {
 
       <Dialog open={!!detailRow} onOpenChange={(open) => { if (!open) setDetailRow(null) }}>
         <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-5xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 dark:bg-[#0f172a] border-0 animate-fade-in sm:w-[calc(100vw-2rem)] lg:min-w-[900px]" hideClose>
-          <div className="flex items-center justify-between bg-slate-900 dark:bg-[#0f172a] text-white px-5 py-3 shrink-0 border-b border-slate-800 dark:border-slate-200">
-            <h3 className="font-bold text-white text-[16px]">รายละเอียดสต๊อกคงเหลือ</h3>
-            <button className="text-2xl text-slate-400 hover:text-white transition-colors outline-none focus:outline-none focus:ring-0" type="button" onClick={() => setDetailRow(null)}>&times;</button>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 bg-slate-900 dark:bg-[#0f172a] text-white px-5 py-3 shrink-0 border-b border-slate-800 dark:border-slate-200">
+            <h3 className="truncate font-bold text-white text-[16px]">รายละเอียดสต๊อกคงเหลือ</h3>
+            <button
+              className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700"
+              type="button"
+              onClick={() => setDetailRow(null)}
+            >
+              ปิด
+            </button>
           </div>
           
           {detailRow ? (
@@ -940,15 +936,6 @@ export function StockBalancePageClient() {
             </div>
           ) : null}
 
-          <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 shrink-0">
-            <button
-              className="rounded-md bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm px-5 py-2 transition-colors outline-none focus:ring-0 animate-fade-in"
-              type="button"
-              onClick={() => setDetailRow(null)}
-            >
-              ปิด
-            </button>
-          </div>
         </DialogContent>
       </Dialog>
     </section>
@@ -1169,7 +1156,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
           <div className="text-lg font-bold mt-1 text-emerald-700 tabular-nums">{formatMoney(info.ready)} <span className="text-xs font-normal">กก.</span></div>
         </div>
       </div>
-      <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">📜 รายการสต๊อกของสินค้านี้ ({rows.length} รายการ)</h4>
           <span className="text-xs text-slate-400 font-medium">กดรายการเพื่อดูข้อมูลย่อย</span>
@@ -1356,10 +1343,12 @@ function MatrixTable({
   return (
     <>
       {/* Desktop View (Table) */}
-      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/85 bg-white shadow-sm overflow-hidden">
         <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
           {columnResize.hasCustomWidths ? (
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+            <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
+              คืนค่าเดิมตาราง
+            </button>
           ) : null}
         </div>
         <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
@@ -1692,10 +1681,12 @@ function DetailTable({
       </div>
 
       {/* Desktop View */}
-      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/85 bg-white shadow-sm overflow-hidden">
         <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
           {columnResize.hasCustomWidths ? (
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+            <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
+              คืนค่าเดิมตาราง
+            </button>
           ) : null}
         </div>
         <table className="w-full text-sm text-slate-700" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>

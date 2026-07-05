@@ -148,7 +148,7 @@ export async function buildCashFlowCalendar(monthValue?: string | null) {
     month,
     sourceState: {
       limitations: [
-        'Cash Flow Calendar เป็น read-only baseline จาก accounts และ bank_statement; legacy floating export/auto-sync ไม่เปิดใน batch นี้',
+        'Cash Flow Calendar เป็น read-only source จาก accounts และ bank_statement; legacy floating export/auto-sync ไม่เปิดใน batch นี้',
       ],
       writeActionsEnabled: false,
     },
@@ -304,7 +304,7 @@ export async function buildBusinessCalendar(monthValue?: string | null) {
     month,
     sourceState: {
       limitations: [
-        'Business Calendar เป็น read-only baseline จาก purchase_bills, sales_bills, expenses, receipts และ payments; export/auto-sync/write actions ยังปิดไว้',
+        'Business Calendar เป็น read-only source จาก purchase_bills, sales_bills, expenses, receipts และ payments; export/auto-sync/write actions ยังปิดไว้',
       ],
       writeActionsEnabled: false,
     },

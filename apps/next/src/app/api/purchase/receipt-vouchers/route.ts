@@ -7,11 +7,27 @@ import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/
 import { getActivePaymentMethods } from '@/lib/server/payment-methods'
 import { prisma } from '@/lib/server/prisma'
 import { isPurchaseBillCancelledStatus, PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
+import { applyWorksheetTableLayout, XLSX } from '@/lib/server/xlsx'
 
 export const runtime = 'nodejs'
 
 const CASH_PAYMENT_METHOD = 'รับเงินสด'
-const DEFAULT_RECEIPT_VOUCHER_NOTE = 'แนบสำเนาบัตรประชาชนผู้รับเงิน (กรณีบุคคลธรรมดา)'
+
+type ReceiptVoucherExportRow = {
+  createdBy?: string
+  date: string
+  docNo: string
+  licensePlate: string
+  note: string
+  paymentMethod: string
+  purchaseBillDocNo: string
+  sellerName: string
+  sellerTaxId: string
+  status: string
+  totalAmount: number
+  totalQty: number
+  updatedAt?: string
+}
 
 const receiptVoucherItemSchema = z.object({
   description: z.string().trim().min(1, 'กรุณากรอกรายการ'),
@@ -45,28 +61,6 @@ const receiptVoucherCancelSchema = z.object({
 })
 
 type ReceiptVoucherStatusLogAction = 'cancelled' | 'created' | 'edited'
-
-type PurchaseBillRemarkLine = {
-  deduct_weight: Prisma.Decimal | number | string | null
-  gross_weight: Prisma.Decimal | number | string | null
-  impurity_id: bigint | number | string | null
-  impurity_name: string | null
-  note: string | null
-  product_id: bigint | number | string | null
-  product_name: string | null
-}
-
-type PurchaseBillReceiptAllocationRemark = {
-  weight_ticket_product_summaries: {
-    product_name: string | null
-    weight_ticket_product_summary_lines: Array<{
-      weight_ticket_lines: PurchaseBillRemarkLine
-    }>
-  }
-  weight_tickets: {
-    weight_ticket_lines: PurchaseBillRemarkLine[]
-  }
-} | null
 
 async function appendReceiptVoucherStatusLog(
   tx: Prisma.TransactionClient,
@@ -126,6 +120,80 @@ function thaiBahtText(value: number) {
   return `${bahtText}บาท${satangText}`
 }
 
+function receiptVoucherStatusLabel(status: string) {
+  if (status === 'cancelled') return 'ยกเลิก'
+  return 'ใช้งาน'
+}
+
+function receiptVoucherSearchText(row: ReceiptVoucherExportRow) {
+  return `${row.docNo} ${row.purchaseBillDocNo} ${row.sellerName} ${row.sellerTaxId} ${row.licensePlate}`.toLowerCase()
+}
+
+function filteredReceiptVoucherExportRows(rows: ReceiptVoucherExportRow[], url: URL) {
+  const dateFrom = url.searchParams.get('dateFrom') ?? ''
+  const dateTo = url.searchParams.get('dateTo') ?? ''
+  const query = url.searchParams.get('search')?.trim().toLowerCase() ?? ''
+  const status = url.searchParams.get('status') ?? 'all'
+  const sortKey = url.searchParams.get('sort') ?? 'date'
+  const sortDirection = url.searchParams.get('direction') === 'asc' ? 'asc' : 'desc'
+
+  return rows
+    .filter((row) => {
+      if (dateFrom && row.date < dateFrom) return false
+      if (dateTo && row.date > dateTo) return false
+      if (status === 'active' && row.status === 'cancelled') return false
+      if (status === 'cancelled' && row.status !== 'cancelled') return false
+      return !query || receiptVoucherSearchText(row).includes(query)
+    })
+    .sort((left, right) => {
+      let comparison = 0
+      if (sortKey === 'docNo') comparison = left.docNo.localeCompare(right.docNo)
+      else if (sortKey === 'sellerName') comparison = left.sellerName.localeCompare(right.sellerName)
+      else if (sortKey === 'sellerTaxId') comparison = left.sellerTaxId.localeCompare(right.sellerTaxId)
+      else if (sortKey === 'purchaseBillDocNo') comparison = left.purchaseBillDocNo.localeCompare(right.purchaseBillDocNo)
+      else if (sortKey === 'licensePlate') comparison = left.licensePlate.localeCompare(right.licensePlate)
+      else if (sortKey === 'status') comparison = left.status.localeCompare(right.status)
+      else if (sortKey === 'totalQty') comparison = left.totalQty - right.totalQty
+      else if (sortKey === 'totalAmount') comparison = left.totalAmount - right.totalAmount
+      else comparison = left.date.localeCompare(right.date)
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+}
+
+async function buildReceiptVoucherWorkbook(rows: ReceiptVoucherExportRow[]) {
+  const workbookRows = rows.map((row) => ({
+    เลขที่: row.docNo,
+    วันที่: row.date,
+    ผู้รับเงิน: row.sellerName,
+    เลขประจำตัวผู้เสียภาษี: row.sellerTaxId,
+    บิลซื้ออ้างอิง: row.purchaseBillDocNo,
+    ทะเบียนรถ: row.licensePlate,
+    วิธีรับเงิน: row.paymentMethod,
+    น้ำหนักรวม: row.totalQty,
+    ยอดเงิน: row.totalAmount,
+    สถานะ: receiptVoucherStatusLabel(row.status),
+    หมายเหตุ: row.note,
+    ผู้สร้าง: row.createdBy ?? '',
+    อัปเดตล่าสุด: row.updatedAt ?? '',
+  }))
+  const workbook = XLSX.utils.book_new()
+  const sheet = XLSX.utils.json_to_sheet(workbookRows)
+  const headers = workbookRows[0] ? Object.keys(workbookRows[0]) : []
+  sheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, header.length + 4) }))
+  applyWorksheetTableLayout(sheet, headers.length, workbookRows.length + 1)
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Receipt Vouchers')
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' })
+}
+
+function xlsxResponse(body: Buffer, filename: string) {
+  return new Response(new Uint8Array(body), {
+    headers: {
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    },
+  })
+}
+
 async function nextReceiptVoucherDocNo(tx: Prisma.TransactionClient, date: string) {
   const compactDate = date.slice(2, 4) + date.slice(5, 7)
   const startsWith = `RV${compactDate}-`
@@ -179,72 +247,10 @@ function toVoucherNumber(value: Prisma.Decimal | number | string | null) {
   return toNumber(value)
 }
 
-function cleanImpurityName(name: string | null | undefined) {
-  if (!name) return ''
-  return name
-    .replace(/\s*[\d.]+\s*kg/gi, '')
-    .replace(/\s*[\d.]+\s*กก\.?/gi, '')
-    .trim()
-}
-
-function receiptVoucherWeight(value: number) {
-  return value.toLocaleString('th-TH', {
-    maximumFractionDigits: 3,
-    minimumFractionDigits: 0,
-  })
-}
-
-function isImpurityLine(line: PurchaseBillRemarkLine) {
-  return toVoucherNumber(line.gross_weight) === 0 && Boolean(line.impurity_name || line.impurity_id)
-}
-
-function isPurchaseFromImpurityLine(line: PurchaseBillRemarkLine) {
-  return toVoucherNumber(line.gross_weight) > 0 && (line.note ?? '').includes('มาจากสิ่งเจือปน')
-}
-
-function findPurchaseLineForImpurity(
-  impurityLine: PurchaseBillRemarkLine,
-  sourceProductName: string,
-  purchaseLines: PurchaseBillRemarkLine[],
-) {
-  return purchaseLines.find((purchaseLine) => {
-    const note = purchaseLine.note ?? ''
-    if (!note.includes(sourceProductName) && !note.includes(String(impurityLine.product_id))) return false
-    return Math.abs(toVoucherNumber(purchaseLine.gross_weight) - toVoucherNumber(impurityLine.deduct_weight)) < 0.001
-  })
-}
-
-function receiptLineRemark(receiptAllocation: PurchaseBillReceiptAllocationRemark) {
-  if (!receiptAllocation) return ''
-  const summary = receiptAllocation.weight_ticket_product_summaries
-  const allReceiptLines = receiptAllocation.weight_tickets.weight_ticket_lines
-  const purchaseLines = allReceiptLines.filter(isPurchaseFromImpurityLine)
-  const summaryLines = summary.weight_ticket_product_summary_lines.map((bridge) => bridge.weight_ticket_lines)
-  const impurityLines = summaryLines.filter(isImpurityLine)
-  const lotNotes = Array.from(new Set(summaryLines
-    .filter((line) => !isImpurityLine(line) && !isPurchaseFromImpurityLine(line))
-    .map((line) => line.note?.trim() ?? '')
-    .filter((note): note is string => Boolean(note))))
-
-  if (impurityLines.length > 0) {
-    const impurityRemarks = impurityLines.map((line, index) => {
-      const purchaseLine = findPurchaseLineForImpurity(line, summary.product_name ?? '', purchaseLines)
-      const impurityName = cleanImpurityName(line.impurity_name) || 'สิ่งเจือปน'
-      const prefix = `- ${index + 1}. ${impurityName} ${receiptVoucherWeight(toVoucherNumber(line.deduct_weight))} กก.`
-      return purchaseLine ? `${prefix} ซื้อเป็น ${purchaseLine.product_name}` : prefix
-    })
-    const noteRemarks = lotNotes.map((note, index) => `- ${impurityRemarks.length + index + 1}. ${note}`)
-    return [...impurityRemarks, ...noteRemarks].join('\n')
-  }
-
-  return lotNotes.join(' / ')
-}
-
 function normalizePurchaseBillVoucherItems(items: Array<{
   amount: Prisma.Decimal | number | null
   display_name: string | null
   line_no: number
-  note?: string | null
   price: Prisma.Decimal | number | null
   product_code: string | null
   product_name: string | null
@@ -270,39 +276,6 @@ function normalizePurchaseBillVoucherItems(items: Array<{
   })
 }
 
-function purchaseBillItemRemarks(items: Array<{
-  line_no: number
-  note?: string | null
-  purchase_bill_receipt_allocations?: PurchaseBillReceiptAllocationRemark
-}>) {
-  return [...items]
-    .sort((left, right) => left.line_no - right.line_no)
-    .map((item) => receiptLineRemark(item.purchase_bill_receipt_allocations ?? null) || item.note?.trim())
-    .filter((note): note is string => Boolean(note))
-    .join('\n')
-}
-
-function combineReceiptVoucherNotes(...notes: Array<string | null | undefined>) {
-  const lines: string[] = []
-  const seen = new Set<string>()
-  notes.forEach((note) => {
-    String(note ?? '')
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .forEach((line) => {
-        if (seen.has(line)) return
-        seen.add(line)
-        lines.push(line)
-      })
-  })
-  return lines.join('\n')
-}
-
-function receiptVoucherNote(note: string | null | undefined, purchaseBillNote?: string | null) {
-  return combineReceiptVoucherNotes(DEFAULT_RECEIPT_VOUCHER_NOTE, note, purchaseBillNote)
-}
-
 async function buildVoucherWriteData(
   tx: Prisma.TransactionClient,
   values: z.infer<typeof receiptVoucherWriteSchema>,
@@ -315,63 +288,15 @@ async function buildVoucherWriteData(
         doc_no: true,
         id: true,
         license_plate: true,
-        note: true,
-        notes: true,
         purchase_bill_items: {
           orderBy: { line_no: 'asc' },
           select: {
             amount: true,
             display_name: true,
             line_no: true,
-            note: true,
             price: true,
             product_code: true,
             product_name: true,
-            purchase_bill_receipt_allocations: {
-              select: {
-                weight_ticket_product_summaries: {
-                  select: {
-                    product_name: true,
-                    weight_ticket_product_summary_lines: {
-                      orderBy: {
-                        weight_ticket_lines: {
-                          line_no: 'asc',
-                        },
-                      },
-                      select: {
-                        weight_ticket_lines: {
-                          select: {
-                            deduct_weight: true,
-                            gross_weight: true,
-                            impurity_id: true,
-                            impurity_name: true,
-                            note: true,
-                            product_id: true,
-                            product_name: true,
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-                weight_tickets: {
-                  select: {
-                    weight_ticket_lines: {
-                      orderBy: { line_no: 'asc' },
-                      select: {
-                        deduct_weight: true,
-                        gross_weight: true,
-                        impurity_id: true,
-                        impurity_name: true,
-                        note: true,
-                        product_id: true,
-                        product_name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
             qty: true,
             unit: true,
           },
@@ -399,17 +324,13 @@ async function buildVoucherWriteData(
   const totalQty = items.reduce((sum, item) => sum + item.qty, 0)
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
   const sellerName = purchaseBill ? purchaseBill.supplier_name_snapshot ?? '' : values.sellerName?.trim() ?? ''
-  const purchaseBillRemarkNote = purchaseBill ? purchaseBillItemRemarks(purchaseBill.purchase_bill_items) : ''
   if (!purchaseBill && !sellerName) throw new Error('กรุณากรอกชื่อผู้รับเงิน')
-  const purchaseBillNote = purchaseBill
-    ? combineReceiptVoucherNotes(purchaseBillRemarkNote, purchaseBill.note, purchaseBill.notes)
-    : ''
   return {
     amount_in_words: values.amountInWords?.trim() || thaiBahtText(totalAmount),
     date: normalizeDate(values.date),
     items: items as Prisma.InputJsonValue,
     license_plate: purchaseBill ? purchaseBill.license_plate ?? null : values.licensePlate || null,
-    note: receiptVoucherNote(values.note, purchaseBillNote) || null,
+    note: values.note || null,
     payer_signer_name: payerSignerName,
     payment_method: values.paymentMethod?.trim() || CASH_PAYMENT_METHOD,
     purchase_bill_doc_no: purchaseBill?.doc_no ?? null,
@@ -427,8 +348,9 @@ async function buildVoucherWriteData(
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url)
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
     const actor = currentActor(context)
@@ -484,55 +406,9 @@ export async function GET() {
               amount: true,
               display_name: true,
               line_no: true,
-              note: true,
               price: true,
               product_code: true,
               product_name: true,
-              purchase_bill_receipt_allocations: {
-                select: {
-                  weight_ticket_product_summaries: {
-                    select: {
-                      product_name: true,
-                      weight_ticket_product_summary_lines: {
-                        orderBy: {
-                          weight_ticket_lines: {
-                            line_no: 'asc',
-                          },
-                        },
-                        select: {
-                          weight_ticket_lines: {
-                            select: {
-                              deduct_weight: true,
-                              gross_weight: true,
-                              impurity_id: true,
-                              impurity_name: true,
-                              note: true,
-                              product_id: true,
-                              product_name: true,
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                  weight_tickets: {
-                    select: {
-                      weight_ticket_lines: {
-                        orderBy: { line_no: 'asc' },
-                        select: {
-                          deduct_weight: true,
-                          gross_weight: true,
-                          impurity_id: true,
-                          impurity_name: true,
-                          note: true,
-                          product_id: true,
-                          product_name: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
               qty: true,
               unit: true,
             },
@@ -607,88 +483,54 @@ export async function GET() {
         .map((supplier) => [supplier.name.trim(), supplier.code] as const)
         .filter(([name]) => name),
     )
-    const rowPurchaseBillIds = rows
-      .map((row) => row.purchase_bill_id)
-      .filter((id): id is bigint => id !== null)
-    const rowPurchaseBillDocNos = rows
-      .map((row) => row.purchase_bill_doc_no?.trim())
-      .filter((docNo): docNo is string => Boolean(docNo))
-    const rowPurchaseBillRemarkRows = rowPurchaseBillIds.length || rowPurchaseBillDocNos.length
-      ? await prisma.purchase_bills.findMany({
-        select: {
-          doc_no: true,
-          id: true,
-          note: true,
-          notes: true,
-          purchase_bill_items: {
-            orderBy: { line_no: 'asc' },
-            select: {
-              line_no: true,
-              note: true,
-              purchase_bill_receipt_allocations: {
-                select: {
-                  weight_ticket_product_summaries: {
-                    select: {
-                      product_name: true,
-                      weight_ticket_product_summary_lines: {
-                        orderBy: {
-                          weight_ticket_lines: {
-                            line_no: 'asc',
-                          },
-                        },
-                        select: {
-                          weight_ticket_lines: {
-                            select: {
-                              deduct_weight: true,
-                              gross_weight: true,
-                              impurity_id: true,
-                              impurity_name: true,
-                              note: true,
-                              product_id: true,
-                              product_name: true,
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                  weight_tickets: {
-                    select: {
-                      weight_ticket_lines: {
-                        orderBy: { line_no: 'asc' },
-                        select: {
-                          deduct_weight: true,
-                          gross_weight: true,
-                          impurity_id: true,
-                          impurity_name: true,
-                          note: true,
-                          product_id: true,
-                          product_name: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            where: { item_status: 'active' },
-          },
-        },
-        where: {
-          OR: [
-            ...(rowPurchaseBillIds.length ? [{ id: { in: rowPurchaseBillIds } }] : []),
-            ...(rowPurchaseBillDocNos.length ? [{ doc_no: { in: rowPurchaseBillDocNos } }] : []),
-          ],
-        },
-      })
-      : []
-    const rowPurchaseBillNoteById = new Map<string, string>()
-    const rowPurchaseBillNoteByDocNo = new Map<string, string>()
-    rowPurchaseBillRemarkRows.forEach((bill) => {
-      const note = combineReceiptVoucherNotes(purchaseBillItemRemarks(bill.purchase_bill_items), bill.note, bill.notes)
-      rowPurchaseBillNoteById.set(bill.id.toString(), note)
-      rowPurchaseBillNoteByDocNo.set(bill.doc_no, note)
-    })
+
+    const receiptVoucherRows = rows.map((row) => ({
+      amountInWords: row.amount_in_words ?? '',
+      createdAt: row.created_at?.toISOString() ?? '',
+      createdBy: row.created_by ?? '',
+      date: toDateOnly(row.date),
+      docNo: row.doc_no ?? '',
+      id: row.doc_no ?? '',
+      items: row.items ?? [],
+      licensePlate: row.license_plate ?? '',
+      note: row.note ?? '',
+      payerSignerName: row.payer_signer_name ?? row.created_by ?? '',
+      paymentMethod: row.payment_method ?? '',
+      purchaseBillId: row.purchase_bill_doc_no ?? '',
+      purchaseBillDocNo: row.purchase_bill_doc_no ?? '',
+      salesPerson: row.sales_person ?? '',
+      sellerAddress: row.seller_address ?? '',
+      sellerName: row.seller_name ?? '',
+      sellerPhone: row.seller_phone ?? '',
+      sellerTaxId: row.seller_tax_id ?? '',
+      status: row.status,
+      supplierCode: supplierCodeByPurchaseBillDocNo.get(row.purchase_bill_doc_no ?? '')
+        || supplierCodeByTaxId.get(row.seller_tax_id?.trim() ?? '')
+        || supplierCodeByName.get(row.seller_name?.trim() ?? '')
+        || '',
+      cancelNote: row.cancel_note ?? '',
+      cancelledAt: row.cancelled_at?.toISOString() ?? '',
+      cancelledBy: row.cancelled_by ?? '',
+      timeline: row.receipt_voucher_status_logs.map((log) => ({
+        action: log.action,
+        createdAt: log.created_at.toISOString(),
+        createdBy: log.created_by ?? '',
+        fromStatus: log.from_status ?? '',
+        id: String(log.id),
+        note: log.note ?? '',
+        toStatus: log.to_status,
+        totalAmount: toNumber(log.total_amount_snapshot),
+      })),
+      totalAmount: toNumber(row.total_amount),
+      totalQty: toNumber(row.total_qty),
+      updatedAt: row.updated_at?.toISOString() ?? '',
+      updatedBy: row.updated_by ?? '',
+    }))
+
+    if (url.searchParams.get('format') === 'xlsx') {
+      const exportRows = filteredReceiptVoucherExportRows(receiptVoucherRows, url)
+      return xlsxResponse(await buildReceiptVoucherWorkbook(exportRows), `receipt_vouchers_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    }
 
     return NextResponse.json({
       companyProfile: companyProfile
@@ -736,7 +578,7 @@ export async function GET() {
           unit: item.unit ?? 'กก.',
         })),
         licensePlate: bill.license_plate ?? '',
-        note: receiptVoucherNote(null, combineReceiptVoucherNotes(purchaseBillItemRemarks(bill.purchase_bill_items), bill.note, bill.notes)),
+        note: bill.note ?? bill.notes ?? '',
         salesPerson: bill.supplier_sales_rep_snapshot ?? '',
         sellerAddress: bill.supplier_address_snapshot ?? '',
         sellerCode: bill.suppliers?.code ?? '',
@@ -745,52 +587,7 @@ export async function GET() {
         sellerTaxId: bill.supplier_tax_id_snapshot ?? '',
         totalAmount: toNumber(bill.total_amount),
       })),
-      rows: rows.map((row) => ({
-        amountInWords: row.amount_in_words ?? '',
-        createdAt: row.created_at?.toISOString() ?? '',
-        createdBy: row.created_by ?? '',
-        date: toDateOnly(row.date),
-        docNo: row.doc_no,
-        id: row.doc_no,
-        items: row.items ?? [],
-        licensePlate: row.license_plate ?? '',
-        note: receiptVoucherNote(
-          row.note,
-          rowPurchaseBillNoteById.get(row.purchase_bill_id?.toString() ?? '')
-            || rowPurchaseBillNoteByDocNo.get(row.purchase_bill_doc_no ?? ''),
-        ),
-        payerSignerName: row.payer_signer_name ?? row.created_by ?? '',
-        paymentMethod: row.payment_method ?? '',
-        purchaseBillId: row.purchase_bill_doc_no ?? '',
-        purchaseBillDocNo: row.purchase_bill_doc_no ?? '',
-        salesPerson: row.sales_person ?? '',
-        sellerAddress: row.seller_address ?? '',
-        sellerName: row.seller_name ?? '',
-        sellerPhone: row.seller_phone ?? '',
-        sellerTaxId: row.seller_tax_id ?? '',
-        status: row.status,
-        supplierCode: supplierCodeByPurchaseBillDocNo.get(row.purchase_bill_doc_no ?? '')
-          || supplierCodeByTaxId.get(row.seller_tax_id?.trim() ?? '')
-          || supplierCodeByName.get(row.seller_name?.trim() ?? '')
-          || '',
-        cancelNote: row.cancel_note ?? '',
-        cancelledAt: row.cancelled_at?.toISOString() ?? '',
-        cancelledBy: row.cancelled_by ?? '',
-        timeline: row.receipt_voucher_status_logs.map((log) => ({
-          action: log.action,
-          createdAt: log.created_at.toISOString(),
-          createdBy: log.created_by ?? '',
-          fromStatus: log.from_status ?? '',
-          id: String(log.id),
-          note: log.note ?? '',
-          toStatus: log.to_status,
-          totalAmount: toNumber(log.total_amount_snapshot),
-        })),
-        totalAmount: toNumber(row.total_amount),
-        totalQty: toNumber(row.total_qty),
-        updatedAt: row.updated_at?.toISOString() ?? '',
-        updatedBy: row.updated_by ?? '',
-      })),
+      rows: receiptVoucherRows,
     })
   } catch (caught) {
     console.error('API Error in GET /api/purchase/receipt-vouchers:', caught)

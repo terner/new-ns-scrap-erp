@@ -96,7 +96,7 @@ function notCancelledWhere() {
 
 function sourceState(extra: string[] = []): SourceState {
   return {
-    basis: 'Management/read baseline from operational transactions. Not a statutory GL statement.',
+    basis: 'Management/source from operational transactions. Not a statutory GL statement.',
     limitations: [
       'ยังไม่มี GL journal, COA mapping, closing period และ retained earnings roll-forward ที่ยืนยันแล้ว',
       'ตัวเลขคำนวณจาก sales/purchase/expense/bank/stock/asset/loan/equity operational tables',

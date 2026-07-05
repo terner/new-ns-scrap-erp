@@ -3,10 +3,11 @@
 import { Download, Plus, Printer } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { paymentMethodGroupFromValue, type PaymentMethodGroup } from '@/lib/account-payment-method'
 import { dailyFetchJson, expenseFormSchema, formatMoney, todayDateInput, type DailyAccountOption, type ExpenseFormValues, type ExpenseLineFormValues } from '@/lib/daily'
@@ -976,7 +977,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     <ResizableTableHead activeSortKey={dashboardSortKey} align="center" direction={dashboardSortDirection} label="สถานะ" resizeProps={dashboardColumnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeDashboardSort} />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 bg-white">
                   {isLoading ? (
                     <tr>
                       <td className="py-12 text-center text-slate-400" colSpan={dashboard.monthList.length + 4}>
@@ -1198,22 +1199,20 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
             {/* 4. Mobile Category Detail Bottom Sheet */}
             {selectedCategoryRow ? (
-              <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-                <div className="expense-dashboard-heatmap w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 animate-slide-up max-h-[85vh] overflow-y-auto">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{getCategoryIcon(selectedCategoryRow.name)}</span>
-                      <h4 className="font-bold text-slate-800 text-sm">{selectedCategoryRow.name}</h4>
-                    </div>
-                    <button
-                      className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                      onClick={() => setSelectedCategoryRow(null)}
-                      type="button"
-                    >
-                      &times;
-                    </button>
-                  </div>
-
+              <MobileFilterSheet
+                bodyClassName="expense-dashboard-heatmap p-5"
+                footer={
+                  <button
+                    type="button"
+                    className="col-span-2 h-10 rounded-md bg-slate-800 text-xs font-semibold text-white transition-colors hover:bg-slate-700"
+                    onClick={() => setSelectedCategoryRow(null)}
+                  >
+                    ปิดหน้าต่าง
+                  </button>
+                }
+                onClose={() => setSelectedCategoryRow(null)}
+                title={selectedCategoryRow.name}
+              >
                   <div className="space-y-4">
                     {/* Summary section */}
                     <div className="space-y-3 bg-slate-50/70 rounded-xl p-4 border border-slate-100">
@@ -1323,36 +1322,38 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                       </div>
                     </div>
                   </div>
-
-                  <div className="mt-5 pt-3 border-t border-slate-100">
-                    <button
-                      type="button"
-                      className="w-full h-10 rounded-lg bg-slate-800 text-xs font-semibold text-white hover:bg-slate-700 transition-colors"
-                      onClick={() => setSelectedCategoryRow(null)}
-                    >
-                      ปิดหน้าต่าง
-                    </button>
-                  </div>
-                </div>
-              </div>
+              </MobileFilterSheet>
             ) : null}
 
             {/* 5. Mobile Filter Bottom Sheet */}
             {showDashboardMobileFilters ? (
-              <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-                <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                    <h4 className="font-bold text-slate-800 text-xs">ตัวกรองข้อมูลวิเคราะห์</h4>
+              <MobileFilterSheet
+                bodyClassName="p-5"
+                footer={
+                  <>
                     <button
-                      className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                      onClick={() => setShowDashboardMobileFilters(false)}
                       type="button"
+                      className="h-10 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                      onClick={() => {
+                        setCategoryId('');
+                        setPeriodMonths(6);
+                        setShowDashboardMobileFilters(false);
+                      }}
                     >
-                      &times;
+                      ล้างตัวกรอง
                     </button>
-                  </div>
-
-                  <div className="space-y-4">
+                    <button
+                      type="button"
+                      className="h-10 rounded-md bg-slate-800 text-xs font-semibold text-white transition-colors hover:bg-slate-700"
+                      onClick={() => setShowDashboardMobileFilters(false)}
+                    >
+                      ค้นหา
+                    </button>
+                  </>
+                }
+                onClose={() => setShowDashboardMobileFilters(false)}
+                title="ตัวกรองข้อมูลวิเคราะห์"
+              >
                     <div>
                       <span className="mb-1.5 block text-xs font-semibold text-slate-600">หมวดค่าใช้จ่าย</span>
                       <select
@@ -1391,30 +1392,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                         })}
                       </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-                    <button
-                      type="button"
-                      className="h-10 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                      onClick={() => {
-                        setCategoryId('');
-                        setPeriodMonths(6);
-                        setShowDashboardMobileFilters(false);
-                      }}
-                    >
-                      ล้างตัวกรอง
-                    </button>
-                    <button
-                      type="button"
-                      className="h-10 rounded-lg bg-slate-800 text-xs font-semibold text-white hover:bg-slate-700 transition-colors"
-                      onClick={() => setShowDashboardMobileFilters(false)}
-                    >
-                      ค้นหา
-                    </button>
-                  </div>
-                </div>
-              </div>
+              </MobileFilterSheet>
             ) : null}
           </div>
 
@@ -1522,7 +1500,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           </div>
 
           {/* Floating Action Button (FAB) for Mobile */}
-          <div className="fixed bottom-6 right-6 z-40 lg:hidden">
+          <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 lg:hidden">
             <button
               className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg active:scale-95 transition-transform"
               onClick={openCreateForm}
@@ -1535,20 +1513,36 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
           {/* Bottom Sheet Filter for Mobile */}
           {showMobileFilters ? (
-            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-              <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                  <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
+            <MobileFilterSheet
+              footer={
+                <>
                   <button
-                    className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                    onClick={() => setShowMobileFilters(false)}
                     type="button"
+                    className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    onClick={() => {
+                      setSearch('')
+                      setDateFrom('')
+                      setDateTo('')
+                      setCategoryId('')
+                      setAccountId('')
+                      setStatusFilter([])
+                      setShowMobileFilters(false)
+                    }}
                   >
-                    &times;
+                    ล้างตัวกรอง
                   </button>
-                </div>
-
-                <div className="space-y-4">
+                  <button
+                    type="button"
+                    className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
+                    onClick={() => setShowMobileFilters(false)}
+                  >
+                    ใช้ตัวกรอง
+                  </button>
+                </>
+              }
+              onClose={() => setShowMobileFilters(false)}
+              title="ตัวกรองเพิ่มเติม"
+            >
                   <div>
                     <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                     <div className="flex items-center gap-2">
@@ -1598,38 +1592,11 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                           >
                             {option.label}
                           </button>
-                        )
-                      })}
-                    </div>
+                      )
+                    })}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    onClick={() => {
-                      setSearch('')
-                      setDateFrom('')
-                      setDateTo('')
-                      setCategoryId('')
-                      setAccountId('')
-                      setStatusFilter([])
-                      setShowMobileFilters(false)
-                    }}
-                  >
-                    ล้างตัวกรอง
-                  </button>
-                  <button
-                    type="button"
-                    className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
-                    onClick={() => setShowMobileFilters(false)}
-                  >
-                    ใช้ตัวกรอง
-                  </button>
-                </div>
-              </div>
-            </div>
+            </MobileFilterSheet>
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
@@ -1647,9 +1614,13 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
           {formOpen ? (
             <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-              <form ref={formRef} noValidate className="w-full max-w-6xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
-                <div className="flex items-center bg-slate-900 text-white px-5 py-4 rounded-t-md shrink-0">
+              <form ref={formRef} noValidate className="w-full max-w-6xl overflow-hidden rounded-md bg-slate-900 shadow-xl" onSubmit={saveForm}>
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 px-5 py-4 text-white rounded-t-md shrink-0">
                   <h3 className="font-bold text-white text-base">{form.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h3>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                    <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
+                    <Button className="h-9 rounded-md bg-emerald-600 px-5 font-medium text-white transition-colors hover:bg-emerald-700 outline-none focus:ring-0" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+                  </div>
                 </div>
                 <div className="space-y-4 bg-slate-50 p-4">
                   <div className="rounded-md bg-white p-4 shadow">
@@ -1879,10 +1850,6 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     ) : null}
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-md">
-                  <Button className="h-9 font-normal border-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors outline-none focus:ring-0" type="button" variant="ghost" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
-                  <Button className="h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors outline-none focus:ring-0 px-5" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
-                </div>
               </form>
             </div>
           ) : null}
@@ -2053,15 +2020,25 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent hideClose className="max-h-[90vh] max-w-4xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none">
         <DialogHeader className="px-5 py-4 bg-slate-900 text-white shrink-0 rounded-t-md">
-          <div>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <DialogTitle id="expense-detail-title" className="text-lg font-bold text-white">รายละเอียด {row.docNo}</DialogTitle>
+              <DialogTitle id="expense-detail-title" className="truncate text-lg font-bold text-white">รายละเอียด {row.docNo}</DialogTitle>
               <span className="inline-flex items-center gap-1.5 rounded bg-white/10 px-2 py-0.5 text-xs font-semibold text-white">
                 <span className={`size-1.5 rounded-full ${expenseStatusDotClass(row.status)}`} />
                 {expenseStatusLabel(row.status)}
               </span>
             </div>
-            <DialogDescription className="mt-1 text-xs text-slate-300">{row.payee || 'ไม่ระบุผู้รับเงิน'}</DialogDescription>
+            <DialogDescription className="mt-1 truncate text-xs text-slate-300">{row.payee || 'ไม่ระบุผู้รับเงิน'}</DialogDescription>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <Button className="h-9 gap-2 border-emerald-600 bg-emerald-600 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white" disabled={isPrinting} type="button" variant="outline" onClick={handlePrint}>
+              <Printer className="size-4" />
+              {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}
+            </Button>
+            {canEdit ? <Button className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white" type="button" variant="outline" onClick={() => onEdit(row)}>แก้ไข</Button> : null}
+            <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={onClose}>ปิด</Button>
+          </div>
           </div>
         </DialogHeader>
 
@@ -2119,7 +2096,7 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
                     <th className="p-2.5 text-right font-semibold">ยอดสุทธิ</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 bg-white">
                   {lines.map((line) => {
                     const lineNet = line.amount + line.vatAmount - line.whtAmount
                     return (
@@ -2154,14 +2131,6 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
           </div>
         </div>
 
-        <DialogFooter className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-md">
-          <Button className="gap-2 h-9 font-normal border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:ring-0 px-5 rounded-md" disabled={isPrinting} type="button" variant="outline" onClick={handlePrint}>
-            <Printer className="size-4" />
-            {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}
-          </Button>
-          <Button className="h-9 font-normal border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:ring-0 px-5 rounded-md" type="button" variant="outline" onClick={onClose}>ปิด</Button>
-          {canEdit ? <Button className="h-9 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-medium transition-colors outline-none focus:ring-0 px-5" type="button" onClick={() => onEdit(row)}>แก้ไข</Button> : null}
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

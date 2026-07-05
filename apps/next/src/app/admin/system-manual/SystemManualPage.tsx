@@ -23,9 +23,7 @@ export function SystemManualPage({ manual }: SystemManualPageProps) {
       <header className="border-b border-slate-200 bg-white px-6 py-5">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-500">ระบบ / ตั้งค่าระบบ / คู่มือระบบ</p>
             <h1 className="mt-2 text-2xl font-bold">คู่มือระบบ</h1>
-            <p className="mt-1 text-sm text-slate-500">คู่มือการใช้งานแยกตาม Module พร้อม Flow และความหมายของ Field</p>
           </div>
           <label className="relative block w-full lg:w-[360px]">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
@@ -110,7 +108,6 @@ export function SystemManualPage({ manual }: SystemManualPageProps) {
 
             <section id="fields" className="scroll-mt-6">
               <h3 className="text-xl font-bold">ความหมายของ Field</h3>
-              <p className="mt-2 text-sm text-slate-500">เลือกเปิดดูความหมายของ Field ตามกลุ่มข้อมูล</p>
               <div className="mt-4 space-y-3">
                 {manual.fieldGroups.map((group) => (
                   <details key={group.title} className="group overflow-hidden rounded-lg border border-slate-200 bg-white">

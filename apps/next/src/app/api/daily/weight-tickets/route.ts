@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { parseInternalBigIntId } from '@/lib/business-code'
-import { calculateTicketTotals, weightTicketFormSchema } from '@/lib/weight-tickets'
+import { calculateTicketTotals, displayWeightTicketStatus, type WeightTicketStatus, type WeightTicketType, weightTicketFormSchema } from '@/lib/weight-tickets'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { recordAuditLog } from '@/lib/server/app-logging'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
@@ -35,6 +35,7 @@ import {
 } from '@/lib/server/weight-tickets'
 import { syncWeightTicketToGoogleSheets } from '@/lib/server/google-sheets-sync'
 import { enqueueNotificationJob, executeNotificationJob } from '@/lib/server/line-notification-jobs'
+import { applyWorksheetTableLayout, XLSX } from '@/lib/server/xlsx'
 
 export const runtime = 'nodejs'
 
@@ -87,6 +88,45 @@ const ticketInclude = {
   },
 } as const
 
+type WeightTicketMappedRow = ReturnType<typeof mapWeightTicketRow>
+
+async function buildWeightTicketWorkbook(rows: WeightTicketMappedRow[]) {
+  const workbookRows = rows.map((row) => ({
+    เลขที่: row.documentNo,
+    ประเภท: row.type === 'WTI' ? 'ใบรับของ WTI' : 'ใบส่งของ WTO',
+    วันที่เอกสาร: row.documentDate,
+    วันที่สร้าง: row.createdAt,
+    คู่ค้า: row.partyName,
+    สาขา: row.branchName,
+    ทะเบียนรถ: row.vehicleNo,
+    คลัง: row.warehouseName,
+    น้ำหนักรวม: row.totals.grossWeight,
+    หักภาชนะ: row.totals.containerDeductionWeight,
+    น้ำหนักสุทธิ: row.totals.netWeight,
+    สถานะ: displayWeightTicketStatus(row.type as WeightTicketType, row.status as WeightTicketStatus),
+    สินค้า: row.productSummaries.map((item) => `${item.productName} ${item.netWeight}`).join(', '),
+    หมายเหตุ: row.remark,
+    ผู้บันทึก: row.enteredBy,
+    อัปเดตล่าสุด: row.updatedAt,
+  }))
+  const workbook = XLSX.utils.book_new()
+  const sheet = XLSX.utils.json_to_sheet(workbookRows)
+  const headers = workbookRows[0] ? Object.keys(workbookRows[0]) : []
+  sheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, header.length + 4) }))
+  applyWorksheetTableLayout(sheet, headers.length, workbookRows.length + 1)
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Weight Tickets')
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' })
+}
+
+function xlsxResponse(body: Buffer, filename: string) {
+  return new Response(new Uint8Array(body), {
+    headers: {
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    },
+  })
+}
+
 export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
@@ -97,12 +137,14 @@ export async function GET(request: Request) {
     const where = weightTicketWhere(query, scopedBranchIds)
     const orderBy = weightTicketOrderBy(query)
 
+    const isXlsx = new URL(request.url).searchParams.get('format') === 'xlsx'
+    const take = isXlsx ? 10000 : query.pageSize
     const [rows, totalRows] = await Promise.all([
       prisma.weight_tickets.findMany({
         include: ticketInclude,
         orderBy,
-        skip: (query.page - 1) * query.pageSize,
-        take: query.pageSize,
+        ...(isXlsx ? {} : { skip: (query.page - 1) * query.pageSize }),
+        take,
         where,
       }),
       prisma.weight_tickets.count({ where }),
@@ -117,6 +159,10 @@ export async function GET(request: Request) {
         salesDocNos: [],
       })
     ))
+
+    if (isXlsx) {
+      return xlsxResponse(await buildWeightTicketWorkbook(mappedRows), `weight_tickets_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    }
 
     return NextResponse.json({ rows: mappedRows, totalRows })
   } catch (caught) {

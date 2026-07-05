@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, RefreshCw, Search, SlidersHorizontal } from 'lucide-react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 
@@ -294,30 +295,9 @@ export function ProductionReconciliationPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรอง Issue</h4>
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
-                type="button"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-slate-600">ประเภท Issue</span>
-                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={issueFilter} onChange={(event) => setIssueFilter(event.target.value)}>
-                  <option value="all">ทุกประเภท issue</option>
-                  {issueKeys.map((issue) => <option key={issue} value={issue}>{issueLabel(issue)}</option>)}
-                </select>
-              </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+        <MobileFilterSheet
+          footer={
+            <>
               <button
                 type="button"
                 className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -335,9 +315,19 @@ export function ProductionReconciliationPageClient() {
               >
                 ใช้ตัวกรอง
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          onClose={() => setShowMobileFilters(false)}
+          title="ตัวกรอง Issue"
+        >
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-slate-600">ประเภท Issue</span>
+                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={issueFilter} onChange={(event) => setIssueFilter(event.target.value)}>
+                  <option value="all">ทุกประเภท issue</option>
+                  {issueKeys.map((issue) => <option key={issue} value={issue}>{issueLabel(issue)}</option>)}
+                </select>
+              </label>
+        </MobileFilterSheet>
       ) : null}
 
       {/* Desktop Table View (Hidden on Mobile) */}

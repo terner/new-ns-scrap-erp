@@ -327,13 +327,11 @@ export function CompanyProfilePageClient() {
       {/* Desktop Toolbar (Hidden on Mobile) */}
       <div className="hidden lg:block rounded-md bg-gradient-to-r from-blue-700 to-cyan-600 p-4 text-white shadow">
         <h1 className="text-xl font-bold">🏢 ข้อมูลบริษัทตามสาขา</h1>
-        <p className="mt-1 text-sm opacity-90">เลือกสาขาก่อนแก้ไขข้อมูลหัวกระดาษสำหรับใบรับสินค้า / ใบส่งของ</p>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
       <div className="lg:hidden rounded-md bg-gradient-to-r from-blue-700 to-cyan-600 p-3.5 text-white shadow animate-fade-in">
         <h1 className="text-lg font-bold">🏢 ข้อมูลบริษัทตามสาขา</h1>
-        <p className="mt-0.5 text-xs opacity-90">เลือกสาขาก่อนแก้ไขข้อมูลหัวกระดาษสำหรับใบพิมพ์</p>
       </div>
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 animate-fade-in">{error}</div> : null}
@@ -427,9 +425,6 @@ export function CompanyProfilePageClient() {
         <button className="w-full sm:w-auto rounded-md bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-60 h-10 flex items-center justify-center font-semibold" disabled={isLoading || isSaving || !selectedBranchId} type="button" onClick={() => void previewDelivery()}>👁 ดูตัวอย่างใบส่งของ</button>
       </div>
 
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-        💡 <b>วิธีใช้:</b> หลังบันทึกข้อมูลบริษัทแล้ว — ไปหน้าบิลซื้อ/บิลขาย → กดปุ่ม &quot;🖨 ใบรับ&quot; หรือ &quot;🖨 ใบส่ง&quot; ในแต่ละบิล → จะเปิดหน้าต่างใหม่พร้อมพิมพ์ (Ctrl+P) หรือ Save as PDF ได้เลย
-      </div>
     </section>
   )
 }

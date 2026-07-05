@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/Dialog'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
-import { Plus } from 'lucide-react'
+import { Download, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
 type Category = { availableForSale: boolean; code: string; name: string; stockEffect: string }
@@ -221,6 +222,14 @@ export function ProductionOrdersPageClient() {
   const currentRows = useMemo(() => data?.rows ?? [], [data?.rows])
   const totalPages = data?.summary.totalPages ?? 1
   const activeMobileFilterCount = (dateFrom || dateTo ? 1 : 0) + (status ? 1 : 0)
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams({ direction, format: 'xlsx', sort })
+    if (search.trim()) params.set('search', search.trim())
+    if (status) params.set('status', status)
+    if (dateFrom) params.set('dateFrom', dateFrom)
+    if (dateTo) params.set('dateTo', dateTo)
+    return `/api/production/orders?${params.toString()}`
+  }, [dateFrom, dateTo, direction, search, sort, status])
   const listControls = (
     <>
       <div className="flex items-center gap-3">
@@ -314,7 +323,13 @@ export function ProductionOrdersPageClient() {
               ล้างตัวกรอง
             </button>
           ) : null}
-          <button className="ml-auto rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 h-9 flex items-center" type="button" onClick={() => setModalMode('create')}>+ ใบสั่งผลิตใหม่</button>
+          <Button asChild className="ml-auto gap-2" size="sm" variant="export">
+            <a href={exportHref}>
+              <Download className="size-4" />
+              <span>ส่งออก Excel</span>
+            </a>
+          </Button>
+          <button className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 h-9 flex items-center" type="button" onClick={() => setModalMode('create')}>+ ใบสั่งผลิตใหม่</button>
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
           <div className="flex flex-wrap items-center gap-4">
@@ -360,24 +375,41 @@ export function ProductionOrdersPageClient() {
             ตัวกรอง {activeMobileFilterCount > 0 ? `(${activeMobileFilterCount})` : ''}
           </button>
         </div>
+        <Button asChild className="w-full gap-2" size="sm" variant="export">
+          <a href={exportHref}>
+            <Download className="size-4" />
+            <span>ส่งออก Excel</span>
+          </a>
+        </Button>
       </div>
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองใบสั่งผลิต</h4>
+        <MobileFilterSheet
+          footer={
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  clearFilters()
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4">
+              <button
+                type="button"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          }
+          onClose={() => setShowMobileFilters(false)}
+          title="ตัวกรองใบสั่งผลิต"
+        >
               <div>
                 <span className="mb-1 block text-xs font-semibold text-slate-600">ช่วงเวลา</span>
                 <div className="flex flex-wrap gap-2">
@@ -475,29 +507,7 @@ export function ProductionOrdersPageClient() {
                   {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  clearFilters()
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between lg:hidden">
@@ -1136,16 +1146,41 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                 {isCreate ? 'เปิดงานผลิตใหม่โดยยังไม่กระทบสต็อก' : `${row?.productName || '-'} · ${row?.branchName || '-'}`}
               </DialogDescription>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {!isCreate && row ? (
-                <div className="flex flex-wrap gap-2">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              {isCreate ? (
+                <>
+                  <button
+                    className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white transition-colors hover:border-rose-700 hover:bg-rose-700"
+                    type="button"
+                    onClick={() => onClose(false)}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                    disabled={isSaving}
+                    type="button"
+                    onClick={() => void submitCreate()}
+                  >
+                    {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+                  </button>
+                </>
+              ) : row ? (
+                <>
                   {rowWipQty <= 0 && row.status !== 'Completed' && row.status !== 'Cancelled' ? (
-                    <button className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => void patchOrder('complete')}>จบงาน</button>
+                    <button className="h-9 rounded-md bg-emerald-600 px-4 text-sm font-normal text-white hover:bg-emerald-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => void patchOrder('complete')}>จบงาน</button>
                   ) : null}
                   {row.inputCount <= 0 && row.outputCount <= 0 && row.status !== 'Cancelled' ? (
-                    <button className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => void patchOrder('cancel')}>ยกเลิก</button>
+                    <button className="h-9 rounded-md border border-slate-700 bg-slate-800 px-4 text-sm font-normal text-white hover:bg-slate-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => void patchOrder('cancel')}>ยกเลิก</button>
                   ) : null}
-                </div>
+                  <button
+                    className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white transition-colors hover:border-rose-700 hover:bg-rose-700"
+                    type="button"
+                    onClick={() => onClose(false)}
+                  >
+                    ปิด
+                  </button>
+                </>
               ) : null}
             </div>
           </div>
@@ -1340,25 +1375,6 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
           ) : null}
         </div>
 
-        <div className="flex flex-wrap justify-end items-center gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-          <button 
-            className="rounded-md px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 bg-transparent border-0 outline-none transition-colors" 
-            type="button" 
-            onClick={() => onClose(false)}
-          >
-            {isCreate ? 'ยกเลิก' : 'ปิด'}
-          </button>
-          {isCreate ? (
-            <button 
-              className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50" 
-              disabled={isSaving} 
-              type="button" 
-              onClick={() => void submitCreate()}
-            >
-              {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
-            </button>
-          ) : null}
-        </div>
       </DialogContent>
     </Dialog>
   )

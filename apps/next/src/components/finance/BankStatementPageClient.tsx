@@ -615,15 +615,15 @@ function DetailTable({
 function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" onClick={onClose}>
-      <div className="w-full max-w-2xl overflow-hidden rounded-md bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-5 py-4">
+      <div className="w-full max-w-2xl overflow-hidden rounded-md bg-slate-900 shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4">
           <div>
             <h2 className="text-lg font-bold text-white">{row.refNo || row.id}</h2>
             <p className="text-xs text-slate-300">{row.accountName}</p>
           </div>
-          <button className="text-2xl text-white/80 hover:text-white" type="button" onClick={onClose}>&times;</button>
+          <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={onClose}>ปิด</button>
         </div>
-        <div className="space-y-4 p-5">
+        <div className="space-y-4 bg-slate-50 p-5">
           {/* ข้อมูลบัญชีและอ้างอิง */}
           <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">ข้อมูลบัญชีและอ้างอิง</div>
@@ -656,9 +656,6 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
               <DetailItem label="หมายเหตุ" value={row.note || '-'} />
             </div>
           </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
-          <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
     </div>

@@ -430,7 +430,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
     },
     filters: { date: dateOnly(selectedDate), from, to },
     sourceState: {
-      basis: 'Main dashboard read/report baseline from operational tables and existing module helpers.',
+      basis: 'Main dashboard report source from operational tables and existing module helpers.',
       limitations: ['No write, approval, posting, planning save, anomaly fix, or legacy localStorage action is enabled.', 'Dashboard figures are management KPIs, not statutory accounting reports.'],
       writeActionsEnabled: false,
     },

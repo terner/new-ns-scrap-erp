@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { formatDateDisplay } from '@/lib/format'
@@ -316,7 +316,6 @@ export function SupplierTrackingPageClient() {
     <section className="space-y-4">
       <PageTitleOverride
         title="Supplier Tracking 360°"
-        subtitle="วิเคราะห์ผู้ขาย — เลือก ปี/เดือน/สินค้า/หมวด · รายปี สลับ น้ำหนัก/ยอดซื้อ"
       />
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
@@ -656,9 +655,14 @@ function SupplierDetailDialog({ detail, isLoading, onOpenChange }: { detail: Sup
   return (
     <Dialog open={detail !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 !p-0 shadow-2xl outline-none focus:outline-none flex flex-col" fallbackTitle="Supplier Tracking Detail" hideClose>
-        <DialogHeader className="shrink-0 rounded-t-md bg-slate-900 px-5 py-4 text-white flex flex-col space-y-1">
-          <DialogTitle className="text-xl font-bold text-white">{detail?.supplier.name ?? 'รายละเอียด Supplier'}</DialogTitle>
-          <DialogDescription className="mt-0.5 text-xs text-slate-300">{detail?.supplier.code ?? ''} · Purchase Bills / Payments / WTI / Grade Adjust / Product mix</DialogDescription>
+        <DialogHeader className="shrink-0 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div className="min-w-0 space-y-1">
+              <DialogTitle className="truncate text-xl font-bold text-white">{detail?.supplier.name ?? 'รายละเอียด Supplier'}</DialogTitle>
+              <DialogDescription className="truncate text-xs text-slate-300">{detail?.supplier.code ?? ''} · Purchase Bills / Payments / WTI / Grade Adjust / Product mix</DialogDescription>
+            </div>
+            <Button className="h-9 shrink-0 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</Button>
+          </div>
         </DialogHeader>
         <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 text-sm sm:p-5">
           {isLoading ? <div className="rounded-md border border-slate-100 bg-white p-6 text-center text-sm text-slate-500">กำลังโหลดรายละเอียด</div> : null}
@@ -722,9 +726,6 @@ function SupplierDetailDialog({ detail, isLoading, onOpenChange }: { detail: Sup
             </>
           ) : null}
         </div>
-        <DialogFooter className="shrink-0 rounded-b-md border-t border-slate-100 bg-white px-5 py-3.5 flex justify-end gap-2">
-          <Button className="font-normal" type="button" variant="outline" onClick={() => onOpenChange(false)}>ปิด</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -947,21 +948,18 @@ function YearCompare({ rows }: { rows: SupplierTrackingRow[] }) {
             ยอดซื้อ (บาท)
           </button>
         </div>
+        {columnResize.hasCustomWidths ? (
+          <button
+            className="ml-auto hidden h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50 outline-none focus:ring-0 lg:inline-flex"
+            type="button"
+            onClick={columnResize.resetColumnWidths}
+          >
+            คืนค่าเดิมตาราง
+          </button>
+        ) : null}
       </div>
 
-      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        {columnResize.hasCustomWidths ? (
-          <div className="flex justify-end border-b border-slate-100 px-3 py-3">
-            <button
-              className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50 outline-none focus:ring-0"
-              type="button"
-              onClick={columnResize.resetColumnWidths}
-            >
-              คืนค่าเดิมตาราง
-            </button>
-          </div>
-        ) : null}
-        <div className="overflow-x-auto">
+      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
         <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {supplierYearCompareColumns.map((column, index) => (
@@ -1021,7 +1019,6 @@ function YearCompare({ rows }: { rows: SupplierTrackingRow[] }) {
             </tr>
           </tbody>
         </table>
-        </div>
       </div>
 
       <div className="space-y-3 lg:hidden">
