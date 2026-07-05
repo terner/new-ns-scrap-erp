@@ -19,7 +19,6 @@ import {
   DualCostingPageSection,
   DualCostingPanel,
   DualCostingStatCard,
-  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type Mode = 'ledger' | 'report' | 'waiting'
@@ -753,16 +752,6 @@ function AllocationLedgerView() {
   return (
     <DualCostingPageSection>
       <DualCostingErrorBox error={error} />
-      <DualCostingWorkflowStrip active="ledger" />
-      
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <DualCostingStatCard icon="📊" label="รวม Allocations" tone="slate" value={String(data?.summary.active ?? 0)}>
-          <span className="text-xs font-semibold text-slate-500 mt-0.5 block">PO {data?.summary.poCount ?? 0} · Spot {data?.summary.spotCount ?? 0}</span>
-        </DualCostingStatCard>
-        <DualCostingStatCard icon="⚖️" label="น้ำหนัก allocate" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
-        <DualCostingStatCard icon="💳" label="ต้นทุนรวม" tone="red" value={formatMoney(data?.summary.cost ?? 0)} />
-        <DualCostingStatCard icon="📈" label="กำไรรวม (Deal Cost)" tone={(data?.summary.gp ?? 0) >= 0 ? 'emerald' : 'red'} value={formatMoney(data?.summary.gp ?? 0)} />
-      </div>
 
       <DualCostingFilterCard>
         {/* Desktop View */}
