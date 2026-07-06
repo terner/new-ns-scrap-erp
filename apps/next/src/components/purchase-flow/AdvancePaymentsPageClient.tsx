@@ -537,14 +537,13 @@ export function AdvancePaymentsPageClient() {
 
     setIsSaving(true)
     try {
-      const saved = await dailyFetchJson<{ id: string }>(editingAdvanceId ? `/api/purchase/advance-payments/${editingAdvanceId}` : '/api/purchase/advance-payments', {
+      await dailyFetchJson<{ id: string }>(editingAdvanceId ? `/api/purchase/advance-payments/${editingAdvanceId}` : '/api/purchase/advance-payments', {
         body: JSON.stringify(parsed.data),
         method: editingAdvanceId ? 'PUT' : 'POST',
       })
       setForm(emptyForm())
       closeForm()
       await loadData()
-      if (saved.id) await loadDetail(saved.id)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'บันทึกรายการจ่ายเงินล่วงหน้าไม่ได้')
     } finally {

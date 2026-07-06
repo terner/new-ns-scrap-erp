@@ -65,6 +65,8 @@ ADV เป็น source document ของเงินล่วงหน้า S
 | 4 | PB cancel/supplier swap | release allocation กลับมาเป็น available |
 | 5 | ปิด ADV | available = 0 จาก allocation/refund ตาม target |
 
+หลังสร้างหรือแก้ไข ADV สำเร็จ หน้า list ต้องปิด form และ reload ข้อมูลด้วย filter เดิมของผู้ใช้เท่านั้น ไม่ auto เปิด detail ของเอกสารที่เพิ่งบันทึก และไม่ auto เปลี่ยน search/status/date filter ให้เหลือรายการใหม่
+
 ## API / Data Contract
 
 ### Current API
