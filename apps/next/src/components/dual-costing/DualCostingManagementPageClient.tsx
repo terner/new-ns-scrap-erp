@@ -18,6 +18,7 @@ import {
   DualCostingPageSection,
   DualCostingPanel,
   DualCostingStatCard,
+  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type Mode = 'ledger' | 'report' | 'waiting'

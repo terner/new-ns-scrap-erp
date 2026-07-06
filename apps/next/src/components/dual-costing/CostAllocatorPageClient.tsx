@@ -15,7 +15,6 @@ import {
   DualCostingPageSection,
   DualCostingPanel,
   DualCostingStatCard,
-  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type ProductOption = {
@@ -310,7 +309,6 @@ export function CostAllocatorPageClient() {
   return (
     <DualCostingPageSection>
       <DualCostingErrorBox error={error} />
-      <DualCostingWorkflowStrip active="allocator" />
 
       <DualCostingPanel title="⓪ เลือกประเภทปลายทางที่จะ Match ต้นทุน">
         <div className="flex flex-wrap gap-2">
