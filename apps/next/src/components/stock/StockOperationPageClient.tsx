@@ -2221,12 +2221,11 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
     const entries = props.reference.costPoolEntries ?? []
     return entries
       .filter((entry) => !values.branchId || entry.branchId === values.branchId)
-      .filter((entry) => !values.warehouseId || entry.warehouseId === values.warehouseId)
       .filter((entry) => !values.sourceProductId || entry.productId === values.sourceProductId)
       .filter((entry) => !values.lotNo || entry.lotNo === values.lotNo)
       .filter((entry) => entry.availableQty > 0)
       .sort((left, right) => sortCostPoolEntries(left, right, values.allocationMethod))
-  }, [props.reference.costPoolEntries, values.allocationMethod, values.branchId, values.lotNo, values.sourceProductId, values.warehouseId])
+  }, [props.reference.costPoolEntries, values.allocationMethod, values.branchId, values.lotNo, values.sourceProductId])
   const autoPreview = useMemo(() => previewCostPoolAllocation(sourceCostPoolEntries, Number(values.sourceQty)), [sourceCostPoolEntries, values.sourceQty])
   const manualTotalQty = values.manualAllocations.reduce((sum, line) => sum + Number(line.qty || 0), 0)
   const costPreviewRows = values.allocationMethod === 'MANUAL'
