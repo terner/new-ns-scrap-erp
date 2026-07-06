@@ -295,7 +295,6 @@ function WaitingAllocationsView() {
   return (
     <DualCostingPageSection>
       <DualCostingErrorBox error={error} />
-      <DualCostingWorkflowStrip active="waiting" />
       
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <DualCostingStatCard icon="❌" label="ยังไม่ส่งจัดสรร" tone="red" value={String(data?.summary.fullyPending ?? 0)} />
