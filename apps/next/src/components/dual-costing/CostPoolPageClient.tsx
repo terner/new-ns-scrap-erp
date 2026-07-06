@@ -16,7 +16,6 @@ import {
   DualCostingFilterCard,
   DualCostingPageSection,
   DualCostingStatCard,
-  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type CostPoolRow = {
@@ -243,7 +242,6 @@ export function CostPoolPageClient() {
   return (
     <DualCostingPageSection>
       <DualCostingErrorBox error={error} />
-      <DualCostingWorkflowStrip active="pool" />
 
       <div className="grid gap-3 md:grid-cols-3">
         {costTypeCards.map((card) => {
