@@ -296,12 +296,6 @@ function DashboardView(props: {
   const k = data?.dashboard.kpi ?? {}
   const section = data?.dashboard.sections
   const analytics = data?.dailyReport.analytics
-  const alerts = [
-    { active: (k.ar ?? 0) > 0, text: `ลูกหนี้คงค้าง ${money(k.ar)}`, tone: 'purple' },
-    { active: (k.ap ?? 0) > 0, text: `เจ้าหนี้คงค้าง ${money(k.ap)}`, tone: 'orange' },
-    { active: (section?.cash.odUsed ?? 0) > 0, text: `OD ใช้ไป ${money(section?.cash.odUsed)}`, tone: 'amber' },
-    { active: (k.cashBalance ?? 0) < (k.ap ?? 0), text: 'เงินสดต่ำกว่าเจ้าหนี้รวม', tone: 'red' },
-  ].filter((alert) => alert.active)
   const purchaseWeight = section?.purchase.qty ?? 0
   const salesWeight = section?.sales.qty ?? 0
   const purchaseAmount = section?.purchase.amount ?? 0
@@ -701,8 +695,6 @@ function DashboardView(props: {
           </DashboardChartCard>
         </div>
       </div>
-
-      {alerts.length ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{alerts.map((alert) => <span className="mr-2 inline-flex rounded-md bg-white px-2 py-1 font-semibold border border-slate-100" key={alert.text}>{alert.text}</span>)}</div> : null}
 
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">

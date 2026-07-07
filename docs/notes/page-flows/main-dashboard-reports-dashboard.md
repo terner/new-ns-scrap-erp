@@ -4,7 +4,7 @@ tags:
   - page-flow
   - menu
 status: accepted-baseline
-updated: 2026-07-06
+updated: 2026-07-07
 route: /dashboard
 ---
 
@@ -38,6 +38,7 @@ Dashboard Overview เป็น management KPI view จาก operational facts.
 - `Historical` แสดงเฉพาะเมื่อมี rows จริง ถ้าไม่มีข้อมูลไม่ต้องแสดง empty banner เพราะไม่ช่วยการตัดสินใจ
 - Detail metric sections ท้ายหน้าต้องไม่ซ้ำกับ KPI/hero โดยตรง เช่น ซื้อ/ขายท้ายหน้าเน้นจำนวนบิล, น้ำหนัก, ราคาเฉลี่ย, GP/Margin แทนการย้ำยอดรวมเดิม
 - Detail-heavy content เช่น ranked list, stock table, และ metric drill-down ต้องอยู่หลัง overview ใน tabs เพื่อให้ผู้ใช้เลือกอ่านทีละบริบท ไม่ให้ dashboard กลายเป็นหน้าตารางยาว
+- AR/AP overdue หรือยอดลูกหนี้/เจ้าหนี้คงค้างไม่ต้องแสดงเป็น alert strip/card แยก ถ้าข้อมูลเดียวกันอยู่ใน `Receivables & Payables Aging` แล้ว เพราะตาราง Aging เป็นพื้นที่หลักที่แยก Current/1-30/31-60/61-90/>90/Total ชัดกว่า
 - Ranked list ใน Dashboard Overview แสดง 5 อันดับแรกก่อน และให้กดขยายดูครบ 10 อันดับเมื่อจำเป็น
 - การเปลี่ยน UI นี้ไม่เปลี่ยนสูตรรายงาน, source tables, permissions, หรือ side effects ของ `GET /api/dashboard`
 
