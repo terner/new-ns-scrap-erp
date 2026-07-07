@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type MainPayload = {
   dashboard: {
@@ -78,6 +80,7 @@ type MainPayload = {
 type Mode = 'daily-report' | 'dashboard' | 'owner-daily' | 'analytics-dashboard'
 type SortDirection = 'asc' | 'desc'
 type DashboardAgingSortKey = 'label' | 'current' | 'd1_30' | 'd31_60' | 'd61_90' | 'over90' | 'total'
+type DashboardDetailTab = 'metrics' | 'ranking' | 'stock'
 type DashboardAgingRow = {
   current: number
   d1_30: number
@@ -116,6 +119,12 @@ const dashboardStockGroupColumns: ResizableColumnDefinition<string>[] = [
   { key: 'group', defaultWidth: 180, minWidth: 130 },
   { key: 'qty', defaultWidth: 120, minWidth: 100 },
   { key: 'value', defaultWidth: 140, minWidth: 110 },
+]
+
+const dashboardDetailTabs: Array<{ key: DashboardDetailTab; label: string; summary: string }> = [
+  { key: 'ranking', label: 'อันดับคู่ค้า', summary: 'Top Supplier / Customer' },
+  { key: 'stock', label: 'Stock', summary: 'แนวโน้มและมูลค่าตามหมวด' },
+  { key: 'metrics', label: 'ตัวชี้วัดย่อย', summary: 'ซื้อ ขาย เงินสด และ Stock' },
 ]
 
 const ownerDueColumns: ResizableColumnDefinition<OwnerDueSortKey>[] = [
@@ -260,6 +269,8 @@ function DashboardView(props: {
   const [agingSortDirection, setAgingSortDirection] = useState<SortDirection>('desc')
   const [stockGroupSortKey, setStockGroupSortKey] = useState<DashboardStockGroupSortKey>('value')
   const [stockGroupSortDirection, setStockGroupSortDirection] = useState<SortDirection>('desc')
+  const [showDashboardMobileFilters, setShowDashboardMobileFilters] = useState(false)
+  const [detailTab, setDetailTab] = useState<DashboardDetailTab>('ranking')
   const agingResize = useResizableColumns('main.dashboard.aging.v1', dashboardAgingColumns)
   const stockGroupResize = useResizableColumns('main.dashboard.stock-by-group.v1', dashboardStockGroupColumns)
 
@@ -286,22 +297,17 @@ function DashboardView(props: {
   const k = data?.dashboard.kpi ?? {}
   const section = data?.dashboard.sections
   const analytics = data?.dailyReport.analytics
-  const alerts = [
-    { active: (k.ar ?? 0) > 0, text: `ลูกหนี้คงค้าง ${money(k.ar)}`, tone: 'purple' },
-    { active: (k.ap ?? 0) > 0, text: `เจ้าหนี้คงค้าง ${money(k.ap)}`, tone: 'orange' },
-    { active: (section?.cash.odUsed ?? 0) > 0, text: `OD ใช้ไป ${money(section?.cash.odUsed)}`, tone: 'amber' },
-    { active: (k.cashBalance ?? 0) < (k.ap ?? 0), text: 'เงินสดต่ำกว่าเจ้าหนี้รวม', tone: 'red' },
-  ].filter((alert) => alert.active)
   const purchaseWeight = section?.purchase.qty ?? 0
-  const salesWeight = section?.sales.qty ?? 0
   const purchaseAmount = section?.purchase.amount ?? 0
   const salesAmount = section?.sales.amount ?? 0
+  const purchaseCount = section?.purchase.count ?? 0
+  const salesCount = section?.sales.count ?? 0
   const gp = section?.sales.gp ?? 0
   const stockQty = section?.stock.qty ?? 0
   const stockValue = section?.stock.value ?? 0
   const gpPct = salesAmount > 0 ? (gp / salesAmount) * 100 : 0
-  const filteredCount = `${money(section?.purchase.count)} ซื้อ · ${money(section?.sales.count)} ขาย`
-  const hasAdvancedFilters = Boolean(dashboardBranchId || dashboardGroup || dashboardSupplierId || dashboardCustomerId || dashboardProductId)
+  const filteredCount = `${purchaseCount.toLocaleString('th-TH')} ซื้อ · ${salesCount.toLocaleString('th-TH')} ขาย`
+  const hasActiveDashboardFilters = rangeMode !== 'year' || Boolean(dashboardBranchId || dashboardGroup || dashboardSupplierId || dashboardCustomerId || dashboardProductId)
   const hasDashboardData = Boolean(
     (k.revenue ?? 0)
     || (k.expenses ?? 0)
@@ -414,9 +420,14 @@ function DashboardView(props: {
   }
   return (
     <>
-      <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500">ช่วงเวลา</span>
+      <div className="rounded-md bg-white p-3 shadow lg:hidden">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-slate-600">ช่วงเวลา:</span>
+          <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200" type="button" onClick={() => setShowDashboardMobileFilters(true)}>
+            ตัวกรอง {hasActiveDashboardFilters ? '(มี)' : ''}
+          </button>
+        </div>
+        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
           {[
             ['year', 'ปีนี้'],
             ['quarter', 'ไตรมาส'],
@@ -424,61 +435,152 @@ function DashboardView(props: {
             ['week', '7 วัน'],
             ['today', 'วันนี้'],
           ].map(([key, label]) => (
-            <button className={`h-8 rounded-md px-3 text-xs font-semibold outline-none transition focus:ring-2 focus:ring-blue-100 ${rangeMode === key ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
+            <button className={`h-9 shrink-0 rounded-md border px-3 text-xs font-medium outline-none transition focus:ring-2 focus:ring-slate-200 ${rangeMode === key ? 'border-slate-700 bg-slate-700 text-white shadow-sm' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} key={`mobile-${key}`} onClick={() => applyPeriod(key)} type="button">{label}</button>
           ))}
-          <DatePickerInput className="h-8 w-[130px] bg-white text-slate-700" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
-          <span className="text-xs text-slate-400">ถึง</span>
-          <DatePickerInput className="h-8 w-[130px] bg-white text-slate-700" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
-          <span className="ml-auto rounded-md bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600">{filteredCount}</span>
-          <button className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100" onClick={clearFilters} type="button">ล้างตัวกรอง</button>
         </div>
-        <details className="mt-2" {...(hasAdvancedFilters ? { open: true } : {})}>
-          <summary className="inline-flex cursor-pointer select-none items-center rounded-md px-1 text-xs font-semibold text-slate-500 hover:text-slate-800">
-            ตัวกรองเพิ่มเติม{hasAdvancedFilters ? ' (มี)' : ''}
-          </summary>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(130px,0.8fr)_minmax(130px,0.8fr)_minmax(170px,1fr)_minmax(170px,1fr)_minmax(170px,1fr)]">
-            <select className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
-            <select className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
+        <div className="mt-2 flex items-center justify-between gap-2 text-xs font-semibold text-slate-600">
+          <span className="min-w-0 truncate">{rangeFrom} → {rangeTo}</span>
+          <span className="shrink-0 rounded-md bg-slate-100 px-2.5 py-1 text-slate-700">{filteredCount}</span>
+        </div>
+      </div>
+      {showDashboardMobileFilters ? (
+        <MobileFilterSheet
+          footer={(
+            <>
+              <button
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={() => {
+                  clearFilters()
+                  setShowDashboardMobileFilters(false)
+                }}
+              >
+                ล้างตัวกรอง
+              </button>
+              <button
+                className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
+                type="button"
+                onClick={() => setShowDashboardMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          )}
+          onClose={() => setShowDashboardMobileFilters(false)}
+          title="ตัวกรอง Dashboard"
+          visibleClassName="lg:hidden"
+        >
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">ช่วงวันที่</span>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <DatePickerInput className="h-9 w-full border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+              <span className="text-slate-400">→</span>
+              <DatePickerInput className="h-9 w-full border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+            </div>
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">สาขา</span>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">หมวดสินค้า</span>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">Supplier</span>
+            <SearchCombobox inputId="dashboard-supplier-filter-mobile" label="Supplier" hideLabel inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500" placeholder="ทุก Supplier" options={supplierSearchOptions} value={dashboardSupplierId} onChange={setDashboardSupplierId} />
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">Customer</span>
+            <SearchCombobox inputId="dashboard-customer-filter-mobile" label="Customer" hideLabel inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500" placeholder="ทุก Customer" options={customerSearchOptions} value={dashboardCustomerId} onChange={setDashboardCustomerId} />
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">สินค้า</span>
+            <SearchCombobox inputId="dashboard-product-filter-mobile" label="สินค้า" hideLabel inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500" placeholder="ทุกสินค้า" options={productSearchOptions} value={dashboardProductId} onChange={setDashboardProductId} />
+          </div>
+        </MobileFilterSheet>
+      ) : null}
+      <div className="hidden rounded-md bg-white p-3 shadow lg:block">
+        <div className="flex flex-wrap items-center gap-2 text-slate-800">
+          <span className="text-xs font-semibold text-slate-600">ช่วงเวลา:</span>
+          {[
+            ['year', 'ปีนี้'],
+            ['quarter', 'ไตรมาส'],
+            ['month', 'เดือนนี้'],
+            ['week', '7 วัน'],
+            ['today', 'วันนี้'],
+          ].map(([key, label]) => (
+            <button className={`h-9 rounded-md border px-3 text-xs font-medium outline-none transition focus:ring-2 focus:ring-slate-200 ${rangeMode === key ? 'border-slate-700 bg-slate-700 text-white shadow-sm' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
+          ))}
+          <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" />
+          <DatePickerInput className="h-9 w-[140px] border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+          <span className="text-xs text-slate-400">→</span>
+          <DatePickerInput className="h-9 w-[140px] border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+          <span className="ml-auto h-9 rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">{filteredCount}</span>
+          {hasActiveDashboardFilters ? (
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200" onClick={clearFilters} type="button">ล้างตัวกรอง</button>
+          ) : null}
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-[160px_180px_minmax(220px,1fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
+          <div className="space-y-1">
+            <span className="block text-[11px] font-semibold text-slate-500">สาขา</span>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+          </div>
+          <div className="space-y-1">
+            <span className="block text-[11px] font-semibold text-slate-500">หมวดสินค้า</span>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
+          </div>
+          <div className="space-y-1">
+            <span className="block text-[11px] font-semibold text-slate-500">Supplier</span>
             <SearchCombobox
               inputId="dashboard-supplier-filter"
               label="Supplier"
               hideLabel
+              inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
               placeholder="ทุก Supplier"
               options={supplierSearchOptions}
               value={dashboardSupplierId}
               onChange={setDashboardSupplierId}
             />
+          </div>
+          <div className="space-y-1">
+            <span className="block text-[11px] font-semibold text-slate-500">Customer</span>
             <SearchCombobox
               inputId="dashboard-customer-filter"
               label="Customer"
               hideLabel
+              inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
               placeholder="ทุก Customer"
               options={customerSearchOptions}
               value={dashboardCustomerId}
               onChange={setDashboardCustomerId}
             />
+          </div>
+          <div className="space-y-1">
+            <span className="block text-[11px] font-semibold text-slate-500">สินค้า</span>
             <SearchCombobox
               inputId="dashboard-product-filter"
               label="สินค้า"
               hideLabel
+              inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
               placeholder="ทุกสินค้า"
               options={productSearchOptions}
               value={dashboardProductId}
               onChange={setDashboardProductId}
             />
           </div>
-        </details>
+        </div>
       </div>
       <div>
         {(data?.dashboard.historical.rows ?? 0) > 0 ? (
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-100 bg-amber-50/70 p-2 text-xs">
-            <span className="font-bold text-amber-800">รวมยอด Historical:</span>
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-600">
+            <span className="font-bold text-slate-700">รวมยอด Historical:</span>
             <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Revenue <b className="text-emerald-700">{money(data?.dashboard.historical.revenue)}</b></span>
             <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">COGS <b className="text-red-700">{money(data?.dashboard.historical.cogs)}</b></span>
             <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Expenses <b className="text-amber-700">{money(data?.dashboard.historical.expenses)}</b></span>
             <span className="text-slate-500">({data?.dashboard.historical.rows ?? 0} rows)</span>
           </div>
-        ) : <div className="mb-3 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-500">ยังไม่มีข้อมูล Historical สำหรับช่วงนี้</div>}
+        ) : null}
         {!hasDashboardData ? (
           <div className="mb-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800">
             ยังไม่มีข้อมูลในช่วงเวลาหรือตัวกรองนี้ ลองเปลี่ยนช่วงเวลา หรือล้างตัวกรองเพื่อดูภาพรวมทั้งหมด
@@ -492,18 +594,15 @@ function DashboardView(props: {
           <DashboardKpi label="AR ลูกหนี้" sub="Receivable" tone="purple" value={money(k.ar)} />
           <DashboardKpi label="AP เจ้าหนี้" sub="Payable" tone="orange" value={money(k.ap)} />
         </div>
-        <div className="mb-4 grid gap-3 lg:grid-cols-3">
+        <div className="mb-4 grid gap-3 lg:grid-cols-2">
           <DashboardChartCard title="Revenue vs Expense (Monthly)">
             <BarRows rows={(data?.dashboard.monthlyTrend ?? []).flatMap((row) => [{ label: `${monthLabel(row.label)} Rev`, value: row.sales }, { label: `${monthLabel(row.label)} Exp`, value: row.expense + Math.max(0, row.sales - row.gp) }])} />
           </DashboardChartCard>
           <DashboardChartCard title="Cash Flow Overview">
             <BarRows rows={(data?.dashboard.cashComposition ?? []).map((row) => ({ label: row.label, value: row.value }))} />
           </DashboardChartCard>
-          <DashboardChartCard title="Expense Breakdown">
-            <BarRows rows={(data?.dashboard.monthlyTrend ?? []).map((row) => ({ label: monthLabel(row.label), value: row.expense }))} />
-          </DashboardChartCard>
         </div>
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="mb-4">
           <DashboardChartCard title="Receivables & Payables Aging">
             <div className="mb-2 flex justify-end">
               {agingResize.hasCustomWidths ? (
@@ -569,24 +668,39 @@ function DashboardView(props: {
               })}
             </div>
           </DashboardChartCard>
-          <DashboardChartCard title="Channel Performance">
-            <MiniLine label="Purchase" value={`${money(purchaseWeight)} กก. · ${money(purchaseAmount)}`} />
-            <MiniLine label="Sales" value={`${money(salesWeight)} กก. · ${money(salesAmount)}`} />
-            <MiniLine label="Stock" value={`${money(stockQty)} กก. · ${money(stockValue)}`} />
-          </DashboardChartCard>
-          <DashboardChartCard title="Quick Insights">
-            <MiniLine label="Gross Margin" value={`${money(gpPct)}%`} />
-            <MiniLine label="Net Profit" value={money(k.netProfit)} />
-            <MiniLine label="Net Cash" value={money(section?.cash.netCash)} />
-          </DashboardChartCard>
         </div>
       </div>
 
-      {alerts.length ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{alerts.map((alert) => <span className="mr-2 inline-flex rounded-md bg-white px-2 py-1 font-semibold border border-slate-100" key={alert.text}>{alert.text}</span>)}</div> : null}
+      <Tabs className="gap-2" value={detailTab} onValueChange={(value) => setDetailTab(value as DashboardDetailTab)}>
+        <TabsList className="w-full overflow-x-auto rounded-md bg-white px-2 shadow-sm" variant="line">
+          {dashboardDetailTabs.map((tab) => {
+            return (
+              <TabsTrigger
+                key={tab.key}
+                aria-label={`${tab.label}: ${tab.summary}`}
+                className="px-3 text-xs sm:text-sm"
+                value={tab.key}
+                variant="line"
+              >
+                {tab.label}
+              </TabsTrigger>
+            )
+          })}
+        </TabsList>
+      </Tabs>
 
-      <div className="grid gap-4 lg:grid-cols-2"><RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="Top Suppliers" /><RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="Top Customers" /></div>
+      {detailTab === 'ranking' ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-sm font-bold text-slate-800">Top Ranking</h2>
+            <span className="text-xs font-medium text-slate-500">อันดับคู่ค้าที่ช่วยอ่านภาพรวมเร็ว ไม่แทนรายการเอกสารต้นทาง</span>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2"><RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="Top Suppliers" /><RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="Top Customers" /></div>
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {detailTab === 'stock' ? (
+        <div className="grid gap-4 lg:grid-cols-2">
         <DashboardChartCard title="แนวโน้มซื้อ-ขาย 30 วัน"><BarRows rows={(analytics?.dailyTrend ?? []).slice(-10).flatMap((row) => [{ label: `${row.label} ซื้อ`, value: row.purchase }, { label: `${row.label} ขาย`, value: row.sales }])} /></DashboardChartCard>
         <DashboardChartCard title="มูลค่าสินค้าตามหมวด">
           <div className="mb-2 flex justify-end">
@@ -636,32 +750,36 @@ function DashboardView(props: {
           </div>
         </DashboardChartCard>
       </div>
+      ) : null}
 
-      <Section title={`ฝั่งซื้อ (${periodInfo.buySection}) — Purchase / Supplier`}>
-        <Metric label={periodInfo.buyLabel} tone="blue" value={money(section?.purchase.amount)} />
-        <Metric label="น้ำหนักซื้อ" value={`${money(section?.purchase.qty)} กก.`} />
-        <Metric label="ราคาซื้อเฉลี่ย" value={`${money(purchaseWeight > 0 ? purchaseAmount / purchaseWeight : 0)} ฿/กก.`} />
-        <Metric label="เจ้าหนี้รวม" tone="red" value={money(k.ap)} />
-      </Section>
-      <Section title={`ฝั่งขาย (${periodInfo.sellSection}) — Sales / Customer`}>
-        <Metric label={periodInfo.sellLabel} tone="emerald" value={money(section?.sales.amount)} />
-        <Metric label="น้ำหนักขาย" value={`${money(section?.sales.qty)} กก.`} />
-        <Metric label="Gross Profit" tone="emerald" value={money(section?.sales.gp)} />
-        <Metric label="Margin %" tone={(gpPct ?? 0) >= 0 ? 'emerald' : 'red'} value={`${money(gpPct)}%`} />
-      </Section>
-      <Section title="ฝั่งการเงิน — Cash / Bank / OD">
-        <Metric label="เงินสดรวม" tone="emerald" value={money(section?.cash.cash)} />
-        <Metric label="ธนาคารรวม" tone="blue" value={money(section?.cash.bank)} />
-        <Metric label="FCD" tone="purple" value={money(section?.cash.fcd)} />
-        <Metric label="OD ใช้ / เหลือ" tone="orange" value={`${money(section?.cash.odUsed)} / ${money(section?.cash.odLimit)}`} />
-        <Metric label="Net Cash Position" tone="purple" value={money(section?.cash.netCash)} />
-      </Section>
-      <Section title="ฝั่ง Stock — Inventory / WAC">
-        <Metric label="น้ำหนักรวม" value={`${money(section?.stock.qty)} กก.`} />
-        <Metric label="มูลค่าสต๊อกรวม" tone="orange" value={money(section?.stock.value)} />
-        <Metric label="ราคาต่อหน่วยเฉลี่ย" value={`${money(stockQty > 0 ? stockValue / stockQty : 0)} ฿/กก.`} />
-        {(data?.dashboard.stockByBranch ?? []).slice(0, 3).map((row) => <Metric key={row.name} label={row.name} value={`${money(row.qty)} กก. · ${money(row.value)}`} />)}
-      </Section>
+      {detailTab === 'metrics' ? (
+        <>
+          <Section title={`ฝั่งซื้อ (${periodInfo.buySection}) — Purchase / Supplier`}>
+            <Metric label="จำนวนบิลซื้อ" tone="blue" value={`${purchaseCount.toLocaleString('th-TH')} บิล`} />
+            <Metric label="น้ำหนักซื้อ" value={`${money(section?.purchase.qty)} กก.`} />
+            <Metric label="ราคาซื้อเฉลี่ย" value={`${money(purchaseWeight > 0 ? purchaseAmount / purchaseWeight : 0)} ฿/กก.`} />
+          </Section>
+          <Section title={`ฝั่งขาย (${periodInfo.sellSection}) — Sales / Customer`}>
+            <Metric label="จำนวนบิลขาย" tone="emerald" value={`${salesCount.toLocaleString('th-TH')} บิล`} />
+            <Metric label="น้ำหนักขาย" value={`${money(section?.sales.qty)} กก.`} />
+            <Metric label="Gross Profit" tone="emerald" value={money(section?.sales.gp)} />
+            <Metric label="Margin %" tone={(gpPct ?? 0) >= 0 ? 'emerald' : 'red'} value={`${money(gpPct)}%`} />
+          </Section>
+          <Section title="ฝั่งการเงิน — Cash / Bank / OD">
+            <Metric label="เงินสดรวม" tone="emerald" value={money(section?.cash.cash)} />
+            <Metric label="ธนาคารรวม" tone="blue" value={money(section?.cash.bank)} />
+            <Metric label="FCD" tone="purple" value={money(section?.cash.fcd)} />
+            <Metric label="OD ใช้ / เหลือ" tone="orange" value={`${money(section?.cash.odUsed)} / ${money(section?.cash.odLimit)}`} />
+            <Metric label="Net Cash Position" tone="purple" value={money(section?.cash.netCash)} />
+          </Section>
+          <Section title="ฝั่ง Stock — Inventory / WAC">
+            <Metric label="น้ำหนักรวม" value={`${money(section?.stock.qty)} กก.`} />
+            <Metric label="มูลค่าสต๊อกรวม" tone="orange" value={money(section?.stock.value)} />
+            <Metric label="ราคาต่อหน่วยเฉลี่ย" value={`${money(stockQty > 0 ? stockValue / stockQty : 0)} ฿/กก.`} />
+            {(data?.dashboard.stockByBranch ?? []).slice(0, 3).map((row) => <Metric key={row.name} label={row.name} value={`${money(row.qty)} กก. · ${money(row.value)}`} />)}
+          </Section>
+        </>
+      ) : null}
     </>
   )
 }
@@ -726,32 +844,30 @@ function cashAccountValue(row: CashAccountRow, key: CashAccountSortKey) {
 }
 
 function DashboardKpi({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
-  const toneMap: Record<string, { dot: string; value: string }> = {
-    blue: { dot: 'bg-blue-500', value: 'text-slate-950' },
-    cyan: { dot: 'bg-cyan-500', value: 'text-slate-950' },
-    emerald: { dot: 'bg-emerald-500', value: 'text-emerald-700' },
-    orange: { dot: 'bg-orange-500', value: 'text-slate-950' },
-    purple: { dot: 'bg-purple-500', value: 'text-slate-950' },
-    red: { dot: 'bg-red-500', value: 'text-slate-950' },
+  const toneMap: Record<string, { accent: string; text: string }> = {
+    blue: { accent: 'bg-blue-500', text: 'text-blue-700' },
+    cyan: { accent: 'bg-cyan-500', text: 'text-cyan-700' },
+    emerald: { accent: 'bg-emerald-500', text: 'text-emerald-700' },
+    orange: { accent: 'bg-orange-500', text: 'text-orange-700' },
+    purple: { accent: 'bg-purple-500', text: 'text-purple-700' },
+    red: { accent: 'bg-rose-500', text: 'text-rose-700' },
   }
-  const style = toneMap[tone] || { dot: 'bg-slate-400', value: 'text-slate-950' }
+  const style = toneMap[tone] ?? { accent: 'bg-slate-400', text: 'text-slate-800' }
 
   return (
-    <div className="flex min-w-0 flex-col justify-between rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <span className={`h-2 w-2 rounded-full ${style.dot}`} />
-          {label}
-        </div>
-        {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
-        <div className={`mt-1 font-mono text-lg font-bold tabular-nums truncate ${style.value}`}>{value}</div>
+    <div className="relative flex min-h-[116px] min-w-0 flex-col justify-between overflow-hidden rounded-xl border border-slate-200 bg-white p-4 pl-5 shadow-sm">
+      <div className={`absolute inset-y-0 left-0 w-1 ${style.accent}`} />
+      <div className="min-w-0">
+        <div className="text-xs font-semibold text-slate-500">{label}</div>
+        {sub && <div className="mt-1 text-xs text-slate-400">{sub}</div>}
       </div>
+      <div className={`mt-3 truncate font-mono text-xl font-bold tabular-nums ${style.text}`}>{value}</div>
     </div>
   )
 }
 
-function DashboardChartCard({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-800">{title}</div>{children}</div>
+function DashboardChartCard({ children, className = '', title }: { children: ReactNode; className?: string; title: string }) {
+  return <div className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${className}`.trim()}><div className="mb-3 text-sm font-bold text-slate-800">{title}</div>{children}</div>
 }
 
 function OwnerDailyView({ data }: { data: MainPayload | null }) {
@@ -1707,6 +1823,7 @@ const rankColumnsEmerald: ResizableColumnDefinition<string>[] = [
 function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: RankRow[]; title: string }) {
   const [sortKey, setSortKey] = useState<string>('amount')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [showAllRows, setShowAllRows] = useState(false)
 
   const columns = color === 'blue' ? rankColumnsBlue : rankColumnsEmerald
   const columnResize = useResizableColumns(`reports.analytics.rank-table.${title}`, columns)
@@ -1744,20 +1861,32 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
     })
     return sorted
   }, [rows, sortKey, sortDirection])
+  const visibleRows = (showAllRows ? sortedRows.slice(0, 10) : sortedRows.slice(0, 5))
 
   return (
     <div className="min-w-0 overflow-hidden rounded-md bg-white shadow-sm border border-slate-200">
       <div className={`border-b p-3 font-bold text-sm ${header} flex items-center justify-between`}>
         <h3 className="font-bold">{title}</h3>
-        {columnResize.hasCustomWidths ? (
-          <button
-            className="text-xs font-normal text-slate-500 hover:text-slate-800 bg-white/60 hover:bg-white rounded px-2 py-0.5 shadow-sm border border-slate-200 transition-all outline-none"
-            type="button"
-            onClick={columnResize.resetColumnWidths}
-          >
-            คืนค่ากว้าง
-          </button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {sortedRows.length > 5 ? (
+            <button
+              className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+              type="button"
+              onClick={() => setShowAllRows((current) => !current)}
+            >
+              {showAllRows ? 'ย่อเหลือ 5' : `ดูครบ ${Math.min(10, sortedRows.length)}`}
+            </button>
+          ) : null}
+          {columnResize.hasCustomWidths ? (
+            <button
+              className="text-xs font-normal text-slate-500 hover:text-slate-800 bg-white/60 hover:bg-white rounded px-2 py-0.5 shadow-sm border border-slate-200 transition-all outline-none"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              คืนค่ากว้าง
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Desktop view */}
@@ -1784,7 +1913,7 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((row, index) => (
+            {visibleRows.map((row, index) => (
               <tr key={`${row.id || 'rank'}-${index}`} className={`border-t border-slate-100 ${hover}`}>
                 <td className={`p-2 font-bold ${text} text-xs whitespace-nowrap`}>{index + 1}</td>
                 <td className="p-2 text-xs text-slate-700 min-w-0 overflow-hidden"><div className="truncate" title={row.name}>{row.name}</div></td>
@@ -1810,7 +1939,7 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
 
       {/* Mobile view */}
       <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
-        {sortedRows.map((row, index) => (
+        {visibleRows.map((row, index) => (
           <div key={`${row.id || 'rank'}-${index}`} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 line-clamp-1">
