@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireBusinessCode, stringifyBusinessValue } from '@/lib/business-code'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { getDualCostingBranch } from '@/lib/server/dual-costing-branch'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { formatDualCostingMatchId, getDualCostingMatchIdPrefix } from '@/lib/server/dual-costing-match-id'
 import { prisma } from '@/lib/server/prisma'
@@ -151,6 +152,7 @@ export async function GET(request: Request) {
     const mode = url.searchParams.get('mode') ?? 'FIFO'
     const sourceType = url.searchParams.get('sourceType') ?? 'spot-sell'
     const targetCost = Number(url.searchParams.get('targetCost')) || 0
+    const branch = await getDualCostingBranch()
 
     const [costPool, poSells, salesBills, spotSalesBills, tradingDeals, products, productionOrders, tradingAllocationFacts] = await Promise.all([
       getCostPoolRowsData({ showAvailableOnly: true }),
@@ -158,12 +160,19 @@ export async function GET(request: Request) {
         include: { customers: true },
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 5000,
-        where: { NOT: { status: { in: ['Cancelled', 'cancelled', 'Canceled', 'canceled', 'Closed', 'closed', 'Completed', 'completed', 'Fully Matched', 'fully matched', 'Received', 'received'] } } },
+        where: {
+          branch_id: branch.id,
+          NOT: { status: { in: ['Cancelled', 'cancelled', 'Canceled', 'canceled', 'Closed', 'closed', 'Completed', 'completed', 'Fully Matched', 'fully matched', 'Received', 'received'] } },
+        },
       }),
       prisma.sales_bills.findMany({
         select: { id: true, po_sell_id: true, doc_no: true },
         take: 10000,
-        where: { NOT: { status: 'cancelled' }, po_sell_id: { not: null } },
+        where: {
+          branch_id: branch.id,
+          NOT: { status: 'cancelled' },
+          po_sell_id: { not: null },
+        },
       }),
       prisma.sales_bills.findMany({
         include: {
@@ -180,6 +189,7 @@ export async function GET(request: Request) {
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
         where: {
+          branch_id: branch.id,
           NOT: [
             { status: { in: ['cancelled', 'Cancelled', 'canceled', 'Canceled'] } },
             { transaction_mode: 'TRADING' },
@@ -201,6 +211,7 @@ export async function GET(request: Request) {
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 5000,
         where: {
+          branch_id: branch.id,
           NOT: { status: 'Cancelled' }
         }
       }),
@@ -225,6 +236,8 @@ export async function GET(request: Request) {
     poSells.forEach((po) => {
       poSellDocNoToPoSellId.set(po.doc_no, po.id)
     })
+    const allowedSalesBillIds = new Set(salesBills.map((bill) => bill.id.toString()))
+    const allowedPoSellIds = new Set(poSells.map((po) => po.id.toString()))
 
     const matchedQtyByPoSellProduct = new Map<string, number>() // key: `${po_sell_id}|${product_id}`
     const matchedQtyBySpotProduct = new Map<string, number>() // key: `${sales_bill_id}:${product_id}`
@@ -253,6 +266,9 @@ export async function GET(request: Request) {
       if (!resolvedPoSellId && fact.sales_doc_no) {
         resolvedPoSellId = poSellDocNoToPoSellId.get(fact.sales_doc_no) ?? null
       }
+      const inBranchScope = (resolvedSalesBillId && allowedSalesBillIds.has(resolvedSalesBillId.toString()))
+        || (resolvedPoSellId && allowedPoSellIds.has(resolvedPoSellId.toString()))
+      if (!inBranchScope) return
 
       if (resolvedSalesBillId) {
         const key = `${resolvedSalesBillId.toString()}:${fact.product_id.toString()}`
@@ -283,6 +299,9 @@ export async function GET(request: Request) {
       if (!resolvedPoSellId && deal.sales_bill_no) {
         resolvedPoSellId = poSellDocNoToPoSellId.get(deal.sales_bill_no) ?? null
       }
+      const inBranchScope = (resolvedSalesBillId && allowedSalesBillIds.has(resolvedSalesBillId.toString()))
+        || (resolvedPoSellId && allowedPoSellIds.has(resolvedPoSellId.toString()))
+      if (!inBranchScope) return
 
       if (resolvedSalesBillId) {
         const key = `${resolvedSalesBillId.toString()}:${deal.product_id.toString()}`
@@ -469,6 +488,7 @@ export async function POST(request: Request) {
     }
 
     const actor = context.appUser?.username || context.authUser.email || 'system'
+    const branch = await getDualCostingBranch()
     const result = await prisma.$transaction(async (tx) => {
       // 1. Find product
       const product = await tx.products.findFirst({
@@ -488,7 +508,11 @@ export async function POST(request: Request) {
         const [docNo, lineNoStr] = poSellId.split(':')
         const lineNo = parseInt(lineNoStr)
         const salesBill = await tx.sales_bills.findFirst({
-          where: { doc_no: docNo, NOT: { status: 'cancelled' } },
+          where: {
+            branch_id: branch.id,
+            doc_no: docNo,
+            NOT: { status: 'cancelled' },
+          },
           include: {
             customers: true,
             sales_bill_lines: {
@@ -513,9 +537,14 @@ export async function POST(request: Request) {
           include: { customers: true }
         })
         if (!poSell) throw new Error(`ไม่พบ PO Sell ID: ${poId}`)
+        if (poSell.branch_id !== branch.id) throw new Error(`ไม่พบ PO Sell ID: ${poId}`)
 
         const salesBill = await tx.sales_bills.findFirst({
-          where: { po_sell_id: poId, NOT: { status: 'cancelled' } }
+          where: {
+            branch_id: branch.id,
+            po_sell_id: poId,
+            NOT: { status: 'cancelled' },
+          }
         })
 
         salesBillId = salesBill?.id || null
@@ -525,7 +554,10 @@ export async function POST(request: Request) {
         unitPrice = toNumber(poSell.unit_price)
       } else if (sourceType === 'production') {
         const prodOrder = await tx.production_orders.findFirst({
-          where: { doc_no: poSellId },
+          where: {
+            branch_id: branch.id,
+            doc_no: poSellId,
+          },
           include: { products: true }
         })
         if (!prodOrder) throw new Error(`ไม่พบใบสั่งผลิต: ${poSellId}`)
@@ -564,6 +596,9 @@ export async function POST(request: Request) {
         })
         if (!poolEntry) {
           throw new Error(`ไม่พบ Cost Pool Entry สำหรับ key: ${cand.costPoolId}`)
+        }
+        if (poolEntry.branch_id !== branch.id) {
+          throw new Error(`Cost Pool ${cand.sourceNo} ไม่ได้อยู่ในสาขา ${branch.name}`)
         }
 
         // If candidate is a purchase document (PO Buy or Spot Buy)

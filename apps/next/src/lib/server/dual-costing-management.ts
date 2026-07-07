@@ -1,5 +1,6 @@
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { buildDualCostingMatchIdMap } from '@/lib/server/dual-costing-match-id'
+import { getDualCostingBranch } from '@/lib/server/dual-costing-branch'
 import { prisma } from '@/lib/server/prisma'
 
 type JsonItem = Record<string, unknown>
@@ -121,6 +122,7 @@ function pct(grossProfit: number, revenue: number) {
 }
 
 export async function buildDualCostingManagement() {
+  const branch = await getDualCostingBranch()
   const [salesBills, tradingDeals, products, poSells, productionOrders, tradingAllocationFacts] = await Promise.all([
     prisma.sales_bills.findMany({
       include: {
@@ -137,7 +139,10 @@ export async function buildDualCostingManagement() {
       },
       orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
       take: 10000,
-      where: { NOT: { status: { in: ['cancelled', 'Cancelled'] } } },
+      where: {
+        branch_id: branch.id,
+        NOT: { status: { in: ['cancelled', 'Cancelled'] } },
+      },
     }),
     prisma.trading_deals.findMany({
       include: { customers: true, products: true, purchase_bills: true, sales_bills: true, suppliers: true },
@@ -150,6 +155,7 @@ export async function buildDualCostingManagement() {
       orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
       take: 5000,
       where: {
+        branch_id: branch.id,
         NOT: {
           status: {
             in: [
@@ -170,6 +176,7 @@ export async function buildDualCostingManagement() {
       orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
       take: 5000,
       where: {
+        branch_id: branch.id,
         NOT: { status: 'Cancelled' }
       }
     }),
@@ -198,6 +205,8 @@ export async function buildDualCostingManagement() {
       salesBillIdToPoSellId.set(bill.id, bill.po_sell_id)
     }
   })
+  const allowedSalesBillIds = new Set(salesBills.map((bill) => bill.id.toString()))
+  const allowedPoSellIds = new Set(poSells.map((po) => po.id.toString()))
 
   const matchedBySaleProduct = new Map<string, { cost: number; qty: number; revenue: number }>()
   const matchedQtyByPoSellProduct = new Map<string, number>() // key: `${po_sell_id}|${product_id}`
@@ -219,6 +228,9 @@ export async function buildDualCostingManagement() {
     if (!resolvedPoSellId && fact.sales_doc_no) {
       resolvedPoSellId = poSellDocNoToPoSellId.get(fact.sales_doc_no) ?? null
     }
+    const inBranchScope = (resolvedSalesBillId && allowedSalesBillIds.has(resolvedSalesBillId.toString()))
+      || (resolvedPoSellId && allowedPoSellIds.has(resolvedPoSellId.toString()))
+    if (!inBranchScope) return
 
     if (resolvedSalesBillId) {
       const key = `${resolvedSalesBillId}|${fact.product_id}`
@@ -261,6 +273,9 @@ export async function buildDualCostingManagement() {
     if (!resolvedPoSellId && deal.sales_bill_no) {
       resolvedPoSellId = poSellDocNoToPoSellId.get(deal.sales_bill_no) ?? null
     }
+    const inBranchScope = (resolvedSalesBillId && allowedSalesBillIds.has(resolvedSalesBillId.toString()))
+      || (resolvedPoSellId && allowedPoSellIds.has(resolvedPoSellId.toString()))
+    if (!inBranchScope) return
 
     if (resolvedSalesBillId) {
       const key = `${resolvedSalesBillId}|${deal.product_id}`
@@ -493,7 +508,7 @@ export async function buildDualCostingManagement() {
     })
   })
 
-  const ledgerRows: CostAllocationLedgerRow[] = tradingDeals.map((deal, index) => {
+  const ledgerRows: CostAllocationLedgerRow[] = tradingDeals.flatMap((deal, index) => {
     const qty = toNumber(deal.matched_qty)
     const totalCost = toNumber(deal.matched_purchase_amount)
     const allocatedRevenue = toNumber(deal.matched_sales_amount)
@@ -511,6 +526,9 @@ export async function buildDualCostingManagement() {
         }
       }
     }
+    const inBranchScope = (deal.sales_bill_id && allowedSalesBillIds.has(deal.sales_bill_id.toString()))
+      || (resolvedPoSellId && allowedPoSellIds.has(resolvedPoSellId.toString()))
+    if (!inBranchScope) return []
     const targetType = resolvedPoSellId ? 'PO_SELL' : 'SPOT_SELL'
     const product = deal.products ?? (deal.product_id != null ? productById.get(String(deal.product_id)) : null)
     const saleDocNo = deal.sales_bill_no ?? deal.sales_bills?.doc_no ?? deal.customers?.name ?? '-'
@@ -518,7 +536,7 @@ export async function buildDualCostingManagement() {
     const productCode = product?.code ?? '-'
     const allocatedAt = deal.created_at?.toISOString() ?? toDateOnly(deal.date)
     const matchId = matchIdByDealId.get(String(deal.id)) ?? deal.deal_no
-    return {
+    return [{
       allocatedAt,
       allocatedBy: deal.created_by ?? '-',
       allocatedQty: qty,
@@ -539,7 +557,7 @@ export async function buildDualCostingManagement() {
       status: isCancelled(deal.status) ? 'reversed' : 'approved',
       targetType,
       totalCost,
-    }
+    }]
   })
 
   const activeLedgerRows = ledgerRows.filter((row) => row.status === 'approved')
