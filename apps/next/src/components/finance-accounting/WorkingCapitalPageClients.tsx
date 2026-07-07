@@ -65,6 +65,13 @@ type ProfitPayload = {
 type StockProductColumnKey = 'code' | 'name' | 'metalGroup' | 'qty' | 'wac' | 'value' | 'ageDays' | 'stdPrice' | 'marginPotential'
 type SlowMovingColumnKey = 'code' | 'name' | 'metalGroup' | 'qty' | 'wac' | 'value' | 'daysSinceSale' | 'stdPrice' | 'marginPotential'
 type StockTableTab = 'products' | 'slowMoving'
+type StockTableScopeFilterProps = {
+  asOf: string
+  branchId: string
+  branches: BranchRow[]
+  onAsOfChange: (value: string) => void
+  onBranchIdChange: (value: string) => void
+}
 type StockTablePageSize = (typeof stockTablePageSizeOptions)[number]
 
 const stockTablePageSizeOptions = [10, 25] as const
@@ -316,7 +323,6 @@ export function StockFinancePageClient() {
     { color: 'bg-emerald-500', key: 'FG', label: 'พร้อมขาย', value: data?.byStatus.FG ?? 0 },
     { color: 'bg-slate-400', key: 'อื่นๆ', label: 'สถานะอื่น', value: data?.byStatus.OTHER ?? 0 },
   ]
-  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [showAllTopProducts, setShowAllTopProducts] = useState(false)
   const [stockTableTab, setStockTableTab] = useState<StockTableTab>('products')
   const topProducts = data?.topProducts ?? []
@@ -326,69 +332,6 @@ export function StockFinancePageClient() {
   return (
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
-      
-      {/* Desktop Filter Panel */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-        <DateInput label="ณ วันที่" value={asOf} onChange={setAsOf} />
-        <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
-      </div>
-
-      {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
-        <div className="flex gap-2 items-center">
-          <div className="flex-1 flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-semibold shrink-0">ณ วันที่</span>
-            <DatePickerInput className="w-full text-xs" value={asOf} onChange={setAsOf} />
-          </div>
-          <button
-            type="button"
-            className="h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
-            onClick={() => setShowMobileFilters(true)}
-          >
-            ตัวกรอง {branchId ? '(มี)' : ''}
-          </button>
-        </div>
-      </div>
-
-      {showMobileFilters ? (
-        <MobileFilterSheet
-          title="ตัวกรองเพิ่มเติม"
-          onClose={() => setShowMobileFilters(false)}
-          footer={
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setBranchId('')
-                }}
-                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowMobileFilters(false)}
-                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
-              >
-                ตกลง
-              </button>
-            </>
-          }
-        >
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
-            <select
-              aria-label="Branch select"
-              className="h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none transition focus:border-slate-400"
-              value={branchId}
-              onChange={(event) => setBranchId(event.target.value)}
-            >
-              <option value="">ทุกสาขา</option>
-              {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-            </select>
-          </div>
-        </MobileFilterSheet>
-      ) : null}
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <div className="rounded-md border border-amber-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -472,9 +415,9 @@ export function StockFinancePageClient() {
           </TabsTrigger>
         </TabsList>
         {stockTableTab === 'products' ? (
-          <ProductTable isLoading={isLoading} rows={data?.products ?? []} />
+          <ProductTable asOf={asOf} branchId={branchId} branches={data?.branches ?? []} isLoading={isLoading} rows={data?.products ?? []} onAsOfChange={setAsOf} onBranchIdChange={setBranchId} />
         ) : (
-          <SlowMovingTable isLoading={isLoading} rows={data?.slowMoving ?? []} />
+          <SlowMovingTable asOf={asOf} branchId={branchId} branches={data?.branches ?? []} isLoading={isLoading} rows={data?.slowMoving ?? []} onAsOfChange={setAsOf} onBranchIdChange={setBranchId} />
         )}
       </Tabs>
     </section>
@@ -964,7 +907,7 @@ function StockTablePagination({
   )
 }
 
-function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockProduct[] }) {
+function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange, onBranchIdChange }: { isLoading: boolean; rows: StockProduct[] } & StockTableScopeFilterProps) {
   const columnResize = useResizableColumns('finance.stock-finance.slow-moving.v6', slowMovingColumns)
   const [sortKey, setSortKey] = useState<SlowMovingColumnKey | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -1011,7 +954,7 @@ function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockP
       return 0
     })
   }, [filteredRows, sortDirection, sortKey])
-  const hasFilters = Boolean(search.trim()) || groupFilter !== 'all'
+  const hasFilters = Boolean(search.trim()) || groupFilter !== 'all' || branchId !== '' || asOf !== today()
   const totalRows = sortedRows.length
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -1022,7 +965,7 @@ function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockP
 
   useEffect(() => {
     setPage(1)
-  }, [groupFilter, pageSize, search, sortDirection, sortKey])
+  }, [asOf, branchId, groupFilter, pageSize, search, sortDirection, sortKey])
 
   useEffect(() => {
     if (page !== currentPage) setPage(currentPage)
@@ -1036,10 +979,12 @@ function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockP
           <div className="mt-0.5 text-xs font-medium text-slate-500">Top 15 ที่ไม่ขายเกิน 60 วัน · {rows.length} รายการ</div>
         </div>
       </div>
-      <div className="hidden gap-2 border-b border-slate-100 bg-white p-3 lg:grid lg:grid-cols-[minmax(260px,1fr)_180px_auto]">
+      <div className="hidden flex-wrap items-center gap-2 border-b border-slate-100 bg-white p-3 lg:flex">
+        <DateInput label="ณ วันที่" value={asOf} onChange={onAsOfChange} />
+        <BranchSelect branches={branches} value={branchId} onChange={onBranchIdChange} />
         <input
           aria-label="ค้นหาสินค้าหมุนช้า"
-          className="h-9 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
+          className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
           placeholder="ค้นหารหัส / ชื่อ / หมวด"
           type="search"
           value={search}
@@ -1047,7 +992,7 @@ function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockP
         />
         <select
           aria-label="หมวดสินค้าหมุนช้า"
-          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+          className="h-9 w-[180px] rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
           value={groupFilter}
           onChange={(event) => setGroupFilter(event.target.value)}
         >
@@ -1059,6 +1004,8 @@ function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockP
           disabled={!hasFilters}
           type="button"
           onClick={() => {
+            onAsOfChange(today())
+            onBranchIdChange('')
             setSearch('')
             setGroupFilter('all')
           }}
@@ -1107,6 +1054,8 @@ function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockP
               <button
                 type="button"
                 onClick={() => {
+                  onAsOfChange(today())
+                  onBranchIdChange('')
                   setSearch('')
                   setGroupFilter('all')
                 }}
@@ -1124,6 +1073,22 @@ function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockP
             </>
           }
         >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">ณ วันที่</label>
+            <DatePickerInput className="w-full text-sm" value={asOf} onChange={onAsOfChange} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="สาขา"
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+              value={branchId}
+              onChange={(event) => onBranchIdChange(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">หมวดสินค้า</label>
             <select
@@ -1210,7 +1175,7 @@ function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockP
   )
 }
 
-function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProduct[] }) {
+function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange, onBranchIdChange }: { isLoading: boolean; rows: StockProduct[] } & StockTableScopeFilterProps) {
   const columnResize = useResizableColumns('finance.stock-finance.products.v1', stockProductColumns)
   const [sortKey, setSortKey] = useState<StockProductColumnKey | null>('value')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -1265,7 +1230,7 @@ function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProd
     })
   }, [filteredRows, sortKey, sortDirection])
 
-  const hasFilters = Boolean(search.trim()) || groupFilter !== 'all' || ageFilter !== 'all'
+  const hasFilters = Boolean(search.trim()) || groupFilter !== 'all' || ageFilter !== 'all' || branchId !== '' || asOf !== today()
   const totalRows = sortedRows.length
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -1273,12 +1238,9 @@ function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProd
     const start = (currentPage - 1) * pageSize
     return sortedRows.slice(start, start + pageSize)
   }, [currentPage, pageSize, sortedRows])
-  const totalValue = filteredRows.reduce((sum, row) => sum + row.value, 0)
-  const totalQty = filteredRows.reduce((sum, row) => sum + row.qty, 0)
-
   useEffect(() => {
     setPage(1)
-  }, [ageFilter, groupFilter, pageSize, search, sortDirection, sortKey])
+  }, [ageFilter, asOf, branchId, groupFilter, pageSize, search, sortDirection, sortKey])
 
   useEffect(() => {
     if (page !== currentPage) setPage(currentPage)
@@ -1292,10 +1254,12 @@ function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProd
           <div className="mt-0.5 text-xs font-medium text-slate-500">เริ่มต้นเรียงตามมูลค่าสูงสุด</div>
         </div>
       </div>
-      <div className="hidden gap-2 border-b border-slate-100 bg-white p-3 lg:grid lg:grid-cols-[minmax(260px,1fr)_150px_140px_auto]">
+      <div className="hidden flex-wrap items-center gap-2 border-b border-slate-100 bg-white p-3 lg:flex">
+        <DateInput label="ณ วันที่" value={asOf} onChange={onAsOfChange} />
+        <BranchSelect branches={branches} value={branchId} onChange={onBranchIdChange} />
         <input
           aria-label="ค้นหา Stock"
-          className="h-9 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
+          className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
           placeholder="ค้นหารหัส / ชื่อ / หมวด"
           type="search"
           value={search}
@@ -1303,7 +1267,7 @@ function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProd
         />
         <select
           aria-label="หมวดสินค้า"
-          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+          className="h-9 w-[150px] rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
           value={groupFilter}
           onChange={(event) => setGroupFilter(event.target.value)}
         >
@@ -1312,7 +1276,7 @@ function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProd
         </select>
         <select
           aria-label="อายุ Stock"
-          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+          className="h-9 w-[140px] rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
           value={ageFilter}
           onChange={(event) => setAgeFilter(event.target.value)}
         >
@@ -1327,6 +1291,8 @@ function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProd
           disabled={!hasFilters}
           type="button"
           onClick={() => {
+            onAsOfChange(today())
+            onBranchIdChange('')
             setSearch('')
             setGroupFilter('all')
             setAgeFilter('all')
@@ -1357,13 +1323,7 @@ function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProd
       <StockTablePagination
         currentPage={currentPage}
         pageSize={pageSize}
-        summary={
-          <>
-            {totalRows !== rows.length ? <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold">จากทั้งหมด {rows.length}</span> : null}
-            <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold">Qty {money(totalQty)} กก.</span>
-            <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold">มูลค่า {money(totalValue)}</span>
-          </>
-        }
+        summary={totalRows !== rows.length ? <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold">จากทั้งหมด {rows.length}</span> : undefined}
         totalPages={totalPages}
         totalRows={totalRows}
         onPageChange={setPage}
@@ -1383,6 +1343,8 @@ function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProd
               <button
                 type="button"
                 onClick={() => {
+                  onAsOfChange(today())
+                  onBranchIdChange('')
                   setSearch('')
                   setGroupFilter('all')
                   setAgeFilter('all')
@@ -1401,6 +1363,22 @@ function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProd
             </>
           }
         >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">ณ วันที่</label>
+            <DatePickerInput className="w-full text-sm" value={asOf} onChange={onAsOfChange} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="สาขา"
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+              value={branchId}
+              onChange={(event) => onBranchIdChange(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">หมวดสินค้า</label>
             <select
