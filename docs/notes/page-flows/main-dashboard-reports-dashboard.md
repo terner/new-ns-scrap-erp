@@ -32,7 +32,8 @@ Dashboard Overview เป็น management KPI view จาก operational facts.
 - ยึด legacy Dashboard ใน `https://sirimasth.github.io/ns-scrap-erp/` หมวดหน้าหลักเป็น visual reference แต่ใช้ข้อมูลและ API ของ active Next app เท่านั้น
 - ลำดับหน้าจอคือ global filter area -> historical/runtime notice -> KPI 6 ใบ -> chart/widget cards -> risk/breakdown panels -> detail tabs สำหรับ Top Ranking / Stock / Metrics
 - Desktop แสดงตัวกรองหลัก (`ช่วงเวลา`, `from`, `to`, `branch`, `group`, `supplier`, `customer`, `product`) ใน white/neutral filter card เดียวกัน ไม่ซ่อนอยู่ใน details เพื่อให้เห็น scope ของ dashboard ชัดก่อนอ่าน KPI
-- Mobile แสดงเฉพาะ quick range, ช่วงวันที่, count summary และปุ่ม `ตัวกรอง`; ตัวกรองเต็มเปิดผ่าน `MobileFilterSheet` เพื่อไม่ให้หน้าเริ่มด้วย form stack ยาว
+- Desktop filter ต้องใช้ shared filter shell (`rounded-md bg-white p-3 shadow`), control height `h-9`, slate segmented quick-range buttons, และแสดงปุ่มล้างตัวกรองเฉพาะเมื่อมี active filter เพื่อไม่ให้ดูเป็น action ลอยที่ไม่จำเป็น
+- Mobile แสดงเฉพาะ quick range, ช่วงวันที่, count summary และปุ่ม `ตัวกรอง`; ตัวกรองเต็มเปิดผ่าน `MobileFilterSheet` เพื่อไม่ให้หน้าเริ่มด้วย form stack ยาว และ controls ใน sheet ต้องคง `h-9` + neutral slate apply/focus treatment ไม่ใช้ปุ่มฟ้า custom
 - ห้ามแสดง hero/banner แยกสำหรับชื่อหน้า Dashboard Overview ถ้ามี title/scope จาก app shell และ filter card อยู่แล้ว เพราะกินพื้นที่และซ้ำกับข้อมูลหน้า
 - KPI 6 ใบใช้ white cards พร้อม accent สีซ้ายเท่านั้น; ห้ามทำ full-gradient ทุกใบจนทั้งหน้าดูแข่งกันเด่น และไม่ใช้ dot marker ที่เหมือนสถานะถ้าไม่มีความหมายจริง
 - Filter card ห้ามใช้แถบดำหนักในหน้านี้; ช่อง input/select/search ต้องอ่านค่าและ placeholder ชัดเจน ไม่ดูเหมือนช่องว่าง

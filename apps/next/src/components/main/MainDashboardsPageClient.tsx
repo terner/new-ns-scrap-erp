@@ -420,10 +420,10 @@ function DashboardView(props: {
   }
   return (
     <>
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:hidden">
+      <div className="rounded-md bg-white p-3 shadow lg:hidden">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-semibold text-slate-600">ช่วงเวลา:</span>
-          <button className="h-9 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-blue-100" type="button" onClick={() => setShowDashboardMobileFilters(true)}>
+          <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200" type="button" onClick={() => setShowDashboardMobileFilters(true)}>
             ตัวกรอง {hasActiveDashboardFilters ? '(มี)' : ''}
           </button>
         </div>
@@ -435,7 +435,7 @@ function DashboardView(props: {
             ['week', '7 วัน'],
             ['today', 'วันนี้'],
           ].map(([key, label]) => (
-            <button className={`h-8 shrink-0 rounded-md px-3 text-xs font-semibold outline-none transition focus:ring-2 focus:ring-blue-100 ${rangeMode === key ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`} key={`mobile-${key}`} onClick={() => applyPeriod(key)} type="button">{label}</button>
+            <button className={`h-9 shrink-0 rounded-md border px-3 text-xs font-medium outline-none transition focus:ring-2 focus:ring-slate-200 ${rangeMode === key ? 'border-slate-700 bg-slate-700 text-white shadow-sm' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} key={`mobile-${key}`} onClick={() => applyPeriod(key)} type="button">{label}</button>
           ))}
         </div>
         <div className="mt-2 flex items-center justify-between gap-2 text-xs font-semibold text-slate-600">
@@ -458,7 +458,7 @@ function DashboardView(props: {
                 ล้างตัวกรอง
               </button>
               <button
-                className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
+                className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
                 type="button"
                 onClick={() => setShowDashboardMobileFilters(false)}
               >
@@ -473,34 +473,34 @@ function DashboardView(props: {
           <div>
             <span className="mb-1 block text-xs font-semibold text-slate-600">ช่วงวันที่</span>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-              <DatePickerInput className="w-full" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+              <DatePickerInput className="h-9 w-full border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
               <span className="text-slate-400">→</span>
-              <DatePickerInput className="w-full" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+              <DatePickerInput className="h-9 w-full border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
             </div>
           </div>
           <div>
             <span className="mb-1 block text-xs font-semibold text-slate-600">สาขา</span>
-            <select className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
           </div>
           <div>
             <span className="mb-1 block text-xs font-semibold text-slate-600">หมวดสินค้า</span>
-            <select className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
           </div>
           <div>
             <span className="mb-1 block text-xs font-semibold text-slate-600">Supplier</span>
-            <SearchCombobox inputId="dashboard-supplier-filter-mobile" label="Supplier" hideLabel placeholder="ทุก Supplier" options={supplierSearchOptions} value={dashboardSupplierId} onChange={setDashboardSupplierId} />
+            <SearchCombobox inputId="dashboard-supplier-filter-mobile" label="Supplier" hideLabel inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500" placeholder="ทุก Supplier" options={supplierSearchOptions} value={dashboardSupplierId} onChange={setDashboardSupplierId} />
           </div>
           <div>
             <span className="mb-1 block text-xs font-semibold text-slate-600">Customer</span>
-            <SearchCombobox inputId="dashboard-customer-filter-mobile" label="Customer" hideLabel placeholder="ทุก Customer" options={customerSearchOptions} value={dashboardCustomerId} onChange={setDashboardCustomerId} />
+            <SearchCombobox inputId="dashboard-customer-filter-mobile" label="Customer" hideLabel inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500" placeholder="ทุก Customer" options={customerSearchOptions} value={dashboardCustomerId} onChange={setDashboardCustomerId} />
           </div>
           <div>
             <span className="mb-1 block text-xs font-semibold text-slate-600">สินค้า</span>
-            <SearchCombobox inputId="dashboard-product-filter-mobile" label="สินค้า" hideLabel placeholder="ทุกสินค้า" options={productSearchOptions} value={dashboardProductId} onChange={setDashboardProductId} />
+            <SearchCombobox inputId="dashboard-product-filter-mobile" label="สินค้า" hideLabel inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500" placeholder="ทุกสินค้า" options={productSearchOptions} value={dashboardProductId} onChange={setDashboardProductId} />
           </div>
         </MobileFilterSheet>
       ) : null}
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:block">
+      <div className="hidden rounded-md bg-white p-3 shadow lg:block">
         <div className="flex flex-wrap items-center gap-2 text-slate-800">
           <span className="text-xs font-semibold text-slate-600">ช่วงเวลา:</span>
           {[
@@ -510,23 +510,25 @@ function DashboardView(props: {
             ['week', '7 วัน'],
             ['today', 'วันนี้'],
           ].map(([key, label]) => (
-            <button className={`h-8 rounded-md px-3 text-xs font-semibold outline-none transition focus:ring-2 focus:ring-blue-100 ${rangeMode === key ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
+            <button className={`h-9 rounded-md border px-3 text-xs font-medium outline-none transition focus:ring-2 focus:ring-slate-200 ${rangeMode === key ? 'border-slate-700 bg-slate-700 text-white shadow-sm' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
           ))}
           <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" />
-          <DatePickerInput className="h-8 w-[136px] border-slate-200 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+          <DatePickerInput className="h-9 w-[140px] border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
           <span className="text-xs text-slate-400">→</span>
-          <DatePickerInput className="h-8 w-[136px] border-slate-200 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
-          <span className="ml-auto rounded-md bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700">{filteredCount}</span>
-          <button className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-blue-100" onClick={clearFilters} type="button">ล้างตัวกรอง</button>
+          <DatePickerInput className="h-9 w-[140px] border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+          <span className="ml-auto h-9 rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">{filteredCount}</span>
+          {hasActiveDashboardFilters ? (
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200" onClick={clearFilters} type="button">ล้างตัวกรอง</button>
+          ) : null}
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(130px,0.8fr)_minmax(130px,0.8fr)_minmax(170px,1fr)_minmax(170px,1fr)_minmax(170px,1fr)]">
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-[160px_180px_minmax(220px,1fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
           <div className="space-y-1">
             <span className="block text-[11px] font-semibold text-slate-500">สาขา</span>
-            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-100" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
           </div>
           <div className="space-y-1">
             <span className="block text-[11px] font-semibold text-slate-500">หมวดสินค้า</span>
-            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-100" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
           </div>
           <div className="space-y-1">
             <span className="block text-[11px] font-semibold text-slate-500">Supplier</span>
