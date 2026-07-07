@@ -120,6 +120,7 @@ const reports: ReportLink[] = [
   { category: 'main', href: '/owner-daily', label: 'Owner Daily Control', owner: 'Main' },
   { category: 'main', href: '/daily-report', label: 'Daily Report', owner: 'Main' },
   { category: 'main', href: '/profit-cost-analysis', label: 'Profit & Cost Analysis', owner: 'Main' },
+  { category: 'main', href: '/sales-plan', label: 'Sales Plan — ทองแดง / ทองเหลือง', owner: 'Main' },
   { category: 'main', href: '/sales-commission', label: 'Sales Tracking Dashboard', owner: 'Main' },
   { category: 'main', href: '/cash-flow-calendar', label: 'Cash Flow Calendar', owner: 'Main' },
   { category: 'main', href: '/business-calendar', label: 'Business Calendar', owner: 'Main' },

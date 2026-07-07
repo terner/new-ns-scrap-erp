@@ -2216,8 +2216,6 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
     targetUnitCostReason: null,
     warehouseId: '',
   })
-  const sourceProduct = props.reference.products.find((item) => item.id === values.sourceProductId)
-  const targetProduct = props.reference.products.find((item) => item.id === values.targetProductId)
   const lossQty = Math.max(0, Number(values.sourceQty) - Number(values.targetQty))
   const yieldPct = Number(values.sourceQty) > 0 ? (Number(values.targetQty) / Number(values.sourceQty)) * 100 : 0
   const sourceCostPoolEntries = useMemo(() => {
@@ -2279,8 +2277,6 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
           />
         </div>
         <Field label="น้ำหนักต้นทาง (กก.)" type="number" value={String(values.sourceQty)} onChange={(sourceQty) => setValues({ ...values, sourceQty: Number(sourceQty) })} />
-        <Field label="Lot ต้นทาง" value={values.lotNo ?? ''} onChange={(lotNo) => setValues({ ...values, lotNo })} />
-        <ReadOnlyBox label="Source Product" value={sourceProduct ? `${sourceProduct.code ? `${sourceProduct.code} - ` : ''}${sourceProduct.name}` : '-'} />
         <label className="block text-sm font-medium md:col-span-2">วิธีตัดต้นทุน
           <select
             className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2"
@@ -2321,8 +2317,6 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
           />
         </div>
         <Field label="น้ำหนักปลายทาง (กก.)" type="number" value={String(values.targetQty)} onChange={(targetQty) => setValues({ ...values, targetQty: Number(targetQty) })} />
-        <Field label="Lot ปลายทาง" value={values.targetLotNo ?? ''} onChange={(targetLotNo) => setValues({ ...values, targetLotNo })} />
-        <ReadOnlyBox label="Target Product" value={targetProduct ? `${targetProduct.code ? `${targetProduct.code} - ` : ''}${targetProduct.name}` : '-'} />
         <label className="block text-sm font-medium md:col-span-2">Target Cost Policy
           <select
             className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2"

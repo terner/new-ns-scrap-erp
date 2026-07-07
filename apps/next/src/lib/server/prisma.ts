@@ -85,6 +85,7 @@ function hasExpectedDelegates(client: PrismaClient) {
 
 function createPrismaClient() {
   const connectionString = resolveRuntimeDatabaseUrl()
+  const poolMax = Math.max(1, Number(process.env.DATABASE_POOL_MAX ?? '5') || 5)
 
   if (globalForPrisma.pgPoolConnectionString !== connectionString) {
     void globalForPrisma.pgPool?.end().catch(() => {})
@@ -92,7 +93,7 @@ function createPrismaClient() {
       connectionString,
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 10_000,
-      max: Number(process.env.DATABASE_POOL_MAX ?? '1'),
+      max: poolMax,
     })
     globalForPrisma.pgPoolConnectionString = connectionString
   }
