@@ -6,7 +6,7 @@ tags:
   - read-model
   - flow
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-07-06
 ---
 
 # Main Dashboard Reports Flow
@@ -19,7 +19,7 @@ updated: 2026-06-11
 
 | Route | Page | Current API | Permission | Source of truth |
 |---|---|---|---|---|
-| `/dashboard` | Financial Dashboard | `GET /api/dashboard` | `reports.reports.view` | purchase bills, sales bills, expenses, payments, receipts, stock ledger, bank statement, production metrics, finance dashboard |
+| `/dashboard` | Dashboard Overview | `GET /api/dashboard` | `reports.reports.view` | purchase bills, sales bills, expenses, payments, receipts, stock ledger, bank statement, production metrics, finance dashboard |
 | `/owner-daily` | Owner Daily Control | `GET /api/owner-daily` re-export dashboard handler | `reports.reports.view` | same payload as dashboard, using `ownerDaily` section |
 | `/daily-report` | Daily Report | `GET /api/daily-report` re-export dashboard handler | `reports.reports.view` | same payload as dashboard, using `dailyReport` section |
 | `/profit-cost-analysis` | Profit & Cost Analysis | `GET /api/profit-cost-analysis` | `reports.reports.view` | PB/SB items, stock ledger, branch/supplier/customer/channel/product masters |
@@ -39,6 +39,7 @@ updated: 2026-06-11
 - drilldown ต้อง link ไป source route ด้วย outward document number/code และ resolve internal id ฝั่ง server
 - หน้า anomaly สามารถแนะนำ action/link ได้ แต่ไม่มี auto-fix/write action
 - รายเดือน/รายปีต้อง roll up จาก daily snapshot/facts ที่ตรวจแล้ว: movement metric ใช้ผลรวมรายวัน ส่วน balance metric ใช้ ending balance ณ วันสุดท้ายของช่วง
+- `/dashboard` ต้องให้ผู้ใช้เห็น global filter scope ก่อน overview เสมอ: desktop ใช้ white/neutral filter card, mobile ใช้ compact strip + `MobileFilterSheet` เพื่อไม่ให้ filter stack ดัน KPI ลงล่าง และรายละเอียดที่เป็น table-heavy ต้องเปิดทีละบริบทผ่าน detail tabs แทนการกองหลายตารางยาวลงหน้าเดียว
 
 ## Current Query Patterns
 

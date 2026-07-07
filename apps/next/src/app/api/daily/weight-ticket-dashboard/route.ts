@@ -40,6 +40,36 @@ function roundWeight(value: number) {
   return Math.round((value + Number.EPSILON) * 1000) / 1000
 }
 
+type DashboardTicketRow = {
+  branchName: string
+  date: string
+  docNo: string
+  followUpWeight: number
+  href: string
+  netWeight: number
+  partyName: string
+  status: string
+  statusLabel: string
+  warning: string
+}
+
+type AttentionRow = Omit<DashboardTicketRow, 'followUpWeight'> & {
+  remainingWeight: number
+  type: string
+}
+
+function sortDashboardRows(rows: DashboardTicketRow[]) {
+  return rows.sort((left, right) => {
+    const leftNeedsFollowUp = left.followUpWeight > 0.0001 ? 1 : 0
+    const rightNeedsFollowUp = right.followUpWeight > 0.0001 ? 1 : 0
+    return (
+      rightNeedsFollowUp - leftNeedsFollowUp
+      || right.date.localeCompare(left.date)
+      || right.docNo.localeCompare(left.docNo)
+    )
+  })
+}
+
 export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
@@ -150,7 +180,9 @@ export async function GET(request: Request) {
       wtoNetWeight: number
     }>()
 
-    const attentionRows = []
+    const attentionRows: AttentionRow[] = []
+    const wtiRows: DashboardTicketRow[] = []
+    const wtoRows: DashboardTicketRow[] = []
 
     for (const row of rows) {
       const typeValue = row.doc_type
@@ -220,6 +252,22 @@ export async function GET(request: Request) {
         productMap.set(productKey, productBucket)
       }
 
+      if (row.doc_type === 'WTI') {
+        const needsPurchaseBill = wtiRemainingWeight > 0.0001 && row.status !== 'billed'
+        wtiRows.push({
+          branchName: branchBucket.branchName,
+          date: toDateOnly(row.document_date),
+          docNo: row.doc_no,
+          followUpWeight: wtiRemainingWeight,
+          href: `/daily/weight-ticket-list/${encodeURIComponent(row.doc_no)}`,
+          netWeight,
+          partyName: row.party_name,
+          status: row.status ?? '',
+          statusLabel: statusLabel(row.doc_type, row.status),
+          warning: needsPurchaseBill ? 'รอเปิด PB' : statusLabel(row.doc_type, row.status),
+        })
+      }
+
       if (row.doc_type === 'WTI' && wtiRemainingWeight > 0.0001 && row.status !== 'billed') {
         summary.wtiWaitingBillCount += 1
         summary.wtiWaitingBillWeight += wtiRemainingWeight
@@ -257,6 +305,22 @@ export async function GET(request: Request) {
         productBucket.documentIds.add(row.doc_no)
         productBucket.pendingOutWeight += qty
         productMap.set(productKey, productBucket)
+      }
+
+      if (row.doc_type === 'WTO') {
+        const needsSalesBill = wtoPendingOutWeight > 0.0001
+        wtoRows.push({
+          branchName: branchBucket.branchName,
+          date: toDateOnly(row.document_date),
+          docNo: row.doc_no,
+          followUpWeight: wtoPendingOutWeight,
+          href: `/daily/weight-ticket-list/${encodeURIComponent(row.doc_no)}`,
+          netWeight,
+          partyName: row.party_name,
+          status: row.status ?? '',
+          statusLabel: statusLabel(row.doc_type, row.status),
+          warning: needsSalesBill ? 'รอออก SB' : statusLabel(row.doc_type, row.status),
+        })
       }
 
       if (row.doc_type === 'WTO' && wtoPendingOutWeight > 0.0001) {
@@ -331,6 +395,16 @@ export async function GET(request: Request) {
         wtoPendingOutWeight: roundWeight(summary.wtoPendingOutWeight),
       },
       topProducts,
+      wtiRows: sortDashboardRows(wtiRows).map((row) => ({
+        ...row,
+        followUpWeight: roundWeight(row.followUpWeight),
+        netWeight: roundWeight(row.netWeight),
+      })),
+      wtoRows: sortDashboardRows(wtoRows).map((row) => ({
+        ...row,
+        followUpWeight: roundWeight(row.followUpWeight),
+        netWeight: roundWeight(row.netWeight),
+      })),
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)

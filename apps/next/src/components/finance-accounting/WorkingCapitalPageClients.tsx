@@ -5,6 +5,7 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { RotateCcw } from 'lucide-react'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
@@ -42,6 +43,7 @@ type StockPayload = {
   branches: BranchRow[]
   byStatus: Record<string, number>
   filters: { asOf: string; branchId: string }
+  products: StockProduct[]
   slowMoving: StockProduct[]
   sourceState: SourceState
   summary: { itemCount: number; marginPotential: number; paidValue: number; totalQty: number; totalValue: number; unpaidValue: number }
@@ -60,7 +62,12 @@ type ProfitPayload = {
   summary: { bankFee: number; fxLoss: number; interestExpense: number; negTotal: number; outlierCount: number; productionLoss: number; stockLoss: number; totalLeak: number }
 }
 
-type StockProductColumnKey = 'code' | 'name' | 'metalGroup' | 'qty' | 'wac' | 'value' | 'daysSinceSale' | 'stdPrice' | 'marginPotential'
+type StockProductColumnKey = 'code' | 'name' | 'metalGroup' | 'qty' | 'wac' | 'value' | 'ageDays' | 'stdPrice' | 'marginPotential'
+type SlowMovingColumnKey = 'code' | 'name' | 'metalGroup' | 'qty' | 'wac' | 'value' | 'daysSinceSale' | 'stdPrice' | 'marginPotential'
+type StockTableTab = 'products' | 'slowMoving'
+type StockTablePageSize = (typeof stockTablePageSizeOptions)[number]
+
+const stockTablePageSizeOptions = [10, 25] as const
 
 const stockProductColumns: Array<ResizableColumnDefinition<StockProductColumnKey>> = [
   { defaultWidth: 95, key: 'code', minWidth: 80 },
@@ -69,9 +76,21 @@ const stockProductColumns: Array<ResizableColumnDefinition<StockProductColumnKey
   { defaultWidth: 95, key: 'qty', minWidth: 80 },
   { defaultWidth: 95, key: 'wac', minWidth: 80 },
   { defaultWidth: 110, key: 'value', minWidth: 90 },
-  { defaultWidth: 120, key: 'daysSinceSale', minWidth: 90 },
+  { defaultWidth: 105, key: 'ageDays', minWidth: 85 },
   { defaultWidth: 110, key: 'stdPrice', minWidth: 80 },
   { defaultWidth: 115, key: 'marginPotential', minWidth: 90 },
+]
+
+const slowMovingColumns: Array<ResizableColumnDefinition<SlowMovingColumnKey>> = [
+  { defaultWidth: 95, key: 'code', minWidth: 80 },
+  { defaultWidth: 220, key: 'name', minWidth: 150 },
+  { defaultWidth: 100, key: 'metalGroup', minWidth: 80 },
+  { defaultWidth: 100, key: 'qty', minWidth: 80 },
+  { defaultWidth: 95, key: 'wac', minWidth: 80 },
+  { defaultWidth: 115, key: 'value', minWidth: 90 },
+  { defaultWidth: 130, key: 'daysSinceSale', minWidth: 100 },
+  { defaultWidth: 115, key: 'stdPrice', minWidth: 85 },
+  { defaultWidth: 120, key: 'marginPotential', minWidth: 95 },
 ]
 
 type NegMarginColumnKey = 'date' | 'docNo' | 'customer' | 'productName' | 'qty' | 'price' | 'unitCost' | 'loss'
@@ -298,6 +317,11 @@ export function StockFinancePageClient() {
     { color: 'bg-slate-400', key: 'อื่นๆ', label: 'สถานะอื่น', value: data?.byStatus.OTHER ?? 0 },
   ]
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [showAllTopProducts, setShowAllTopProducts] = useState(false)
+  const [stockTableTab, setStockTableTab] = useState<StockTableTab>('products')
+  const topProducts = data?.topProducts ?? []
+  const visibleTopProducts = showAllTopProducts ? topProducts : topProducts.slice(0, 5)
+  const canToggleTopProducts = topProducts.length > 5
 
   return (
     <section className="space-y-4">
@@ -419,14 +443,40 @@ export function StockFinancePageClient() {
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Panel title="อายุสต็อกตามมูลค่า">{(data?.aging ?? []).map((row) => <AgingBar key={row.key} row={row} total={total} />)}</Panel>
-        <Panel title="สินค้า 10 อันดับมูลค่าสูงสุด">{(data?.topProducts ?? []).map((row, index) => <TopProduct key={row.id} index={index} max={data?.topProducts[0]?.value ?? 1} row={row} />)}{isLoading ? <Loading /> : null}</Panel>
+        <Panel title="สินค้า 10 อันดับมูลค่าสูงสุด">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-semibold text-slate-500">
+              แสดง {visibleTopProducts.length} / {topProducts.length} อันดับ
+            </div>
+            {canToggleTopProducts ? (
+              <button
+                className="h-8 rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                type="button"
+                onClick={() => setShowAllTopProducts((current) => !current)}
+              >
+                {showAllTopProducts ? 'ย่อเหลือ 5 อันดับ' : 'แสดงครบ 10 อันดับ'}
+              </button>
+            ) : null}
+          </div>
+          {visibleTopProducts.map((row, index) => <TopProduct key={row.id} index={index} max={topProducts[0]?.value ?? 1} row={row} />)}
+          {isLoading ? <Loading /> : null}
+        </Panel>
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Insight tone="emerald" title="พร้อมขาย" value={money(data?.byStatus.FG)} body={`${percent(data?.byStatus.FG ?? 0, total)}% ของสต็อกรวม · เปลี่ยนเป็นเงินสดได้ทันที`} />
-        <Insight tone="blue" title="วัตถุดิบรอผลิต" value={money(data?.byStatus.RM)} body={`${percent(data?.byStatus.RM ?? 0, total)}% ของสต็อกรวม · ต้องเข้าแผนผลิต`} />
-        <Insight tone="red" title="สต็อกจมเงิน 90+ วัน" value={money(oldStock?.value)} body={`${oldStock?.count ?? 0} รายการ · เร่งระบายหรือทบทวนราคา`} />
-      </div>
-      <ProductTable rows={data?.slowMoving ?? []} />
+      <Tabs className="gap-3" value={stockTableTab} onValueChange={(value) => setStockTableTab(value as StockTableTab)}>
+        <TabsList className="w-full overflow-x-auto rounded-md bg-white px-2 shadow-sm" variant="line">
+          <TabsTrigger value="products" variant="line">
+            Stock ทั้งหมด <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{data?.products.length ?? 0}</span>
+          </TabsTrigger>
+          <TabsTrigger value="slowMoving" variant="line">
+            สินค้าหมุนช้า / ควรเร่งระบาย <span className="ml-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{data?.slowMoving.length ?? 0}</span>
+          </TabsTrigger>
+        </TabsList>
+        {stockTableTab === 'products' ? (
+          <ProductTable isLoading={isLoading} rows={data?.products ?? []} />
+        ) : (
+          <SlowMovingTable isLoading={isLoading} rows={data?.slowMoving ?? []} />
+        )}
+      </Tabs>
     </section>
   )
 }
@@ -825,64 +875,274 @@ function TopProduct({ index, max, row }: { index: number; max: number; row: Stoc
   )
 }
 
-function ProductTable({ rows }: { rows: StockProduct[] }) {
-  const columnResize = useResizableColumns('finance.stock-finance.slow-moving.v5', stockProductColumns)
-  const [sortKey, setSortKey] = useState<StockProductColumnKey | null>(null)
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+function normalizeStockText(value: string) {
+  return value.trim().toLocaleLowerCase('th-TH')
+}
 
-  const handleSort = (key: StockProductColumnKey) => {
+function stockAgeBucket(ageDays: number) {
+  if (ageDays <= 30) return '0-30'
+  if (ageDays <= 60) return '31-60'
+  if (ageDays <= 90) return '61-90'
+  return '90+'
+}
+
+function stockAgeTextClass(ageDays: number) {
+  if (ageDays > 90) return 'font-bold text-red-700'
+  if (ageDays > 60) return 'font-bold text-red-600'
+  if (ageDays > 30) return 'font-semibold text-amber-600'
+  return 'text-slate-600'
+}
+
+function lastSaleText(daysSinceSale: number) {
+  return daysSinceSale >= 9999 ? 'ไม่เคยขาย' : `${daysSinceSale} วัน`
+}
+
+function StockTablePagination({
+  currentPage,
+  onPageChange,
+  onPageSizeChange,
+  onResetWidths,
+  pageSize,
+  summary,
+  totalPages,
+  totalRows,
+}: {
+  currentPage: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: StockTablePageSize) => void
+  onResetWidths?: () => void
+  pageSize: StockTablePageSize
+  summary?: ReactNode
+  totalPages: number
+  totalRows: number
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
+      <div className="flex flex-wrap items-center gap-2">
+        <span>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        </span>
+        {summary}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {onResetWidths ? (
+          <button
+            className="hidden h-9 items-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50 lg:inline-flex"
+            type="button"
+            onClick={onResetWidths}
+          >
+            <RotateCcw className="h-3 w-3" /> คืนค่าเดิมตาราง
+          </button>
+        ) : null}
+        <select
+          aria-label="จำนวนรายการต่อหน้า"
+          className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-500"
+          value={pageSize}
+          onChange={(event) => onPageSizeChange(Number(event.target.value) as StockTablePageSize)}
+        >
+          {stockTablePageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+        </select>
+        <button
+          className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 outline-none transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={currentPage <= 1}
+          type="button"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        >
+          ก่อนหน้า
+        </button>
+        <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+        <button
+          className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 outline-none transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={currentPage >= totalPages}
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        >
+          ถัดไป
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SlowMovingTable({ isLoading, rows }: { isLoading: boolean; rows: StockProduct[] }) {
+  const columnResize = useResizableColumns('finance.stock-finance.slow-moving.v6', slowMovingColumns)
+  const [sortKey, setSortKey] = useState<SlowMovingColumnKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [search, setSearch] = useState('')
+  const [groupFilter, setGroupFilter] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<StockTablePageSize>(10)
+
+  const handleSort = (key: SlowMovingColumnKey) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
     } else {
       setSortKey(key)
-      setSortDirection('asc')
+      setSortDirection(key === 'value' || key === 'daysSinceSale' || key === 'marginPotential' ? 'desc' : 'asc')
     }
   }
 
+  const groups = useMemo(() => {
+    return Array.from(new Set(rows.map((row) => row.metalGroup).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
+  }, [rows])
+
+  const filteredRows = useMemo(() => {
+    const query = normalizeStockText(search)
+    return rows.filter((row) => {
+      const matchesSearch = !query || [row.code, row.name, row.metalGroup].some((value) => normalizeStockText(value).includes(query))
+      const matchesGroup = groupFilter === 'all' || row.metalGroup === groupFilter
+      return matchesSearch && matchesGroup
+    })
+  }, [groupFilter, rows, search])
+
   const sortedRows = useMemo(() => {
-    if (!sortKey) return rows
-    return [...rows].sort((a, b) => {
+    if (!sortKey) return filteredRows
+    return [...filteredRows].sort((a, b) => {
       const aVal = a[sortKey]
       const bVal = b[sortKey]
 
-      if (aVal === undefined || aVal === null) return 1
-      if (bVal === undefined || bVal === null) return -1
-
       if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return sortDirection === 'asc'
-          ? aVal.localeCompare(bVal, 'th')
-          : bVal.localeCompare(aVal, 'th')
+        return sortDirection === 'asc' ? aVal.localeCompare(bVal, 'th') : bVal.localeCompare(aVal, 'th')
       }
       if (typeof aVal === 'number' && typeof bVal === 'number') {
         return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
       }
       return 0
     })
-  }, [rows, sortKey, sortDirection])
+  }, [filteredRows, sortDirection, sortKey])
+  const hasFilters = Boolean(search.trim()) || groupFilter !== 'all'
+  const totalRows = sortedRows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return sortedRows.slice(start, start + pageSize)
+  }, [currentPage, pageSize, sortedRows])
+
+  useEffect(() => {
+    setPage(1)
+  }, [groupFilter, pageSize, search, sortDirection, sortKey])
+
+  useEffect(() => {
+    if (page !== currentPage) setPage(currentPage)
+  }, [currentPage, page])
 
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
+      <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-bold text-slate-800">สินค้าหมุนช้า / ควรเร่งระบาย</div>
           <div className="mt-0.5 text-xs font-medium text-slate-500">Top 15 ที่ไม่ขายเกิน 60 วัน · {rows.length} รายการ</div>
         </div>
-        {columnResize.hasCustomWidths && (
-          <button
-            className="hidden h-9 items-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50 lg:inline-flex"
-            type="button"
-            onClick={columnResize.resetColumnWidths}
-          >
-            <RotateCcw className="h-3 w-3" /> คืนค่าเดิมตาราง
-          </button>
-        )}
       </div>
-      
-      {/* Desktop View */}
-      <div className="hidden lg:block overflow-x-auto bg-white">
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+      <div className="hidden gap-2 border-b border-slate-100 bg-white p-3 lg:grid lg:grid-cols-[minmax(260px,1fr)_180px_auto]">
+        <input
+          aria-label="ค้นหาสินค้าหมุนช้า"
+          className="h-9 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
+          placeholder="ค้นหารหัส / ชื่อ / หมวด"
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <select
+          aria-label="หมวดสินค้าหมุนช้า"
+          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+          value={groupFilter}
+          onChange={(event) => setGroupFilter(event.target.value)}
+        >
+          <option value="all">ทุกหมวด</option>
+          {groups.map((group) => <option key={group} value={group}>{group}</option>)}
+        </select>
+        <button
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 outline-none transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!hasFilters}
+          type="button"
+          onClick={() => {
+            setSearch('')
+            setGroupFilter('all')
+          }}
+        >
+          ล้างตัวกรอง
+        </button>
+      </div>
+      <div className="border-b border-slate-100 bg-white p-3 lg:hidden">
+        <div className="flex gap-2">
+          <input
+            aria-label="ค้นหาสินค้าหมุนช้า"
+            className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
+            placeholder="ค้นหาสินค้าหมุนช้า"
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <button
+            className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50"
+            type="button"
+            onClick={() => setShowFilters(true)}
+          >
+            ตัวกรอง {hasFilters ? '(มี)' : ''}
+          </button>
+        </div>
+      </div>
+      <StockTablePagination
+        currentPage={currentPage}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        totalRows={totalRows}
+        onPageChange={setPage}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize)
+          setPage(1)
+        }}
+        onResetWidths={columnResize.hasCustomWidths ? columnResize.resetColumnWidths : undefined}
+      />
+
+      {showFilters ? (
+        <MobileFilterSheet
+          title="ตัวกรองสินค้าหมุนช้า"
+          onClose={() => setShowFilters(false)}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('')
+                  setGroupFilter('all')
+                }}
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                ล้างตัวกรอง
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFilters(false)}
+                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          }
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">หมวดสินค้า</label>
+            <select
+              aria-label="หมวดสินค้าหมุนช้า"
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+              value={groupFilter}
+              onChange={(event) => setGroupFilter(event.target.value)}
+            >
+              <option value="all">ทุกหมวด</option>
+              {groups.map((group) => <option key={group} value={group}>{group}</option>)}
+            </select>
+          </div>
+        </MobileFilterSheet>
+      ) : null}
+
+      <div className="hidden overflow-x-auto bg-white lg:block">
+        <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
-            {stockProductColumns.map((column) => (
+            {slowMovingColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
             ))}
           </colgroup>
@@ -900,44 +1160,340 @@ function ProductTable({ rows }: { rows: StockProduct[] }) {
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((row) => (
-              <tr className="border-t border-slate-100 hover:bg-slate-50/50 transition" key={row.id}>
-                <Td mono className="font-bold text-amber-700">{row.code}</Td>
-                <Td className="font-semibold text-slate-900">{row.name}</Td>
+            {isLoading && !totalRows ? <tr><td className="py-8 text-center text-slate-400" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
+            {pagedRows.map((row) => (
+              <tr className="border-t border-slate-100 transition hover:bg-slate-50/50" key={row.id}>
+                <Td mono className="font-bold text-slate-700">{row.code}</Td>
+                <Td className="whitespace-normal font-semibold text-slate-900">{row.name}</Td>
                 <Td>{row.metalGroup}</Td>
                 <Td align="right">{money(row.qty)}</Td>
                 <Td align="right">{money(row.wac)}</Td>
                 <Td align="right" className="font-bold text-slate-900">{money(row.value)}</Td>
-                <Td align="right">{row.daysSinceSale >= 9999 ? 'ไม่เคยขาย' : `${row.daysSinceSale} วัน`}</Td>
+                <Td align="right" className={row.daysSinceSale >= 9999 ? 'text-slate-600' : stockAgeTextClass(row.daysSinceSale)}>{lastSaleText(row.daysSinceSale)}</Td>
+                <Td align="right">{money(row.stdPrice)}</Td>
+                <Td align="right" className={row.marginPotential < 0 ? 'font-semibold text-red-700' : 'font-semibold text-emerald-700'}>{money(row.marginPotential)}</Td>
+              </tr>
+            ))}
+            {!isLoading && !totalRows ? <tr><td className="py-8 text-center text-slate-400" colSpan={9}>ไม่มีสินค้าหมุนช้าตามเงื่อนไขนี้</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="block divide-y divide-slate-100 lg:hidden">
+        {isLoading && !totalRows ? (
+          <div className="py-8 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล</div>
+        ) : !totalRows ? (
+          <div className="py-8 text-center text-slate-400 text-xs">ไม่มีสินค้าหมุนช้าตามเงื่อนไขนี้</div>
+        ) : (
+          pagedRows.map((row) => (
+            <div key={row.id} className="space-y-2 p-4 text-xs transition hover:bg-slate-50/50">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="block font-mono font-bold text-slate-700">{row.code}</span>
+                  <span className="block text-sm font-bold text-slate-900">{row.name}</span>
+                </div>
+                <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{row.metalGroup}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-100/50 bg-slate-50/50 p-2.5 text-xs">
+                <div><span className="text-slate-400">จำนวน:</span> <span className="font-semibold text-slate-800">{money(row.qty)} กก.</span></div>
+                <div><span className="text-slate-400">มูลค่า:</span> <span className="font-bold text-slate-900">{money(row.value)}</span></div>
+                <div><span className="text-slate-400">WAC:</span> <span className="font-medium text-slate-600">{money(row.wac)}</span></div>
+                <div><span className="text-slate-400">ครั้งสุดท้ายขาย:</span> <span className={row.daysSinceSale >= 9999 ? 'font-semibold text-slate-700' : `font-semibold ${stockAgeTextClass(row.daysSinceSale)}`}>{lastSaleText(row.daysSinceSale)}</span></div>
+                <div><span className="text-slate-400">ราคามาตรฐาน:</span> <span className="font-medium text-slate-600">{money(row.stdPrice)}</span></div>
+                <div><span className="text-slate-400">โอกาสกำไร:</span> <span className={row.marginPotential < 0 ? 'font-bold text-red-700' : 'font-bold text-emerald-700'}>{money(row.marginPotential)}</span></div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ProductTable({ isLoading, rows }: { isLoading: boolean; rows: StockProduct[] }) {
+  const columnResize = useResizableColumns('finance.stock-finance.products.v1', stockProductColumns)
+  const [sortKey, setSortKey] = useState<StockProductColumnKey | null>('value')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [search, setSearch] = useState('')
+  const [groupFilter, setGroupFilter] = useState('all')
+  const [ageFilter, setAgeFilter] = useState('all')
+  const [showProductFilters, setShowProductFilters] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<StockTablePageSize>(25)
+
+  const handleSort = (key: StockProductColumnKey) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDirection(key === 'value' || key === 'ageDays' || key === 'marginPotential' ? 'desc' : 'asc')
+    }
+  }
+
+  const groups = useMemo(() => {
+    return Array.from(new Set(rows.map((row) => row.metalGroup).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
+  }, [rows])
+
+  const filteredRows = useMemo(() => {
+    const query = normalizeStockText(search)
+    return rows.filter((row) => {
+      const matchesSearch = !query || [row.code, row.name, row.metalGroup].some((value) => normalizeStockText(value).includes(query))
+      const matchesGroup = groupFilter === 'all' || row.metalGroup === groupFilter
+      const matchesAge = ageFilter === 'all' || stockAgeBucket(row.ageDays) === ageFilter
+      return matchesSearch && matchesGroup && matchesAge
+    })
+  }, [ageFilter, groupFilter, rows, search])
+
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return filteredRows
+    return [...filteredRows].sort((a, b) => {
+      const aVal = a[sortKey]
+      const bVal = b[sortKey]
+
+      if (aVal === undefined || aVal === null) return 1
+      if (bVal === undefined || bVal === null) return -1
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc'
+          ? aVal.localeCompare(bVal, 'th')
+          : bVal.localeCompare(aVal, 'th')
+      }
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
+      }
+      return 0
+    })
+  }, [filteredRows, sortKey, sortDirection])
+
+  const hasFilters = Boolean(search.trim()) || groupFilter !== 'all' || ageFilter !== 'all'
+  const totalRows = sortedRows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return sortedRows.slice(start, start + pageSize)
+  }, [currentPage, pageSize, sortedRows])
+  const totalValue = filteredRows.reduce((sum, row) => sum + row.value, 0)
+  const totalQty = filteredRows.reduce((sum, row) => sum + row.qty, 0)
+
+  useEffect(() => {
+    setPage(1)
+  }, [ageFilter, groupFilter, pageSize, search, sortDirection, sortKey])
+
+  useEffect(() => {
+    if (page !== currentPage) setPage(currentPage)
+  }, [currentPage, page])
+
+  return (
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="text-sm font-bold text-slate-800">Stock ทั้งหมด</div>
+          <div className="mt-0.5 text-xs font-medium text-slate-500">เริ่มต้นเรียงตามมูลค่าสูงสุด</div>
+        </div>
+      </div>
+      <div className="hidden gap-2 border-b border-slate-100 bg-white p-3 lg:grid lg:grid-cols-[minmax(260px,1fr)_150px_140px_auto]">
+        <input
+          aria-label="ค้นหา Stock"
+          className="h-9 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
+          placeholder="ค้นหารหัส / ชื่อ / หมวด"
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <select
+          aria-label="หมวดสินค้า"
+          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+          value={groupFilter}
+          onChange={(event) => setGroupFilter(event.target.value)}
+        >
+          <option value="all">ทุกหมวด</option>
+          {groups.map((group) => <option key={group} value={group}>{group}</option>)}
+        </select>
+        <select
+          aria-label="อายุ Stock"
+          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+          value={ageFilter}
+          onChange={(event) => setAgeFilter(event.target.value)}
+        >
+          <option value="all">ทุกอายุ</option>
+          <option value="0-30">0-30 วัน</option>
+          <option value="31-60">31-60 วัน</option>
+          <option value="61-90">61-90 วัน</option>
+          <option value="90+">90+ วัน</option>
+        </select>
+        <button
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 outline-none transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!hasFilters}
+          type="button"
+          onClick={() => {
+            setSearch('')
+            setGroupFilter('all')
+            setAgeFilter('all')
+          }}
+        >
+          ล้างตัวกรอง
+        </button>
+      </div>
+      <div className="border-b border-slate-100 bg-white p-3 lg:hidden">
+        <div className="flex gap-2">
+          <input
+            aria-label="ค้นหา Stock"
+            className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
+            placeholder="ค้นหา Stock"
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <button
+            className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50"
+            type="button"
+            onClick={() => setShowProductFilters(true)}
+          >
+            ตัวกรอง {hasFilters ? '(มี)' : ''}
+          </button>
+        </div>
+      </div>
+      <StockTablePagination
+        currentPage={currentPage}
+        pageSize={pageSize}
+        summary={
+          <>
+            {totalRows !== rows.length ? <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold">จากทั้งหมด {rows.length}</span> : null}
+            <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold">Qty {money(totalQty)} กก.</span>
+            <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold">มูลค่า {money(totalValue)}</span>
+          </>
+        }
+        totalPages={totalPages}
+        totalRows={totalRows}
+        onPageChange={setPage}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize)
+          setPage(1)
+        }}
+        onResetWidths={columnResize.hasCustomWidths ? columnResize.resetColumnWidths : undefined}
+      />
+
+      {showProductFilters ? (
+        <MobileFilterSheet
+          title="ตัวกรองรายการ Stock"
+          onClose={() => setShowProductFilters(false)}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('')
+                  setGroupFilter('all')
+                  setAgeFilter('all')
+                }}
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                ล้างตัวกรอง
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowProductFilters(false)}
+                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          }
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">หมวดสินค้า</label>
+            <select
+              aria-label="หมวดสินค้า"
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+              value={groupFilter}
+              onChange={(event) => setGroupFilter(event.target.value)}
+            >
+              <option value="all">ทุกหมวด</option>
+              {groups.map((group) => <option key={group} value={group}>{group}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">อายุ Stock</label>
+            <select
+              aria-label="อายุ Stock"
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+              value={ageFilter}
+              onChange={(event) => setAgeFilter(event.target.value)}
+            >
+              <option value="all">ทุกอายุ</option>
+              <option value="0-30">0-30 วัน</option>
+              <option value="31-60">31-60 วัน</option>
+              <option value="61-90">61-90 วัน</option>
+              <option value="90+">90+ วัน</option>
+            </select>
+          </div>
+        </MobileFilterSheet>
+      ) : null}
+
+      {/* Desktop View */}
+      <div className="hidden lg:block overflow-x-auto bg-white">
+        <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <colgroup>
+            {stockProductColumns.map((column) => (
+              <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            ))}
+          </colgroup>
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
+            <tr>
+              <ResizableTableHead label="รหัส" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="code" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('code', 'รหัส')} />
+              <ResizableTableHead label="ชื่อ" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="name" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อ')} />
+              <ResizableTableHead label="หมวด" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="metalGroup" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('metalGroup', 'หมวด')} />
+              <ResizableTableHead align="right" label="จำนวน" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="qty" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('qty', 'จำนวน')} />
+              <ResizableTableHead align="right" label="WAC" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="wac" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('wac', 'WAC')} />
+              <ResizableTableHead align="right" label="มูลค่า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="value" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('value', 'มูลค่า')} />
+              <ResizableTableHead align="right" label="อายุ Stock" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="ageDays" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('ageDays', 'อายุ Stock')} />
+              <ResizableTableHead align="right" label="ราคามาตรฐาน" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="stdPrice" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('stdPrice', 'ราคามาตรฐาน')} />
+              <ResizableTableHead align="right" label="โอกาสกำไร" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="marginPotential" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('marginPotential', 'โอกาสกำไร')} />
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && !totalRows ? <tr><td className="py-8 text-center text-slate-400" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
+            {pagedRows.map((row) => (
+              <tr className="border-t border-slate-100 hover:bg-slate-50/50 transition" key={row.id}>
+                <Td mono className="font-bold text-amber-700">{row.code}</Td>
+                <Td className="whitespace-normal font-semibold text-slate-900">{row.name}</Td>
+                <Td>{row.metalGroup}</Td>
+                <Td align="right">{money(row.qty)}</Td>
+                <Td align="right">{money(row.wac)}</Td>
+                <Td align="right" className="font-bold text-slate-900">{money(row.value)}</Td>
+                <Td align="right" className={stockAgeTextClass(row.ageDays)}>{row.ageDays} วัน</Td>
                 <Td align="right">{money(row.stdPrice)}</Td>
                 <Td align="right" className="text-emerald-700 font-semibold">{money(row.marginPotential)}</Td>
               </tr>
             ))}
-            {!sortedRows.length ? <tr><td className="py-8 text-center text-slate-400" colSpan={9}>ไม่มีสินค้าหมุนช้า</td></tr> : null}
+            {!isLoading && !totalRows ? <tr><td className="py-8 text-center text-slate-400" colSpan={9}>ไม่พบ Stock ตามตัวกรองนี้</td></tr> : null}
           </tbody>
         </table>
       </div>
 
       {/* Mobile View */}
       <div className="block lg:hidden divide-y divide-slate-100">
-        {!sortedRows.length ? (
-          <div className="py-8 text-center text-slate-400 text-xs">ไม่มีสินค้าหมุนช้า</div>
+        {isLoading && !totalRows ? (
+          <div className="py-8 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล</div>
+        ) : !totalRows ? (
+          <div className="py-8 text-center text-slate-400 text-xs">ไม่พบ Stock ตามตัวกรองนี้</div>
         ) : (
-          sortedRows.map((row) => (
+          pagedRows.map((row) => (
             <div key={row.id} className="p-4 space-y-2 text-xs hover:bg-slate-50/50 transition">
               <div className="flex justify-between items-start">
                 <div>
                   <span className="font-mono text-amber-700 font-bold block">{row.code}</span>
                   <span className="font-bold text-slate-900 text-sm block">{row.name}</span>
                 </div>
-                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{row.metalGroup}</span>
+                <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{row.metalGroup}</span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/50 p-2.5 rounded-lg border border-slate-100/50">
                 <div><span className="text-slate-400">จำนวน:</span> <span className="font-semibold text-slate-800">{money(row.qty)} กก.</span></div>
                 <div><span className="text-slate-400">มูลค่าสต็อก:</span> <span className="font-bold text-slate-900">{money(row.value)}</span></div>
                 <div><span className="text-slate-400">WAC:</span> <span className="font-medium text-slate-600">{money(row.wac)}</span></div>
                 <div><span className="text-slate-400">ราคามาตรฐาน:</span> <span className="font-medium text-slate-600">{money(row.stdPrice)}</span></div>
-                <div><span className="text-slate-400">ไม่ขายมาแล้ว:</span> <span className="font-semibold text-red-600">{row.daysSinceSale >= 9999 ? 'ไม่เคยขาย' : `${row.daysSinceSale} วัน`}</span></div>
+                <div><span className="text-slate-400">อายุ Stock:</span> <span className={`font-semibold ${stockAgeTextClass(row.ageDays)}`}>{row.ageDays} วัน</span></div>
                 <div><span className="text-slate-400">โอกาสกำไร:</span> <span className="font-bold text-emerald-700">{money(row.marginPotential)}</span></div>
               </div>
             </div>

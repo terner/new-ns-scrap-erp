@@ -243,12 +243,14 @@ export async function buildStockFinance(filter: PeriodDaysFilter) {
     marginPotential: (row.stdPrice - (row.qty > 0 ? row.value / row.qty : 0)) * row.qty,
     wac: row.qty > 0 ? row.value / row.qty : 0,
   }))
+  const productsByValue = [...productRows].sort((left, right) => right.value - left.value)
   return {
     aging,
     branches,
     byStatus,
     filters: { asOf: dateOnly(filter.asOf), branchId: filter.branchId ?? 'ALL' },
-    slowMoving: productRows.filter((row) => row.daysSinceSale > 60).sort((left, right) => right.value - left.value).slice(0, 15),
+    products: productsByValue,
+    slowMoving: productsByValue.filter((row) => row.daysSinceSale > 60).slice(0, 15),
     sourceState: sourceState(['Paid/unpaid stock is approximated from current positive stock value until bill-level settlement linkage is finalized.']),
     summary: {
       itemCount: productRows.length,
@@ -258,7 +260,7 @@ export async function buildStockFinance(filter: PeriodDaysFilter) {
       totalValue,
       unpaidValue: stock.unpaidValue,
     },
-    topProducts: productRows.sort((left, right) => right.value - left.value).slice(0, 10),
+    topProducts: productsByValue.slice(0, 10),
   }
 }
 

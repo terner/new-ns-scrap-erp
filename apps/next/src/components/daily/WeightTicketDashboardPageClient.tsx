@@ -14,7 +14,6 @@ import { dailyFetchJson } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { formatWeight } from '@/lib/weight-tickets'
 
-type FilterType = 'all' | 'WTI' | 'WTO'
 type StatusRow = {
   count: number
   netWeight: number
@@ -42,29 +41,21 @@ type ProductRow = {
   wtiRemainingWeight: number
   wtoNetWeight: number
 }
-type AttentionRow = {
+type DashboardTicketRow = {
   branchName: string
   date: string
   docNo: string
+  followUpWeight: number
   href: string
   netWeight: number
   partyName: string
-  remainingWeight: number
   status: string
   statusLabel: string
-  type: string
   warning: string
 }
 type DashboardPayload = {
-  attentionRows: AttentionRow[]
   byBranch: BranchRow[]
   byStatus: StatusRow[]
-  filters: {
-    branchId: string
-    dateFrom: string
-    dateTo: string
-    type: FilterType
-  }
   summary: {
     cancelledDocuments: number
     totalDocuments: number
@@ -78,14 +69,16 @@ type DashboardPayload = {
     wtoPendingOutWeight: number
   }
   topProducts: ProductRow[]
+  wtiRows: DashboardTicketRow[]
+  wtoRows: DashboardTicketRow[]
 }
 type BranchOption = {
   id: string
   name: string
 }
-type DashboardTab = 'attention' | 'overview' | 'products'
+type DashboardTab = 'overview' | 'products' | 'wti' | 'wto'
 type ProductColumnKey = 'documents' | 'pendingOut' | 'product' | 'wtiNet' | 'wtiRemaining' | 'wtoNet'
-type AttentionColumnKey = 'branch' | 'date' | 'docNo' | 'netWeight' | 'party' | 'remaining' | 'status' | 'type'
+type FlowColumnKey = 'branch' | 'date' | 'docNo' | 'followUp' | 'netWeight' | 'party' | 'status'
 
 const productColumns: Array<ResizableColumnDefinition<ProductColumnKey>> = [
   { key: 'product', defaultWidth: 210, minWidth: 160 },
@@ -96,21 +89,14 @@ const productColumns: Array<ResizableColumnDefinition<ProductColumnKey>> = [
   { key: 'pendingOut', defaultWidth: 130, minWidth: 115 },
 ]
 
-const attentionColumns: Array<ResizableColumnDefinition<AttentionColumnKey>> = [
+const flowColumns: Array<ResizableColumnDefinition<FlowColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
-  { key: 'type', defaultWidth: 80, minWidth: 70 },
-  { key: 'date', defaultWidth: 100, minWidth: 90 },
-  { key: 'party', defaultWidth: 190, minWidth: 150 },
+  { key: 'date', defaultWidth: 110, minWidth: 95 },
+  { key: 'party', defaultWidth: 210, minWidth: 160 },
   { key: 'branch', defaultWidth: 130, minWidth: 110 },
-  { key: 'remaining', defaultWidth: 120, minWidth: 105 },
+  { key: 'followUp', defaultWidth: 135, minWidth: 115 },
   { key: 'netWeight', defaultWidth: 120, minWidth: 105 },
   { key: 'status', defaultWidth: 130, minWidth: 110 },
-]
-
-const typeOptions: Array<{ label: string; value: FilterType }> = [
-  { label: 'WTI/WTO ทั้งหมด', value: 'all' },
-  { label: 'ใบรับของ WTI', value: 'WTI' },
-  { label: 'ใบส่งของ WTO', value: 'WTO' },
 ]
 
 const quickRangeOptions: Array<{ label: string; value: 'last30' | 'last7' | 'month' | 'today' }> = [
@@ -122,15 +108,19 @@ const quickRangeOptions: Array<{ label: string; value: 'last30' | 'last7' | 'mon
 
 const dashboardTabs: Array<{ label: string; value: DashboardTab }> = [
   { label: 'ภาพรวม', value: 'overview' },
+  { label: 'WTI รับเข้า', value: 'wti' },
+  { label: 'WTO ส่งออก', value: 'wto' },
   { label: 'สรุปสินค้า', value: 'products' },
-  { label: 'เอกสารที่ต้องตามต่อ', value: 'attention' },
 ]
 
 const mobileTabLabels: Record<DashboardTab, string> = {
   overview: 'ภาพรวม',
+  wti: 'WTI',
+  wto: 'WTO',
   products: 'สินค้า',
-  attention: 'ตามต่อ',
 }
+
+const pageSizeOptions = [10, 25]
 
 function formatDateInput(date: Date) {
   const year = date.getFullYear()
@@ -179,18 +169,17 @@ export function WeightTicketDashboardPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
-  const [type, setType] = useState<FilterType>('all')
 
   const activeFilterText = useMemo(() => {
     const branchName = branchId === 'all' ? 'ทุกสาขา' : branches.find((branch) => branch.id === branchId)?.name ?? branchId
-    const typeName = type === 'all' ? 'WTI/WTO' : type
-    return `${branchName} · ${typeName} · ${formatDateDisplay(dateRange.dateFrom)} - ${formatDateDisplay(dateRange.dateTo)}`
-  }, [branchId, branches, dateRange.dateFrom, dateRange.dateTo, type])
+    return `${branchName} · ${formatDateDisplay(dateRange.dateFrom)} - ${formatDateDisplay(dateRange.dateTo)}`
+  }, [branchId, branches, dateRange.dateFrom, dateRange.dateTo])
 
-  const hasActiveFilters = branchId !== 'all' || type !== 'all' || dateRange.dateFrom !== defaultDateRange.dateFrom || dateRange.dateTo !== defaultDateRange.dateTo
+  const hasActiveFilters = branchId !== 'all' || dateRange.dateFrom !== defaultDateRange.dateFrom || dateRange.dateTo !== defaultDateRange.dateTo
   const tabCounts: Partial<Record<DashboardTab, number>> = {
-    attention: data?.attentionRows.length ?? 0,
     products: data?.topProducts.length ?? 0,
+    wti: data?.wtiRows.length ?? 0,
+    wto: data?.wtoRows.length ?? 0,
   }
 
   const loadData = useCallback(async () => {
@@ -202,7 +191,6 @@ export function WeightTicketDashboardPageClient() {
         dateTo: dateRange.dateTo,
       })
       if (branchId !== 'all') params.set('branchId', branchId)
-      if (type !== 'all') params.set('type', type)
       const payload = await dailyFetchJson<DashboardPayload>(`/api/daily/weight-ticket-dashboard?${params.toString()}`)
       setData(payload)
     } catch (caught) {
@@ -211,7 +199,7 @@ export function WeightTicketDashboardPageClient() {
     } finally {
       setIsLoading(false)
     }
-  }, [branchId, dateRange.dateFrom, dateRange.dateTo, type])
+  }, [branchId, dateRange.dateFrom, dateRange.dateTo])
 
   useEffect(() => {
     let cancelled = false
@@ -241,7 +229,6 @@ export function WeightTicketDashboardPageClient() {
 
   function resetFilters() {
     setBranchId('all')
-    setType('all')
     setDateRange({ ...defaultDateRange })
   }
 
@@ -340,17 +327,6 @@ export function WeightTicketDashboardPageClient() {
                 {option.label}
               </button>
             ))}
-            <span className="ml-2 text-xs font-semibold text-slate-600">ประเภท:</span>
-            {typeOptions.map((option) => (
-              <button
-                className={`rounded-md border px-3 py-1 text-xs font-medium transition ${type === option.value ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
-                key={option.value}
-                type="button"
-                onClick={() => setType(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
           </div>
         </div>
       </div>
@@ -433,21 +409,6 @@ export function WeightTicketDashboardPageClient() {
               onChange={(nextBranchId) => setBranchId(nextBranchId ?? 'all')}
             />
           </div>
-          <div>
-            <span className="mb-1 block text-xs font-semibold text-slate-600">ประเภทเอกสาร</span>
-            <div className="flex flex-wrap gap-2">
-              {typeOptions.map((option) => (
-                <button
-                  className={`rounded-md border px-3 py-1 text-xs font-medium transition ${type === option.value ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
-                  key={`mobile-type-${option.value}`}
-                  type="button"
-                  onClick={() => setType(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
         </MobileFilterSheet>
       ) : null}
 
@@ -459,8 +420,29 @@ export function WeightTicketDashboardPageClient() {
           <BranchPanel isLoading={isLoading} rows={data?.byBranch ?? []} />
         </div>
       ) : null}
+      {activeTab === 'wti' ? (
+        <FlowTablePanel
+          emptyText="ยังไม่มีเอกสาร WTI ตามเงื่อนไข"
+          followUpLabel="WTI รอ PB"
+          followUpTone="amber"
+          isLoading={isLoading}
+          rows={data?.wtiRows ?? []}
+          storageKey="daily.weight-ticket-dashboard.wti.v1"
+          title="WTI รับเข้า"
+        />
+      ) : null}
+      {activeTab === 'wto' ? (
+        <FlowTablePanel
+          emptyText="ยังไม่มีเอกสาร WTO ตามเงื่อนไข"
+          followUpLabel="WTO pending out"
+          followUpTone="purple"
+          isLoading={isLoading}
+          rows={data?.wtoRows ?? []}
+          storageKey="daily.weight-ticket-dashboard.wto.v1"
+          title="WTO ส่งออก"
+        />
+      ) : null}
       {activeTab === 'products' ? <ProductPanel isLoading={isLoading} rows={data?.topProducts ?? []} /> : null}
-      {activeTab === 'attention' ? <AttentionPanel isLoading={isLoading} rows={data?.attentionRows ?? []} /> : null}
     </section>
   )
 }
@@ -629,56 +611,112 @@ function ProductPanel({ isLoading, rows }: { isLoading: boolean; rows: ProductRo
   )
 }
 
-function AttentionPanel({ isLoading, rows }: { isLoading: boolean; rows: AttentionRow[] }) {
-  const columnResize = useResizableColumns('daily.weight-ticket-dashboard.attention.v1', attentionColumns)
+function FlowTablePanel({
+  emptyText,
+  followUpLabel,
+  followUpTone,
+  isLoading,
+  rows,
+  storageKey,
+  title,
+}: {
+  emptyText: string
+  followUpLabel: string
+  followUpTone: 'amber' | 'purple'
+  isLoading: boolean
+  rows: DashboardTicketRow[]
+  storageKey: string
+  title: string
+}) {
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const columnResize = useResizableColumns(storageKey, flowColumns)
+  const totalRows = rows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const totalNetWeight = useMemo(() => rows.reduce((sum, row) => sum + row.netWeight, 0), [rows])
+  const totalFollowUpWeight = useMemo(() => rows.reduce((sum, row) => sum + row.followUpWeight, 0), [rows])
+  const pageRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return rows.slice(start, start + pageSize)
+  }, [page, pageSize, rows])
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages))
+  }, [totalPages])
+
+  const followUpTextClass = followUpTone === 'amber' ? 'text-amber-700' : 'text-purple-700'
+  const followUpBadgeClass = followUpTone === 'amber' ? 'bg-amber-50 text-amber-700' : 'bg-purple-50 text-purple-700'
+
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-3">
         <div>
-          <div className="text-sm font-bold text-slate-800">เอกสารที่ต้องตามต่อ</div>
-          <div className="text-xs text-slate-500">WTI ที่ยังเหลือรอ PB และ WTO ที่ยังมี pending out</div>
+          <div className="text-sm font-bold text-slate-800">{title}</div>
         </div>
-        {columnResize.hasCustomWidths ? (
-          <Button className="hidden lg:inline-flex" size="xs" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าตาราง</Button>
-        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 text-sm text-slate-600">
+        <div className="min-w-0">
+          <span className="font-semibold text-slate-800">พบทั้งหมด {formatCount(totalRows)} รายการ</span>
+          <span className="mx-2 text-slate-300">|</span>
+          <span>สุทธิ <span className="font-mono font-semibold text-slate-800 tabular-nums">{weightText(totalNetWeight)}</span></span>
+          <span className="mx-2 text-slate-300">|</span>
+          <span>{followUpLabel} <span className={`font-mono font-bold tabular-nums ${followUpTextClass}`}>{weightText(totalFollowUpWeight)}</span></span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {columnResize.hasCustomWidths ? (
+            <Button className="hidden lg:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button>
+          ) : null}
+          <select
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800"
+            value={pageSize}
+            onChange={(event) => {
+              setPageSize(Number(event.target.value))
+              setPage(1)
+            }}
+          >
+            {pageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <Button disabled={page <= 1} size="sm" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
+          <span className="px-1 text-sm font-medium text-slate-600">หน้า {page} / {totalPages}</span>
+          <Button disabled={page >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
+        </div>
       </div>
 
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
-            {attentionColumns.map((column, index) => <col key={column.key} style={index === attentionColumns.length - 1 ? undefined : columnResize.getColumnStyle(column.key)} />)}
+            {flowColumns.map((column, index) => <col key={column.key} style={index === flowColumns.length - 1 ? undefined : columnResize.getColumnStyle(column.key)} />)}
           </colgroup>
-          <thead className="border-b border-slate-200 bg-slate-50 text-slate-700">
+          <thead className="border-b border-slate-200 bg-slate-100 text-slate-700">
             <tr>
-              <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
-              <ResizableTableHead align="center" label="ประเภท" resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} />
-              <ResizableTableHead label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
+              <ResizableTableHead label="เลขที่เอกสาร" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่เอกสาร')} />
+              <ResizableTableHead label="วันที่เอกสาร" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่เอกสาร')} />
               <ResizableTableHead label="คู่ค้า" resizeProps={columnResize.getResizeHandleProps('party', 'คู่ค้า')} />
               <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} />
-              <ResizableTableHead align="right" label="คงเหลือ" resizeProps={columnResize.getResizeHandleProps('remaining', 'คงเหลือ')} />
-              <ResizableTableHead align="right" label="สุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'สุทธิ')} />
+              <ResizableTableHead align="right" label={followUpLabel} resizeProps={columnResize.getResizeHandleProps('followUp', followUpLabel)} />
+              <ResizableTableHead align="right" label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'น้ำหนักสุทธิ')} />
               <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td className="p-6 text-center text-slate-400" colSpan={8}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-400" colSpan={8}>ไม่มีเอกสารที่ต้องตามต่อ</td></tr> : null}
-            {!isLoading && rows.map((row) => (
-              <tr key={`${row.type}-${row.docNo}`} className="hover:bg-slate-50">
+            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={7}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={7}>{emptyText}</td></tr> : null}
+            {!isLoading && pageRows.map((row) => (
+              <tr key={row.docNo} className="hover:bg-slate-50">
                 <td className="p-2.5">
                   <Link className="inline-flex min-w-0 items-center gap-1 font-semibold text-blue-700 hover:text-blue-900" href={row.href}>
                     <span className="truncate">{row.docNo}</span>
                     <ArrowUpRight className="size-3.5 shrink-0" />
                   </Link>
                 </td>
-                <td className="p-2.5 text-center font-bold text-slate-700">{row.type}</td>
                 <td className="p-2.5 whitespace-nowrap">{formatDateDisplay(row.date)}</td>
                 <td className="min-w-0 p-2.5"><div className="truncate" title={row.partyName}>{row.partyName}</div></td>
                 <td className="min-w-0 p-2.5"><div className="truncate" title={row.branchName}>{row.branchName}</div></td>
-                <td className="p-2.5 text-right font-mono font-bold text-amber-700 tabular-nums">{weightText(row.remainingWeight)}</td>
+                <td className={`p-2.5 text-right font-mono font-bold tabular-nums ${followUpTextClass}`}>{weightText(row.followUpWeight)}</td>
                 <td className="p-2.5 text-right font-mono text-slate-700 tabular-nums">{weightText(row.netWeight)}</td>
                 <td className="p-2.5 text-center">
-                  <span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">{row.warning}</span>
+                  <span className={`rounded-md px-2 py-1 text-[11px] font-bold ${row.followUpWeight > 0.0001 ? followUpBadgeClass : 'bg-slate-100 text-slate-700'}`}>{row.warning}</span>
                 </td>
               </tr>
             ))}
@@ -688,26 +726,26 @@ function AttentionPanel({ isLoading, rows }: { isLoading: boolean; rows: Attenti
 
       <div className="divide-y divide-slate-100 lg:hidden">
         {isLoading ? <div className="p-6 text-center text-sm text-slate-400">กำลังโหลดข้อมูล</div> : null}
-        {!isLoading && rows.length === 0 ? <div className="p-6 text-center text-sm text-slate-400">ไม่มีเอกสารที่ต้องตามต่อ</div> : null}
-        {!isLoading && rows.map((row) => (
-          <Link key={`${row.type}-${row.docNo}`} className="block space-y-3 p-4 hover:bg-slate-50" href={row.href}>
+        {!isLoading && rows.length === 0 ? <div className="p-6 text-center text-sm text-slate-400">{emptyText}</div> : null}
+        {!isLoading && pageRows.map((row) => (
+          <Link key={row.docNo} className="block space-y-3 p-4 hover:bg-slate-50" href={row.href}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-bold text-blue-700">{row.docNo}</div>
-                <div className="mt-0.5 truncate text-xs text-slate-500">{row.type} · {formatDateDisplay(row.date)}</div>
+                <div className="mt-0.5 truncate text-xs text-slate-500">{formatDateDisplay(row.date)} · {row.branchName}</div>
               </div>
-              <span className="shrink-0 rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700">{row.warning}</span>
+              <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${row.followUpWeight > 0.0001 ? followUpBadgeClass : 'bg-slate-100 text-slate-700'}`}>{row.warning}</span>
             </div>
             <div className="rounded-md border border-slate-100 bg-slate-50 p-3 text-xs">
               <div className="truncate font-semibold text-slate-800">{row.partyName}</div>
               <div className="mt-2 grid grid-cols-2 gap-2">
-              <MetricLine label="สาขา" value={row.branchName} />
-              <MetricLine label="สุทธิ" value={weightText(row.netWeight)} />
+                <MetricLine label="สุทธิ" value={weightText(row.netWeight)} />
+                <MetricLine label={followUpLabel} value={weightText(row.followUpWeight)} />
               </div>
             </div>
             <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs">
-              <span className="font-semibold text-slate-500">คงเหลือต้องตามต่อ</span>
-              <span className="font-mono font-bold text-amber-700 tabular-nums">{weightText(row.remainingWeight)}</span>
+              <span className="font-semibold text-slate-500">เปิดรายละเอียดเอกสาร</span>
+              <span className="inline-flex items-center gap-1 font-semibold text-blue-700">ดูรายละเอียด <ArrowUpRight className="size-3.5" /></span>
             </div>
           </Link>
         ))}

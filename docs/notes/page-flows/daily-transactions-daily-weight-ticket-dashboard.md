@@ -5,7 +5,7 @@ tags:
   - menu
   - dashboard
 status: accepted-baseline
-updated: 2026-07-06
+updated: 2026-07-07
 route: /daily/weight-ticket-dashboard
 ---
 
@@ -42,7 +42,7 @@ route: /daily/weight-ticket-dashboard
 
 1. ผู้ใช้เข้า `/daily/weight-ticket-dashboard` จากหมวด Daily Transactions
 2. หน้าเริ่มด้วยช่วงวันที่ 30 วันล่าสุด และ filter `ทุกสาขา + WTI/WTO ทั้งหมด`
-3. Client เรียก `GET /api/daily/weight-ticket-dashboard?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD&branchId={code}&type=WTI|WTO`
+3. Client เรียก `GET /api/daily/weight-ticket-dashboard?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD&branchId={code}` แล้วแยก WTI/WTO ใน UI ด้วย table tabs
 4. API ใช้สิทธิ์ `daily.weight_tickets.view` และ branch scope เดียวกับหน้า WTI/WTO เดิม
 5. API อ่าน `weight_tickets`, `weight_ticket_product_summaries`, และ active `stock_holds`
 6. UI แสดง KPI, สรุปสถานะ, สรุปสาขา, top products และรายการเอกสารที่ต้องตามต่อ
@@ -71,7 +71,9 @@ Response sections:
 - `byStatus`: count/net weight ตาม `doc_type + status`
 - `byBranch`: WTI/WTO count/net weight, WTI waiting bill weight, WTO pending out weight ตามสาขา
 - `topProducts`: product aggregate จาก summary rows และ active holds
-- `attentionRows`: WTI remaining rows และ WTO active pending_out rows พร้อม link ไป detail
+- `wtiRows`: รายการ WTI active ทั้งหมดในช่วงที่เลือก พร้อม `followUpWeight = remaining_weight` สำหรับคอลัมน์ `WTI รอ PB`
+- `wtoRows`: รายการ WTO active ทั้งหมดในช่วงที่เลือก พร้อม `followUpWeight = pending_out` สำหรับคอลัมน์ `WTO pending out`
+- `attentionRows`: legacy/compatibility payload สำหรับ WTI remaining และ WTO pending_out ที่ต้องตามต่อ; UI ล่าสุดไม่ใช้เป็นตารางรวมแล้ว
 
 ## Validation / Status Rules
 
@@ -103,6 +105,15 @@ Response sections:
 - Mobile tabs ใช้ป้ายสั้น `สินค้า` / `ตามต่อ` แต่เก็บชื่อเต็มไว้ใน `aria-label` เพื่อไม่ให้แท็บดัน viewport กว้างเกินจอ
 - KPI card บนมือถือห้ามตัดเลขน้ำหนักด้วย ellipsis; ให้ตัวเลข/หน่วยขึ้นบรรทัดตามพื้นที่เพื่อคงความหมายครบ
 - การเปลี่ยนแปลงนี้เป็น presentation-only; ไม่เปลี่ยน API, permission, source calculation, หรือ read-only boundary
+
+## UI Checkpoint 2026-07-07
+
+- แยกตาราง row-level ออกจากตารางรวม `เอกสารที่ต้องตามต่อ` เป็นแท็บ `WTI รับเข้า` และ `WTO ส่งออก` เพื่อให้ผู้ใช้เห็นบริบทขาซื้อ/ขาขายชัดเจนกว่าเดิม
+- เอา filter ประเภทเอกสารออกจาก UI เพราะแท็บ WTI/WTO เป็นตัวเลือกบริบทของตารางอยู่แล้ว ลดความซ้ำระหว่าง filter กับ table surface
+- ตาราง WTI/WTO แต่ละแท็บมี pagination ของตัวเอง, page size `10 / หน้า` และ `25 / หน้า`, resizable columns, ปุ่ม `คืนค่าเดิมตาราง`, และ dense mobile cards
+- ตาราง WTI เรียงเอกสารที่ยังมี `WTI รอ PB` ไว้ก่อน แล้วตามด้วยเอกสารล่าสุด; ตาราง WTO เรียงเอกสารที่ยังมี `WTO pending out` ไว้ก่อน แล้วตามด้วยเอกสารล่าสุด
+- KPI ด้านบนยังเป็นภาพรวมทั้งหน้า ส่วนยอดรวมเฉพาะแท็บย้ายไปอยู่ใน toolbar ของตารางแทนการเพิ่มการ์ดซ้ำ
+- API เพิ่ม `wtiRows` และ `wtoRows` จากข้อมูลที่ query อยู่แล้ว ไม่เพิ่ม write path, ไม่เปลี่ยนสูตร KPI, permission, Supabase schema, หรือ side effects
 
 ## Implementation Checklist
 
