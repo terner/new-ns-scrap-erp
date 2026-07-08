@@ -580,6 +580,7 @@ export async function POST(request: Request) {
         if (isCancelled(poSell.status)) {
           throw new Error(`PO Sell ${poSell.doc_no} ถูกปิดหรือยกเลิกแล้ว`)
         }
+        if (poSell.branch_id !== branch.id) throw new Error(`ไม่พบ PO Sell ID: ${poId}`)
 
         const salesBill = await tx.sales_bills.findFirst({
           where: {
@@ -645,6 +646,9 @@ export async function POST(request: Request) {
         const availableQty = Math.max(0, toNumber(poolEntry.original_qty) - toNumber(poolEntry.allocated_qty) - toNumber(poolEntry.released_qty))
         if (qtyToUse > availableQty + 0.001) {
           throw new Error(`Cost Pool ${cand.sourceNo} คงเหลือไม่พอสำหรับยืนยัน กรุณาเปิด Preview ใหม่อีกครั้ง`)
+        }
+        if (poolEntry.branch_id !== branch.id) {
+          throw new Error(`Cost Pool ${cand.sourceNo} ไม่ได้อยู่ในสาขา ${branch.name}`)
         }
 
         // If candidate is a purchase document (PO Buy or Spot Buy)
