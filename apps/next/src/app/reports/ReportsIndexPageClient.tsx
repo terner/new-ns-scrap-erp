@@ -116,7 +116,7 @@ const columnsByTab: Record<LegacyTab, Column[]> = {
 }
 
 const reports: ReportLink[] = [
-  { category: 'main', href: '/dashboard', label: 'Dashboard', owner: 'Main' },
+  { category: 'main', href: '/dashboard', label: 'Dashboard Overview', owner: 'Main' },
   { category: 'main', href: '/owner-daily', label: 'Owner Daily Control', owner: 'Main' },
   { category: 'main', href: '/daily-report', label: 'Daily Report', owner: 'Main' },
   { category: 'main', href: '/profit-cost-analysis', label: 'Profit & Cost Analysis', owner: 'Main' },
