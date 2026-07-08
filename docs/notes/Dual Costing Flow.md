@@ -161,7 +161,7 @@ Clarification 2026-06-13: `stock_cost_pool_entries` ที่ใช้โดย 
 - `Cost Allocator` confirm must allocate the full target qty only; no partial target allocation.
 - Confirm must be disabled when Cost Pool available qty is less than target required qty.
 - Waiting Allocations must exclude target rows that already have approved allocation for the full target qty.
-- Current `Cost Allocator` may still be read-only simulation in code; target needs a durable allocation ledger/match log before enabling confirm.
+- Current `Cost Allocator` confirm flow is implemented; non-Manual modes should auto-show preview/confirm after target selection, while `Manual` still requires explicit calculate first.
 - Current `Match Log` and `Allocation Ledger` may read from `trading_deals`; target needs a durable allocation ledger/match log when allocator write is implemented.
 - Reverse/edit rules must be append-only or reverse-based; no physical delete of allocation history.
 - Report formulas must always label whether they use Deal Cost or WAC.

@@ -233,6 +233,8 @@ export function CostAllocatorPageClient() {
   const hasSelection = Boolean(selectedProductId)
   const hasPoSell = Boolean(data?.selectedPoSell)
   const hasCandidates = (data?.candidates.length ?? 0) > 0
+  const isManualMode = allocationMode === 'Manual'
+  const shouldShowPreview = isManualMode ? showPreview : hasPoSell
   const sourceTypeButtons = data?.filters.sourceTypes ?? ['po-sell', 'spot-sell']
   const sourceTypeLabel = sourceType === 'po-sell' ? 'PO Sell' : sourceType === 'production' ? 'Production' : 'Spot Sell / บิลขายไม่มี PO'
   const allocationModes = data?.filters.modes?.length ? data.filters.modes : ['FIFO', 'LIFO', 'Cheap', 'Expensive']
@@ -254,9 +256,9 @@ export function CostAllocatorPageClient() {
       ...current,
       step2: hasSelection ? current.step2 : false,
       step3: hasSelection ? current.step3 : false,
-      step4: showPreview && hasCandidates ? current.step4 : false,
+      step4: shouldShowPreview && hasCandidates ? current.step4 : false,
     }))
-  }, [hasCandidates, hasSelection, showPreview])
+  }, [hasCandidates, hasSelection, shouldShowPreview])
 
   function resetSale() {
     setSelectedPoSellId('')
@@ -421,7 +423,7 @@ export function CostAllocatorPageClient() {
                 value={selectedPoSellId}
                 onChange={(event) => {
                   setSelectedPoSellId(event.target.value)
-                  setShowPreview(false)
+                  setShowPreview(isManualMode ? false : Boolean(event.target.value))
                 }}
               >
                 <option value="">{sourceType === 'po-sell' ? '-- เลือก PO ขาย --' : sourceType === 'production' ? '-- เลือกใบสั่งผลิต --' : '-- เลือกบิลขายไม่มี PO --'}</option>
@@ -431,13 +433,21 @@ export function CostAllocatorPageClient() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-500">Allocation Mode</label>
-              <Select className="focus-visible:ring-emerald-100 border-slate-300" value={allocationMode} onChange={(event) => setAllocationMode(event.target.value)}>
+              <Select
+                className="focus-visible:ring-emerald-100 border-slate-300"
+                value={allocationMode}
+                onChange={(event) => {
+                  const nextMode = event.target.value
+                  setAllocationMode(nextMode)
+                  setShowPreview(nextMode === 'Manual' ? false : Boolean(selectedPoSellId))
+                }}
+              >
                 {allocationModes.map((mode) => <option key={mode} value={mode}>{allocationModeLabel(mode)}</option>)}
               </Select>
             </div>
           </div>
 
-          {allocationMode === 'Manual' && (
+          {isManualMode && (
             <div className="mt-3 rounded-xl border border-amber-200/60 bg-amber-50/20 p-4 space-y-3">
               <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
                 <span>⚙️</span>
@@ -697,7 +707,7 @@ export function CostAllocatorPageClient() {
         </DualCostingPanel>
       ) : null}
 
-      {showPreview && hasCandidates ? (
+      {shouldShowPreview && hasCandidates ? (
         <DualCostingPanel title="④ Preview การจับคู่ต้นทุน" titleAction={<PanelToggleButton collapsed={collapsedSections.step4} onClick={() => toggleSection('step4')} />}>
           {!collapsedSections.step4 ? (
           <>
@@ -774,7 +784,9 @@ export function CostAllocatorPageClient() {
             <DualCostingStatCard icon="📈" label="กำไรคาดการณ์" tone={(data?.summary.expectedMargin ?? 0) >= 0 ? 'purple' : 'red'} value={formatMoney(data?.summary.expectedMargin ?? 0)} />
           </div>
           <div className="mt-4 flex justify-end gap-2">
-            <Button className="rounded-lg h-10 px-4 text-sm font-semibold focus-visible:ring-slate-100" type="button" variant="secondary" onClick={() => setShowPreview(false)} disabled={isSubmitting}>ปิด Preview</Button>
+            {isManualMode ? (
+              <Button className="rounded-lg h-10 px-4 text-sm font-semibold focus-visible:ring-slate-100" type="button" variant="secondary" onClick={() => setShowPreview(false)} disabled={isSubmitting}>ปิด Preview</Button>
+            ) : null}
             <Button
               className="rounded-lg h-10 px-4 text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors focus-visible:outline-none"
               type="button"
