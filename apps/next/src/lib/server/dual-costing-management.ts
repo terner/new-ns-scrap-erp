@@ -159,9 +159,7 @@ export async function buildDualCostingManagement() {
         NOT: {
           status: {
             in: [
-              'Cancelled', 'cancelled', 'Canceled', 'canceled',
-              'Closed', 'closed', 'Completed', 'completed',
-              'Fully Matched', 'fully matched', 'Received', 'received'
+              'Cancelled', 'cancelled', 'Canceled', 'canceled'
             ]
           }
         }
