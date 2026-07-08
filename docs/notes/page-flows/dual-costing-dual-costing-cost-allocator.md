@@ -5,7 +5,7 @@ tags:
   - menu
   - dual-costing
 status: accepted-baseline
-updated: 2026-06-23
+updated: 2026-07-08
 route: /dual-costing/cost-allocator
 ---
 
@@ -18,7 +18,7 @@ route: /dual-costing/cost-allocator
 | Menu section | Dual Costing |
 | Route | `/dual-costing/cost-allocator` |
 | Page | Cost Allocator (ทอง/เหลือง) |
-| Current Next | read-only simulation baseline |
+| Current Next | active allocation flow with confirm |
 
 ## Canonical References
 
@@ -61,7 +61,7 @@ Target write behavior เมื่อ implement จริง:
 - แสดง target sale rows ที่ยังค้าง allocate
 - preview lots ตาม allocation mode
 - แสดง expected revenue, total cost, expected margin
-- เตรียมข้อมูลสำหรับ confirm allocation ในอนาคต
+- เปิดทางให้ confirm allocation จาก preview ปัจจุบัน
 - validate ว่า preview รวมครบ target qty ก่อนเปิดให้ Confirm
 
 ## Non-Responsibilities
@@ -70,7 +70,7 @@ Target write behavior เมื่อ implement จริง:
 - ไม่สร้าง stock ledger
 - ไม่คำนวณ WAC
 - ไม่แก้ GL/P&L
-- ไม่ reverse allocation โดยตรงใน current read-only baseline
+- ไม่ reverse allocation แบบแก้ history ตรง ๆ
 
 ## Lifecycle / Read Flow
 
@@ -79,16 +79,17 @@ Target write behavior เมื่อ implement จริง:
 | 1 | เปิดหน้า | โหลด Cost Pool + PO Sell/SB target candidates |
 | 2 | เลือกสินค้า | แสดง pool summary และ target list ของสินค้านั้น |
 | 3 | เลือก target | คำนวณ target qty ที่ต้อง allocate เต็มจำนวน |
-| 4 | เลือก mode | preview lots จาก Cost Pool |
-| 5 | Preview | ระบบต้องเลือก Cost Pool lots ให้ครบ target qty |
+| 4 | เลือก mode | ระบบคำนวณ preview lots จาก Cost Pool |
+| 5 | Preview | ระบบต้องเลือก Cost Pool lots ให้ครบ target qty; โหมดอัตโนมัติเปิด preview ทันทีหลังเลือก target ส่วน `Manual` ต้องกดคำนวณก่อน |
 | 6 | ถ้า Cost Pool ไม่พอ | disable Confirm และแจ้งว่า Cost Pool ไม่เพียงพอ |
-| 7 | Confirm | write durable allocation log แบบ full match; current Next อาจยังเป็น read-only simulation |
+| 7 | Confirm | write durable allocation log แบบ full match |
 
 ## API / Data Contract
 
 ### Current API
 
 - `GET /api/dual-costing/cost-allocator`
+- `POST /api/dual-costing/cost-allocator`
 
 Current query params:
 
@@ -114,21 +115,26 @@ Required payload groups:
 | `candidates` | preview rows with `qtyToUse` / cost |
 | `summary` | pool qty/value, target remaining, expected margin |
 
+Current behavior 2026-07-08:
+
+- `FIFO`, `LIFO`, `Cheap`, `Expensive` เป็น auto-preview mode; เมื่อเลือก target แล้ว preview และปุ่ม `ยืนยันการจับคู่` ต้องแสดงอัตโนมัติ
+- `Manual` เป็น explicit-preview mode; ผู้ใช้ต้องกรอกราคาต้นทุนเป้าหมายและกด `คำนวณ Match อัตโนมัติ` ก่อนจึงจะเห็น preview/confirm
+- การกด Confirm จะส่ง candidate rows ที่ preview อยู่ไปยัง `POST /api/dual-costing/cost-allocator`
+
 ## Validation / Status Rules
 
 - Product must be eligible by metal group.
 - Candidate pool rows must come from filtered Cost Pool API.
 - `qtyToUse` cannot exceed pool row `availableQty`.
 - total `qtyToUse` must equal target required qty before Confirm.
-- mode must be one of `FIFO`, `LIFO`, `Cheap`, `Expensive`; legacy `Manual` remains a UI option but needs explicit target-write decision before confirm is enabled.
+- mode must be one of `FIFO`, `LIFO`, `Cheap`, `Expensive`, `Manual`.
+- auto modes must expose preview/confirm immediately after target selection; `Manual` must require explicit calculate first.
 - Confirm write must be idempotent and create an auditable `matchId`.
 - If multiple Cost Pool rows have equal priority in the selected mode, tie-break by oldest incoming row/doc first.
 
 ## Side Effects
 
-Current Next: read-only simulation, no write side effect.
-
-Target future confirm:
+Current Next confirm:
 
 - create allocation/match log rows
 - reduce available qty in derived Cost Pool through allocation facts
@@ -138,13 +144,14 @@ Target future confirm:
 
 ## Current Code Baseline
 
-- Current API/page is implemented as read-only simulation and protected by `finance.cash.view`.
+- Current API/page supports confirm allocation and is protected by `finance.cash.view`.
 - Current API delegates pool eligibility to Cost Pool API, so Cost Pool hardening is prerequisite.
 - 2026-06-14 runtime opens `spot-sell` read targets from Sales Bill lines with no active PO allocation and non-Trading transaction mode. This is the default mode per latest requirement.
+- 2026-07-08 runtime behavior: non-Manual modes (`FIFO`, `LIFO`, `Cheap`, `Expensive`) auto-open preview when a target is selected so the confirm action is visible without extra user input; `Manual` still requires explicit calculation first.
 
 ## Current Gap
 
-- None. Match Confirmation and stable FIFO sorting tie-breakers have been successfully implemented and validated via browser UAT.
+- None for confirm visibility flow. Match Confirmation and stable FIFO sorting tie-breakers are implemented; non-Manual modes now show preview/confirm automatically.
 - Partial target allocation is intentionally out of scope for the latest flow.
 
 ## Implementation Checklist
@@ -156,4 +163,5 @@ Target future confirm:
 - [x] Add confirm allocation endpoint (`POST /api/dual-costing/cost-allocator`)
 - [x] Add reverse/recreate edit policy
 - [x] Revisit manual target-cost mode and sort pool lots correctly when mode is selected
+- [x] Make non-Manual modes show preview and confirm action automatically after target selection
 - [x] Confirm target policy: full match only, no partial target allocation
