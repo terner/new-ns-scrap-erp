@@ -187,7 +187,7 @@ export const navigationItems: NavigationItem[] = [
   { href: '/owner-daily', icon: '☀️', label: 'Owner Daily Control (เปิดทุกเช้า)', pageTitle: 'Owner Daily Control', pageSubtitle: 'เปิดดูทุกเช้า · ตรวจสอบสถานะการเงินครบทุกมุมก่อนเริ่มวัน', section: 'main' },
   { href: '/daily-report', icon: '📰', label: 'Daily Report (รายงานประจำวัน)', pageTitle: 'Daily Report', pageSubtitle: 'รายงานสรุปประจำวัน — ทุกตัวเลขสำคัญในหน้าเดียว', section: 'main' },
   { href: '/analytics-dashboard', icon: '📈', label: 'Analytics Dashboard (วิเคราะห์ข้อมูล)', pageTitle: 'Analytics Dashboard', pageSubtitle: 'รายงานสรุปแบบช่วงเวลา · วิเคราะห์ยอดซื้อ ยอดขาย อันดับสินค้า และผลงานทีมขาย', section: 'main' },
-  { href: '/dashboard', icon: '📊', label: 'Dashboard', pageTitle: 'Financial Dashboard', pageSubtitle: 'ภาพรวมทางการเงิน · Real-time overview', section: 'main' },
+  { href: '/dashboard', icon: '📊', label: 'Dashboard Overview', pageTitle: 'Dashboard Overview', pageSubtitle: 'ภาพรวมทางการเงิน · Real-time overview', section: 'main' },
   { href: '/profit-cost-analysis', icon: '💎', label: 'Profit & Cost Analysis', pageSubtitle: 'วิเคราะห์ซื้อ ขาย COGS GP และ Stock Value ด้วย WAC/ต้นทุนจากบิลขาย', section: 'main' },
   { href: '/sales-plan', icon: '📋', label: 'วางแผนการขาย (LME)', pageTitle: 'วางแผนการขาย (Sales Plan) — ทองแดง / ทองเหลือง', pageSubtitle: 'เสนอ % LME + ช่องทางขาย → กดล็อกเพื่อยืนยันราคา → ตู้ในรอขายลดลงอัตโนมัติ', section: 'main' },
   { href: '/sales-commission', icon: '💼', label: 'Sales Tracking Dashboard', pageTitle: 'Sales Tracking — ผลงานพนักงาน', pageSubtitle: 'ผูก Sales กับ Supplier · ดึงยอดบิลรับซื้อ · กดการ์ดเพื่อดูรายละเอียด', section: 'main' },
