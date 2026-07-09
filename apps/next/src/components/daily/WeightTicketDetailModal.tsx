@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, ClipboardList, Package2, Printer, RotateCcw,
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import {
   WeightTicketProductBreakdownTable,
   WeightTicketTimelinePendingOutChanges,
@@ -253,49 +254,61 @@ export function WeightTicketDetailModal({
     <Dialog open onOpenChange={(open) => {
       if (!open) onClose()
     }}>
-      <DialogContent aria-labelledby="weight-ticket-detail-title" className="max-h-[90vh] max-w-[min(96vw,96rem)] rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0">
-        <DialogHeader className="p-4 bg-slate-900 text-white shrink-0 rounded-t-md">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <DialogTitle id="weight-ticket-detail-title" className="text-white">
+      <DialogContent hideClose aria-labelledby="weight-ticket-detail-title" className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[90vh] sm:w-[calc(100%-2rem)] sm:max-w-[min(96vw,96rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-md">
+        <DialogHeader className="bg-slate-900 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] text-white shrink-0 rounded-none sm:p-4 sm:rounded-t-md">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:flex sm:flex-wrap sm:justify-between">
+            <div className="min-w-0">
+              <DialogTitle id="weight-ticket-detail-title" className="truncate text-base text-white sm:text-lg">
                 {ticket?.type === 'WTI' ? 'ใบรับของ' : ticket?.type === 'WTO' ? 'ใบส่งของ' : 'รายละเอียดเอกสาร'} {ticket?.documentNo ?? ticketId}
               </DialogTitle>
-              <DialogDescription className="text-slate-300">{ticket?.partyName ?? (isLoading ? 'กำลังโหลดข้อมูล' : '-')}</DialogDescription>
+              <DialogDescription className="truncate text-slate-300">{ticket?.partyName ?? (isLoading ? 'กำลังโหลดข้อมูล' : '-')}</DialogDescription>
             </div>
-            {ticket ? (
-              <div className="flex gap-2">
+            <div className="flex max-w-[min(58vw,15rem)] justify-end gap-2 overflow-x-auto pb-0.5 sm:max-w-none sm:flex-wrap sm:overflow-visible sm:pb-0">
+              {ticket ? (
+                <>
                 {canReturnStock ? (
-                  <Button type="button" variant="outline" className="font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white" onClick={() => setShowStockReturnDialog(true)}>
-                    <RotateCcw className="mr-2 size-4" />
-                    รับของคืน
+                  <Button aria-label="รับของคืน" type="button" variant="outline" className="h-10 w-10 shrink-0 gap-0 px-0 font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" onClick={() => setShowStockReturnDialog(true)}>
+                    <RotateCcw className="size-4" />
+                    <span className="sr-only sm:not-sr-only">รับของคืน</span>
                   </Button>
                 ) : null}
                 {ticket.canEdit ? (
                   onEdit ? (
                     <Button
+                      aria-label="แก้ไข"
                       type="button"
                       variant="outline"
-                      className="font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white"
+                      className="h-10 w-10 shrink-0 gap-0 px-0 font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4"
                       onClick={() => onEdit(ticket.id, ticket.type)}
                     >
-                      <SquarePen className="mr-2 size-4" />
-                      แก้ไข
+                      <SquarePen className="size-4" />
+                      <span className="sr-only sm:not-sr-only">แก้ไข</span>
                     </Button>
                   ) : (
-                    <Button asChild type="button" variant="outline" className="font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white">
-                      <Link href={`/daily/weight-tickets?id=${encodeURIComponent(ticket.id)}`}>
-                        <SquarePen className="mr-2 size-4" />
-                        แก้ไข
+                    <Button asChild type="button" variant="outline" className="h-10 w-10 shrink-0 gap-0 px-0 font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4">
+                      <Link aria-label="แก้ไข" href={`/daily/weight-tickets?id=${encodeURIComponent(ticket.id)}`}>
+                        <SquarePen className="size-4" />
+                        <span className="sr-only sm:not-sr-only">แก้ไข</span>
                       </Link>
                     </Button>
                   )
                 ) : null}
-              </div>
-            ) : null}
+                <Button aria-label="แชร์" className="h-10 w-10 shrink-0 gap-0 px-0 font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" type="button" variant="outline" onClick={() => setShowShareDialog(true)}>
+                  <Share2 className="size-4" />
+                  <span className="sr-only sm:not-sr-only">แชร์</span>
+                </Button>
+                <Button aria-label={isPrinting ? 'กำลังเตรียมพิมพ์' : 'พิมพ์'} className="h-10 w-10 shrink-0 gap-0 border-emerald-600 bg-emerald-600 px-0 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
+                  <Printer className="size-4" />
+                  <span className="sr-only sm:not-sr-only">{isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}</span>
+                </Button>
+                </>
+              ) : null}
+              <Button className="h-10 shrink-0 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white sm:h-9" type="button" variant="outline" onClick={onClose}>ปิด</Button>
+            </div>
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50">
+        <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50">
 
         {isLoading ? (
           <div className="p-8 text-center text-sm text-slate-500">กำลังโหลดข้อมูล...</div>
@@ -304,10 +317,10 @@ export function WeightTicketDetailModal({
             <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{loadError || 'ไม่พบใบรับ-ส่งของ'}</div>
           </div>
         ) : (
-          <div className="space-y-5 p-4">
+          <div className="space-y-4 p-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:space-y-5 sm:p-4">
             <div className="space-y-4">
-              <Card className="p-5">
-                <SectionTitle subtitle="ข้อมูลเอกสารและผู้ใช้งาน" title="ข้อมูลเอกสาร" />
+              <Card className="p-4 sm:p-5">
+                <SectionTitle title="ข้อมูลเอกสาร" />
                 <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 md:grid-cols-4">
                   <DetailItem
                     label={ticket.type === 'WTI' ? 'ใบรับของ' : 'ใบส่งของ'}
@@ -368,8 +381,8 @@ export function WeightTicketDetailModal({
                 />
               </div>
 
-              <Card className="p-5">
-                <SectionTitle subtitle="ข้อมูลคู่ค้าและรถที่ใช้ส่งสินค้า" title={ticket.type === 'WTI' ? 'ข้อมูลผู้ขาย' : 'ข้อมูลลูกค้า'} />
+              <Card className="p-4 sm:p-5">
+                <SectionTitle title={ticket.type === 'WTI' ? 'ข้อมูลผู้ขาย' : 'ข้อมูลลูกค้า'} />
                 <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
                   <div className="grid grid-cols-2 gap-4">
                     <DetailItem label={ticket.type === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} value={ticket.partyName} />
@@ -386,8 +399,8 @@ export function WeightTicketDetailModal({
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
                 <div className="space-y-4">
                   <Card className="overflow-hidden p-0">
-                    <div className="border-b border-slate-200 px-5 py-4">
-                      <SectionTitle subtitle="เรียงตามสินค้า รวมเต๋าจริง สิ่งเจือปน และรายการซื้อเพิ่มไว้ในกลุ่มเดียว" title="รายละเอียดสินค้าและที่มา" />
+                    <div className="border-b border-slate-200 px-4 py-3 sm:px-5 sm:py-4">
+                      <SectionTitle title="รายละเอียดสินค้าและที่มา" />
                     </div>
                     <WeightTicketProductBreakdownTable
                       ticket={ticket}
@@ -396,8 +409,8 @@ export function WeightTicketDetailModal({
                   </Card>
                   </div>
 
-                <Card className="p-5">
-                  <SectionTitle subtitle="สถานะปัจจุบันของเอกสาร" title="สถานะ" />
+                <Card className="p-4 sm:p-5">
+                  <SectionTitle title="สถานะ" />
                   <div className="mt-4 space-y-3">
                     <div className="rounded-md bg-slate-50 px-4 py-3">
                       <div className="text-sm font-semibold text-slate-500">สถานะเอกสาร</div>
@@ -439,11 +452,11 @@ export function WeightTicketDetailModal({
 
             {ticket.type === 'WTI' ? (
               <Card className="overflow-hidden p-0">
-                <div className="border-b border-slate-200 px-5 py-4">
-                  <SectionTitle subtitle="บันทึกการนำใบรับของไปออกบิลและการคืนยอด" title="ประวัติการใช้งานใบรับของ" />
+                <div className="border-b border-slate-200 px-4 py-3 sm:px-5 sm:py-4">
+                  <SectionTitle title="ประวัติการใช้งานใบรับของ" />
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="hidden lg:table min-w-full divide-y divide-slate-100 text-sm">
+                  <table className="ns-table hidden lg:table min-w-full divide-y divide-slate-100 text-sm">
                     <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500">
                       <tr>
                         <th className="px-3 py-3 text-left">เวลา</th>
@@ -455,7 +468,7 @@ export function WeightTicketDetailModal({
                         <th className="px-3 py-3 text-left">ผู้ทำรายการ/หมายเหตุ</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 bg-white">
                       {ticket.usageTimeline.length === 0 ? (
                         <tr>
                           <td className="px-3 py-8 text-center text-sm text-slate-400" colSpan={7}>
@@ -561,7 +574,7 @@ export function WeightTicketDetailModal({
                   const isExpanded = Boolean(expandedTimelineIds[event.id])
 
                   return (
-                    <div key={event.id} className="grid grid-cols-[88px_1fr] gap-3 sm:grid-cols-[128px_1fr]">
+                    <div key={event.id} className="grid grid-cols-[72px_1fr] gap-3 sm:grid-cols-[128px_1fr]">
                       <div className="pt-1 text-right text-sm text-slate-500 font-medium">
                         <div>{formatDateTime(event.occurredAt)}</div>
                         <div className="mt-1 truncate text-sm font-semibold text-slate-600">{event.actorName}</div>
@@ -582,7 +595,7 @@ export function WeightTicketDetailModal({
                             เปลี่ยนสถานะจาก {timelineStatusLabel(ticket.type, fromStatus)}
                           </div>
                         ) : null}
-                        <div className="mt-2 grid gap-1.5 rounded-md bg-white px-3 py-2.5 text-sm text-slate-600 shadow-sm border border-slate-100">
+                        <div className="mt-2 grid gap-1.5 rounded-xl bg-white px-3 py-2.5 text-sm text-slate-600 shadow-sm border border-slate-100">
                           {targetDocNo || productName || allocatedNetWeight != null ? (
                             <div className="flex flex-wrap gap-x-4 gap-y-1">
                               {targetDocNo ? (
@@ -626,8 +639,8 @@ export function WeightTicketDetailModal({
             </div>
 
             {ticket.canCancel ? (
-              <Card className="p-5">
-                <SectionTitle subtitle="ยกเลิกได้จนกว่าจะถูกนำไปใช้ออกบิล" title="ยกเลิกเอกสาร" />
+              <Card className="p-4 sm:p-5">
+                <SectionTitle title="ยกเลิกเอกสาร" />
                 <div className="mt-4 space-y-3 px-1">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">
@@ -654,30 +667,19 @@ export function WeightTicketDetailModal({
 
         </div>
 
-        <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t bg-slate-50 shrink-0">
-          {ticket ? (
-            <>
-              <Button className="gap-2 font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
-                <Printer className="size-4" />
-                {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}
-              </Button>
-              <Button className="gap-2 font-normal" type="button" variant="outline" onClick={() => setShowShareDialog(true)}>
-                <Share2 className="size-4" />
-                แชร์
-              </Button>
-            </>
-          ) : null}
-          <Button className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</Button>
-        </DialogFooter>
-
         {previewImage && (
           <Dialog open onOpenChange={(open) => {
             if (!open) setPreviewImage(null)
           }}>
-            <DialogContent className="max-w-4xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
+            <DialogContent hideClose className="max-w-4xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
               <DialogHeader className="rounded-t-md">
-                <DialogTitle>รูปภาพแนบ</DialogTitle>
-                <DialogDescription>{previewImage.fileName}</DialogDescription>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <DialogTitle>รูปภาพแนบ</DialogTitle>
+                    <DialogDescription className="truncate">{previewImage.fileName}</DialogDescription>
+                  </div>
+                  <Button className="h-9 shrink-0 border-rose-600 bg-rose-600 px-4 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setPreviewImage(null)}>ปิด</Button>
+                </div>
               </DialogHeader>
               <div className="overflow-hidden bg-slate-950 p-4">
                 <Image
@@ -697,12 +699,17 @@ export function WeightTicketDetailModal({
           <Dialog open onOpenChange={(open) => {
             if (!open) setLineGallery(null)
           }}>
-            <DialogContent className="max-w-5xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
+            <DialogContent hideClose className="max-w-5xl rounded-md !p-0 overflow-hidden bg-slate-900 border-0 flex flex-col">
               <DialogHeader className="rounded-t-md">
-                <DialogTitle>{lineGallery.title}</DialogTitle>
-                <DialogDescription>
-                  {activeGalleryImage.fileName} · รูป {lineGallery.activeIndex + 1} / {lineGallery.images.length}
-                </DialogDescription>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <DialogTitle>{lineGallery.title}</DialogTitle>
+                    <DialogDescription className="truncate">
+                      {activeGalleryImage.fileName} · รูป {lineGallery.activeIndex + 1} / {lineGallery.images.length}
+                    </DialogDescription>
+                  </div>
+                  <Button className="h-9 shrink-0 border-rose-600 bg-rose-600 px-4 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setLineGallery(null)}>ปิด</Button>
+                </div>
               </DialogHeader>
               <div className="space-y-4 p-4 bg-slate-950">
                 <div className="relative overflow-hidden rounded-md bg-slate-950">
@@ -771,11 +778,11 @@ export function WeightTicketDetailModal({
           }
         }}
         >
-          <DialogContent className="max-w-lg">
+          <DialogContent hideClose mobileAppShell={false} className="max-w-lg rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 outline-none focus:outline-none">
             <DialogHeader>
               <DialogTitle>แชร์ใบรับ-ส่งของ</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 px-4 pb-4">
+            <div className="space-y-3 bg-slate-50 p-4">
               <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 <div className="font-semibold text-slate-900">{ticket?.documentNo}</div>
                 <div className="mt-1 text-xs text-slate-500">{ticket?.partyName} · {ticket ? `${formatWeight(ticket.totals.netWeight)} กก.` : ''}</div>
@@ -809,8 +816,8 @@ export function WeightTicketDetailModal({
         </Dialog>
 
         <Dialog open={!!successModalMessage} onOpenChange={(open) => !open && setSuccessModalMessage('')}>
-          <DialogContent hideClose className="max-w-sm">
-            <div className="flex flex-col items-center justify-center p-6 space-y-4">
+          <DialogContent hideClose mobileAppShell={false} className="max-w-sm rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 outline-none focus:outline-none">
+            <div className="flex flex-col items-center justify-center space-y-4 bg-white p-6">
               <div className="rounded-full bg-emerald-100 p-3">
                 <CheckCircle2 className="h-8 w-8 text-emerald-600" />
               </div>
@@ -838,29 +845,23 @@ export function WeightTicketDetailModal({
   )
 }
 
-function SectionTitle({ subtitle, title }: { subtitle: string; title: string }) {
+function SectionTitle({ title }: { title: string }) {
   return (
     <div>
-      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-      <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+      <h2 className="text-base font-bold text-slate-900 sm:text-lg">{title}</h2>
     </div>
   )
 }
 
 function MetricCard({ className, icon, label, value }: { className?: string; icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className={cn("rounded-md border border-slate-200 bg-white px-4 py-4 shadow-sm", className)}>
-      <div className="flex items-center gap-2 text-sm font-semibold uppercase text-slate-500">{icon}{label}</div>
-      <div className="mt-2 text-lg font-bold tabular-nums text-slate-950">{value}</div>
-    </div>
-  )
+  return <SharedKpiCard className={className} icon={icon} label={label} tone="slate" value={value} />
 }
 
 function DetailItem({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
     <div>
       <div className="text-sm font-medium text-slate-500">{label}</div>
-      <div className={cn('mt-1 text-base font-semibold text-slate-900', valueClassName)}>{value}</div>
+      <div className={cn('mt-1 text-sm font-semibold text-slate-900 sm:text-base', valueClassName)}>{value}</div>
     </div>
   )
 }

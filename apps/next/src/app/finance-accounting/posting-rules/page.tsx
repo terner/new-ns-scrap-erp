@@ -7,70 +7,70 @@ export const metadata: Metadata = {
 
 const ruleGroups = [
   {
-    group: 'Sales',
-    source: 'SB, RCP, customer advance allocation',
-    concern: 'Revenue, AR, VAT output, cash/bank, advance liability',
+    group: 'ขาย',
+    source: 'SB, RCP, allocation เงินรับล่วงหน้าลูกค้า',
+    concern: 'รายได้, AR, VAT ขาย, เงินสด/ธนาคาร, หนี้สินเงินรับล่วงหน้า',
     readiness: 'ต้อง map ก่อนเปิด GL',
   },
   {
-    group: 'Purchase',
-    source: 'PB, PMT, supplier advance allocation',
-    concern: 'Inventory/expense, AP, VAT input, cash/bank, advance asset',
+    group: 'ซื้อ',
+    source: 'PB, PMT, allocation เงินจ่ายล่วงหน้าซัพพลายเออร์',
+    concern: 'สต็อก/ค่าใช้จ่าย, AP, VAT ซื้อ, เงินสด/ธนาคาร, สินทรัพย์เงินจ่ายล่วงหน้า',
     readiness: 'ต้อง map ก่อนเปิด GL',
   },
   {
-    group: 'Stock',
+    group: 'สต็อก',
     source: 'stock_ledger, WAC/COGS, status convert',
-    concern: 'Inventory account, COGS, adjustment gain/loss',
+    concern: 'บัญชีสต็อก, COGS, กำไร/ขาดทุนจากการปรับปรุง',
     readiness: 'ต้อง reconcile ก่อน',
   },
   {
-    group: 'Bank/Cash',
+    group: 'ธนาคาร/เงินสด',
     source: 'bank_statement, transfer, correction',
-    concern: 'Cash, bank, OD, FCD account and movement classification',
+    concern: 'เงินสด, ธนาคาร, OD, FCD และประเภท movement',
     readiness: 'policy เท่านั้น',
   },
   {
-    group: 'Assets',
+    group: 'ทรัพย์สิน',
     source: 'acquisition, depreciation, disposal',
-    concern: 'Asset cost, accumulated depreciation, depreciation expense, gain/loss',
+    concern: 'ต้นทุนทรัพย์สิน, ค่าเสื่อมสะสม, ค่าเสื่อมงวด, กำไร/ขาดทุน',
     readiness: 'บาง lifecycle เปิดแล้ว',
   },
   {
-    group: 'Loans',
+    group: 'เงินกู้',
     source: 'loan schedule, payment, interest',
-    concern: 'Principal, interest, current/non-current liability',
-    readiness: 'design-only',
+    concern: 'เงินต้น, ดอกเบี้ย, หนี้สินระยะสั้น/ระยะยาว',
+    readiness: 'รอออกแบบ',
   },
   {
-    group: 'Tax',
+    group: 'ภาษี',
     source: 'VAT/WHT facts',
-    concern: 'Tax payable/receivable and filing readiness',
+    concern: 'ภาษีค้างจ่าย/รับคืน และความพร้อมยื่นแบบ',
     readiness: 'ยังไม่ใช่ filing ledger',
   },
   {
-    group: 'Equity',
+    group: 'ส่วนทุน',
     source: 'opening balance, equity, year close',
-    concern: 'Capital, retained earnings, current year profit/loss',
+    concern: 'ทุน, กำไรสะสม, กำไร/ขาดทุนปีปัจจุบัน',
     readiness: 'ต้องมี close policy',
   },
 ] as const
 
 const controlRules = [
   {
-    title: 'Missing mapping must be visible',
+    title: 'ต้องเห็น mapping ที่ยังหาย',
     detail: 'ถ้า source type ยังไม่มี account mapping ต้องแสดงเป็น readiness issue ไม่ default เข้าบัญชีสำรองแบบเงียบ',
   },
   {
-    title: 'Stable source meaning',
+    title: 'ความหมาย source ต้องนิ่ง',
     detail: 'Rule ต้องอ้าง source type และ business meaning ที่ stable ไม่อิงเฉพาะ label บน UI',
   },
   {
-    title: 'Version and audit',
+    title: 'ต้องมี version และ audit',
     detail: 'การแก้ mapping ต้องมี version/audit เพราะมีผลกับงวดที่ close แล้วและการ repost ในอนาคต',
   },
   {
-    title: 'Report boundary',
+    title: 'แยกรายงานกับ journal',
     detail: 'รายงาน management ปัจจุบันยังอ่าน operational facts/helpers ไม่ได้กลายเป็น journal source',
   },
 ] as const
@@ -83,44 +83,23 @@ const boundaries = [
 ] as const
 
 const pendingWork = [
-  'Define posting rule schema, versioning, and audit table',
-  'Define required mapping list per source type',
-  'Define readiness check API',
-  'Define relationship to Accounting Periods lock/close',
-  'Keep GL/statutory posting separate from current management report helpers',
+  'กำหนด schema ของ posting rule, versioning และ audit table',
+  'กำหนดรายการ mapping ที่จำเป็นต่อ source type',
+  'กำหนด API ตรวจความพร้อมก่อน posting',
+  'ผูกความสัมพันธ์กับ Accounting Periods lock/close',
+  'แยก GL/statutory posting ออกจาก helper รายงานผู้บริหารปัจจุบัน',
 ] as const
 
 export default function PostingRulesPage() {
   return (
     <section className="space-y-4">
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-4 shadow-sm">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-4xl">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">FA5 mapping readiness</p>
-            <h2 className="mt-1 text-lg font-bold text-slate-900">Posting Rules และ source-to-account mapping</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-700">
-              หน้านี้ใช้บอกว่า source document หรือ movement ใดต้อง map ไปบัญชีใดก่อนเปิด GL/statutory posting ในอนาคต
-              สถานะปัจจุบันยังเป็น policy UI และยังไม่ post journal อัตโนมัติ
-            </p>
-          </div>
-          <StatusBadge tone="blue">GL posting deferred</StatusBadge>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <SummaryCard label="Runtime write" value="ปิดอยู่" detail="ไม่มี save, apply, post, repost หรือ journal mutation" />
-        <SummaryCard label="Fallback policy" value="ห้าม fallback" detail="mapping ที่หายต้องแสดงเป็น issue ไม่ default แบบเงียบ" />
-        <SummaryCard label="Close dependency" value="ต้อง complete" detail="Posting Rules ต้องพร้อมก่อน Accounting Periods lock/statutory close" />
-      </div>
-
-      <section className="rounded-md bg-white p-4 shadow">
+      <section className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <div className="mb-3">
-          <h3 className="text-sm font-bold text-slate-900">Controls ก่อนเปิดใช้งานจริง</h3>
-          <p className="mt-1 text-xs text-slate-500">กติกานี้ป้องกันไม่ให้ report page กลายเป็น GL source หรือทำ mapping หายแบบเงียบ</p>
+          <h3 className="text-sm font-bold text-slate-900">เงื่อนไขก่อนเปิดใช้งานจริง</h3>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {controlRules.map((rule) => (
-            <div key={rule.title} className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+            <div key={rule.title} className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
               <h4 className="text-sm font-bold text-slate-900">{rule.title}</h4>
               <p className="mt-3 text-xs leading-5 text-slate-600">{rule.detail}</p>
             </div>
@@ -131,11 +110,11 @@ export default function PostingRulesPage() {
       <PostingRulesTable rows={ruleGroups} />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-        <section className="rounded-md bg-white p-4 shadow">
+        <section className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-bold text-slate-900">Boundary ที่ยังต้องรักษา</h3>
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
             {boundaries.map(([title, detail]) => (
-              <div key={title} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <div key={title} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="text-sm font-bold text-slate-800">{title}</h4>
                 <p className="mt-2 text-xs leading-5 text-slate-600">{detail}</p>
               </div>
@@ -143,11 +122,11 @@ export default function PostingRulesPage() {
           </div>
         </section>
 
-        <section className="rounded-md bg-white p-4 shadow">
+        <section className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-bold text-slate-900">งานที่ยังต้องออกแบบก่อนเปิดใช้</h3>
           <div className="mt-3 space-y-2">
             {pendingWork.map((item, index) => (
-              <div key={item} className="flex gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <div key={item} className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
                   {index + 1}
                 </span>
@@ -158,16 +137,6 @@ export default function PostingRulesPage() {
         </section>
       </div>
     </section>
-  )
-}
-
-function SummaryCard({ detail, label, value }: { detail: string; label: string; value: string }) {
-  return (
-    <div className="rounded-md bg-white p-4 shadow">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-2 text-xl font-bold text-slate-900">{value}</p>
-      <p className="mt-1 text-xs leading-5 text-slate-600">{detail}</p>
-    </div>
   )
 }
 

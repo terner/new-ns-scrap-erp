@@ -20,12 +20,14 @@ export type AdvancePaymentPrintDocument = {
   docNo: string
   advanceDate: string
   amount: number
+  advanceTypeLabel?: string | null
   allocatedAmount: number
   remainingAmount: number
   branchId: string
   branchName?: string | null
   supplierName?: string | null
   customerName?: string | null
+  invoiceNo?: string | null
   plateNo?: string | null
   productName?: string | null
   netWeight?: number | null
@@ -33,6 +35,11 @@ export type AdvancePaymentPrintDocument = {
   paymentMethod?: string | null
   accountName?: string | null
   remark?: string | null
+  subtotalAmount?: number | null
+  totalAmount?: number | null
+  vatAmount?: number | null
+  vatRatePercent?: number | null
+  vatTypeLabel?: string | null
   createdBy: string
   createdAt: string
   allocations?: AdvancePaymentPrintAllocation[]
@@ -109,6 +116,7 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
       <td class="center" style="width:30mm">${dateDisplay(alloc.allocatedAt)}</td>
     </tr>
   `).join('')
+  const allocationEmptyRowsHtml = Array.from({ length: Math.max(0, 8 - (doc.allocations ?? []).length) }, () => '<tr class="empty"><td>&nbsp;</td><td></td><td></td><td></td></tr>').join('')
 
   const allocationsTable = (doc.allocations ?? []).length > 0 ? `
     <h3 style="margin-top: 15px; font-size: 12px; color: #1e293b;">ประวัติการหักล้างมัดจำ (Allocation History)</h3>
@@ -123,7 +131,15 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
       </thead>
       <tbody>
         ${allocationsHtml}
+        ${allocationEmptyRowsHtml}
       </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" class="num">รวมทั้งสิ้น</td>
+          <td class="num final-amount">${money(doc.allocatedAmount)}</td>
+          <td></td>
+        </tr>
+      </tfoot>
     </table>
   ` : '<div style="margin-top:15px;font-style:italic;color:#64748b;font-size: 12px">ยังไม่มีการนำไปหักล้างกับบิลซื้อ</div>'
 
@@ -157,9 +173,15 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
       .field-label { color: #64748b; font-size: 12px; }
       .field-value { font-weight: 750; color: #0f172a; margin-top: 1px; overflow-wrap: anywhere; }
       table { width: 100%; border-collapse: collapse; }
-      .items { margin-top: 12px; font-size: 12px; }
+      .items { margin-top: 12px; font-size: 12px; table-layout: fixed; }
+      .items thead { display: table-header-group; }
+      .items tbody { break-inside: auto; page-break-inside: auto; }
       .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 6px 5px; text-align: left; font-weight: 900; }
-      .items td { border: 1px solid #dbe3ea; padding: 6px 5px; }
+      .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
+      .items tr { break-inside: avoid; page-break-inside: avoid; }
+      .items .empty td { height: 24px; color: transparent; }
+      .items tfoot td { background: #ecfdf5; color: #0f172a; font-weight: 900; }
+      .items tfoot .final-amount { color: #1e3a8a; }
       .num { text-align: right; }
       .center { text-align: center; }
       .bottom-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 15px; align-items: start; }
@@ -177,6 +199,8 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
         body { background: white; font-size: 12px; line-height: 1.2; }
         .toolbar { display: none; }
         .page { width: auto; min-height: 281mm; margin: 0; padding: 0; box-shadow: none; }
+        .items th, .items td { padding: 3px; }
+        .items .empty td { height: 18px; }
       }
     </style>
   </head><body>
@@ -202,6 +226,8 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
             <div class="doc-grid">
               <div class="kv"><div class="label">เลขที่เอกสาร</div><div class="value">${escapeHtml(doc.docNo)}</div></div>
               <div class="kv"><div class="label">วันที่ทำมัดจำ</div><div class="value">${escapeHtml(dateDisplay(doc.advanceDate))}</div></div>
+              <div class="kv"><div class="label">ประเภท ADV</div><div class="value">${escapeHtml(plain(doc.advanceTypeLabel))}</div></div>
+              <div class="kv"><div class="label">Invoice</div><div class="value">${escapeHtml(plain(doc.invoiceNo))}</div></div>
             </div>
           </div>
         </section>
@@ -236,7 +262,9 @@ export function buildAdvancePaymentPrintHtml(doc: AdvancePaymentPrintDocument, p
             <div class="panel-body note">${escapeHtml(plain(doc.remark))}</div>
           </div>
           <div class="totals">
-            <div class="total-row"><div>ยอดเงินมัดจำ / Total Advance</div><div class="num">${money(doc.amount)}</div></div>
+            <div class="total-row"><div>ยอดก่อน VAT</div><div class="num">${money(doc.subtotalAmount ?? doc.amount)}</div></div>
+            <div class="total-row"><div>${escapeHtml(doc.vatTypeLabel || 'VAT')}${doc.vatRatePercent ? ` (${money(doc.vatRatePercent).replace('.00', '')}%)` : ''}</div><div class="num">${money(doc.vatAmount)}</div></div>
+            <div class="total-row"><div>ยอดรวมมัดจำ / Total Advance</div><div class="num">${money(doc.totalAmount ?? doc.amount)}</div></div>
             <div class="total-row allocated"><div>หักล้างแล้ว / Allocated</div><div class="num">${money(doc.allocatedAmount)}</div></div>
             <div class="total-row final"><div>ยอดคงเหลือ / Remaining</div><div class="num">${money(doc.remainingAmount)}</div></div>
           </div>

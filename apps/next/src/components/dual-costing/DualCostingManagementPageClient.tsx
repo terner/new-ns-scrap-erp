@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
@@ -15,10 +16,10 @@ import {
   DualCostingCountRow,
   DualCostingErrorBox,
   DualCostingFilterCard,
-  DualCostingHint,
   DualCostingPageSection,
   DualCostingPanel,
   DualCostingStatCard,
+  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type Mode = 'ledger' | 'report' | 'waiting'
@@ -76,7 +77,7 @@ type WaitingPayload = {
   po: TabPayload
   bill: TabPayload
   production: TabPayload
-  summary: { byCategory: { count: number; name: string; qty: number; revenue: number }[]; count: number; fullyPending: number; partial: number; totalQty: number; totalRevenue: number }
+  summary: { byCategory: { count: number; name: string; partial: number; qty: number; revenue: number }[]; count: number; fullyPending: number; partial: number; totalQty: number; totalRevenue: number }
 }
 
 type LedgerPayload = {
@@ -99,11 +100,12 @@ type ReportMetric = { cost: number; count: number; gp: number; gpPct: number; qt
 type ReportCategoryRow = ReportPayload['report']['byCategory'][number]
 type ReportColumnKey = 'allocatedQty' | 'category' | 'cost' | 'gp' | 'gpPct' | 'pendingQty' | 'pendingRevenue' | 'revenue'
 type WaitingSummaryRow = WaitingPayload['summary']['byCategory'][number]
-type WaitingSummaryColumnKey = 'count' | 'name' | 'qty' | 'revenue'
+type WaitingSummaryColumnKey = 'count' | 'name' | 'partial' | 'qty' | 'revenue'
 
 const waitingSummaryColumns: Array<ResizableColumnDefinition<WaitingSummaryColumnKey> & { align?: 'center' | 'left' | 'right'; label: string }> = [
   { key: 'name', label: 'หมวดสินค้า', defaultWidth: 180, minWidth: 140 },
   { key: 'count', label: 'รายการรอจัดสรร', defaultWidth: 130, minWidth: 110, align: 'right' },
+  { key: 'partial', label: 'บางส่วน', defaultWidth: 100, minWidth: 90, align: 'right' },
   { key: 'qty', label: 'น้ำหนักรอจัดสรร', defaultWidth: 150, minWidth: 125, align: 'right' },
   { key: 'revenue', label: 'มูลค่ารอจัดสรร', defaultWidth: 150, minWidth: 125, align: 'right' },
 ]
@@ -152,7 +154,7 @@ function WaitingAllocationsView() {
     { key: 'productName', label: 'สินค้า', defaultWidth: 220 },
     { key: 'metalGroup', label: 'หมวด', defaultWidth: 90, align: 'center' },
     { key: 'qty', label: 'ขาย (กก.)', defaultWidth: 110, align: 'right' },
-    { key: 'allocatedQty', label: 'Allocate แล้ว', defaultWidth: 110, align: 'right' },
+    { key: 'allocatedQty', label: 'จัดสรรแล้ว', defaultWidth: 110, align: 'right' },
     { key: 'remainingQty', label: 'รอจัดสรร (กก.)', defaultWidth: 115, align: 'right' },
     { key: 'unitPrice', label: 'ราคา/กก.', defaultWidth: 100, align: 'right' },
     { key: 'revenuePending', label: 'มูลค่ารอจัดสรร', defaultWidth: 120, align: 'right' },
@@ -167,7 +169,7 @@ function WaitingAllocationsView() {
     { key: 'productName', label: 'สินค้า', defaultWidth: 220 },
     { key: 'metalGroup', label: 'หมวด', defaultWidth: 90, align: 'center' },
     { key: 'qty', label: 'ขาย (กก.)', defaultWidth: 110, align: 'right' },
-    { key: 'allocatedQty', label: 'Allocate แล้ว', defaultWidth: 110, align: 'right' },
+    { key: 'allocatedQty', label: 'จัดสรรแล้ว', defaultWidth: 110, align: 'right' },
     { key: 'remainingQty', label: 'รอจัดสรร (กก.)', defaultWidth: 115, align: 'right' },
     { key: 'unitPrice', label: 'ราคา/กก.', defaultWidth: 100, align: 'right' },
     { key: 'revenuePending', label: 'มูลค่ารอจัดสรร', defaultWidth: 120, align: 'right' },
@@ -182,7 +184,7 @@ function WaitingAllocationsView() {
     { key: 'productName', label: 'สินค้า', defaultWidth: 220 },
     { key: 'metalGroup', label: 'หมวด', defaultWidth: 90, align: 'center' },
     { key: 'qty', label: 'ผลิต (กก.)', defaultWidth: 110, align: 'right' },
-    { key: 'allocatedQty', label: 'Allocate แล้ว', defaultWidth: 110, align: 'right' },
+    { key: 'allocatedQty', label: 'จัดสรรแล้ว', defaultWidth: 110, align: 'right' },
     { key: 'remainingQty', label: 'รอจัดสรร (กก.)', defaultWidth: 115, align: 'right' },
     { key: 'unitPrice', label: 'ต้นทุน/กก.', defaultWidth: 100, align: 'right' },
     { key: 'revenuePending', label: 'มูลค่ารอจัดสรร', defaultWidth: 120, align: 'right' },
@@ -296,23 +298,12 @@ function WaitingAllocationsView() {
     <DualCostingPageSection>
       <DualCostingErrorBox error={error} />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <DualCostingStatCard icon="⏳" label="รายการที่รอส่งต่อ" tone="amber" value={String(data?.summary.count ?? 0)} />
-        <DualCostingStatCard icon="⚖️" label="น้ำหนักรอจัดสรร" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
-        <div className="col-span-2 md:col-span-1">
-          <DualCostingStatCard icon="💰" label="มูลค่ารอจัดสรร" tone="emerald" value={formatMoney(data?.summary.totalRevenue ?? 0)} />
-        </div>
-      </div>
-
-      <DualCostingPanel title="สรุปตามหมวด">
+      <DualCostingPanel
+        title="สรุปตามหมวด"
+        titleAction={summaryResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={summaryResize.resetColumnWidths}>คืนค่าเดิมตารางสรุป</Button> : null}
+      >
         {/* Desktop View */}
-        <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-          {summaryResize.hasCustomWidths ? (
-            <div className="flex justify-end border-b border-slate-100 px-3 py-3">
-              <Button size="sm" type="button" variant="outline" onClick={summaryResize.resetColumnWidths}>คืนค่าเดิมตารางสรุป</Button>
-            </div>
-          ) : null}
-          <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
           <Table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: summaryResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {waitingSummaryColumns.map((column, index) => {
@@ -343,6 +334,7 @@ function WaitingAllocationsView() {
                 <TableRow key={row.name} className="transition-colors hover:bg-slate-50">
                   <TableCell className="px-3 py-3"><span className="block truncate rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800" title={row.name}>{row.name}</span></TableCell>
                   <TableCell className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{row.count}</TableCell>
+                  <TableCell className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{row.partial}</TableCell>
                   <TableCell className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-slate-800">{formatMoney(row.qty)} กก.</TableCell>
                   <TableCell className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-emerald-700">{formatMoney(row.revenue)}</TableCell>
                 </TableRow>
@@ -350,7 +342,6 @@ function WaitingAllocationsView() {
               {!isLoading && summaryRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-400" colSpan={waitingSummaryColumns.length}>ไม่มีรายการรอ allocate ตามตัวกรอง</TableCell></TableRow> : null}
             </TableBody>
           </Table>
-          </div>
         </div>
 
         {/* Mobile View */}
@@ -361,7 +352,11 @@ function WaitingAllocationsView() {
                 <span className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{row.name}</span>
                 <span className="text-xs text-slate-500 font-semibold">{row.count} รายการ</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-500 block">บางส่วน</span>
+                  <span className="font-mono font-bold text-slate-800">{row.partial}</span>
+                </div>
                 <div>
                   <span className="text-slate-500 block">น้ำหนักรอ</span>
                   <span className="font-mono font-bold text-slate-800">{formatMoney(row.qty)} กก.</span>
@@ -379,50 +374,27 @@ function WaitingAllocationsView() {
         </div>
       </DualCostingPanel>
 
-      <div className="flex overflow-x-auto rounded-md bg-white px-2 shadow-sm">
-        <button
-          className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors focus-visible:outline-none ${
-            activeTab === 'po'
-              ? 'border-slate-900 text-slate-900 font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-          onClick={() => {
-            setActiveTab('po')
-            setSortKey('date')
-            setSortDirection('desc')
-          }}
-        >
-          PO ขาย <span className="ml-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600 font-medium">{data?.po.count ?? 0}</span>
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors focus-visible:outline-none ${
-            activeTab === 'bill'
-              ? 'border-slate-900 text-slate-900 font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-          onClick={() => {
-            setActiveTab('bill')
-            setSortKey('date')
-            setSortDirection('desc')
-          }}
-        >
-          บิลขาย <span className="ml-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600 font-medium">{data?.bill.count ?? 0}</span>
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors focus-visible:outline-none ${
-            activeTab === 'production'
-              ? 'border-slate-900 text-slate-900 font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-          onClick={() => {
-            setActiveTab('production')
-            setSortKey('date')
-            setSortDirection('desc')
-          }}
-        >
-          Production <span className="ml-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600 font-medium">{data?.production.count ?? 0}</span>
-        </button>
-      </div>
+      <Tabs
+        className="gap-0"
+        value={activeTab}
+        onValueChange={(value) => {
+          setActiveTab(value as typeof activeTab)
+          setSortKey('date')
+          setSortDirection('desc')
+        }}
+      >
+        <TabsList className="w-full flex-nowrap overflow-x-auto" variant="line">
+          <TabsTrigger value="po" variant="line">
+            PO ขาย <span className="ml-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">{data?.po.count ?? 0}</span>
+          </TabsTrigger>
+          <TabsTrigger value="bill" variant="line">
+            บิลขาย <span className="ml-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">{data?.bill.count ?? 0}</span>
+          </TabsTrigger>
+          <TabsTrigger value="production" variant="line">
+            Production <span className="ml-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">{data?.production.count ?? 0}</span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <DualCostingFilterCard>
         {/* Desktop View */}
@@ -448,13 +420,13 @@ function WaitingAllocationsView() {
           <div className="flex gap-2">
             <Input className="flex-1 h-10 rounded-md border-slate-300 focus-visible:ring-emerald-100 text-sm" placeholder="ค้นหา doc no / สินค้า / ลูกค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <button
-              className={`h-10 rounded-md border px-3 text-sm font-semibold transition-colors flex items-center gap-1 shrink-0 ${
-                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+              className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors ${
+                showMobileFilters ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
               }`}
               type="button"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
             >
-              🔍 ตัวกรอง
+              ตัวกรอง
             </button>
           </div>
 
@@ -506,7 +478,7 @@ function WaitingAllocationsView() {
 
       {/* Desktop View */}
       <div className="hidden overflow-x-auto lg:block" style={{ width: '100%', overflowX: 'auto' }}>
-        <table className="w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {currentColumns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -573,7 +545,7 @@ function WaitingAllocationsView() {
                     <StatusPill status={row.allocationStatus} />
                   </td>
                   <td className="p-3 pr-4 text-center">
-                    <Button asChild size="xs" type="button" className="rounded-lg font-semibold focus-visible:ring-2 focus-visible:ring-emerald-100">
+                    <Button asChild size="xs" type="button" className="rounded-md font-semibold focus-visible:ring-2 focus-visible:ring-emerald-100">
                       <Link href={allocatorHref}>
                         {row.allocatedQty > 0 ? 'จัดสรรต่อ' : 'จัดสรร'}
                       </Link>
@@ -620,7 +592,7 @@ function WaitingAllocationsView() {
               </div>
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
                 <div>
-                  <span className="text-slate-500 block">ขาย / Allocate แล้ว</span>
+                  <span className="text-slate-500 block">ขาย / จัดสรรแล้ว</span>
                   <span className="font-mono font-medium text-slate-800">{formatMoney(row.qty)} / <span className="text-emerald-700 font-semibold">{formatMoney(row.allocatedQty)}</span> กก.</span>
                 </div>
                 <div className="text-right">
@@ -637,7 +609,7 @@ function WaitingAllocationsView() {
                 </div>
               </div>
               <div className="pt-1">
-                <Button asChild size="sm" type="button" className="w-full rounded-lg font-semibold focus-visible:ring-2 focus-visible:ring-emerald-100">
+                <Button asChild size="sm" type="button" className="w-full rounded-md font-semibold focus-visible:ring-2 focus-visible:ring-emerald-100">
                   <Link href={allocatorHref}>
                     {row.allocatedQty > 0 ? 'จัดสรรต่อ' : 'จัดสรร'}
                   </Link>
@@ -681,7 +653,7 @@ function AllocationLedgerView() {
     { key: 'saleQty', label: 'Sale Qty', defaultWidth: 115, minWidth: 105, align: 'right' },
     { key: 'allocatedQty', label: 'Allocated', defaultWidth: 115, minWidth: 105, align: 'right' },
     { key: 'costPoolNo', label: 'Cost Pool', defaultWidth: 145, minWidth: 130 },
-    { key: 'costPerKg', label: 'บาท/กก.', defaultWidth: 95, minWidth: 85, align: 'right' },
+    { key: 'costPerKg', label: 'ต้นทุน บาท/กก.', defaultWidth: 130, minWidth: 120, align: 'right' },
     { key: 'totalCost', label: 'Total Cost', defaultWidth: 125, minWidth: 110, align: 'right' },
     { key: 'allocatedRevenue', label: 'Revenue', defaultWidth: 125, minWidth: 110, align: 'right' },
     { key: 'grossProfit', label: 'GP', defaultWidth: 115, minWidth: 100, align: 'right' },
@@ -722,6 +694,7 @@ function AllocationLedgerView() {
     if (toDate) params.set('to', toDate)
     return params.toString()
   }, [category, fromDate, search, status, targetType, toDate])
+  const exportHref = useMemo(() => `/api/dual-costing/cost-allocation-ledger?${queryString ? `${queryString}&` : ''}format=xlsx`, [queryString])
 
   const loadData = useCallback(async () => {
     setError(null)
@@ -764,7 +737,16 @@ function AllocationLedgerView() {
             <Select className="w-auto min-w-[130px] h-9 border-slate-300 focus-visible:ring-emerald-100" value={targetType} onChange={(event) => setTargetType(event.target.value)}><option value="all">ทุก target</option>{(data?.filters.targetTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
             <Select className="w-auto min-w-[130px] h-9 border-slate-300 focus-visible:ring-emerald-100" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">ทุกหมวด</option>{(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
             <Select className="w-auto min-w-[130px] h-9 border-slate-300 focus-visible:ring-emerald-100" value={status} onChange={(event) => setStatus(event.target.value)}><option value="approved">Approved</option><option value="reversed">Reversed</option><option value="all">ทั้งหมด</option></Select>
-            <Button disabled className="ml-auto h-9 rounded-md px-3 text-sm font-normal focus-visible:ring-slate-100" size="sm" type="button" variant="export">ส่งออก CSV</Button>
+            <Button
+              className="ml-auto h-9 rounded-md px-3 text-sm font-normal focus-visible:ring-slate-100"
+              disabled={isLoading || sortedRows.length === 0}
+              size="sm"
+              type="button"
+              variant="export"
+              onClick={() => window.location.assign(exportHref)}
+            >
+              ส่งออก Excel
+            </Button>
           </div>
         </div>
 
@@ -773,8 +755,8 @@ function AllocationLedgerView() {
           <div className="flex gap-2">
             <Input className="h-9 flex-1 rounded-md border-slate-300 text-sm focus-visible:ring-emerald-100" placeholder="ค้นหา match id / doc / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <button
-              className={`h-9 shrink-0 rounded-md border px-3 text-sm font-semibold transition-colors ${
-                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+              className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors ${
+                showMobileFilters ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
               }`}
               type="button"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -1045,19 +1027,16 @@ function DualCostingReportView() {
 
   return (
     <DualCostingPageSection>
-      <DualCostingHint tone="emerald">
-        รายงานนี้ใช้ Deal Cost เพื่อให้ผู้บริหารดูกำไรต่อดีล/ลอตที่ allocate เท่านั้น ไม่ใช้ปิดงบ และ P&L ยังใช้ WAC ตามหลักบัญชี
-      </DualCostingHint>
       <DualCostingErrorBox error={error} />
       {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">กำลังโหลดข้อมูล...</div> : null}
       
       {!isLoading && report ? (
         <>
-          <div className="grid grid-cols-2 gap-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 p-5 text-white shadow-lg border border-emerald-500/20 md:grid-cols-4">
-            <HeroMetric label="Total Revenue (Allocated)" value={formatMoney((report?.po.revenue ?? 0) + (report?.spotAllocated.revenue ?? 0))} />
-            <HeroMetric label="Total Cost (Deal Cost)" value={formatMoney(report?.total.cost ?? 0)} />
-            <HeroMetric label="Gross Profit" value={formatMoney(report?.total.gp ?? 0)} />
-            <HeroMetric label="GP%" value={`${(report?.total.gpPct ?? 0).toFixed(2)}%`} />
+          <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
+            <DualCostingStatCard icon="💰" label="Total Revenue (Allocated)" tone="emerald" value={formatMoney((report?.po.revenue ?? 0) + (report?.spotAllocated.revenue ?? 0))} />
+            <DualCostingStatCard icon="💳" label="Total Cost (Deal Cost)" tone="red" value={formatMoney(report?.total.cost ?? 0)} />
+            <DualCostingStatCard icon="📈" label="กำไรรวม / Gross Profit (Deal Cost)" tone={(report?.total.gp ?? 0) >= 0 ? 'emerald' : 'red'} value={formatMoney(report?.total.gp ?? 0)} />
+            <DualCostingStatCard icon="%" label="GP%" tone={(report?.total.gpPct ?? 0) >= 0 ? 'emerald' : 'red'} value={`${(report?.total.gpPct ?? 0).toFixed(2)}%`} />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <ReportCard metric={report?.po} title="ขายผ่าน PO Sell" />
@@ -1068,15 +1047,12 @@ function DualCostingReportView() {
             <DualCostingStatCard icon="⚖️" label="น้ำหนักค้าง" tone="amber" value={`${formatMoney(report?.waiting.qty ?? 0)} กก.`} />
             <DualCostingStatCard icon="💰" label="มูลค่าขายค้าง" tone="emerald" value={formatMoney(report?.waiting.revenue ?? 0)} />
           </div>
-          <DualCostingPanel title="สรุปตามหมวดสินค้า">
+          <DualCostingPanel
+            title="สรุปตามหมวดสินค้า"
+            titleAction={reportResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={reportResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
+          >
             {/* Desktop View */}
-            <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-              {reportResize.hasCustomWidths ? (
-                <div className="flex justify-end border-b border-slate-100 px-3 py-3">
-                  <Button size="sm" type="button" variant="outline" onClick={reportResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button>
-                </div>
-              ) : null}
-              <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
               <Table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: reportResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
                   {reportColumns.map((column, index) => {
@@ -1118,7 +1094,6 @@ function DualCostingReportView() {
                   ))}
                 </TableBody>
               </Table>
-              </div>
             </div>
 
             {/* Mobile View */}
@@ -1188,10 +1163,6 @@ function LedgerStatusText({ status }: { status: string }) {
 
 function TargetPill({ type }: { type: string }) {
   return <span className={`inline-flex whitespace-nowrap rounded border px-2 py-0.5 text-xs font-semibold ${type === 'PO_SELL' ? 'bg-blue-50 text-blue-700 border-blue-200/50' : 'bg-purple-50 text-purple-700 border-purple-200/50'}`}>{type === 'PO_SELL' ? 'PO' : 'Spot'}</span>
-}
-
-function HeroMetric({ label, value }: { label: string; value: string }) {
-  return <div><div className="text-xs text-white/80">{label}</div><div className="mt-1 text-lg font-bold">{value}</div></div>
 }
 
 function ReportCard({ metric, title }: { metric?: ReportMetric; title: string }) {

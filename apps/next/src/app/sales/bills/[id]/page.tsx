@@ -42,7 +42,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
   return (
     <div className="min-h-full bg-slate-100 px-2 py-4 sm:px-4">
       <PageTitleOverride breadcrumbLabel={bill.docNo} title={`รายละเอียดบิลขาย - ${bill.docNo}`} />
-      <div className="mx-auto max-w-6xl rounded-md bg-white shadow-xl">
+      <div className="mx-auto max-w-6xl rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
           <div>
             <h1 className="text-base font-bold text-slate-900">รายละเอียดบิลขาย {bill.docNo}</h1>
@@ -59,7 +59,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
             <Summary label="สถานะรับเงิน" value={bill.statusLabel} />
           </section>
 
-          <section className="rounded-md border border-slate-100 p-4">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="mb-3 text-base font-bold text-slate-800">ข้อมูลบิล</h2>
             <div className="grid gap-3 text-sm md:grid-cols-3">
               <Info label="เลขที่บิล" value={bill.docNo} />
@@ -77,10 +77,36 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
             </div>
           </section>
 
-          <section className="rounded-md border border-slate-100 p-4">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="mb-3 text-base font-bold text-slate-800">รายการสินค้า</h2>
-            <div className="overflow-x-auto rounded-md border border-slate-100">
-              <table className="w-full min-w-[1120px] text-sm">
+            <div className="space-y-3 lg:hidden">
+              {bill.items.length === 0 ? (
+                <div className="rounded-xl border border-slate-100 bg-white px-4 py-6 text-center text-sm text-slate-500">ไม่มีรายการสินค้าในบิล</div>
+              ) : bill.items.map((item) => (
+                <div key={item.lineNo} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-900">{item.productName}</div>
+                      <div className="mt-1 text-xs text-slate-500">{[item.productCode || null, `line ${item.lineNo}`].filter(Boolean).join(' · ')}</div>
+                    </div>
+                    <div className="shrink-0 text-right text-sm font-semibold text-blue-700 tabular-nums">{formatMoney(item.amount)}</div>
+                  </div>
+                  {item.note ? <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">{item.note}</div> : null}
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div><div className="text-xs text-slate-500">ที่มา</div><div className="mt-1 font-medium text-slate-900">{item.sourceLabel || '-'}</div><div className="text-xs text-slate-500">{item.sourceType || '-'}</div></div>
+                    <div><div className="text-xs text-slate-500">WTO / รถ</div><div className="mt-1 font-medium text-slate-900">{item.deliveryTicketDocNo || '-'}</div><div className="text-xs text-slate-500">{item.deliveryVehicleNo || '-'}</div></div>
+                    <div><div className="text-xs text-slate-500">Gross</div><div className="mt-1 tabular-nums text-slate-900">{formatMoney(item.grossWeight)}</div></div>
+                    <div><div className="text-xs text-slate-500">หัก</div><div className="mt-1 tabular-nums text-slate-900">{formatMoney(item.deductWeight)}</div></div>
+                    <div><div className="text-xs text-slate-500">จำนวน</div><div className="mt-1 font-semibold tabular-nums text-slate-900">{formatMoney(item.qty || item.netWeight)} {item.unit}</div></div>
+                    <div><div className="text-xs text-slate-500">ราคา/หน่วย</div><div className="mt-1 tabular-nums text-slate-900">{formatMoney(item.price)}</div></div>
+                    <div><div className="text-xs text-slate-500">ส่วนลด</div><div className="mt-1 tabular-nums text-slate-900">{formatMoney(item.discount)}</div></div>
+                    {item.matchedCogs > 0 ? <div><div className="text-xs text-slate-500">Matched COGS</div><div className="mt-1 tabular-nums text-red-600">{formatMoney(item.matchedCogs)}</div></div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto rounded-md border border-slate-100 lg:block">
+              <table className="ns-table w-full min-w-[1120px] text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium">สินค้า</th>
@@ -126,7 +152,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-md border border-slate-100 p-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="mb-3 text-base font-bold text-slate-800">VAT / ยอดรวม</h2>
               <div className="space-y-2 text-sm">
                 <Line label="ยอดก่อนส่วนลด" value={formatMoney(bill.subtotal)} />
@@ -135,7 +161,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
                 <Line strong label="ยอดสุทธิ" value={formatMoney(bill.totalAmount)} />
               </div>
             </div>
-            <div className="rounded-md border border-slate-100 p-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="mb-3 text-base font-bold text-slate-800">ใบกำกับภาษี / หมายเหตุ</h2>
               <div className="grid gap-3 text-sm md:grid-cols-2">
                 <Info label="ออกใบกำกับภาษี" value={bill.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ได้ออก'} />
@@ -193,36 +219,57 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
                 {bill.sourceUsageFacts.length === 0 ? (
                   <div className="rounded-md bg-white p-4 text-center text-xs text-slate-500">ยังไม่มี usage fact สำหรับบิลนี้</div>
                 ) : (
-                  <div className="max-h-[360px] overflow-auto rounded-md border border-slate-100 bg-white">
-                    <table className="w-full min-w-[620px] text-xs">
-                      <thead className="bg-slate-50 text-slate-600">
-                        <tr>
-                          <th className="px-3 py-2 text-left font-medium">รายการ</th>
-                          <th className="px-3 py-2 text-left font-medium">เอกสาร</th>
-                          <th className="px-3 py-2 text-right font-medium">จำนวน</th>
-                          <th className="px-3 py-2 text-right font-medium">มูลค่า/COGS</th>
-                          <th className="px-3 py-2 text-left font-medium">สถานะ</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {bill.sourceUsageFacts.map((fact) => (
-                          <tr key={fact.id} className="border-t border-slate-100">
-                            <td className="px-3 py-2 align-top">
+                  <>
+                    <div className="space-y-2 lg:hidden">
+                      {bill.sourceUsageFacts.map((fact) => (
+                        <div key={fact.id} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
                               <div className="font-medium text-slate-900">{fact.title}</div>
-                              <div className="text-slate-500">{[fact.type, fact.productName !== '-' ? fact.productName : null, fact.lineNo ? `line ${fact.lineNo}` : null].filter(Boolean).join(' · ')}</div>
-                            </td>
-                            <td className="px-3 py-2 align-top font-mono text-xs text-slate-700">{fact.docNo || '-'}</td>
-                            <td className="px-3 py-2 text-right align-top tabular-nums">{fact.qty ? `${formatMoney(fact.qty)} ${fact.unit}` : '-'}</td>
-                            <td className="px-3 py-2 text-right align-top tabular-nums">{fact.amount ? formatMoney(fact.amount) : '-'}</td>
-                            <td className="px-3 py-2 align-top">
-                              <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${fact.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{fact.status}</span>
-                              <div className="mt-1 text-xs text-slate-400">{formatDateTime(fact.createdAt)}</div>
-                            </td>
+                              <div className="mt-1 text-xs text-slate-500">{[fact.type, fact.productName !== '-' ? fact.productName : null, fact.lineNo ? `line ${fact.lineNo}` : null].filter(Boolean).join(' · ')}</div>
+                              <div className="mt-2 font-mono text-xs text-slate-700">{fact.docNo || '-'}</div>
+                            </div>
+                            <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ${fact.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{fact.status}</span>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                            <div><div className="text-slate-500">จำนวน</div><div className="mt-1 font-medium tabular-nums text-slate-900">{fact.qty ? `${formatMoney(fact.qty)} ${fact.unit}` : '-'}</div></div>
+                            <div><div className="text-slate-500">มูลค่า/COGS</div><div className="mt-1 font-medium tabular-nums text-slate-900">{fact.amount ? formatMoney(fact.amount) : '-'}</div></div>
+                            <div className="col-span-2 text-slate-400">{formatDateTime(fact.createdAt)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="hidden max-h-[360px] overflow-auto rounded-md border border-slate-100 bg-white lg:block">
+                      <table className="ns-table w-full min-w-[620px] text-xs">
+                        <thead className="bg-slate-50 text-slate-600">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium">รายการ</th>
+                            <th className="px-3 py-2 text-left font-medium">เอกสาร</th>
+                            <th className="px-3 py-2 text-right font-medium">จำนวน</th>
+                            <th className="px-3 py-2 text-right font-medium">มูลค่า/COGS</th>
+                            <th className="px-3 py-2 text-left font-medium">สถานะ</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {bill.sourceUsageFacts.map((fact) => (
+                            <tr key={fact.id} className="border-t border-slate-100">
+                              <td className="px-3 py-2 align-top">
+                                <div className="font-medium text-slate-900">{fact.title}</div>
+                                <div className="text-slate-500">{[fact.type, fact.productName !== '-' ? fact.productName : null, fact.lineNo ? `line ${fact.lineNo}` : null].filter(Boolean).join(' · ')}</div>
+                              </td>
+                              <td className="px-3 py-2 align-top font-mono text-xs text-slate-700">{fact.docNo || '-'}</td>
+                              <td className="px-3 py-2 text-right align-top tabular-nums">{fact.qty ? `${formatMoney(fact.qty)} ${fact.unit}` : '-'}</td>
+                              <td className="px-3 py-2 text-right align-top tabular-nums">{fact.amount ? formatMoney(fact.amount) : '-'}</td>
+                              <td className="px-3 py-2 align-top">
+                                <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${fact.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{fact.status}</span>
+                                <div className="mt-1 text-xs text-slate-400">{formatDateTime(fact.createdAt)}</div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -235,7 +282,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
 
 function Summary({ label, tone = 'slate', value }: { label: string; tone?: 'emerald' | 'red' | 'slate'; value: string }) {
   const color = tone === 'red' ? 'text-red-700' : tone === 'emerald' ? 'text-emerald-700' : 'text-slate-900'
-  return <div className="rounded-md bg-slate-50 p-4"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-xl font-bold ${color}`}>{value}</div></div>
+  return <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-xl font-bold ${color}`}>{value}</div></div>
 }
 
 function Info({ label, value }: { label: string; value: string }) {

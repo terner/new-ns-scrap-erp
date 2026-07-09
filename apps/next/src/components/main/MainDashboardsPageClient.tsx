@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { KpiCard as SharedKpiCard, type KpiCardTone } from '@/components/ui/KpiCard'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type MainPayload = {
   dashboard: {
@@ -78,6 +81,8 @@ type MainPayload = {
 type Mode = 'daily-report' | 'dashboard' | 'owner-daily' | 'analytics-dashboard'
 type SortDirection = 'asc' | 'desc'
 type DashboardAgingSortKey = 'label' | 'current' | 'd1_30' | 'd31_60' | 'd61_90' | 'over90' | 'total'
+type DashboardDetailTab = 'metrics' | 'ranking' | 'stock'
+type AnalyticsDetailTab = 'partners' | 'products' | 'sales'
 type DashboardAgingRow = {
   current: number
   d1_30: number
@@ -102,20 +107,26 @@ type DailyGroupProductSortKey = keyof DailyGroupProductRow | 'spread'
 type CashAccountRow = MainPayload['dailyReport']['cashMovement']['accounts'][number]
 type CashAccountSortKey = keyof CashAccountRow | 'net'
 
-const dashboardAgingColumns: ResizableColumnDefinition<string>[] = [
-  { key: 'label', defaultWidth: 170, minWidth: 140 },
-  { key: 'current', defaultWidth: 110, minWidth: 90 },
-  { key: 'd1_30', defaultWidth: 110, minWidth: 90 },
-  { key: 'd31_60', defaultWidth: 110, minWidth: 90 },
-  { key: 'd61_90', defaultWidth: 110, minWidth: 90 },
-  { key: 'over90', defaultWidth: 110, minWidth: 90 },
-  { key: 'total', defaultWidth: 120, minWidth: 100 },
+const dashboardAgingColumns: ResizableColumnDefinition<DashboardAgingSortKey>[] = [
+  { key: 'label', defaultWidth: 150, minWidth: 110 },
+  { key: 'current', defaultWidth: 100, minWidth: 90 },
+  { key: 'd1_30', defaultWidth: 95, minWidth: 85 },
+  { key: 'd31_60', defaultWidth: 95, minWidth: 85 },
+  { key: 'd61_90', defaultWidth: 95, minWidth: 85 },
+  { key: 'over90', defaultWidth: 95, minWidth: 85 },
+  { key: 'total', defaultWidth: 110, minWidth: 95 },
 ]
 
 const dashboardStockGroupColumns: ResizableColumnDefinition<string>[] = [
   { key: 'group', defaultWidth: 180, minWidth: 130 },
   { key: 'qty', defaultWidth: 120, minWidth: 100 },
   { key: 'value', defaultWidth: 140, minWidth: 110 },
+]
+
+const dashboardDetailTabs: Array<{ key: DashboardDetailTab; label: string; summary: string }> = [
+  { key: 'ranking', label: 'อันดับคู่ค้า', summary: 'Top Supplier / Customer' },
+  { key: 'stock', label: 'Stock', summary: 'แนวโน้มและมูลค่าตามหมวด' },
+  { key: 'metrics', label: 'ตัวชี้วัดย่อย', summary: 'ซื้อ ขาย เงินสด และ Stock' },
 ]
 
 const ownerDueColumns: ResizableColumnDefinition<OwnerDueSortKey>[] = [
@@ -229,11 +240,8 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
       {mode === 'owner-daily' ? <OwnerDailyView data={data} /> : null}
       {mode === 'daily-report' ? <DailyReportView data={data} date={date} setDate={setDate} /> : null}
       {mode === 'analytics-dashboard' ? <AnalyticsDashboardView data={data} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
-      <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
-        <b>Main dashboard read baseline</b><span className="ml-2">{data?.sourceState?.limitations?.[0] ?? 'ไม่มี write action ใน baseline นี้'}</span>
-      </div>
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      {isLoading ? <div className="rounded-md bg-white p-4 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
+      {isLoading ? <div className="rounded-xl bg-white p-4 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
     </section>
   )
 }
@@ -263,6 +271,8 @@ function DashboardView(props: {
   const [agingSortDirection, setAgingSortDirection] = useState<SortDirection>('desc')
   const [stockGroupSortKey, setStockGroupSortKey] = useState<DashboardStockGroupSortKey>('value')
   const [stockGroupSortDirection, setStockGroupSortDirection] = useState<SortDirection>('desc')
+  const [showDashboardMobileFilters, setShowDashboardMobileFilters] = useState(false)
+  const [detailTab, setDetailTab] = useState<DashboardDetailTab>('ranking')
   const agingResize = useResizableColumns('main.dashboard.aging.v1', dashboardAgingColumns)
   const stockGroupResize = useResizableColumns('main.dashboard.stock-by-group.v1', dashboardStockGroupColumns)
 
@@ -289,24 +299,34 @@ function DashboardView(props: {
   const k = data?.dashboard.kpi ?? {}
   const section = data?.dashboard.sections
   const analytics = data?.dailyReport.analytics
-  const alerts = [
-    { active: (k.ar ?? 0) > 0, text: `ลูกหนี้คงค้าง ${money(k.ar)}`, tone: 'purple' },
-    { active: (k.ap ?? 0) > 0, text: `เจ้าหนี้คงค้าง ${money(k.ap)}`, tone: 'orange' },
-    { active: (section?.cash.odUsed ?? 0) > 0, text: `OD ใช้ไป ${money(section?.cash.odUsed)}`, tone: 'amber' },
-    { active: (k.cashBalance ?? 0) < (k.ap ?? 0), text: 'เงินสดต่ำกว่าเจ้าหนี้รวม', tone: 'red' },
-  ].filter((alert) => alert.active)
   const purchaseWeight = section?.purchase.qty ?? 0
-  const salesWeight = section?.sales.qty ?? 0
   const purchaseAmount = section?.purchase.amount ?? 0
   const salesAmount = section?.sales.amount ?? 0
+  const purchaseCount = section?.purchase.count ?? 0
+  const salesCount = section?.sales.count ?? 0
   const gp = section?.sales.gp ?? 0
   const stockQty = section?.stock.qty ?? 0
   const stockValue = section?.stock.value ?? 0
   const gpPct = salesAmount > 0 ? (gp / salesAmount) * 100 : 0
-  const filteredCount = `${money(section?.purchase.count)} ซื้อ · ${money(section?.sales.count)} ขาย`
+  const filteredCount = `${purchaseCount.toLocaleString('th-TH')} ซื้อ · ${salesCount.toLocaleString('th-TH')} ขาย`
+  const hasActiveDashboardFilters = rangeMode !== 'year' || Boolean(dashboardBranchId || dashboardGroup || dashboardSupplierId || dashboardCustomerId || dashboardProductId)
+  const hasDashboardData = Boolean(
+    (k.revenue ?? 0)
+    || (k.expenses ?? 0)
+    || (k.netProfit ?? 0)
+    || (k.cashBalance ?? 0)
+    || (k.ar ?? 0)
+    || (k.ap ?? 0)
+    || purchaseAmount
+    || salesAmount
+    || stockValue
+    || (data?.dashboard.historical.rows ?? 0)
+    || (analytics?.topSuppliers.length ?? 0)
+    || (analytics?.topCustomers.length ?? 0),
+  )
   const agingRows = useMemo<DashboardAgingRow[]>(() => [
-    buildDashboardAgingRow('ar', '📥 AR ลูกหนี้', 'emerald', data?.dashboard.agingBuckets.ar, k.ar ?? 0),
-    buildDashboardAgingRow('ap', '📤 AP เจ้าหนี้', 'red', data?.dashboard.agingBuckets.ap, k.ap ?? 0),
+    buildDashboardAgingRow('ar', 'AR ลูกหนี้', 'emerald', data?.dashboard.agingBuckets.ar, k.ar ?? 0),
+    buildDashboardAgingRow('ap', 'AP เจ้าหนี้', 'red', data?.dashboard.agingBuckets.ap, k.ap ?? 0),
   ], [data?.dashboard.agingBuckets.ap, data?.dashboard.agingBuckets.ar, k.ap, k.ar])
   const sortedAgingRows = useMemo(() => {
     return [...agingRows].sort((left, right) => compareDashboardValues(dashboardAgingValue(left, agingSortKey), dashboardAgingValue(right, agingSortKey), agingSortDirection))
@@ -402,93 +422,199 @@ function DashboardView(props: {
   }
   return (
     <>
-      <div className="rounded-md bg-gradient-to-r from-slate-800 to-slate-900 p-4 text-white shadow-xl">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold opacity-80">📅 ช่วงเวลา:</span>
+      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-slate-600">ช่วงเวลา:</span>
+          <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200" type="button" onClick={() => setShowDashboardMobileFilters(true)}>
+            ตัวกรอง {hasActiveDashboardFilters ? '(มี)' : ''}
+          </button>
+        </div>
+        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
           {[
-            ['year', '📊 ปีนี้'],
+            ['year', 'ปีนี้'],
             ['quarter', 'ไตรมาส'],
             ['month', 'เดือนนี้'],
             ['week', '7 วัน'],
             ['today', 'วันนี้'],
           ].map(([key, label]) => (
-            <button className={`rounded-md px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-400 ${rangeMode === key ? 'bg-amber-400 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
+            <button className={`h-9 shrink-0 rounded-md border px-3 text-xs font-medium outline-none transition focus:ring-2 focus:ring-slate-200 ${rangeMode === key ? 'border-slate-700 bg-slate-700 text-white shadow-sm' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} key={`mobile-${key}`} onClick={() => applyPeriod(key)} type="button">{label}</button>
           ))}
-          <span className="mx-2 opacity-30">|</span>
-          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white outline-none focus:ring-2 focus:ring-amber-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
-          <span>→</span>
-          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white outline-none focus:ring-2 focus:ring-amber-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
-          <span className="ml-auto rounded-md bg-white/10 px-2 py-1 text-xs">📊 {filteredCount}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-amber-400" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option className="text-slate-900" value="">🏢 ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
-          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-amber-400" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option className="text-slate-900" value="">📦 ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option className="text-slate-900" key={group} value={group}>{group}</option>)}</select>
-          <div className="w-[180px] text-slate-800 text-sm">
-            <SearchCombobox
-              inputId="dashboard-supplier-filter"
-              label="Supplier"
-              hideLabel
-              placeholder="🏭 ทุก Supplier"
-              options={supplierSearchOptions}
-              value={dashboardSupplierId}
-              onChange={setDashboardSupplierId}
-            />
+        <div className="mt-2 flex items-center justify-between gap-2 text-xs font-semibold text-slate-600">
+          <span className="min-w-0 truncate">{rangeFrom} → {rangeTo}</span>
+          <span className="shrink-0 rounded-md bg-slate-100 px-2.5 py-1 text-slate-700">{filteredCount}</span>
+        </div>
+      </div>
+      {showDashboardMobileFilters ? (
+        <MobileFilterSheet
+          footer={(
+            <>
+              <button
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={() => {
+                  clearFilters()
+                  setShowDashboardMobileFilters(false)
+                }}
+              >
+                ล้างตัวกรอง
+              </button>
+              <button
+                className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
+                type="button"
+                onClick={() => setShowDashboardMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          )}
+          onClose={() => setShowDashboardMobileFilters(false)}
+          title="ตัวกรอง Dashboard"
+          visibleClassName="lg:hidden"
+        >
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">ช่วงวันที่</span>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <DatePickerInput className="h-9 w-full border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+              <span className="text-slate-400">→</span>
+              <DatePickerInput className="h-9 w-full border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+            </div>
           </div>
-          <div className="w-[180px] text-slate-800 text-sm">
-            <SearchCombobox
-              inputId="dashboard-customer-filter"
-              label="Customer"
-              hideLabel
-              placeholder="👥 ทุก Customer"
-              options={customerSearchOptions}
-              value={dashboardCustomerId}
-              onChange={setDashboardCustomerId}
-            />
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">สาขา</span>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
           </div>
-          <div className="w-[180px] text-slate-800 text-sm">
-            <SearchCombobox
-              inputId="dashboard-product-filter"
-              label="สินค้า"
-              hideLabel
-              placeholder="🏷 ทุกสินค้า"
-              options={productSearchOptions}
-              value={dashboardProductId}
-              onChange={setDashboardProductId}
-            />
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">หมวดสินค้า</span>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
           </div>
-          <button className="ml-auto rounded-md bg-amber-500 px-3 py-1 font-bold text-slate-900 hover:bg-amber-600 outline-none focus:ring-2 focus:ring-amber-400" onClick={clearFilters} type="button">✕ ล้าง Filter</button>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">ผู้ขาย</span>
+            <SearchCombobox inputId="dashboard-supplier-filter-mobile" label="ผู้ขาย" hideLabel inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500" placeholder="ทุกผู้ขาย" options={supplierSearchOptions} value={dashboardSupplierId} onChange={setDashboardSupplierId} />
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">ลูกค้า</span>
+            <SearchCombobox inputId="dashboard-customer-filter-mobile" label="ลูกค้า" hideLabel inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500" placeholder="ทุกลูกค้า" options={customerSearchOptions} value={dashboardCustomerId} onChange={setDashboardCustomerId} />
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">สินค้า</span>
+            <SearchCombobox inputId="dashboard-product-filter-mobile" label="สินค้า" hideLabel inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500" placeholder="ทุกสินค้า" options={productSearchOptions} value={dashboardProductId} onChange={setDashboardProductId} />
+          </div>
+        </MobileFilterSheet>
+      ) : null}
+      <div className="hidden rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:block">
+        <div className="space-y-3">
+          <div className="grid items-end gap-2 lg:grid-cols-2 xl:grid-cols-[minmax(320px,1.35fr)_minmax(140px,0.8fr)_minmax(160px,0.9fr)_minmax(220px,1fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
+            <div className="space-y-1">
+              <span className="block text-[11px] font-semibold text-slate-500">วันที่</span>
+              <div className="grid grid-cols-[minmax(145px,1fr)_auto_minmax(145px,1fr)] items-center gap-2">
+                <DatePickerInput className="h-9 w-full border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+                <span className="text-xs text-slate-400">→</span>
+                <DatePickerInput className="h-9 w-full border-slate-300 bg-white text-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <span className="block text-[11px] font-semibold text-slate-500">สาขา</span>
+              <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+            </div>
+            <div className="space-y-1">
+              <span className="block text-[11px] font-semibold text-slate-500">หมวดสินค้า</span>
+              <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-200" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option value="">ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option key={group} value={group}>{group}</option>)}</select>
+            </div>
+            <div className="space-y-1">
+              <span className="block text-[11px] font-semibold text-slate-500">ผู้ขาย</span>
+              <SearchCombobox
+                inputId="dashboard-supplier-filter"
+                label="ผู้ขาย"
+                hideLabel
+                inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
+                placeholder="ทุกผู้ขาย"
+                options={supplierSearchOptions}
+                value={dashboardSupplierId}
+                onChange={setDashboardSupplierId}
+              />
+            </div>
+            <div className="space-y-1">
+              <span className="block text-[11px] font-semibold text-slate-500">ลูกค้า</span>
+              <SearchCombobox
+                inputId="dashboard-customer-filter"
+                label="ลูกค้า"
+                hideLabel
+                inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
+                placeholder="ทุกลูกค้า"
+                options={customerSearchOptions}
+                value={dashboardCustomerId}
+                onChange={setDashboardCustomerId}
+              />
+            </div>
+            <div className="space-y-1">
+              <span className="block text-[11px] font-semibold text-slate-500">สินค้า</span>
+              <SearchCombobox
+                inputId="dashboard-product-filter"
+                label="สินค้า"
+                hideLabel
+                inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
+                placeholder="ทุกสินค้า"
+                options={productSearchOptions}
+                value={dashboardProductId}
+                onChange={setDashboardProductId}
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-slate-800">
+              <span className="text-xs font-semibold text-slate-600">ช่วงเวลา:</span>
+              {[
+                ['year', 'ปีนี้'],
+                ['quarter', 'ไตรมาส'],
+                ['month', 'เดือนนี้'],
+                ['week', '7 วัน'],
+                ['today', 'วันนี้'],
+              ].map(([key, label]) => (
+                <button className={`h-9 rounded-md border px-3 text-xs font-medium outline-none transition focus:ring-2 focus:ring-slate-200 ${rangeMode === key ? 'border-slate-700 bg-slate-700 text-white shadow-sm' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
+              ))}
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="h-9 rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">{filteredCount}</span>
+              {hasActiveDashboardFilters ? (
+                <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200" onClick={clearFilters} type="button">ล้างตัวกรอง</button>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
       <div>
         {(data?.dashboard.historical.rows ?? 0) > 0 ? (
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs">
-            <span className="font-bold text-amber-800">📅 รวมยอด Historical:</span>
-            <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Revenue <b className="text-emerald-700">{money(data?.dashboard.historical.revenue)}</b></span>
-            <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">COGS <b className="text-red-700">{money(data?.dashboard.historical.cogs)}</b></span>
-            <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Expenses <b className="text-amber-700">{money(data?.dashboard.historical.expenses)}</b></span>
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-600">
+            <span className="font-bold text-slate-700">รวมยอด Historical:</span>
+            <span className="rounded-xl bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Revenue <b className="text-emerald-700">{money(data?.dashboard.historical.revenue)}</b></span>
+            <span className="rounded-xl bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">COGS <b className="text-red-700">{money(data?.dashboard.historical.cogs)}</b></span>
+            <span className="rounded-xl bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Expenses <b className="text-amber-700">{money(data?.dashboard.historical.expenses)}</b></span>
             <span className="text-slate-500">({data?.dashboard.historical.rows ?? 0} rows)</span>
           </div>
-        ) : <div className="mb-3 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-500">ℹ️ ยังไม่มีข้อมูล Historical — ไปที่เมนู <b>📅 ข้อมูลย้อนหลัง</b> เพื่อคีย์ยอด ม.ค.-เม.ย. 2026</div>}
+        ) : null}
+        {!hasDashboardData ? (
+          <div className="mb-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800">
+            ยังไม่มีข้อมูลในช่วงเวลาหรือตัวกรองนี้ ลองเปลี่ยนช่วงเวลา หรือล้างตัวกรองเพื่อดูภาพรวมทั้งหมด
+          </div>
+        ) : null}
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <DashboardKpi icon="📈" label="Revenue" sub="ยอดขาย" tone="from-blue-500 to-blue-700" value={money(k.revenue)} />
-          <DashboardKpi icon="💸" label="Expenses" sub="ค่าใช้จ่าย + COGS" tone="from-rose-500 to-red-600" value={money(k.expenses)} />
-          <DashboardKpi icon="🥧" label="Net Profit" sub="กำไรสุทธิ" tone={(k.netProfit ?? 0) >= 0 ? 'from-emerald-500 to-teal-600' : 'from-red-500 to-rose-700'} value={money(k.netProfit)} />
-          <DashboardKpi icon="💵" label="Cash Balance" sub="เงินสด/ธนาคาร" tone="from-cyan-500 to-blue-600" value={money(k.cashBalance)} />
-          <DashboardKpi icon="👤" label="AR ลูกหนี้" sub="Receivable" tone="from-purple-500 to-fuchsia-600" value={money(k.ar)} />
-          <DashboardKpi icon="📋" label="AP เจ้าหนี้" sub="Payable" tone="from-orange-500 to-red-600" value={money(k.ap)} />
+          <DashboardKpi label="Revenue" sub="ยอดขาย" tone="blue" value={money(k.revenue)} />
+          <DashboardKpi label="Expenses" sub="ค่าใช้จ่าย + COGS" tone="red" value={money(k.expenses)} />
+          <DashboardKpi label="Net Profit" sub="กำไรสุทธิ" tone={(k.netProfit ?? 0) >= 0 ? 'emerald' : 'red'} value={money(k.netProfit)} />
+          <DashboardKpi label="Cash Balance" sub="เงินสด/ธนาคาร" tone="cyan" value={money(k.cashBalance)} />
+          <DashboardKpi label="AR ลูกหนี้" sub="Receivable" tone="purple" value={money(k.ar)} />
+          <DashboardKpi label="AP เจ้าหนี้" sub="Payable" tone="orange" value={money(k.ap)} />
         </div>
-        <div className="mb-4 grid gap-3 lg:grid-cols-3">
+        <div className="mb-4 grid gap-3 lg:grid-cols-2">
           <DashboardChartCard title="Revenue vs Expense (Monthly)">
             <BarRows rows={(data?.dashboard.monthlyTrend ?? []).flatMap((row) => [{ label: `${monthLabel(row.label)} Rev`, value: row.sales }, { label: `${monthLabel(row.label)} Exp`, value: row.expense + Math.max(0, row.sales - row.gp) }])} />
           </DashboardChartCard>
           <DashboardChartCard title="Cash Flow Overview">
             <BarRows rows={(data?.dashboard.cashComposition ?? []).map((row) => ({ label: row.label, value: row.value }))} />
           </DashboardChartCard>
-          <DashboardChartCard title="Expense Breakdown">
-            <BarRows rows={(data?.dashboard.monthlyTrend ?? []).map((row) => ({ label: monthLabel(row.label), value: row.expense }))} />
-          </DashboardChartCard>
         </div>
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="mb-4">
           <DashboardChartCard title="Receivables & Payables Aging">
             <div className="mb-2 flex justify-end">
               {agingResize.hasCustomWidths ? (
@@ -498,10 +624,10 @@ function DashboardView(props: {
               ) : null}
             </div>
             <div className="hidden overflow-x-auto sm:block">
-              <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: agingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+              <table className="ns-table min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: agingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
-                  {dashboardAgingColumns.map((column, index) => (
-                    <col key={column.key} style={index === dashboardAgingColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : agingResize.getColumnStyle(column.key)} />
+                  {dashboardAgingColumns.map((column) => (
+                    <col key={column.key} style={agingResize.getColumnStyle(column.key)} />
                   ))}
                 </colgroup>
                 <thead className="bg-slate-50 text-slate-500">
@@ -537,7 +663,7 @@ function DashboardView(props: {
               {sortedAgingRows.map((row) => {
                 const textTone = row.tone === 'emerald' ? 'text-emerald-700' : 'text-red-700'
                 return (
-                  <div key={row.key} className="rounded-lg border border-slate-100 bg-slate-50/60 p-2 text-xs">
+                  <div key={row.key} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2 text-xs">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <span className={`font-bold ${textTone}`}>{row.label}</span>
                       <span className={`font-bold ${textTone}`}>{money(row.total)}</span>
@@ -554,26 +680,41 @@ function DashboardView(props: {
               })}
             </div>
           </DashboardChartCard>
-          <DashboardChartCard title="Channel Performance">
-            <MiniLine label="📥 Purchase" value={`${money(purchaseWeight)} กก. · ${money(purchaseAmount)}`} />
-            <MiniLine label="📤 Sales" value={`${money(salesWeight)} กก. · ${money(salesAmount)}`} />
-            <MiniLine label="📦 Stock" value={`${money(stockQty)} กก. · ${money(stockValue)}`} />
-          </DashboardChartCard>
-          <DashboardChartCard title="Quick Insights">
-            <MiniLine label="Gross Margin" value={`${money(gpPct)}%`} />
-            <MiniLine label="Net Profit" value={money(k.netProfit)} />
-            <MiniLine label="Net Cash" value={money(section?.cash.netCash)} />
-          </DashboardChartCard>
         </div>
       </div>
 
-      {alerts.length ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{alerts.map((alert) => <span className="mr-2 inline-flex rounded-md bg-white px-2 py-1 font-semibold border border-slate-100" key={alert.text}>⚠ {alert.text}</span>)}</div> : null}
+      <Tabs className="gap-2" value={detailTab} onValueChange={(value) => setDetailTab(value as DashboardDetailTab)}>
+        <TabsList className="w-full overflow-x-auto" variant="line">
+          {dashboardDetailTabs.map((tab) => {
+            return (
+              <TabsTrigger
+                key={tab.key}
+                aria-label={`${tab.label}: ${tab.summary}`}
+                className="px-3 text-xs sm:text-sm"
+                value={tab.key}
+                variant="line"
+              >
+                {tab.label}
+              </TabsTrigger>
+            )
+          })}
+        </TabsList>
+      </Tabs>
 
-      <div className="grid gap-4 lg:grid-cols-2"><RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="🥇 Top Suppliers" /><RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="🥇 Top Customers" /></div>
+      {detailTab === 'ranking' ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-sm font-bold text-slate-800">Top Ranking</h2>
+            <span className="text-xs font-medium text-slate-500">อันดับคู่ค้าที่ช่วยอ่านภาพรวมเร็ว ไม่แทนรายการเอกสารต้นทาง</span>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2"><RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="Top Suppliers" /><RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="Top Customers" /></div>
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <DashboardChartCard title="📈 แนวโน้มซื้อ-ขาย 30 วัน"><BarRows rows={(analytics?.dailyTrend ?? []).slice(-10).flatMap((row) => [{ label: `${row.label} ซื้อ`, value: row.purchase }, { label: `${row.label} ขาย`, value: row.sales }])} /></DashboardChartCard>
-        <DashboardChartCard title="📦 มูลค่าสินค้าตามหมวด">
+      {detailTab === 'stock' ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+        <DashboardChartCard title="แนวโน้มซื้อ-ขาย 30 วัน"><BarRows rows={(analytics?.dailyTrend ?? []).slice(-10).flatMap((row) => [{ label: `${row.label} ซื้อ`, value: row.purchase }, { label: `${row.label} ขาย`, value: row.sales }])} /></DashboardChartCard>
+        <DashboardChartCard title="มูลค่าสินค้าตามหมวด">
           <div className="mb-2 flex justify-end">
             {stockGroupResize.hasCustomWidths ? (
               <button className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50" type="button" onClick={stockGroupResize.resetColumnWidths}>
@@ -582,7 +723,7 @@ function DashboardView(props: {
             ) : null}
           </div>
           <div className="hidden overflow-x-auto sm:block">
-            <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: stockGroupResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: stockGroupResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {dashboardStockGroupColumns.map((column, index) => (
                   <col key={column.key} style={index === dashboardStockGroupColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : stockGroupResize.getColumnStyle(column.key)} />
@@ -609,7 +750,7 @@ function DashboardView(props: {
           </div>
           <div className="space-y-2 sm:hidden">
             {sortedStockGroupRows.map((row) => (
-              <div key={row.group} className="rounded-lg border border-slate-100 bg-slate-50/60 p-2 text-xs">
+              <div key={row.group} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2 text-xs">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="font-bold text-slate-800 truncate">{row.group}</span>
                   <span className="font-bold text-indigo-700">{money(row.value)}</span>
@@ -621,32 +762,36 @@ function DashboardView(props: {
           </div>
         </DashboardChartCard>
       </div>
+      ) : null}
 
-      <Section title={`📥 ฝั่งซื้อ (${periodInfo.buySection}) — Purchase / Supplier`}>
-        <Metric label={periodInfo.buyLabel} tone="blue" value={money(section?.purchase.amount)} />
-        <Metric label="น้ำหนักซื้อ" value={`${money(section?.purchase.qty)} กก.`} />
-        <Metric label="ราคาซื้อเฉลี่ย" value={`${money(purchaseWeight > 0 ? purchaseAmount / purchaseWeight : 0)} ฿/กก.`} />
-        <Metric label="เจ้าหนี้รวม" tone="red" value={money(k.ap)} />
-      </Section>
-      <Section title={`📤 ฝั่งขาย (${periodInfo.sellSection}) — Sales / Customer`}>
-        <Metric label={periodInfo.sellLabel} tone="emerald" value={money(section?.sales.amount)} />
-        <Metric label="น้ำหนักขาย" value={`${money(section?.sales.qty)} กก.`} />
-        <Metric label="Gross Profit" tone="emerald" value={money(section?.sales.gp)} />
-        <Metric label="Margin %" tone={(gpPct ?? 0) >= 0 ? 'emerald' : 'red'} value={`${money(gpPct)}%`} />
-      </Section>
-      <Section title="💰 ฝั่งการเงิน — Cash / Bank / OD">
-        <Metric label="💵 เงินสดรวม" tone="emerald" value={money(section?.cash.cash)} />
-        <Metric label="🏦 ธนาคารรวม" tone="blue" value={money(section?.cash.bank)} />
-        <Metric label="💱 FCD" tone="purple" value={money(section?.cash.fcd)} />
-        <Metric label="⚠ OD ใช้ / เหลือ" tone="orange" value={`${money(section?.cash.odUsed)} / ${money(section?.cash.odLimit)}`} />
-        <Metric label="💎 Net Cash Position" tone="purple" value={money(section?.cash.netCash)} />
-      </Section>
-      <Section title="📦 ฝั่ง Stock — Inventory / WAC">
-        <Metric label="⚖ น้ำหนักรวม" value={`${money(section?.stock.qty)} กก.`} />
-        <Metric label="💰 มูลค่าสต๊อกรวม" tone="orange" value={money(section?.stock.value)} />
-        <Metric label="📊 ราคาต่อหน่วยเฉลี่ย" value={`${money(stockQty > 0 ? stockValue / stockQty : 0)} ฿/กก.`} />
-        {(data?.dashboard.stockByBranch ?? []).slice(0, 3).map((row) => <Metric key={row.name} label={`🏢 ${row.name}`} value={`${money(row.qty)} กก. · ${money(row.value)}`} />)}
-      </Section>
+      {detailTab === 'metrics' ? (
+        <>
+          <Section title={`ฝั่งซื้อ (${periodInfo.buySection}) — Purchase / Supplier`}>
+            <Metric label="จำนวนบิลซื้อ" tone="blue" value={`${purchaseCount.toLocaleString('th-TH')} บิล`} />
+            <Metric label="น้ำหนักซื้อ" value={`${money(section?.purchase.qty)} กก.`} />
+            <Metric label="ราคาซื้อเฉลี่ย" value={`${money(purchaseWeight > 0 ? purchaseAmount / purchaseWeight : 0)} ฿/กก.`} />
+          </Section>
+          <Section title={`ฝั่งขาย (${periodInfo.sellSection}) — Sales / Customer`}>
+            <Metric label="จำนวนบิลขาย" tone="emerald" value={`${salesCount.toLocaleString('th-TH')} บิล`} />
+            <Metric label="น้ำหนักขาย" value={`${money(section?.sales.qty)} กก.`} />
+            <Metric label="Gross Profit" tone="emerald" value={money(section?.sales.gp)} />
+            <Metric label="Margin %" tone={(gpPct ?? 0) >= 0 ? 'emerald' : 'red'} value={`${money(gpPct)}%`} />
+          </Section>
+          <Section title="ฝั่งการเงิน — Cash / Bank / OD">
+            <Metric label="เงินสดรวม" tone="emerald" value={money(section?.cash.cash)} />
+            <Metric label="ธนาคารรวม" tone="blue" value={money(section?.cash.bank)} />
+            <Metric label="FCD" tone="purple" value={money(section?.cash.fcd)} />
+            <Metric label="OD ใช้ / เหลือ" tone="orange" value={`${money(section?.cash.odUsed)} / ${money(section?.cash.odLimit)}`} />
+            <Metric label="Net Cash Position" tone="purple" value={money(section?.cash.netCash)} />
+          </Section>
+          <Section title="ฝั่ง Stock — Inventory / WAC">
+            <Metric label="น้ำหนักรวม" value={`${money(section?.stock.qty)} กก.`} />
+            <Metric label="มูลค่าสต๊อกรวม" tone="orange" value={money(section?.stock.value)} />
+            <Metric label="ราคาต่อหน่วยเฉลี่ย" value={`${money(stockQty > 0 ? stockValue / stockQty : 0)} ฿/กก.`} />
+            {(data?.dashboard.stockByBranch ?? []).slice(0, 3).map((row) => <Metric key={row.name} label={row.name} value={`${money(row.qty)} กก. · ${money(row.value)}`} />)}
+          </Section>
+        </>
+      ) : null}
     </>
   )
 }
@@ -710,33 +855,12 @@ function cashAccountValue(row: CashAccountRow, key: CashAccountSortKey) {
   return row[key]
 }
 
-function DashboardKpi({ icon, label, sub, tone, value }: { icon: string; label: string; sub: string; tone: string; value: string }) {
-  const toneMap: Record<string, { bg: string; text: string }> = {
-    'from-blue-500 to-blue-700': { bg: 'bg-blue-50', text: 'text-blue-600' },
-    'from-rose-500 to-red-600': { bg: 'bg-red-50', text: 'text-red-600' },
-    'from-emerald-500 to-teal-600': { bg: 'bg-emerald-50', text: 'text-emerald-600' },
-    'from-cyan-500 to-blue-600': { bg: 'bg-cyan-50', text: 'text-cyan-600' },
-    'from-purple-500 to-fuchsia-600': { bg: 'bg-purple-50', text: 'text-purple-600' },
-    'from-orange-500 to-red-600': { bg: 'bg-orange-50', text: 'text-orange-600' },
-  }
-  const style = toneMap[tone] || { bg: 'bg-slate-50', text: 'text-slate-600' }
-
-  return (
-    <div className="flex items-center gap-3 bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${style.bg} ${style.text} text-2xl`}>
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold text-slate-500">{label}</div>
-        {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
-        <div className="mt-0.5 font-mono text-lg font-bold text-slate-900 truncate">{value}</div>
-      </div>
-    </div>
-  )
+function DashboardKpi({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
+  return <SharedKpiCard label={label} note={sub} tone={tone as KpiCardTone} value={value} />
 }
 
-function DashboardChartCard({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-700">{title}</div>{children}</div>
+function DashboardChartCard({ children, className = '', title }: { children: ReactNode; className?: string; title: string }) {
+  return <div className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${className}`.trim()}><div className="mb-3 text-sm font-bold text-slate-800">{title}</div>{children}</div>
 }
 
 function OwnerDailyView({ data }: { data: MainPayload | null }) {
@@ -763,7 +887,7 @@ function OwnerDailyView({ data }: { data: MainPayload | null }) {
         <LegacyKpi label="📤 คาดจ่ายวันนี้" sub={`AP ${money(data?.ownerDaily.due.ap.reduce((sum, row) => sum + row.amount, 0))} · Loan ${money(data?.ownerDaily.loanToday.reduce((sum, row) => sum + row.amount, 0))} · Exp ${money(data?.ownerDaily.expensesToday.reduce((sum, row) => sum + row.amount, 0))}`} tone="red" value={`-${money(plan?.expectedOut)}`} />
       </div>
       {(pending.tradingPending ?? 0) > 0 ? <PendingBlock color="purple" cta="→ ไป Trading Matching" title="🔄 Trading Pending รับเงิน — จ่ายซื้อ Trading แล้ว แต่ยังไม่เปิดบิลขาย" cards={[['📋 บิลซื้อ Trading', String(pending.tradingPending)], ['💸 จ่ายไปแล้ว', money(pending.tradingPaidTotal)], ['✓ Match แล้ว', money(pending.tradingMatchedTotal)], ['⏳ Pending รับเงิน', money(pending.tradingPendingValue)]]} /> : null}
-      <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-100">
+      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
         <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">📊 ที่เกิดขึ้นจริงวันนี้แล้ว</h3>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <Tile tone="emerald" label="📥 รับเงินจริง" value={`+${money(actual?.cashIn)}`} />
@@ -794,6 +918,13 @@ function DailyReportView({ data, date, setDate }: { data: MainPayload | null; da
   const salesCount = data?.dailyReport.salesBills.length ?? 0
   const analytics = data?.dailyReport.analytics
   const isToday = date === today()
+  const purchaseAmount = safeNumber(summary.purchaseAmount)
+  const purchaseQty = safeNumber(summary.purchaseQty)
+  const salesAmount = safeNumber(summary.salesAmount)
+  const salesQty = safeNumber(summary.salesQty)
+  const gpAmount = salesAmount - safeNumber(analytics?.rangeKpi.cogs)
+  const gpPct = safeNumber(analytics?.rangeKpi.gpPct)
+  const dateButtonClass = 'h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200'
   function shiftDate(days: number) {
     const next = new Date(`${date}T00:00:00`)
     next.setDate(next.getDate() + days)
@@ -801,19 +932,19 @@ function DailyReportView({ data, date, setDate }: { data: MainPayload | null; da
   }
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-100 mb-4">
-        <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 outline-none" type="button" onClick={() => shiftDate(-1)}>← วันก่อน</button>
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
+        <button className={dateButtonClass} type="button" onClick={() => shiftDate(-1)}>← วันก่อน</button>
         <DatePickerInput className="w-[140px]" value={date} onChange={setDate} />
-        <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30 outline-none" disabled={isToday} type="button" onClick={() => shiftDate(1)}>วันถัดไป →</button>
-        <button className={isToday ? 'rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white outline-none' : 'rounded-lg bg-yellow-300 px-4 py-2 text-sm font-bold text-amber-900 hover:bg-yellow-200 outline-none'} type="button" onClick={() => setDate(today())}>📍 วันนี้</button>
+        <button className={`${dateButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} disabled={isToday} type="button" onClick={() => shiftDate(1)}>วันถัดไป →</button>
+        <button className={isToday ? 'h-9 rounded-md border border-slate-300 bg-slate-100 px-4 text-sm font-semibold text-slate-900 outline-none transition focus:ring-2 focus:ring-slate-200' : `${dateButtonClass} px-4`} type="button" onClick={() => setDate(today())}>วันนี้</button>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <DailyBigCard count={purchaseCount} icon="📥" label="ยอดรับซื้อ" sub={`เฉลี่ย ${money((summary.purchaseAmount ?? 0) / Math.max(1, summary.purchaseQty ?? 0))} ฿/กก.`} tone="from-blue-600 to-indigo-700" value={money(summary.purchaseAmount)} weight={money(summary.purchaseQty)} />
-        <DailyBigCard count={salesCount} icon="📤" label="ยอดขาย" sub={`GP ${money(summary.salesAmount - (analytics?.rangeKpi.cogs ?? 0))} (${money(analytics?.rangeKpi.gpPct)}%)`} tone="from-emerald-600 to-teal-700" value={money(summary.salesAmount)} weight={money(summary.salesQty)} />
+        <DailyBigCard icon="📥" label="ยอดรับซื้อ" sub={`เฉลี่ย ${money(purchaseAmount / Math.max(1, purchaseQty))} ฿/กก.`} tone="from-blue-600 to-indigo-700" value={money(purchaseAmount)} weight={money(purchaseQty)} />
+        <DailyBigCard icon="📤" label="ยอดขาย" sub={`GP ${money(gpAmount)} (${money(gpPct)}%)`} tone="from-emerald-600 to-teal-700" value={money(salesAmount)} weight={money(salesQty)} />
       </div>
       <GroupBreakdown groups={data?.dailyReport.groupBreakdown ?? []} expandedGroup={expandedGroup} setExpandedGroup={setExpandedGroup} />
-      <div className="grid gap-4 lg:grid-cols-2"><DailyBillTable rows={data?.dailyReport.purchaseBills ?? []} title={`📋 บิลรับซื้อประจำวัน (${purchaseCount})`} total={summary.purchaseAmount ?? 0} tone="blue" /><DailyBillTable rows={data?.dailyReport.salesBills ?? []} title={`📋 บิลขายประจำวัน (${salesCount})`} total={summary.salesAmount ?? 0} tone="emerald" /></div>
-      <ExpenseSummary rows={data?.dailyReport.expenseByCategory ?? []} total={summary.expenseAmount ?? 0} />
+      <div className="grid gap-4 lg:grid-cols-2"><DailyBillTable rows={data?.dailyReport.purchaseBills ?? []} title={`📋 บิลรับซื้อประจำวัน (${purchaseCount})`} tone="blue" /><DailyBillTable rows={data?.dailyReport.salesBills ?? []} title={`📋 บิลขายประจำวัน (${salesCount})`} tone="emerald" /></div>
+      <ExpenseSummary rows={data?.dailyReport.expenseByCategory ?? []} total={safeNumber(summary.expenseAmount)} />
       <CashMovement movement={data?.dailyReport.cashMovement} />
     </>
   )
@@ -821,6 +952,7 @@ function DailyReportView({ data, date, setDate }: { data: MainPayload | null; da
 
 function AnalyticsDashboardView({ data, rangeFrom, rangeMode, rangeTo, setRangeFrom, setRangeMode, setRangeTo }: { data: MainPayload | null; rangeFrom: string; rangeMode: string; rangeTo: string; setRangeFrom: (value: string) => void; setRangeMode: (value: string) => void; setRangeTo: (value: string) => void }) {
   const analytics = data?.dailyReport.analytics
+  const [detailTab, setDetailTab] = useState<AnalyticsDetailTab>('partners')
   const trendMax = useMemo(() => Math.max(1, ...(analytics?.dailyTrend ?? []).flatMap((row) => [row.purchase, row.sales])), [analytics?.dailyTrend])
 
   function applyRange(mode: string) {
@@ -847,16 +979,16 @@ function AnalyticsDashboardView({ data, rangeFrom, rangeMode, rangeTo, setRangeF
 
   return (
     <div className="pt-2 animate-fade-in pb-16">
-      <div className="mb-4 rounded-xl bg-gradient-to-r from-violet-900 to-indigo-950 p-5 text-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 className="text-xl font-bold">📊 Analytics Dashboard</h2><p className="mt-1 text-xs opacity-85">รายงานสรุปแบบช่วงเวลา · วิเคราะห์ยอดซื้อ ยอดขาย อันดับสินค้า และผลงานทีมขาย</p></div>
+      <div className="mb-4 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><h2 className="text-sm font-bold text-slate-900">Analytics Dashboard</h2></div>
           <div className="flex flex-wrap items-center gap-2">
             {['today', 'yesterday', 'last7', 'last30', 'last90', 'month'].map((mode) => (
-              <button key={mode} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all outline-none focus:ring-0 ${rangeMode === mode ? 'bg-white text-slate-900' : 'bg-white/10 text-white hover:bg-white/20'}`} type="button" onClick={() => applyRange(mode)}>{rangeLabel(mode)}</button>
+              <button key={mode} className={`inline-flex h-9 items-center justify-center rounded-md border px-3 text-xs font-medium transition-colors outline-none focus:ring-0 ${rangeMode === mode ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`} type="button" onClick={() => applyRange(mode)}>{rangeLabel(mode)}</button>
             ))}
-            <DatePickerInput className="w-[130px] bg-white text-slate-900 border-slate-300 outline-none" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
-            <span className="text-xs">→</span>
-            <DatePickerInput className="w-[130px] bg-white text-slate-900 border-slate-300 outline-none" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+            <DatePickerInput className="h-9 w-[130px] bg-white text-slate-900 border-slate-300 outline-none" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+            <span className="text-xs text-slate-400">→</span>
+            <DatePickerInput className="h-9 w-[130px] bg-white text-slate-900 border-slate-300 outline-none" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
           </div>
         </div>
       </div>
@@ -870,28 +1002,44 @@ function AnalyticsDashboardView({ data, rangeFrom, rangeMode, rangeTo, setRangeF
         </div>
       </div>
       <div className="mb-4 grid min-w-0 gap-4 lg:grid-cols-2">
-        <div className="min-w-0 rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+        <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
            <h3 className="mb-3 font-bold text-slate-700 text-sm">📈 ยอดซื้อ vs ขาย (รายวัน)</h3>
-           {(analytics?.dailyTrend ?? []).map((row) => <div key={row.label} className="mb-2.5 grid grid-cols-12 items-center gap-2 text-xs"><div className="col-span-3 font-mono text-slate-600">{row.label}</div><div className="col-span-4 rounded-full bg-slate-100 h-5 overflow-hidden"><div className="rounded-full bg-blue-500 h-full text-right text-white pr-2 font-bold text-xs flex items-center justify-end" style={{ width: `${Math.max(15, row.purchase / trendMax * 100)}%` }}>{money(row.purchase)}</div></div><div className="col-span-5 rounded-full bg-slate-100 h-5 overflow-hidden"><div className="rounded-full bg-emerald-500 h-full text-right text-white pr-2 font-bold text-xs flex items-center justify-end" style={{ width: `${Math.max(15, row.sales / trendMax * 100)}%` }}>{money(row.sales)}</div></div></div>)}
+           {(analytics?.dailyTrend ?? []).map((row) => <div key={row.label} className="mb-2.5 grid grid-cols-12 items-center gap-2 text-xs"><div className="col-span-3 font-mono text-slate-600">{row.label}</div><AnalyticsTrendBar className="col-span-4" max={trendMax} tone="blue" value={row.purchase} /><AnalyticsTrendBar className="col-span-5" max={trendMax} tone="emerald" value={row.sales} /></div>)}
         </div>
         <TopSimpleTable rows={analytics?.groupSummary ?? []} title="🥧 มูลค่าตามหมวดสินค้า" />
       </div>
-      <div className="mb-4 grid min-w-0 gap-4 lg:grid-cols-2">
-        <RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="🥇 Top 10 ผู้ขาย (ยอดซื้อสูงสุด)" />
-        <RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="🥇 Top 10 ผู้ซื้อ (ยอดขายสูงสุด)" />
-      </div>
-      <div className="mb-4 grid min-w-0 gap-4 lg:grid-cols-2">
-        <ProductRank rows={analytics?.topProductsIn ?? []} title="📦 Top 5 สินค้ารับเข้า (ตามมูลค่า)" tone="indigo" />
-        <ProductRank rows={analytics?.topProductsOut ?? []} title="📦 Top 5 สินค้าขายออก (ตามมูลค่า)" tone="teal" />
-      </div>
-      <div className="mb-4">
-        <SalespersonTable rows={analytics?.bySalesperson ?? []} />
-      </div>
+      <Tabs className="mb-4 gap-3" value={detailTab} onValueChange={(value) => setDetailTab(value as AnalyticsDetailTab)}>
+        <TabsList className="w-full min-w-0 overflow-x-auto" variant="line">
+          <TabsTrigger value="partners" variant="line">คู่ค้า</TabsTrigger>
+          <TabsTrigger value="products" variant="line">สินค้า</TabsTrigger>
+          <TabsTrigger value="sales" variant="line">Sale</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {detailTab === 'partners' ? (
+        <div className="mb-4 grid min-w-0 gap-4 lg:grid-cols-2">
+          <RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="🥇 Top 10 ผู้ขาย (ยอดซื้อสูงสุด)" />
+          <RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="🥇 Top 10 ผู้ซื้อ (ยอดขายสูงสุด)" />
+        </div>
+      ) : null}
+
+      {detailTab === 'products' ? (
+        <div className="mb-4 grid min-w-0 gap-4 lg:grid-cols-2">
+          <ProductRank rows={analytics?.topProductsIn ?? []} title="📦 Top 5 สินค้ารับเข้า (ตามมูลค่า)" tone="indigo" />
+          <ProductRank rows={analytics?.topProductsOut ?? []} title="📦 Top 5 สินค้าขายออก (ตามมูลค่า)" tone="teal" />
+        </div>
+      ) : null}
+
+      {detailTab === 'sales' ? (
+        <div className="mb-4">
+          <SalespersonTable rows={analytics?.bySalesperson ?? []} />
+        </div>
+      ) : null}
 
       {/* Floating Action Buttons */}
-      <div className="fixed bottom-6 right-6 flex flex-row gap-2 z-50">
+      <div className="mt-4 grid grid-cols-2 gap-2 pb-4 lg:fixed lg:bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:right-6 lg:z-50 lg:mt-0 lg:flex lg:flex-row lg:pb-0">
         <button
-          className="shadow-lg rounded-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 text-sm font-semibold transition-all hover:scale-105 active:scale-95 outline-none"
+          className="shadow-sm rounded-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 text-sm font-semibold transition-all hover:scale-105 active:scale-95 outline-none"
           type="button"
           onClick={() => {
             alert('แชร์ข้อมูลสรุปไปที่ LINE OA เรียบร้อยแล้ว')
@@ -900,7 +1048,7 @@ function AnalyticsDashboardView({ data, rangeFrom, rangeMode, rangeTo, setRangeF
           <span>🟢</span> Share รูปภาพ - LINE
         </button>
         <button
-          className="shadow-lg rounded-full px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-2 text-sm font-semibold transition-all hover:scale-105 active:scale-95 outline-none"
+          className="shadow-sm rounded-full px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center gap-2 text-sm font-semibold transition-all hover:scale-105 active:scale-95 outline-none"
           type="button"
           onClick={printReport}
         >
@@ -917,27 +1065,10 @@ function rangeLabel(mode: string) {
 }
 
 function LegacyKpi({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
-  const toneMap: Record<string, { bg: string; text: string }> = {
-    blue: { bg: 'bg-blue-50', text: 'text-blue-600' },
-    emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600' },
-    red: { bg: 'bg-red-50', text: 'text-red-600' },
-  }
-  const style = toneMap[tone] || { bg: 'bg-slate-50', text: 'text-slate-600' }
   const icon = label.slice(0, 2)
   const cleanLabel = label.slice(2).trim()
 
-  return (
-    <div className="flex items-center gap-3 bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${style.bg} ${style.text} text-2xl`}>
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold text-slate-500">{cleanLabel}</div>
-        {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
-        <div className={`mt-0.5 font-mono text-lg font-bold truncate ${style.text}`}>{value}</div>
-      </div>
-    </div>
-  )
+  return <SharedKpiCard icon={icon} label={cleanLabel} note={sub} tone={tone as KpiCardTone} value={value} />
 }
 
 function PendingBlock({ cards, color, cta, title }: { cards: [string, string][]; color: 'amber' | 'purple'; cta: string; title: string }) {
@@ -947,7 +1078,7 @@ function PendingBlock({ cards, color, cta, title }: { cards: [string, string][];
     <div className="bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className={`text-sm font-bold ${text}`}>{title}</h3>
-        <button className={`rounded-lg ${button} px-3 py-1.5 text-xs font-bold opacity-80 outline-none`} disabled type="button">{cta}</button>
+        <button className={`rounded-md ${button} px-3 py-1.5 text-xs font-bold opacity-80 outline-none`} disabled type="button">{cta}</button>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {cards.map(([label, value]) => (
@@ -961,29 +1092,12 @@ function PendingBlock({ cards, color, cta, title }: { cards: [string, string][];
   )
 }
 
-function Tile({ label, sub, tone, value, className }: { label: string; sub?: string; tone: string; value: string; className?: string }) {
-  const toneMap: Record<string, string> = {
-    amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    blue: 'bg-blue-50 text-blue-700 border-blue-100',
-    cyan: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    orange: 'bg-orange-50 text-orange-700 border-orange-100',
-    purple: 'bg-purple-50 text-purple-700 border-purple-100',
-    red: 'bg-red-50 text-red-700 border-red-100',
-    slate: 'bg-slate-50 text-slate-700 border-slate-100',
-  }
-  const cls = toneMap[tone] || toneMap.slate
-  return (
-    <div className={`rounded-xl border p-3 text-center ${cls} ${className || ''}`}>
-      <div className="text-xs font-semibold">{label}</div>
-      <div className="font-mono text-lg font-bold mt-1">{value}</div>
-      {sub ? <div className="text-xs opacity-85 mt-0.5">{sub}</div> : null}
-    </div>
-  )
+function Tile({ label, sub, tone, value, className }: { label: string; sub?: string; tone: KpiCardTone; value: string; className?: string }) {
+  return <SharedKpiCard className={className} label={label} note={sub} tone={tone} value={value} />
 }
 
 function MiniLine({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between rounded-lg bg-slate-50 p-2 text-xs border border-slate-100"><span>{label}</span><span className="font-bold text-slate-800">{value}</span></div>
+  return <div className="flex items-center justify-between rounded-xl bg-slate-50 p-2 text-xs border border-slate-100"><span>{label}</span><span className="font-bold text-slate-800">{value}</span></div>
 }
 
 function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: string; type: 'ap' | 'ar' }) {
@@ -1019,7 +1133,7 @@ function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: stri
 
       {/* Desktop view */}
       <div className="hidden lg:block max-h-64 overflow-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {columns.map((column, index) => (
               <col key={column.key} style={index === columns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
@@ -1062,7 +1176,7 @@ function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: stri
       {/* Mobile view (Dense Card List) */}
       <div className="block lg:hidden max-h-64 overflow-y-auto divide-y divide-slate-100 p-2 bg-slate-50/30">
         {sortedRows.map((row) => (
-          <div key={row.docNo} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+          <div key={row.docNo} className="p-2.5 bg-white rounded-xl border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 line-clamp-1">{row.name}</span>
               <span className="font-bold text-slate-900">{money(row.amount)}</span>
@@ -1119,7 +1233,7 @@ function OwnerSmallTable({ rows, tableKey, title }: { rows: OwnerSmallRow[]; tab
 
       {/* Desktop view */}
       <div className="hidden lg:block overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className="ns-table min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {ownerSmallColumns.map((column, index) => (
               <col key={column.key} style={index === ownerSmallColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
@@ -1152,7 +1266,7 @@ function OwnerSmallTable({ rows, tableKey, title }: { rows: OwnerSmallRow[]; tab
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
         {sortedRows.map((row, index) => (
-          <div key={`${row.docNo ?? row.contractNo ?? index}`} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+          <div key={`${row.docNo ?? row.contractNo ?? index}`} className="p-2.5 bg-white rounded-xl border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-center">
               <span className="font-mono text-slate-600">{row.docNo ?? row.contractNo}</span>
               <span className="font-bold text-slate-900">{money(row.amount)}</span>
@@ -1170,7 +1284,7 @@ function OwnerSmallTable({ rows, tableKey, title }: { rows: OwnerSmallRow[]; tab
   )
 }
 
-function DailyBigCard({ count, icon, label, sub, tone, value, weight }: { count: number; icon: string; label: string; sub: string; tone: string; value: string; weight: string }) {
+function DailyBigCard({ icon, label, sub, tone, value, weight }: { icon: string; label: string; sub: string; tone: string; value: string; weight: string }) {
   const toneMap: Record<string, { bg: string; text: string; iconBg: string; border: string }> = {
     'from-blue-600 to-indigo-700': { bg: 'bg-white', text: 'text-blue-700', iconBg: 'bg-blue-50 text-blue-600', border: 'border-slate-100' },
     'from-emerald-600 to-teal-700': { bg: 'bg-white', text: 'text-emerald-700', iconBg: 'bg-emerald-50 text-emerald-600', border: 'border-slate-100' },
@@ -1183,9 +1297,8 @@ function DailyBigCard({ count, icon, label, sub, tone, value, weight }: { count:
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex justify-between items-center">
+        <div className="flex items-center">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{count} บิล</span>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-4">
           <div>
@@ -1195,9 +1308,9 @@ function DailyBigCard({ count, icon, label, sub, tone, value, weight }: { count:
           <div>
             <div className="text-xs text-slate-400 font-semibold">ยอดเงินรวม</div>
             <div className="font-mono text-xl font-bold text-slate-900 leading-none mt-1">{value}</div>
-            <div className="text-xs text-slate-500 mt-1">{sub}</div>
           </div>
         </div>
+        <div className="mt-3 border-t border-slate-100 pt-2 text-xs font-medium tabular-nums text-slate-500">{sub}</div>
       </div>
     </div>
   )
@@ -1206,10 +1319,10 @@ function DailyBigCard({ count, icon, label, sub, tone, value, weight }: { count:
 function GroupBreakdown({ expandedGroup, groups, setExpandedGroup }: { expandedGroup: string; groups: MainPayload['dailyReport']['groupBreakdown']; setExpandedGroup: (value: string) => void }) {
   const max = Math.max(1, ...groups.map((row) => Math.max(row.buyAmt, row.sellAmt)))
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-100">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="mb-3 font-bold text-slate-800 text-sm">📊 หมวดสินค้า — ซื้อ vs ขาย <span className="text-xs font-normal text-slate-500">(กดที่หมวด → ดูรายละเอียดสินค้า)</span></h3>
       {groups.length === 0 ? (
-        <div className="py-10 text-center text-slate-400 text-xs">ไม่มีรายการในวันนี้</div>
+        <div className="py-6 text-center text-slate-400 text-xs">ไม่มีรายการในวันนี้</div>
       ) : (
         <div className="space-y-3">
           {groups.map((group, idx) => (
@@ -1290,13 +1403,13 @@ function GroupProductTable({ rows, tableKey }: { rows: DailyGroupProductRow[]; t
           ) : null}
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {dailyGroupProductColumns.map((column, index) => (
                 <col key={column.key} style={index === dailyGroupProductColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
               ))}
             </colgroup>
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="bg-slate-100 text-slate-600">
               <tr>
                 <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="Code" resizeProps={columnResize.getResizeHandleProps('productCode', 'Code')} sortKey="productCode" onSort={handleSort} />
                 <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="สินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} sortKey="productName" onSort={handleSort} />
@@ -1326,18 +1439,18 @@ function GroupProductTable({ rows, tableKey }: { rows: DailyGroupProductRow[]; t
 
       <div className="block border-t border-slate-100 divide-y divide-slate-100 bg-slate-50/30 p-2 lg:hidden">
         {sortedRows.map((row, idx) => (
-          <div key={`${row.productId}_${idx}`} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+          <div key={`${row.productId}_${idx}`} className="p-2.5 bg-white rounded-xl border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800">{row.productName}</span>
               <span className="font-mono text-xs text-slate-400">{row.productCode}</span>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
-              <div className="text-blue-700 bg-blue-50/50 p-1.5 rounded-lg">
+              <div className="text-blue-700 bg-blue-50/50 p-1.5 rounded-xl">
                 <div className="font-semibold text-xs">📥 ซื้อ</div>
                 <div className="mt-0.5">{money(row.buyQty)} กก.</div>
                 <div className="font-bold mt-0.5">{money(row.buyAmt)} ฿</div>
               </div>
-              <div className="text-emerald-700 bg-emerald-50/50 p-1.5 rounded-lg">
+              <div className="text-emerald-700 bg-emerald-50/50 p-1.5 rounded-xl">
                 <div className="font-semibold text-xs">📤 ขาย</div>
                 <div className="mt-0.5">{money(row.sellQty)} กก.</div>
                 <div className="font-bold mt-0.5">{money(row.sellAmt)} ฿</div>
@@ -1355,12 +1468,11 @@ function GroupProductTable({ rows, tableKey }: { rows: DailyGroupProductRow[]; t
   )
 }
 
-function DailyBillTable({ rows, title, tone, total }: { rows: DailyBillRow[]; title: string; tone: 'blue' | 'emerald'; total: number }) {
+function DailyBillTable({ rows, title, tone }: { rows: DailyBillRow[]; title: string; tone: 'blue' | 'emerald' }) {
   const [sortKey, setSortKey] = useState<DailyBillSortKey>('amount')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const columnResize = useResizableColumns(`main.daily-report.bills.${tone}.v1`, dailyBillColumns)
-  const header = tone === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-  const hover = tone === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
+  const hover = 'hover:bg-slate-50/60'
   const amountColor = tone === 'blue' ? 'text-blue-700' : 'text-emerald-700'
   const sortedRows = useMemo(() => {
     return [...rows].sort((left, right) => compareDashboardValues(left[sortKey], right[sortKey], sortDirection))
@@ -1374,13 +1486,12 @@ function DailyBillTable({ rows, title, tone, total }: { rows: DailyBillRow[]; ti
   }
 
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
-      <div className={`flex justify-between border-b p-3 font-bold text-sm ${header}`}>
-        <h3 className="font-bold">{title}</h3>
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="flex justify-between border-b border-slate-100 bg-white p-3 text-sm">
+        <h3 className="font-bold text-slate-800">{title}</h3>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold">{money(total)}</span>
           {columnResize.hasCustomWidths ? (
-            <button className="rounded border border-slate-200 bg-white/70 px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-white hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
+            <button className="rounded border border-slate-200 bg-white px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-slate-50 hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
               คืนค่าเดิมตาราง
             </button>
           ) : null}
@@ -1389,13 +1500,13 @@ function DailyBillTable({ rows, title, tone, total }: { rows: DailyBillRow[]; ti
 
       {/* Desktop view */}
       <div className="hidden lg:block max-h-[300px] overflow-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {dailyBillColumns.map((column, index) => (
               <col key={column.key} style={index === dailyBillColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
             ))}
           </colgroup>
-          <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 text-xs">
+          <thead className="sticky top-0 bg-slate-100 border-b border-slate-100 text-xs text-slate-600">
             <tr>
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={handleSort} />
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label={tone === 'blue' ? 'Supplier' : 'Customer'} resizeProps={columnResize.getResizeHandleProps('name', tone === 'blue' ? 'Supplier' : 'Customer')} sortKey="name" onSort={handleSort} />
@@ -1414,7 +1525,7 @@ function DailyBillTable({ rows, title, tone, total }: { rows: DailyBillRow[]; ti
             ))}
             {rows.length === 0 && (
               <tr>
-                <td className="py-8 text-center text-slate-400" colSpan={4}>
+                <td className="py-6 text-center text-slate-400" colSpan={4}>
                   {tone === 'blue' ? 'ไม่มีบิลซื้อ' : 'ไม่มีบิลขาย'}
                 </td>
               </tr>
@@ -1424,9 +1535,9 @@ function DailyBillTable({ rows, title, tone, total }: { rows: DailyBillRow[]; ti
       </div>
 
       {/* Mobile view */}
-      <div className="block lg:hidden max-h-[300px] overflow-y-auto divide-y divide-slate-100 p-2 bg-slate-50/30">
+      <div className="block lg:hidden max-h-[300px] overflow-y-auto divide-y divide-slate-100 bg-slate-50/30 p-2">
         {sortedRows.map((row) => (
-          <div key={row.docNo} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+          <div key={row.docNo} className="p-2.5 bg-white rounded-xl border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 line-clamp-1">{row.name}</span>
               <span className={`font-bold ${amountColor}`}>{money(row.amount)}</span>
@@ -1438,7 +1549,7 @@ function DailyBillTable({ rows, title, tone, total }: { rows: DailyBillRow[]; ti
           </div>
         ))}
         {rows.length === 0 && (
-          <div className="py-6 text-center text-slate-400 text-xs">
+          <div className="py-5 text-center text-slate-400 text-xs">
             {tone === 'blue' ? 'ไม่มีบิลซื้อ' : 'ไม่มีบิลขาย'}
           </div>
         )}
@@ -1450,13 +1561,13 @@ function DailyBillTable({ rows, title, tone, total }: { rows: DailyBillRow[]; ti
 function ExpenseSummary({ rows, total }: { rows: { amount: number; count: number; name: string }[]; total: number }) {
   const max = Math.max(1, ...rows.map((row) => row.amount))
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-100">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex justify-between items-center">
         <h3 className="font-bold text-slate-800 text-sm">💸 ค่าใช้จ่ายประจำวัน ({rows.reduce((sum, row) => sum + row.count, 0)} รายการ)</h3>
         <span className="text-base font-bold text-red-600">รวม {money(total)} บาท</span>
       </div>
       {rows.length === 0 ? (
-        <div className="py-8 text-center text-slate-400 text-xs">ไม่มีค่าใช้จ่ายวันนี้</div>
+        <div className="py-6 text-center text-slate-400 text-xs">ไม่มีค่าใช้จ่ายวันนี้</div>
       ) : (
         <div className="space-y-3">
           {rows.map((row, idx) => (
@@ -1493,7 +1604,7 @@ function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cas
   }
 
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-100">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="font-bold text-slate-800 text-sm">💰 เงินหมุนประจำวัน</h3>
         {columnResize.hasCustomWidths ? (
@@ -1518,14 +1629,14 @@ function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cas
           </div>
         ))}
       </div>
-      <div className="hidden overflow-x-auto sm:block">
-        <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white sm:block">
+        <table className="ns-table min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {cashAccountColumns.map((column, index) => (
               <col key={column.key} style={index === cashAccountColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
             ))}
           </colgroup>
-          <thead className="bg-slate-50 text-slate-500">
+          <thead className="bg-slate-100 text-slate-600">
             <tr>
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="บัญชี" resizeProps={columnResize.getResizeHandleProps('name', 'บัญชี')} sortKey="name" onSort={handleSort} />
               <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="เข้า" resizeProps={columnResize.getResizeHandleProps('cashIn', 'เข้า')} sortKey="cashIn" onSort={handleSort} />
@@ -1553,7 +1664,7 @@ function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cas
         {sortedAccountRows.map((row) => {
           const net = row.cashIn - row.cashOut
           return (
-            <div key={row.name} className="rounded-lg border border-slate-100 bg-slate-50/60 p-2 text-xs">
+            <div key={row.name} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2 text-xs">
               <div className="mb-2 flex items-start justify-between gap-2">
                 <div>
                   <div className="font-bold text-slate-800">{row.name}</div>
@@ -1569,6 +1680,29 @@ function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cas
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function AnalyticsTrendBar({ className, max, tone, value }: { className?: string; max: number; tone: 'blue' | 'emerald'; value: number }) {
+  const width = value > 0 ? Math.max(3, Math.min(100, value / Math.max(1, max) * 100)) : 0
+  const clipRight = 100 - width
+  const fillClassName = tone === 'blue' ? 'bg-blue-500' : 'bg-emerald-500'
+  const label = money(value)
+  return (
+    <div className={`${className ?? ''} relative h-6 overflow-hidden rounded-md bg-slate-200/90 shadow-inner ring-1 ring-slate-300/70`}>
+      <div className={`absolute inset-y-0 left-0 ${fillClassName}`} style={{ width: `${width}%` }} />
+      <div className="absolute inset-0 flex items-center justify-center px-1 text-center text-[11px] font-bold leading-none text-slate-700 tabular-nums">
+        {label}
+      </div>
+      {width > 0 ? (
+        <div
+          className="absolute inset-0 flex items-center justify-center px-1 text-center text-[11px] font-bold leading-none text-white tabular-nums drop-shadow-[0_1px_1px_rgba(15,23,42,0.55)]"
+          style={{ clipPath: `inset(0 ${clipRight}% 0 0)` }}
+        >
+          {label}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -1624,7 +1758,7 @@ function TopSimpleTable({ rows, title }: { rows: { amount: number; group: string
   }, [rows, sortKey, sortDirection])
 
   return (
-    <div className="min-w-0 rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="font-bold text-slate-700 text-sm">{title}</h3>
         {columnResize.hasCustomWidths ? (
@@ -1638,7 +1772,7 @@ function TopSimpleTable({ rows, title }: { rows: { amount: number; group: string
         ) : null}
       </div>
       <div className="min-w-0 overflow-x-auto">
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {topSimpleColumns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -1692,11 +1826,12 @@ const rankColumnsEmerald: ResizableColumnDefinition<string>[] = [
 function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: RankRow[]; title: string }) {
   const [sortKey, setSortKey] = useState<string>('amount')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [showAllRows, setShowAllRows] = useState(false)
 
   const columns = color === 'blue' ? rankColumnsBlue : rankColumnsEmerald
   const columnResize = useResizableColumns(`reports.analytics.rank-table.${title}`, columns)
 
-  const header = color === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+  const header = 'bg-white text-slate-800 border-slate-100'
   const hover = color === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
   const text = color === 'blue' ? 'text-blue-700' : 'text-emerald-700'
 
@@ -1729,25 +1864,37 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
     })
     return sorted
   }, [rows, sortKey, sortDirection])
+  const visibleRows = (showAllRows ? sortedRows.slice(0, 10) : sortedRows.slice(0, 5))
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className={`border-b p-3 font-bold text-sm ${header} flex items-center justify-between`}>
         <h3 className="font-bold">{title}</h3>
-        {columnResize.hasCustomWidths ? (
-          <button
-            className="text-xs font-normal text-slate-500 hover:text-slate-800 bg-white/60 hover:bg-white rounded px-2 py-0.5 shadow-sm border border-slate-200 transition-all outline-none"
-            type="button"
-            onClick={columnResize.resetColumnWidths}
-          >
-            คืนค่ากว้าง
-          </button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {sortedRows.length > 5 ? (
+            <button
+              className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+              type="button"
+              onClick={() => setShowAllRows((current) => !current)}
+            >
+              {showAllRows ? 'ย่อเหลือ 5' : `ดูครบ ${Math.min(10, sortedRows.length)}`}
+            </button>
+          ) : null}
+          {columnResize.hasCustomWidths ? (
+            <button
+              className="text-xs font-normal text-slate-500 hover:text-slate-800 bg-white/60 hover:bg-white rounded px-2 py-0.5 shadow-sm border border-slate-200 transition-all outline-none"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              คืนค่ากว้าง
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Desktop view */}
       <div className="hidden min-w-0 overflow-x-auto sm:block">
-        <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {columns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -1769,7 +1916,7 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((row, index) => (
+            {visibleRows.map((row, index) => (
               <tr key={`${row.id || 'rank'}-${index}`} className={`border-t border-slate-100 ${hover}`}>
                 <td className={`p-2 font-bold ${text} text-xs whitespace-nowrap`}>{index + 1}</td>
                 <td className="p-2 text-xs text-slate-700 min-w-0 overflow-hidden"><div className="truncate" title={row.name}>{row.name}</div></td>
@@ -1795,8 +1942,8 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
 
       {/* Mobile view */}
       <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
-        {sortedRows.map((row, index) => (
-          <div key={`${row.id || 'rank'}-${index}`} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+        {visibleRows.map((row, index) => (
+          <div key={`${row.id || 'rank'}-${index}`} className="p-2.5 bg-white rounded-xl border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 line-clamp-1">
                 <span className={`font-bold mr-1.5 ${text}`}>#{index + 1}</span>
@@ -1888,7 +2035,7 @@ function ProductRank({ rows, title, tone }: { rows: { amount: number; code: stri
 
       {/* Desktop view */}
       <div className="hidden min-w-0 overflow-x-auto sm:block">
-        <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {productRankColumns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -1927,7 +2074,7 @@ function ProductRank({ rows, title, tone }: { rows: { amount: number; code: stri
       {/* Mobile view */}
       <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
         {sortedRows.map((row, index) => (
-          <div key={`${row.id || 'prod'}-${index}`} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+          <div key={`${row.id || 'prod'}-${index}`} className="p-2.5 bg-white rounded-xl border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 line-clamp-1">
                 <span className={`font-bold mr-1.5 ${text}`}>#{index + 1}</span>
@@ -1992,7 +2139,7 @@ function SalespersonTable({ rows }: { rows: { amount: number; bills: number; id:
   }, [rows, sortKey, sortDirection])
 
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-bold text-slate-700 text-sm">🆕 ยอดซื้อแต่ละ Sale — จำนวน supplier/กก./ยอดซื้อ</h3>
         {columnResize.hasCustomWidths ? (
@@ -2008,7 +2155,7 @@ function SalespersonTable({ rows }: { rows: { amount: number; bills: number; id:
 
       {/* Desktop view */}
       <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {salespersonColumns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -2045,7 +2192,7 @@ function SalespersonTable({ rows }: { rows: { amount: number; bills: number; id:
       {/* Mobile view */}
       <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
         {sortedRows.map((row, index) => (
-          <div key={`${row.id || 'sales'}-${index}`} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+          <div key={`${row.id || 'sales'}-${index}`} className="p-2.5 bg-white rounded-xl border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800">{row.name}</span>
               <span className="font-bold text-blue-600">{money(row.amount)}</span>
@@ -2079,35 +2226,15 @@ function AnalyticsKpiCard({
   unit?: string
   tone?: string
 }) {
-  const toneMap: Record<string, { bg: string; text: string }> = {
-    blue: { bg: 'bg-blue-50 text-blue-600', text: 'text-blue-600' },
-    emerald: { bg: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600' },
-    purple: { bg: 'bg-purple-50 text-purple-600', text: 'text-purple-600' },
-    cyan: { bg: 'bg-cyan-50 text-cyan-600', text: 'text-cyan-600' },
-    orange: { bg: 'bg-orange-50 text-orange-600', text: 'text-orange-600' },
-    slate: { bg: 'bg-slate-50 text-slate-600', text: 'text-slate-600' },
-  }
-  const cls = toneMap[tone] || toneMap.slate
-
-  return (
-    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${cls.bg} ${cls.text} text-2xl`}>
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold text-slate-500">{label}</div>
-        <div className="mt-1 flex items-baseline gap-1">
-          <span className="font-mono text-xl font-bold text-slate-900 truncate">{value}</span>
-          {unit && <span className="text-xs text-slate-400 font-semibold">{unit}</span>}
-        </div>
-        {subtext && <div className="text-xs text-slate-400 mt-0.5">{subtext}</div>}
-      </div>
-    </div>
-  )
+  return <SharedKpiCard icon={icon} label={label} note={subtext} tone={tone as KpiCardTone} value={unit ? `${value} ${unit}` : value} />
 }
 
 function money(value?: number) {
-  return formatMoney(value ?? 0)
+  return formatMoney(safeNumber(value))
+}
+
+function safeNumber(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
 function toneClass(tone: string) {
@@ -2124,44 +2251,12 @@ function toneClass(tone: string) {
   return map[tone] ?? map.slate
 }
 
-function Metric({ label, tone = 'slate', value }: { label: string; tone?: string; value: string }) {
-  const toneMap: Record<string, { bg: string; text: string }> = {
-    blue: { bg: 'bg-blue-50/50 text-blue-900 border-blue-100', text: 'text-blue-600' },
-    emerald: { bg: 'bg-emerald-50/50 text-emerald-900 border-emerald-100', text: 'text-emerald-600' },
-    red: { bg: 'bg-red-50/50 text-red-900 border-red-100', text: 'text-red-600' },
-    amber: { bg: 'bg-amber-50/50 text-amber-900 border-amber-100', text: 'text-amber-600' },
-    orange: { bg: 'bg-orange-50/50 text-orange-900 border-orange-100', text: 'text-orange-600' },
-    purple: { bg: 'bg-purple-50/50 text-purple-900 border-purple-100', text: 'text-purple-600' },
-    cyan: { bg: 'bg-cyan-50/50 text-cyan-900 border-cyan-100', text: 'text-cyan-600' },
-  }
-  const cls = toneMap[tone] || { bg: 'bg-slate-50/50 text-slate-900 border-slate-100', text: 'text-slate-500' }
-  const icon = label.slice(0, 2)
-  const isEmoji = /[\uD800-\uDFFF\u2600-\u27BF]/.test(icon)
-  const cleanLabel = isEmoji ? label.slice(2).trim() : label
-
-  return (
-    <div className={`rounded-xl border p-4 shadow-sm bg-white border-slate-100 flex items-center gap-3`}>
-      {isEmoji && (
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cls.bg} ${cls.text} text-xl`}>
-          {icon}
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold text-slate-500">{cleanLabel}</div>
-        <div className="mt-0.5 font-mono text-lg font-bold text-slate-900 truncate">{value}</div>
-      </div>
-    </div>
-  )
+function Metric({ label, tone = 'slate', value }: { label: string; tone?: KpiCardTone; value: string }) {
+  return <SharedKpiCard label={label} tone={tone} value={value} />
 }
 
 function BigCard({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
-  return (
-    <div className="bg-white shadow-sm border border-slate-100 rounded-xl p-5">
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className="mt-2 font-mono text-2xl font-bold text-slate-950">{value}</div>
-      <div className="mt-1 text-xs text-slate-400">{sub}</div>
-    </div>
-  )
+  return <SharedKpiCard label={label} note={sub} tone={tone as KpiCardTone} value={value} />
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
@@ -2183,10 +2278,14 @@ function Section({ children, title }: { children: ReactNode; title: string }) {
 }
 
 function BarRows({ rows }: { rows: { label: string; value: number }[] }) {
+  const visibleRows = rows.filter((row) => Number(row.value) !== 0)
+  if (visibleRows.length === 0) {
+    return <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-xs font-medium text-slate-400">ไม่มีข้อมูลในช่วงนี้</div>
+  }
   const max = Math.max(1, ...rows.map((row) => Math.abs(row.value)))
   return (
     <div className="space-y-2">
-      {rows.map((row) => (
+      {visibleRows.map((row) => (
         <div key={row.label}>
           <div className="mb-1 flex justify-between text-xs text-slate-600">
             <span>{row.label}</span>

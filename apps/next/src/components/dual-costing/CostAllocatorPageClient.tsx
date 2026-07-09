@@ -233,6 +233,8 @@ export function CostAllocatorPageClient() {
   const hasSelection = Boolean(selectedProductId)
   const hasPoSell = Boolean(data?.selectedPoSell)
   const hasCandidates = (data?.candidates.length ?? 0) > 0
+  const isManualMode = allocationMode === 'Manual'
+  const shouldShowPreview = isManualMode ? showPreview : hasPoSell
   const sourceTypeButtons = data?.filters.sourceTypes ?? ['po-sell', 'spot-sell']
   const sourceTypeLabel = sourceType === 'po-sell' ? 'PO Sell' : sourceType === 'production' ? 'Production' : 'Spot Sell / บิลขายไม่มี PO'
   const allocationModes = data?.filters.modes?.length ? data.filters.modes : ['FIFO', 'LIFO', 'Cheap', 'Expensive']
@@ -244,17 +246,19 @@ export function CostAllocatorPageClient() {
     }
 
     const matchedOption = productSearchOptions.find((option) => option.id === selectedProductId)
-    if (matchedOption) setSelectedProductOption(matchedOption)
-  }, [productSearchOptions, selectedProductId])
+    if (matchedOption && selectedProductOption?.id !== matchedOption.id) {
+      setSelectedProductOption(matchedOption)
+    }
+  }, [productSearchOptions, selectedProductId, selectedProductOption?.id])
 
   useEffect(() => {
     setCollapsedSections((current) => ({
       ...current,
       step2: hasSelection ? current.step2 : false,
       step3: hasSelection ? current.step3 : false,
-      step4: showPreview && hasCandidates ? current.step4 : false,
+      step4: shouldShowPreview && hasCandidates ? current.step4 : false,
     }))
-  }, [hasCandidates, hasSelection, showPreview])
+  }, [hasCandidates, hasSelection, shouldShowPreview])
 
   function resetSale() {
     setSelectedPoSellId('')
@@ -357,8 +361,8 @@ export function CostAllocatorPageClient() {
                 key={item}
                 className={
                   active
-                    ? 'rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
-                    : 'rounded-lg border border-slate-100 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-100'
+                    ? 'rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
+                    : 'rounded-xl border border-slate-100 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-100'
                 }
                 type="button"
                 onClick={() => {
@@ -419,7 +423,7 @@ export function CostAllocatorPageClient() {
                 value={selectedPoSellId}
                 onChange={(event) => {
                   setSelectedPoSellId(event.target.value)
-                  setShowPreview(false)
+                  setShowPreview(isManualMode ? false : Boolean(event.target.value))
                 }}
               >
                 <option value="">{sourceType === 'po-sell' ? '-- เลือก PO ขาย --' : sourceType === 'production' ? '-- เลือกใบสั่งผลิต --' : '-- เลือกบิลขายไม่มี PO --'}</option>
@@ -429,13 +433,21 @@ export function CostAllocatorPageClient() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-500">Allocation Mode</label>
-              <Select className="focus-visible:ring-emerald-100 border-slate-300" value={allocationMode} onChange={(event) => setAllocationMode(event.target.value)}>
+              <Select
+                className="focus-visible:ring-emerald-100 border-slate-300"
+                value={allocationMode}
+                onChange={(event) => {
+                  const nextMode = event.target.value
+                  setAllocationMode(nextMode)
+                  setShowPreview(nextMode === 'Manual' ? false : Boolean(selectedPoSellId))
+                }}
+              >
                 {allocationModes.map((mode) => <option key={mode} value={mode}>{allocationModeLabel(mode)}</option>)}
               </Select>
             </div>
           </div>
 
-          {allocationMode === 'Manual' && (
+          {isManualMode && (
             <div className="mt-3 rounded-xl border border-amber-200/60 bg-amber-50/20 p-4 space-y-3">
               <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
                 <span>⚙️</span>
@@ -465,7 +477,7 @@ export function CostAllocatorPageClient() {
                   />
                 </div>
                 <Button
-                  className="rounded-lg h-10 px-4 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors focus-visible:outline-none"
+                  className="rounded-md h-10 px-4 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors focus-visible:outline-none"
                   type="button"
                   onClick={handleCalculateManualMatch}
                 >
@@ -519,7 +531,7 @@ export function CostAllocatorPageClient() {
             </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: targetColumnResize.tableMinWidth }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: targetColumnResize.tableMinWidth }}>
               <colgroup>
                 {targetColumns.map((column) => (
                   <col key={column.key} style={targetColumnResize.getColumnStyle(column.key)} />
@@ -575,17 +587,17 @@ export function CostAllocatorPageClient() {
           </div>
 
           <div className="space-y-3 p-3 md:hidden">
-            {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-sm">กำลังโหลด target candidates</div> : null}
-            {!isLoading && (data?.poSells.length ?? 0) === 0 ? <div className="rounded-lg border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-sm">ไม่มี {sourceTypeLabel} ของสินค้านี้ที่ยังไม่ match</div> : null}
+            {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-sm">กำลังโหลด target candidates</div> : null}
+            {!isLoading && (data?.poSells.length ?? 0) === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-sm">ไม่มี {sourceTypeLabel} ของสินค้านี้ที่ยังไม่ match</div> : null}
             {pagedPoSells.map((target) => {
               const active = selectedPoSellId === target.id
               return (
-                <div key={target.id} className={`rounded-lg border p-4 shadow-sm ${active ? 'border-blue-200 bg-blue-50/50' : 'border-slate-200 bg-white'}`}>
+                <div key={target.id} className={`rounded-xl border p-4 shadow-sm ${active ? 'border-blue-200 bg-blue-50/50' : 'border-slate-200 bg-white'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="font-mono text-base font-bold text-slate-900">{target.docNo}</div>
                     <div className="shrink-0 text-sm font-medium text-slate-500">{target.date}</div>
                   </div>
-                  <div className="mt-3 space-y-1.5 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
+                  <div className="mt-3 space-y-1.5 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
                     <div><span className="font-semibold text-slate-500">{sourceType === 'production' ? 'ผู้ผลิต' : 'ลูกค้า'}: </span><span className="text-slate-900">{target.customerName === '-' ? 'ภายในโรงงาน' : target.customerName}</span></div>
                     <div><span className="font-semibold text-slate-500">สินค้า: </span><span className="text-slate-900">{target.productName}</span></div>
                   </div>
@@ -629,7 +641,7 @@ export function CostAllocatorPageClient() {
               </div>
             ) : null}
             <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: poolColumnResize.tableMinWidth, width: '100%' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: poolColumnResize.tableMinWidth, width: '100%' }}>
               <colgroup>
                 {poolColumns.map((column) => (
                   <col key={column.key} style={poolColumnResize.getColumnStyle(column.key)} />
@@ -666,10 +678,10 @@ export function CostAllocatorPageClient() {
           </div>
 
           <div className="space-y-3 md:hidden">
-            {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-sm">กำลังโหลด Cost Pool</div> : null}
-            {!isLoading && (data?.pool.length ?? 0) === 0 ? <div className="rounded-lg border border-slate-200 bg-white p-4 text-center text-sm text-amber-700 shadow-sm">ยังไม่มี Cost Pool lot สำหรับสินค้านี้</div> : null}
+            {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-sm">กำลังโหลด Cost Pool</div> : null}
+            {!isLoading && (data?.pool.length ?? 0) === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-4 text-center text-sm text-amber-700 shadow-sm">ยังไม่มี Cost Pool lot สำหรับสินค้านี้</div> : null}
             {sortedPoolRows.slice(0, 12).map((row) => (
-              <div key={row.costPoolId} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <div key={row.costPoolId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <span className={`rounded border px-2 py-0.5 text-xs font-semibold ${sourceBadgeClass(row.sourceType)}`}>{row.sourceType}</span>
@@ -677,7 +689,7 @@ export function CostAllocatorPageClient() {
                   </div>
                   <div className="shrink-0 text-sm font-medium text-slate-500">{row.date}</div>
                 </div>
-                <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
+                <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
                   <span className="font-semibold text-slate-500">คู่ค้า: </span>
                   <span className="text-slate-900">{row.counterparty}</span>
                 </div>
@@ -695,7 +707,7 @@ export function CostAllocatorPageClient() {
         </DualCostingPanel>
       ) : null}
 
-      {showPreview && hasCandidates ? (
+      {shouldShowPreview && hasCandidates ? (
         <DualCostingPanel title="④ Preview การจับคู่ต้นทุน" titleAction={<PanelToggleButton collapsed={collapsedSections.step4} onClick={() => toggleSection('step4')} />}>
           {!collapsedSections.step4 ? (
           <>
@@ -708,7 +720,7 @@ export function CostAllocatorPageClient() {
               </div>
             ) : null}
             <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: previewColumnResize.tableMinWidth, width: '100%' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: previewColumnResize.tableMinWidth, width: '100%' }}>
               <colgroup>
                 {previewColumns.map((column) => (
                   <col key={column.key} style={previewColumnResize.getColumnStyle(column.key)} />
@@ -744,14 +756,14 @@ export function CostAllocatorPageClient() {
 
           <div className="space-y-3 md:hidden">
             {sortedPreviewRows.map((row) => (
-              <div key={row.costPoolId} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <div key={row.costPoolId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <span className={`rounded border px-2 py-0.5 text-xs font-semibold ${sourceBadgeClass(row.sourceType)}`}>{row.sourceType}</span>
                     <div className="mt-2 font-mono text-base font-bold text-slate-900">{row.sourceNo}</div>
                   </div>
                 </div>
-                <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
+                <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
                   <span className="font-semibold text-slate-500">คู่ค้า: </span>
                   <span className="text-slate-900">{row.counterparty}</span>
                 </div>
@@ -772,9 +784,11 @@ export function CostAllocatorPageClient() {
             <DualCostingStatCard icon="📈" label="กำไรคาดการณ์" tone={(data?.summary.expectedMargin ?? 0) >= 0 ? 'purple' : 'red'} value={formatMoney(data?.summary.expectedMargin ?? 0)} />
           </div>
           <div className="mt-4 flex justify-end gap-2">
-            <Button className="rounded-lg h-10 px-4 text-sm font-semibold focus-visible:ring-slate-100" type="button" variant="secondary" onClick={() => setShowPreview(false)} disabled={isSubmitting}>ปิด Preview</Button>
+            {isManualMode ? (
+              <Button className="rounded-md h-10 px-4 text-sm font-semibold focus-visible:ring-slate-100" type="button" variant="secondary" onClick={() => setShowPreview(false)} disabled={isSubmitting}>ปิด Preview</Button>
+            ) : null}
             <Button
-              className="rounded-lg h-10 px-4 text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors focus-visible:outline-none"
+              className="rounded-md h-10 px-4 text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors focus-visible:outline-none"
               type="button"
               onClick={handleConfirmMatch}
               disabled={isSubmitting}

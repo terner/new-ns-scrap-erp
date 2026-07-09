@@ -64,7 +64,7 @@ export function AccountingPeriodsLockImpactTable({ rows }: { rows: readonly (rea
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {lockImpactColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -89,7 +89,7 @@ export function AccountingPeriodsLockImpactTable({ rows }: { rows: readonly (rea
 
       <div className="space-y-3 p-3 md:hidden">
         {sortedRows.map((row) => (
-          <div key={row.area} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div key={row.area} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-sm font-bold text-slate-900">{row.area}</p>
             <p className="mt-2 text-xs leading-5 text-slate-700">{row.impact}</p>
           </div>

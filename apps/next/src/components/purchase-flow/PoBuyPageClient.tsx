@@ -9,6 +9,8 @@ import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input as UiInput } from '@/components/ui/Input'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select as UiSelect } from '@/components/ui/Select'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
@@ -279,14 +281,14 @@ type PoBuyColumnKey = 'action' | 'checkbox' | 'date' | 'docNo' | 'expectedDelive
 
 const poBuyColumns: Array<ResizableColumnDefinition<PoBuyColumnKey>> = [
   { key: 'checkbox', defaultWidth: 40, minWidth: 40 },
-  { key: 'docNo', defaultWidth: 110, minWidth: 90 },
-  { key: 'date', defaultWidth: 95, minWidth: 80 },
+  { key: 'docNo', defaultWidth: 155, minWidth: 145 },
+  { key: 'date', defaultWidth: 160, minWidth: 150 },
   { key: 'supplierName', defaultWidth: 260, minWidth: 120 },
   { key: 'productName', defaultWidth: 180, minWidth: 100 },
   { key: 'qty', defaultWidth: 110, minWidth: 90 },
   { key: 'totalAmount', defaultWidth: 135, minWidth: 110 },
   { key: 'remainingQty', defaultWidth: 110, minWidth: 90 },
-  { key: 'expectedDelivery', defaultWidth: 110, minWidth: 90 },
+  { key: 'expectedDelivery', defaultWidth: 160, minWidth: 150 },
   { key: 'note', defaultWidth: 85, minWidth: 70 },
   { key: 'status', defaultWidth: 110, minWidth: 90 },
   { key: 'updatedAt', defaultWidth: 180, minWidth: 150 },
@@ -779,7 +781,7 @@ export function PoBuyPageClient() {
       </div>
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden lg:block space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden space-y-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:block">
         <div className="flex flex-wrap items-center gap-2">
           <UiInput className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลข PO / ชื่อผู้ขาย / ชื่อสินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <label className="text-xs text-slate-500">วันที่:</label>
@@ -787,8 +789,6 @@ export function PoBuyPageClient() {
           <span className="text-slate-400">→</span>
           <DatePickerInput id="po-buy-date-to" value={toDate} onChange={setToDate} />
           {hasFilters ? <UiButton size="xs" type="button" variant="secondary" onClick={resetFilters}>✕ ล้าง</UiButton> : null}
-          <ExportButton href={exportHref} />
-          <UiButton type="button" onClick={openCreateForm}>+ PO Buy ใหม่</UiButton>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">สถานะเอกสาร:</span>
@@ -827,11 +827,15 @@ export function PoBuyPageClient() {
             onClick={() => toggleStatusFilter('Cancelled', setStatuses)}
             tone="cancelled"
           />
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <ExportButton href={exportHref} />
+            <UiButton size="sm" type="button" onClick={openCreateForm}>+ PO Buy ใหม่</UiButton>
+          </div>
         </div>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="space-y-2 rounded-md bg-white p-3 shadow lg:hidden">
+      <div className="space-y-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
         <div className="flex gap-2 items-center">
           <UiInput className="min-w-[200px] flex-1 rounded-md h-9" placeholder="ค้นหาเลข PO / ผู้ขาย / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <button
@@ -877,20 +881,31 @@ export function PoBuyPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองรายการจองซื้อ</h4>
+        <MobileFilterSheet
+          title="ตัวกรองรายการจองซื้อ"
+          onClose={() => setShowMobileFilters(false)}
+          footer={(
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  resetFilters()
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4">
+              <button
+                type="button"
+                className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          )}
+        >
               <div>
                 <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                 <div className="flex items-center gap-2">
@@ -940,41 +955,19 @@ export function PoBuyPageClient() {
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  resetFilters()
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       {/* Mobile Card List (Hidden on Desktop) */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-100">กำลังโหลดข้อมูล</div>
+          <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-100">กำลังโหลดข้อมูล</div>
         ) : null}
         
         {!isLoading && pageRows.map((row) => (
           <div
             key={row.id}
-            className="rounded-md border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+            className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
             onClick={() => setSelectedRow(row)}
           >
             <div className="flex justify-between items-start mb-2">
@@ -1019,7 +1012,7 @@ export function PoBuyPageClient() {
         ))}
 
         {!isLoading && totalRows === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-100">
+          <div className="rounded-xl bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-100">
             ยังไม่มี PO Buy
           </div>
         ) : null}
@@ -1029,8 +1022,11 @@ export function PoBuyPageClient() {
       <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <Table className="text-xs font-semibold" style={{ fontFamily: "'Noto Sans Thai', Arial, sans-serif", tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}>
           <colgroup>
-            {poBuyColumns.map((column) => {
+            {poBuyColumns.map((column, index) => {
               const style = columnResize.getColumnStyle(column.key)
+              if (index === poBuyColumns.length - 1) {
+                return <col key={column.key} style={{ minWidth: column.minWidth }} />
+              }
               return <col key={column.key} style={style} />
             })}
           </colgroup>
@@ -1057,8 +1053,8 @@ export function PoBuyPageClient() {
             {!isLoading && pageRows.map((row, index) => (
               <TableRow key={row.id} className={`cursor-pointer border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
                 <TableCell className="text-center"><input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} /></TableCell>
-                <TableCell className="w-36 whitespace-nowrap font-mono">{row.docNo}</TableCell>
-                <TableCell className="w-28 whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
+                <TableCell className="whitespace-nowrap font-mono">{row.docNo}</TableCell>
+                <TableCell className="whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
                 <TableCell className="w-36">{row.supplierName}</TableCell>
                 <TableCell className="w-[280px] max-w-[280px]">
                   <PoBuyItemSummary fallbackText={row.productName} items={row.items} />
@@ -1066,7 +1062,7 @@ export function PoBuyPageClient() {
                 <TableNumberCell value={formatMoney(row.qty)} />
                 <TableNumberCell strong value={formatMoney(row.totalAmount)} />
                 <TableNumberCell tone="amber" value={formatMoney(row.remainingQty)} />
-                <TableCell className="w-28 whitespace-nowrap">{formatDateDisplay(row.expectedDelivery)}</TableCell>
+                <TableCell className="whitespace-nowrap">{formatDateDisplay(row.expectedDelivery)}</TableCell>
                 <TableCell className="text-center"><PoBuyNoteIndicator note={row.notes} poNo={row.docNo} /></TableCell>
                 <TableCell className="w-28 whitespace-nowrap text-center">
                   <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusBadge(row.status)}`}>
@@ -1109,7 +1105,7 @@ export function PoBuyPageClient() {
         </Table>
       </div>
 
-      <div className="fixed bottom-6 right-6 lg:hidden">
+      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 lg:hidden">
         <button
           className="flex size-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
           onClick={openCreateForm}
@@ -1203,47 +1199,7 @@ function SummaryCard({
   tone?: 'blue' | 'amber' | 'emerald' | 'slate'
   value: string
 }) {
-  const configs = {
-    slate: {
-      bg: 'bg-slate-100 text-slate-600',
-      emoji: '📋',
-      labelColor: 'text-slate-500',
-      valueColor: 'text-slate-900',
-    },
-    blue: {
-      bg: 'bg-blue-100 text-blue-600',
-      emoji: '📋',
-      labelColor: 'text-blue-600',
-      valueColor: 'text-blue-700',
-    },
-    amber: {
-      bg: 'bg-amber-100 text-amber-600',
-      emoji: '⏱️',
-      labelColor: 'text-amber-600',
-      valueColor: 'text-amber-700',
-    },
-    emerald: {
-      bg: 'bg-emerald-100 text-emerald-600',
-      emoji: '💰',
-      labelColor: 'text-emerald-600',
-      valueColor: 'text-emerald-700',
-    },
-  }
-
-  const config = configs[tone]
-
-  return (
-    <div className={`bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 ${className}`}>
-      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${config.bg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
-        {config.emoji}
-      </div>
-      <div>
-        <div className={`text-xs ${config.labelColor}`}>{label}</div>
-        <div className={`font-mono text-lg sm:text-2xl font-bold ${config.valueColor}`}>{value}</div>
-        {sublabel ? <div className="text-xs text-slate-400 font-medium mt-0.5">{sublabel}</div> : null}
-      </div>
-    </div>
-  )
+  return <SharedKpiCard className={className} label={label} note={sublabel} tone={tone} value={value} />
 }
 
 function PoBuyNoteIndicator({ note, poNo }: { note: string; poNo: string }) {
@@ -1468,24 +1424,13 @@ function PoBuySegment({
   active,
   label,
   onClick,
-  tone = 'default',
 }: {
   active: boolean
   label: string
   onClick: () => void
   tone?: 'cancelled' | 'default' | 'open' | 'partial' | 'received' | 'shortClosed'
 }) {
-  const className = tone === 'open'
-    ? active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white hover:bg-blue-50'
-    : tone === 'partial'
-      ? active ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-300 bg-white hover:bg-amber-50'
-      : tone === 'received'
-        ? active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white hover:bg-emerald-50'
-        : tone === 'shortClosed'
-          ? active ? 'border-red-600 bg-red-600 text-white' : 'border-slate-300 bg-white hover:bg-red-50'
-        : tone === 'cancelled'
-          ? active ? 'border-slate-500 bg-slate-500 text-white' : 'border-slate-300 bg-white hover:bg-slate-100'
-          : active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white hover:bg-slate-100'
+  const className = active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
 
   return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${className}`} type="button" onClick={onClick}>{label}</button>
 }
@@ -1679,8 +1624,14 @@ function PoBuyFormModal({
       if (!open && !isSaving) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 shadow-2xl !p-0 flex flex-col outline-none focus:outline-none" data-combobox-portal-root="true" hideClose>
-        <DialogHeader className="px-5 py-4 bg-slate-900 text-white flex flex-row items-center rounded-t-md shrink-0">
-          <DialogTitle id="po-buy-form-title" className="text-white font-bold">{heading}</DialogTitle>
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-md shrink-0">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <DialogTitle id="po-buy-form-title" className="truncate text-white font-bold">{heading}</DialogTitle>
+            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+              <UiButton className="h-9 border-emerald-600 bg-emerald-600 px-4 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white disabled:opacity-60" disabled={isSaving} type="button" variant="outline" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</UiButton>
+              <UiButton className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" disabled={isSaving} type="button" variant="outline" onClick={onClose}>ยกเลิก</UiButton>
+            </div>
+          </div>
         </DialogHeader>
         <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-5 text-sm">
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1756,7 +1707,7 @@ function PoBuyFormModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 lg:col-span-1">
-              <label className={`flex h-full items-center gap-3 rounded-md border p-3 cursor-pointer ${form.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-300 bg-white'}`}>
+              <label className={`flex h-full items-center gap-3 rounded-xl border p-3 cursor-pointer ${form.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-300 bg-white'}`}>
                 <input
                   checked={form.hasVat}
                   className="size-5"
@@ -1779,10 +1730,6 @@ function PoBuyFormModal({
             {fieldError('notes')}
           </div>
         </div>
-        <DialogFooter className="px-5 border-t border-slate-100 bg-white py-3 flex justify-end gap-2 rounded-b-md shrink-0">
-          <UiButton className="font-normal" disabled={isSaving} type="button" variant="outline" onClick={onClose}>ยกเลิก</UiButton>
-          <UiButton className="bg-slate-900 font-normal hover:bg-slate-800 text-white rounded-md h-9 transition-colors px-4" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</UiButton>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -1810,16 +1757,65 @@ function PoBuyDetailModal({
       if (!open) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-detail-title" className="max-h-[90vh] max-w-3xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 dark:bg-[#0f172a] border-0 shadow-2xl outline-none focus:outline-none" hideClose>
-        <DialogHeader className="p-4 bg-slate-900 dark:bg-[#0f172a] text-white shrink-0 flex flex-row items-start gap-3 rounded-t-md">
-          <div>
-            <DialogTitle id="po-buy-detail-title" className="text-white text-base font-bold">รายละเอียด {row.docNo}</DialogTitle>
-            <DialogDescription className="text-slate-300">{row.supplierName}</DialogDescription>
+        <DialogHeader className="p-4 bg-slate-900 dark:bg-[#0f172a] text-white shrink-0 rounded-t-md">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
+            <DialogTitle id="po-buy-detail-title" className="truncate text-white text-base font-bold">รายละเอียด {row.docNo}</DialogTitle>
+            <DialogDescription className="truncate text-slate-300">{row.supplierName}</DialogDescription>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {onEdit && onCancel && row.status === 'Open' && row.qty === row.remainingQty ? (
+              <>
+                <UiButton
+                  className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white"
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    onClose()
+                    onCancel(row)
+                  }}
+                >
+                  ยกเลิก PO
+                </UiButton>
+                <UiButton
+                  className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white"
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    onClose()
+                    onEdit(row)
+                  }}
+                >
+                  แก้ไข
+                </UiButton>
+              </>
+            ) : null}
+            {onShortClose && shouldShowShortCloseButton(row) ? (
+              <UiButton
+                className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white"
+                disabled={!canShortClosePoBuy(row)}
+                title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อรับสินค้าบางส่วนแล้ว'}
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onClose()
+                  onShortClose(row)
+                }}
+              >
+                ปิดรับไม่ครบ
+              </UiButton>
+            ) : null}
+            <UiButton className="h-9 border-emerald-600 bg-emerald-600 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(row)}>
+              {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}
+            </UiButton>
+            <UiButton className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={onClose}>ปิด</UiButton>
+          </div>
           </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4 text-sm">
           {/* Card 1: ข้อมูลหลัก */}
-          <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">ข้อมูลหลัก</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-5">
               <div>
@@ -1841,7 +1837,7 @@ function PoBuyDetailModal({
           </div>
 
           {/* Card 2: ยอดเงินและจำนวน */}
-          <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">ยอดเงินและจำนวน</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-5">
               <div>
@@ -1916,53 +1912,6 @@ function PoBuyDetailModal({
           </div>
         </div>
 
-        <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t border-slate-100 bg-white shrink-0 rounded-b-md">
-          {onEdit && onCancel && row.status === 'Open' && row.qty === row.remainingQty ? (
-            <>
-              <UiButton
-                className="font-normal border-red-200 text-red-700 hover:bg-red-50"
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  onClose()
-                  onCancel(row)
-                }}
-              >
-                ยกเลิก PO
-              </UiButton>
-              <UiButton
-                className="font-normal"
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  onClose()
-                  onEdit(row)
-                }}
-              >
-                แก้ไข
-              </UiButton>
-            </>
-          ) : null}
-          {onShortClose && shouldShowShortCloseButton(row) ? (
-            <UiButton
-              className="font-normal border-amber-200 text-amber-700 hover:bg-amber-50"
-              disabled={!canShortClosePoBuy(row)}
-              title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อรับสินค้าบางส่วนแล้ว'}
-              type="button"
-              variant="outline"
-              onClick={() => {
-                onClose()
-                onShortClose(row)
-              }}
-            >
-              ปิดรับไม่ครบ
-            </UiButton>
-          ) : null}
-          <UiButton className="font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(row)}>
-            {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์ PO Buy'}
-          </UiButton>
-          <UiButton className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</UiButton>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

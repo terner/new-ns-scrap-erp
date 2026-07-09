@@ -17,7 +17,7 @@ const DialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={cn('fixed inset-0 z-50 bg-black/40', className)}
+    className={cn('fixed inset-0 z-50 bg-slate-950/50', className)}
     {...props}
   />
 ))
@@ -25,37 +25,44 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean; fallbackTitle?: string }
->(({ className, children, fallbackTitle = 'Dialog', hideClose = false, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white shadow-2xl duration-200 focus:outline-none outline-none focus-visible:outline-none focus-visible:ring-0',
-        className,
-      )}
-      {...props}
-    >
-      <DialogPrimitive.Title className="sr-only">{fallbackTitle}</DialogPrimitive.Title>
-      {children}
-      {!hideClose ? (
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 text-slate-400 hover:text-slate-200">
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      ) : null}
-    </DialogPrimitive.Content>
-  </DialogPortal>
-))
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean; fallbackTitle?: string; mobileAppShell?: boolean }
+>(({ className, children, fallbackTitle = 'Dialog', hideClose = false, mobileAppShell = true, ...props }, ref) => {
+  const classNameText = typeof className === 'string' ? className : ''
+  const isMobileSheet = classNameText.includes('bottom-0') || classNameText.includes('top-auto')
+  const shellMode = mobileAppShell && !isMobileSheet ? 'app' : 'dialog'
+
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        data-ns-dialog-content={shellMode}
+        className={cn(
+          'fixed left-1/2 top-1/2 z-50 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-md border-0 bg-slate-900 !p-0 shadow-2xl duration-200 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0',
+          className,
+        )}
+        {...props}
+      >
+        <DialogPrimitive.Title className="sr-only">{fallbackTitle}</DialogPrimitive.Title>
+        {children}
+        {!hideClose ? (
+          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 text-slate-400 hover:text-slate-200">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        ) : null}
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
+})
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col space-y-1.5 bg-slate-900 text-white p-5 rounded-t-2xl dark:bg-[#0f172a]', className)} {...props} />
+  <div data-ns-dialog-header className={cn('flex flex-col space-y-1.5 rounded-t-md bg-slate-900 p-5 text-white dark:bg-[#0f172a]', className)} {...props} />
 )
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3', className)} {...props} />
+  <div className={cn('flex justify-end gap-2 border-t border-slate-100 bg-white px-4 py-3', className)} {...props} />
 )
 
 const DialogTitle = React.forwardRef<

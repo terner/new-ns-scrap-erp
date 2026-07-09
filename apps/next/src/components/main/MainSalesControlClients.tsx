@@ -4,13 +4,15 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { KpiCard as SharedKpiCard, type KpiCardTone } from '@/components/ui/KpiCard'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 
 type AnyRow = Record<string, number | string | boolean | null | undefined>
 type SortDirection = 'asc' | 'desc'
 type TableColumn<TKey extends string> = ResizableColumnDefinition<TKey> & { align?: 'center' | 'left' | 'right'; label: string }
-type SalesPlanColumnKey = 'action' | 'channel' | 'containers' | 'customerName' | 'fx' | 'kgPerContainer' | 'lme' | 'productName' | 'sellPctLme' | 'sellPrice' | 'status' | 'totalKg'
+type SalesPlanColumnKey = 'channel' | 'containers' | 'customerName' | 'fx' | 'kgPerContainer' | 'lme' | 'productName' | 'sellPctLme' | 'sellPrice' | 'status' | 'totalKg'
 type SalesPlanAnalysisColumnKey = 'bestPlanPct' | 'bestPlanPrice' | 'lockedKg' | 'metalGroup' | 'name' | 'projectedMarginPct' | 'projectedProfit' | 'recommendation' | 'remainingKg' | 'stock' | 'wac'
 type SalesPlanRemainingColumnKey = 'code' | 'lockedContainers' | 'lockedKg' | 'metalGroup' | 'name' | 'remainingContainers' | 'remainingKg' | 'stock' | 'value' | 'wac'
 type CommissionCategoryColumnKey = 'amount' | 'category' | 'qty'
@@ -86,7 +88,6 @@ const salesPlanColumns: Array<TableColumn<SalesPlanColumnKey>> = [
   { key: 'fx', label: 'FX', defaultWidth: 90, minWidth: 75, align: 'right' },
   { key: 'sellPrice', label: 'ราคา THB/kg', defaultWidth: 135, minWidth: 115, align: 'right' },
   { key: 'status', label: 'สถานะ', defaultWidth: 150, minWidth: 120, align: 'center' },
-  { key: 'action', label: 'จัดการ', defaultWidth: 80, minWidth: 70, align: 'right' },
 ]
 const salesPlanAnalysisColumns: Array<TableColumn<SalesPlanAnalysisColumnKey>> = [
   { key: 'name', label: 'สินค้า', defaultWidth: 230, minWidth: 165 },
@@ -165,7 +166,6 @@ function compareSortValues(left: string | number, right: string | number) {
 }
 
 function getAnySortValue(row: AnyRow, key: string): string | number {
-  if (key === 'action') return ''
   if (key === 'lockedContainers') return 0
   const value = row[key]
   return typeof value === 'number' || typeof value === 'string' ? value : ''
@@ -276,7 +276,6 @@ export function SalesPlanPageClient() {
   }
 
   function changePlanSort(key: SalesPlanColumnKey) {
-    if (key === 'action') return
     if (planSortKey === key) {
       setPlanSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
       return
@@ -312,22 +311,21 @@ export function SalesPlanPageClient() {
         <LmeStat label="📦 กก./ตู้" value={`${money(data?.lmeConfig.kgPerContainer)} กก.`} />
         <div className="text-xs text-slate-400 font-medium self-center px-2">LME Config ยังเป็น read-only จนกว่าจะมีหน้าตั้งค่าเฉพาะ</div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <label className="text-xs font-bold text-slate-500">เดือน</label>
-        <input className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
-        <select className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={filterGroup} onChange={(event) => setFilterGroup(event.target.value)}>
+        <input className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+        <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={filterGroup} onChange={(event) => setFilterGroup(event.target.value)}>
           <option value="">ทุกหมวด (ทองแดง+ทองเหลือง)</option>
           <option value="ทองแดง">🥉 ทองแดง เท่านั้น</option>
           <option value="ทองเหลือง">🌟 ทองเหลือง เท่านั้น</option>
         </select>
-        <select className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={filterChannel} onChange={(event) => setFilterChannel(event.target.value)}>
+        <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={filterChannel} onChange={(event) => setFilterChannel(event.target.value)}>
           <option value="">ทุกช่องทาง</option>
           <option value="export">🌍 ส่งออก</option>
           <option value="domestic">🇹🇭 ในประเทศ</option>
         </select>
         <span className="flex-1" />
-        <button className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-400 outline-none focus:outline-none focus:ring-0 cursor-not-allowed opacity-60 h-10 flex items-center justify-center" disabled type="button">+ เพิ่มรายการ</button>
-        <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center" onClick={exportPlan} type="button">📥 Export CSV</button>
+        <button className="flex h-9 items-center justify-center rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-emerald-700 outline-none focus:outline-none focus:ring-0" onClick={exportPlan} type="button">ส่งออก Excel</button>
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
@@ -385,7 +383,7 @@ export function SalesPlanPageClient() {
           </div>
         ) : null}
         <div className="hidden overflow-x-auto lg:block">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: planResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: planResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {salesPlanColumns.map((column) => (
                 <col key={column.key} style={planResize.getColumnStyle(column.key)} />
@@ -400,7 +398,7 @@ export function SalesPlanPageClient() {
                     align={column.align}
                     direction={planSortDirection}
                     label={column.label}
-                    sortKey={column.key === 'action' ? undefined : column.key}
+                    sortKey={column.key}
                     onSort={changePlanSort}
                     resizeProps={planResize.getResizeHandleProps(column.key, column.label)}
                   />
@@ -410,21 +408,20 @@ export function SalesPlanPageClient() {
             <tbody className="divide-y divide-slate-100">
               {sortedPlanRows.map((row) => (
                 <tr className="hover:bg-slate-50/50 transition-colors" key={text(row.id)}>
-                  <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.productId)}><option>{text(row.productName) || '-เลือก-'}</option></select></td>
-                  <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.channel)}><option>{text(row.channel) || 'ส่งออก'}</option></select></td>
-                  <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.customerId)}><option>{text(row.customerName) || '-เลือก-'}</option></select></td>
-                  <td className="p-1.5"><input className="w-full rounded-xl border border-slate-200 px-2 py-1 text-right text-xs bg-slate-50 outline-none" disabled type="number" value={num(row.containers)} /></td>
-                  <td className="p-1.5"><input className="w-full rounded-xl border border-slate-200 px-2 py-1 text-right text-xs bg-slate-50 outline-none" disabled type="number" value={num(row.kgPerContainer)} /></td>
+                  <td className="p-1.5"><select className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.productId)}><option>{text(row.productName) || '-เลือก-'}</option></select></td>
+                  <td className="p-1.5"><select className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.channel)}><option>{text(row.channel) || 'ส่งออก'}</option></select></td>
+                  <td className="p-1.5"><select className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.customerId)}><option>{text(row.customerName) || '-เลือก-'}</option></select></td>
+                  <td className="p-1.5"><input className="w-full rounded-md border border-slate-200 px-2 py-1 text-right text-xs bg-slate-50 outline-none" disabled type="number" value={num(row.containers)} /></td>
+                  <td className="p-1.5"><input className="w-full rounded-md border border-slate-200 px-2 py-1 text-right text-xs bg-slate-50 outline-none" disabled type="number" value={num(row.kgPerContainer)} /></td>
                   <td className="p-1.5 text-right font-semibold text-slate-800">{money(row.totalKg)}</td>
-                  <td className="p-1.5"><input className="w-full rounded-xl border border-amber-200 bg-amber-50/30 px-2 py-1 text-right text-xs font-bold text-amber-700 outline-none" disabled type="number" value={num(row.sellPctLme)} /></td>
+                  <td className="p-1.5"><input className="w-full rounded-md border border-amber-200 bg-amber-50/30 px-2 py-1 text-right text-xs font-bold text-amber-700 outline-none" disabled type="number" value={num(row.sellPctLme)} /></td>
                   <td className="p-1.5 text-right text-xs text-slate-400 font-medium">{money(row.lme)}</td>
                   <td className="p-1.5 text-right text-xs text-slate-400 font-medium">{money(row.fx)}</td>
                   <td className="bg-emerald-50/20 p-1.5 text-right font-bold text-emerald-600">{money(row.sellPrice)}</td>
-                  <td className="p-1.5 text-center"><button className="w-full rounded-xl bg-amber-100/50 px-2.5 py-1 text-xs font-semibold text-amber-700 opacity-80 cursor-not-allowed" disabled type="button">⏳ Pending — กดล็อก</button></td>
-                  <td className="p-1.5 text-right"><button className="rounded-full w-6 h-6 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 opacity-60 transition-colors" disabled type="button">×</button></td>
+                  <td className="p-1.5 text-center"><span className="inline-flex rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{text(row.status) || 'Pending'}</span></td>
                 </tr>
               ))}
-              {!sortedPlanRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanColumns.length}>ยังไม่มีรายการในเดือนนี้ - กด + เพิ่มรายการ</td></tr> : null}
+              {!sortedPlanRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanColumns.length}>ยังไม่มีรายการในเดือนนี้</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -465,14 +462,11 @@ export function SalesPlanPageClient() {
               </div>
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-400 font-semibold">สถานะ:</span>
-                <div className="flex gap-2">
-                  <button className="rounded-xl bg-amber-100/50 px-2.5 py-1 text-xs font-semibold text-amber-700 opacity-80 cursor-not-allowed" disabled type="button">⏳ Pending — กดล็อก</button>
-                  <button className="rounded-full w-6 h-6 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 opacity-60 transition-colors" disabled type="button">×</button>
-                </div>
+                <span className="rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{text(row.status) || 'Pending'}</span>
               </div>
             </div>
           ))}
-          {!sortedPlanRows.length ? <div className="text-center text-slate-400 py-4 font-semibold text-xs">ยังไม่มีรายการในเดือนนี้ - กด + เพิ่มรายการ</div> : null}
+          {!sortedPlanRows.length ? <div className="text-center text-slate-400 py-4 font-semibold text-xs">ยังไม่มีรายการในเดือนนี้</div> : null}
         </div>
       </div>
 
@@ -481,7 +475,6 @@ export function SalesPlanPageClient() {
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4">
           <div>
             <h3 className="font-bold text-slate-800 text-sm">📊 วิเคราะห์แผนขาย vs สต๊อกว่างขาย — ผู้บริหารตัดสินใจ</h3>
-            <p className="text-xs text-slate-400 font-semibold mt-0.5">เปรียบเทียบราคาที่เสนอในแผนขาย vs WAC ของสต๊อกที่ยังว่างให้ขาย</p>
           </div>
         </div>
 
@@ -492,7 +485,7 @@ export function SalesPlanPageClient() {
           </div>
         ) : null}
         <div className="hidden overflow-x-auto lg:block">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: analysisResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: analysisResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {salesPlanAnalysisColumns.map((column) => (
                 <col key={column.key} style={analysisResize.getColumnStyle(column.key)} />
@@ -596,7 +589,7 @@ export function SalesPlanPageClient() {
           </div>
         ) : null}
         <div className="hidden overflow-x-auto lg:block">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: remainingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: remainingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {salesPlanRemainingColumns.map((column) => (
                 <col key={column.key} style={remainingResize.getColumnStyle(column.key)} />
@@ -670,7 +663,6 @@ export function SalesPlanPageClient() {
         </div>
       </div>
 
-      <Notice text={data?.sourceState.limitations[0]} />
       {error ? <ErrorBox text={error} /> : null}
     </section>
   )
@@ -679,7 +671,7 @@ export function SalesPlanPageClient() {
 function Select({ onChange, options, value }: { onChange: (value: string) => void; options: { id: string; name: string }[]; value: string }) {
   return (
     <select
-      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none select h-10 transition-all focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+      className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none select h-10 transition-all focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
       value={value}
       onChange={(event) => onChange(event.target.value)}
     >
@@ -712,6 +704,7 @@ export function SalesCommissionPageClient() {
   const [data, setData] = useState<CommissionPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showCommissionMobileFilters, setShowCommissionMobileFilters] = useState(false)
 
   // Filters for tables in drilldown or overview
   const [summarySalesFilter, setSummarySalesFilter] = useState('ALL')
@@ -965,10 +958,10 @@ export function SalesCommissionPageClient() {
           <div className="flex gap-2">
             <button
               onClick={handleDownloadCsv}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 shadow-xs outline-none transition-colors h-10 flex items-center justify-center gap-1.5"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white shadow-xs outline-none transition-colors hover:bg-emerald-700"
               type="button"
             >
-              📥 ส่งออกรายละเอียด CSV
+              ส่งออก Excel
             </button>
             <button
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 shadow-xs outline-none transition-colors h-10 flex items-center justify-center"
@@ -1009,7 +1002,7 @@ export function SalesCommissionPageClient() {
               </div>
             ) : null}
             <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
-              <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table1Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+              <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table1Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
                   {commissionCategoryColumns.map((column) => (
                     <col key={column.key} style={table1Resize.getColumnStyle(column.key)} />
@@ -1063,7 +1056,7 @@ export function SalesCommissionPageClient() {
               </div>
             ) : null}
             <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
-              <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table2Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+              <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table2Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
                   {commissionCategoryColumns.map((column) => (
                     <col key={column.key} style={table2Resize.getColumnStyle(column.key)} />
@@ -1118,7 +1111,7 @@ export function SalesCommissionPageClient() {
             </div>
           ) : null}
           <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm mb-3">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table3Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table3Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {commissionSupplierColumns.map((column) => (
                   <col key={column.key} style={table3Resize.getColumnStyle(column.key)} />
@@ -1174,14 +1167,14 @@ export function SalesCommissionPageClient() {
               <span className="text-xs text-slate-500 font-semibold">แสดงหน้า {table3Page} จาก {totalTable3Pages} (ทั้งหมด {table3Data.length} รายการ)</span>
               <div className="flex gap-1">
                 <button
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 outline-none"
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 outline-none"
                   disabled={table3Page <= 1}
                   onClick={() => setTable3Page((p) => p - 1)}
                 >
                   ย้อนกลับ
                 </button>
                 <button
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 outline-none"
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 outline-none"
                   disabled={table3Page >= totalTable3Pages}
                   onClick={() => setTable3Page((p) => p + 1)}
                 >
@@ -1196,7 +1189,7 @@ export function SalesCommissionPageClient() {
         <Panel title="📊 Table 4: รายการสินค้าละเอียด">
           <div className="mb-3 flex gap-2">
             <input
-              className="border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white font-semibold text-slate-700 h-9 w-64 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-all"
+              className="border border-slate-200 rounded-md px-3 py-2 text-xs bg-white font-semibold text-slate-700 h-9 w-64 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-all"
               placeholder="ค้นหาเลขที่บิล, Supplier, สินค้า..."
               value={table4Search}
               onChange={(e) => {
@@ -1211,7 +1204,7 @@ export function SalesCommissionPageClient() {
             </div>
           ) : null}
           <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm mb-3">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table4Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table4Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {commissionBillColumns.map((column) => (
                   <col key={column.key} style={table4Resize.getColumnStyle(column.key)} />
@@ -1273,14 +1266,14 @@ export function SalesCommissionPageClient() {
               <span className="text-xs text-slate-500 font-semibold">แสดงหน้า {table4Page} จาก {totalTable4Pages} (ทั้งหมด {sortedTable4Data.length} รายการ)</span>
               <div className="flex gap-1">
                 <button
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 outline-none"
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 outline-none"
                   disabled={table4Page <= 1}
                   onClick={() => setTable4Page((p) => p - 1)}
                 >
                   ย้อนกลับ
                 </button>
                 <button
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 outline-none"
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 outline-none"
                   disabled={table4Page >= totalTable4Pages}
                   onClick={() => setTable4Page((p) => p + 1)}
                 >
@@ -1298,7 +1291,23 @@ export function SalesCommissionPageClient() {
   return (
     <section className="space-y-4 text-[13.5px]">
       {/* Filters Toolbar */}
-      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-semibold text-slate-500">ช่วงวันที่</div>
+            <div className="truncate text-sm font-semibold text-slate-900">{formatDateDisplay(from)} - {formatDateDisplay(to)}</div>
+          </div>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200"
+            type="button"
+            onClick={() => setShowCommissionMobileFilters(true)}
+          >
+            ตัวกรอง{branchId ? ' (มี)' : ''}
+          </button>
+        </div>
+      </div>
+
+      <div className="hidden rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:block">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4 items-end">
           <Field label="จากวันที่">
             <DatePickerInput className="w-full mt-1" value={from} onChange={setFrom} />
@@ -1326,6 +1335,31 @@ export function SalesCommissionPageClient() {
           <span className="rounded-xl bg-slate-100 text-slate-700 px-2.5 py-1 text-xs font-bold">{money(data?.totals.bills)} บิล</span>
         </div>
       </div>
+
+      {showCommissionMobileFilters ? (
+        <MobileFilterSheet
+          title="ตัวกรอง Sales Tracking"
+          onClose={() => setShowCommissionMobileFilters(false)}
+          footer={(
+            <>
+              <button className="h-10 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700" type="button" onClick={() => setBranchId('')}>ล้าง</button>
+              <button className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white" type="button" onClick={() => setShowCommissionMobileFilters(false)}>ปิด</button>
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            <Field label="จากวันที่">
+              <DatePickerInput className="mt-1 w-full" value={from} onChange={setFrom} />
+            </Field>
+            <Field label="ถึงวันที่">
+              <DatePickerInput className="mt-1 w-full" value={to} onChange={setTo} />
+            </Field>
+            <Field label="สาขา">
+              <Select options={data?.filters.branches ?? []} value={branchId} onChange={setBranchId} />
+            </Field>
+          </div>
+        </MobileFilterSheet>
+      ) : null}
 
       {/* 8 Summary Metrics Cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
@@ -1381,7 +1415,7 @@ export function SalesCommissionPageClient() {
         <div className="mb-3.5 flex items-center gap-3">
           <label className="text-xs font-bold text-slate-500">เลือกดูพนักงานขาย:</label>
           <select
-            className="border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white font-semibold text-slate-700 h-9 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-all cursor-pointer"
+            className="border border-slate-200 rounded-md px-3 py-2 text-xs bg-white font-semibold text-slate-700 h-9 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-all cursor-pointer"
             value={summarySalesFilter}
             onChange={(e) => setSummarySalesFilter(e.target.value)}
           >
@@ -1397,8 +1431,8 @@ export function SalesCommissionPageClient() {
             <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={summaryResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
           </div>
         ) : null}
-        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: summaryResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: summaryResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {commissionSummaryColumns.map((column) => (
                 <col key={column.key} style={summaryResize.getColumnStyle(column.key)} />
@@ -1455,9 +1489,32 @@ export function SalesCommissionPageClient() {
             </tbody>
           </table>
         </div>
+        <div className="space-y-3 lg:hidden">
+          {summaryFlatRows.map((row) => (
+            <button
+              key={`${row.salesId}-${row.category}`}
+              className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm active:bg-slate-50"
+              type="button"
+              onClick={() => setSelectedSales(row.salesId)}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-bold text-slate-900">{row.salesName}</div>
+                  <div className="mt-0.5 text-xs font-semibold text-slate-500">{row.category}</div>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <Mini label="จำนวน" value={money(row.qty)} />
+                <Mini label="ยอดซื้อ" value={money(row.amount)} />
+              </div>
+            </button>
+          ))}
+          {summaryFlatRows.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-400">ไม่มีข้อมูล</div>
+          ) : null}
+        </div>
       </Panel>
 
-      <Notice text={data?.sourceState.limitations[0]} />
       {error ? <ErrorBox text={error} /> : null}
     </section>
   )
@@ -1468,7 +1525,7 @@ function SimpleTable({ empty = 'ไม่มีข้อมูล', headers, row
     <div>
       {/* Desktop View Table */}
       <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        <table className="w-full text-xs">
+        <table className="ns-table w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
               {headers.map((h) => (
@@ -1553,57 +1610,17 @@ function Panel({ children, title }: { children: ReactNode; title: string }) {
 function LmeStat({ label, value }: { label: string; value: string }) {
   const icon = label.slice(0, 2)
   const cleanLabel = label.slice(2).trim()
-  return (
-    <div className="bg-white p-3 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 flex-1 w-full">
-      <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-lg shrink-0">
-        {icon}
-      </div>
-      <div>
-        <div className="text-xs text-slate-500 font-semibold mb-0.5">{cleanLabel}</div>
-        <div className="text-sm font-bold text-slate-800">{value}</div>
-      </div>
-    </div>
-  )
+  return <SharedKpiCard className="flex-1 w-full" icon={icon} label={cleanLabel} tone="slate" value={value} />
 }
 
-function Metric({ label, tone, value }: { label: string; tone: string; value: string }) {
-  const colors: Record<string, { bg: string; text: string; emoji: string }> = {
-    amber: { bg: 'bg-amber-50', text: 'text-amber-600', emoji: '⏳' },
-    blue: { bg: 'bg-blue-50', text: 'text-blue-600', emoji: '📋' },
-    emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', emoji: '📈' },
-    purple: { bg: 'bg-purple-50', text: 'text-purple-600', emoji: '📦' },
-    red: { bg: 'bg-red-50', text: 'text-red-600', emoji: '⚠️' },
-    slate: { bg: 'bg-slate-100', text: 'text-slate-600', emoji: '🏷️' }
-  }
-  const style = colors[tone] ?? colors.slate
-  return (
-    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3 w-full">
-      <div className={`w-10 h-10 rounded-full ${style.bg} ${style.text} flex items-center justify-center text-lg shrink-0`}>
-        {style.emoji}
-      </div>
-      <div>
-        <div className="text-xs text-slate-500 font-semibold mb-0.5">{label}</div>
-        <div className="text-lg font-bold text-slate-800 leading-tight">{value}</div>
-      </div>
-    </div>
-  )
+function Metric({ label, tone, value }: { label: string; tone: KpiCardTone; value: string }) {
+  return <SharedKpiCard label={label} tone={tone} value={value} />
 }
 
 function BigCard({ label, tone, value }: { label: string; tone: string; value: string }) {
   const isWeight = label.includes('น้ำหนัก')
   const emoji = isWeight ? '📦' : '💰'
-  const iconBg = isWeight ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'
-  return (
-    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-5 flex items-center gap-4 w-full">
-      <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center text-xl shrink-0`}>
-        {emoji}
-      </div>
-      <div>
-        <div className="text-xs text-slate-500 font-semibold mb-1">{label}</div>
-        <div className="break-words font-mono text-2xl font-bold text-slate-800">{value}</div>
-      </div>
-    </div>
-  )
+  return <SharedKpiCard className="w-full" icon={emoji} label={label} tone={(isWeight ? 'amber' : tone || 'blue') as KpiCardTone} value={value} />
 }
 
 function Mini({ label, value }: { label: string; value: string }) {
@@ -1611,15 +1628,6 @@ function Mini({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-xs">
       <div className="text-xs text-slate-400 font-semibold">{label}</div>
       <div className="text-xs font-bold text-slate-800">{value}</div>
-    </div>
-  )
-}
-
-function Notice({ text: value }: { text?: string }) {
-  return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 text-xs font-semibold text-amber-800 shadow-sm leading-relaxed">
-      <span>💡 <b>Read/design baseline:</b></span>
-      <span className="ml-1.5">{value ?? 'ไม่มี write action ใน baseline นี้'}</span>
     </div>
   )
 }

@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
@@ -15,7 +17,7 @@ import { useResizableColumns, type ResizableColumnDefinition } from '@/component
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
-import { supplierAdvancePaymentFormSchema } from '@/lib/purchase-advance'
+import { calculateSupplierAdvanceTaxBreakdown, supplierAdvancePaymentFormSchema } from '@/lib/purchase-advance'
 import { openAdvancePaymentPrint } from '@/lib/advance-payment-print'
 
 type OptionRow = {
@@ -40,6 +42,8 @@ type AdvancePaymentColumnKey = 'action' | 'advanceDate' | 'allocatedAmount' | 'a
 type AdvancePaymentRow = {
   accountName: string
   advanceDate: string
+  advanceType: string
+  advanceTypeLabel: string
   allocatedAmount: number
   allocations: AdvancePaymentAllocation[]
   branchId: string
@@ -57,6 +61,7 @@ type AdvancePaymentRow = {
   fundingAccountId: string
   id: string
   inDate: string
+  invoiceNo: string
   largeScaleDocNo: string
   netWeight: number
   outDate: string
@@ -70,12 +75,18 @@ type AdvancePaymentRow = {
   senderName: string
   status: string
   statusLabel: string
+  subtotalAmount: number
   supplierCode: string
   supplierId: string
   supplierName: string
+  totalAmount: number
   lockedReason?: string
   updatedAt: string
   updatedBy: string
+  vatAmount: number
+  vatRatePercent: number
+  vatType: string
+  vatTypeLabel: string
   vehiclePhotoNames: string[]
   weightIn: number
   weightOut: number
@@ -83,8 +94,11 @@ type AdvancePaymentRow = {
 
 type AdvancePaymentAllocation = {
   allocatedAmount: number
+  allocatedSubtotalAmount: number
   allocatedAt: string
   allocatedBy: string
+  allocatedTotalAmount: number
+  allocatedVatAmount: number
   id: string
   purchaseBillDocNo: string
   purchaseBillId: string
@@ -153,6 +167,7 @@ const advancePaymentColumns: Array<ResizableColumnDefinition<AdvancePaymentColum
 ]
 
 const emptyForm = (): FormState => ({
+  advanceType: 'WAITING_SORT',
   amount: '',
   branchId: '',
   customerName: '',
@@ -160,6 +175,7 @@ const emptyForm = (): FormState => ({
   driverName: '',
   fundingAccountId: '',
   inDate: '',
+  invoiceNo: '',
   largeScaleDocNo: '',
   netWeight: '',
   outDate: '',
@@ -172,6 +188,7 @@ const emptyForm = (): FormState => ({
   scaleOperator: '',
   senderName: '',
   supplierId: '',
+  vatType: 'NONE',
   weightIn: '',
   weightOut: '',
 })
@@ -261,6 +278,7 @@ export function AdvancePaymentsPageClient() {
     searchText: `${product.code ?? ''} ${product.name} ${product.unit ?? ''}`,
   })), [activeProducts])
   const selectedProduct = useMemo(() => activeProducts.find((product) => product.id === form.productId) ?? null, [activeProducts, form.productId])
+  const isAdvanceInvoice = form.advanceType === 'ADVANCE_INVOICE'
   const derivedNetWeight = useMemo(() => calculateNetWeightInputValue(form.weightIn, form.weightOut), [form.weightIn, form.weightOut])
   const computedAmount = useMemo(() => {
     const netWeight = Number(derivedNetWeight)
@@ -268,6 +286,11 @@ export function AdvancePaymentsPageClient() {
     if (!Number.isFinite(netWeight) || !Number.isFinite(pricePerKg)) return 0
     return Math.max(0, netWeight * pricePerKg)
   }, [derivedNetWeight, form.pricePerKg])
+  const taxBreakdown = useMemo(() => calculateSupplierAdvanceTaxBreakdown({
+    amount: Number(form.amount) || 0,
+    vatRatePercent: 7,
+    vatType: form.vatType === 'INCLUDE' ? 'INCLUDE' : 'NONE',
+  }), [form.amount, form.vatType])
 
   const closeForm = useCallback(() => {
     setEditingAdvanceId(null)
@@ -289,11 +312,13 @@ export function AdvancePaymentsPageClient() {
     setError(null)
     setForm(() => ({
       ...emptyForm(),
+      advanceType: 'WAITING_SORT',
       branchId: '',
       fundingAccountId: '',
       inDate: defaultDateTime,
       outDate: defaultDateTime,
       paymentMethod: '',
+      vatType: 'NONE',
     }))
     setIsFormOpen(true)
   }, [])
@@ -304,12 +329,14 @@ export function AdvancePaymentsPageClient() {
       docNo: row.docNo,
       advanceDate: row.advanceDate,
       amount: row.amount,
+      advanceTypeLabel: row.advanceTypeLabel,
       allocatedAmount: row.allocatedAmount,
       remainingAmount: row.remainingAmount,
       branchId: row.branchId,
       branchName: row.branchName,
       supplierName: row.supplierName,
       customerName: row.customerName,
+      invoiceNo: row.invoiceNo,
       plateNo: row.plateNo,
       productName: row.productName,
       netWeight: row.netWeight,
@@ -317,6 +344,11 @@ export function AdvancePaymentsPageClient() {
       paymentMethod: row.paymentMethod,
       accountName: row.accountName,
       remark: row.remark,
+      subtotalAmount: row.subtotalAmount,
+      totalAmount: row.totalAmount,
+      vatAmount: row.vatAmount,
+      vatRatePercent: row.vatRatePercent,
+      vatTypeLabel: row.vatTypeLabel,
       createdBy: row.createdBy,
       createdAt: row.createdAt,
       allocations: row.allocations,
@@ -331,13 +363,17 @@ export function AdvancePaymentsPageClient() {
     setFieldErrors({})
     setError(null)
     setForm({
-      amount: row.amount ? String(row.amount) : '',
+      amount: row.vatType === 'INCLUDE'
+        ? (row.subtotalAmount ? String(row.subtotalAmount) : '')
+        : (row.amount ? String(row.amount) : ''),
+      advanceType: row.advanceType ?? 'WAITING_SORT',
       branchId: 'branchId' in row ? row.branchId : '',
       customerName: row.customerName ?? '',
       docNo: row.docNo ?? '',
       driverName: 'driverName' in row ? row.driverName : '',
       fundingAccountId: 'fundingAccountId' in row ? row.fundingAccountId : '',
       inDate: 'inDate' in row && row.inDate ? row.inDate : defaultDateTime,
+      invoiceNo: row.invoiceNo ?? '',
       largeScaleDocNo: row.largeScaleDocNo ?? '',
       netWeight: calculateNetWeightInputValue(String(row.weightIn ?? ''), String(row.weightOut ?? '')),
       outDate: 'outDate' in row && row.outDate ? row.outDate : defaultDateTime,
@@ -350,6 +386,7 @@ export function AdvancePaymentsPageClient() {
       scaleOperator: 'scaleOperator' in row ? row.scaleOperator : '',
       senderName: 'senderName' in row ? row.senderName : '',
       supplierId: 'supplierId' in row ? row.supplierId : '',
+      vatType: row.vatType ?? 'NONE',
       weightIn: String(row.weightIn ?? ''),
       weightOut: String(row.weightOut ?? ''),
     })
@@ -425,6 +462,22 @@ export function AdvancePaymentsPageClient() {
         ))
         if (!supplierStillEligible) next.supplierId = ''
       }
+      if (field === 'advanceType') {
+        if (value === 'WAITING_SORT') {
+          next.invoiceNo = ''
+        } else {
+          next.largeScaleDocNo = ''
+          next.inDate = ''
+          next.outDate = ''
+          next.productId = ''
+          next.productName = ''
+          next.weightIn = ''
+          next.weightOut = ''
+          next.netWeight = ''
+          next.pricePerKg = ''
+          next.plateNo = ''
+        }
+      }
       return next
     })
     setFieldErrors((current) => {
@@ -468,11 +521,15 @@ export function AdvancePaymentsPageClient() {
     setFieldErrors({})
     const normalizedForm = {
       ...form,
-      netWeight: calculateNetWeightInputValue(form.weightIn, form.weightOut),
+      netWeight: isAdvanceInvoice ? '0' : calculateNetWeightInputValue(form.weightIn, form.weightOut),
+      pricePerKg: isAdvanceInvoice ? '0' : form.pricePerKg,
+      productId: isAdvanceInvoice ? '' : form.productId,
+      weightIn: isAdvanceInvoice ? '0' : form.weightIn,
+      weightOut: isAdvanceInvoice ? '0' : form.weightOut,
     }
     const parsed = supplierAdvancePaymentFormSchema.safeParse({
       ...normalizedForm,
-      productName: selectedProduct?.name ?? '',
+      productName: isAdvanceInvoice ? '' : selectedProduct?.name ?? '',
       vehiclePhotoNames: vehiclePhotoFiles.map((file) => file.fileName),
     })
     if (!parsed.success) {
@@ -483,14 +540,13 @@ export function AdvancePaymentsPageClient() {
 
     setIsSaving(true)
     try {
-      const saved = await dailyFetchJson<{ id: string }>(editingAdvanceId ? `/api/purchase/advance-payments/${editingAdvanceId}` : '/api/purchase/advance-payments', {
+      await dailyFetchJson<{ id: string }>(editingAdvanceId ? `/api/purchase/advance-payments/${editingAdvanceId}` : '/api/purchase/advance-payments', {
         body: JSON.stringify(parsed.data),
         method: editingAdvanceId ? 'PUT' : 'POST',
       })
       setForm(emptyForm())
       closeForm()
       await loadData()
-      if (saved.id) await loadDetail(saved.id)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'บันทึกรายการจ่ายเงินล่วงหน้าไม่ได้')
     } finally {
@@ -569,11 +625,11 @@ export function AdvancePaymentsPageClient() {
           <div>
             <Button type="button" variant="outline" onClick={closeForm}><ArrowLeft className="mr-1 h-4 w-4" />กลับไปหน้ารายการ</Button>
           </div>
-          <div className="rounded-2xl bg-white p-4 shadow">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-4">
             <div>
               <div className="text-sm font-semibold text-slate-900">{editingAdvanceId ? `แก้ไขรายการ ADV ${editingAdvanceNo ?? ''}` : 'สร้างรายการจ่ายเงินล่วงหน้า / มัดจำ'}</div>
-              <div className="text-xs text-slate-500">{editingAdvanceId ? 'แก้ไขได้เฉพาะรายการที่ยังไม่อนุมัติ และยังไม่ถูกใช้หักบิล' : 'บันทึกเอกสาร ADV ใหม่จากข้อมูลใบชั่งใหญ่และข้อมูลการจ่ายเงิน'}</div>
+              <div className="text-xs text-slate-500">{editingAdvanceId ? 'แก้ไขได้เฉพาะรายการที่ยังไม่อนุมัติ และยังไม่ถูกใช้หักบิล' : 'บันทึกเอกสาร ADV ใหม่จากประเภทมัดจำ ข้อมูลผู้ขาย และยอดการจ่ายเงิน'}</div>
             </div>
           </div>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -582,42 +638,65 @@ export function AdvancePaymentsPageClient() {
                 description="ระบุผู้ขาย สาขา และยอดเงินที่ต้องจ่ายล่วงหน้า"
                 title="ข้อมูลการเงิน"
               >
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                  <div className="col-span-2 sm:col-span-1">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-12">
+                  <div className="col-span-2 lg:col-span-3">
+                    <Field error={fieldErrors.advanceType} label="ประเภท ADV *">
+                      <Select className="h-10 w-full px-3 py-2" value={form.advanceType} onChange={(event) => updateForm('advanceType', event.target.value)}>
+                        <option value="WAITING_SORT">มัดจำส่งของรอคัดแยก</option>
+                        <option value="ADVANCE_INVOICE">มัดจำล่วงหน้ายังไม่ส่งของ</option>
+                      </Select>
+                    </Field>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1 lg:col-span-2">
                     <Field error={fieldErrors.branchId} label="สาขา *">
-                      <Select className={`h-9 w-full px-2 py-1.5 ${form.branchId ? '' : 'text-slate-400'}`} value={form.branchId} onChange={(event) => updateForm('branchId', event.target.value)}>
+                      <Select className={`h-10 w-full px-3 py-2 ${form.branchId ? '' : 'text-slate-400'}`} value={form.branchId} onChange={(event) => updateForm('branchId', event.target.value)}>
                         <option disabled value="">เลือกสาขา</option>
                         {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                       </Select>
                     </Field>
                   </div>
-                  <div className="col-span-2 sm:col-span-1">
+                  <div className="col-span-2 lg:col-span-3">
                     <SearchCombobox disabled={!form.branchId} error={fieldErrors.supplierId} errorKey="supplierId" inputId="advance-supplier" label="ผู้ขาย *" options={supplierOptions} placeholder={form.branchId ? 'ค้นหาชื่อหรือรหัสผู้ขาย' : 'เลือกสาขาก่อน'} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
                   </div>
-                  <div className="col-span-2 lg:col-span-1">
-                    <MoneyInputField error={fieldErrors.amount} label="ยอดมัดจำ *" value={form.amount} onChange={(value) => updateForm('amount', value)} />
+                  <div className="col-span-2 sm:col-span-1 lg:col-span-2">
+                    <MoneyInputField error={fieldErrors.amount} label={form.vatType === 'INCLUDE' ? 'ยอดก่อน VAT *' : 'ยอดมัดจำ *'} value={form.amount} onChange={(value) => updateForm('amount', value)} />
+                  </div>
+                  {isAdvanceInvoice ? (
+                    <div className="col-span-2 sm:col-span-1 lg:col-span-2">
+                      <InputField error={fieldErrors.invoiceNo} label="เลข invoice *" value={form.invoiceNo} onChange={(value) => updateForm('invoiceNo', value)} />
+                    </div>
+                  ) : null}
+                  <div className="col-span-2 sm:col-span-1 lg:col-span-2">
+                    <Field error={fieldErrors.vatType} label="VAT *">
+                      <Select className={`h-10 w-full px-3 py-2 ${form.vatType === 'INCLUDE' ? 'border-amber-500 bg-amber-50 font-medium text-slate-800' : ''}`} value={form.vatType} onChange={(event) => updateForm('vatType', event.target.value)}>
+                        <option value="NONE">ไม่มี VAT</option>
+                        <option value="INCLUDE">มี VAT</option>
+                      </Select>
+                    </Field>
                   </div>
                 </div>
               </FormSection>
 
-              <FormSection
-                description="ผูกเอกสาร ADV กับข้อมูลอ้างอิงจากรถเข้า/ใบชั่งใหญ่"
-                title="อ้างอิงใบชั่งใหญ่"
-              >
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                  <div className="col-span-2 sm:col-span-1">
-                    <InputField error={fieldErrors.largeScaleDocNo} label="เลขที่ใบชั่งใหญ่" value={form.largeScaleDocNo} onChange={(value) => updateForm('largeScaleDocNo', value)} />
+              {!isAdvanceInvoice ? (
+                <FormSection
+                  description="ผูกเอกสาร ADV กับข้อมูลอ้างอิงจากรถเข้า/ใบชั่งใหญ่"
+                  title="อ้างอิงใบชั่งใหญ่"
+                >
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="col-span-2 sm:col-span-1">
+                      <InputField error={fieldErrors.largeScaleDocNo} label="เลขที่ใบชั่งใหญ่" value={form.largeScaleDocNo} onChange={(value) => updateForm('largeScaleDocNo', value)} />
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <InputField className="max-w-[220px]" error={fieldErrors.inDate} label="วันที่รถเข้า" step="60" type="datetime-local" value={form.inDate} onChange={(value) => updateForm('inDate', value)} />
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <InputField className="max-w-[220px]" error={fieldErrors.outDate} label="วันที่รถออก" step="60" type="datetime-local" value={form.outDate} onChange={(value) => updateForm('outDate', value)} />
+                    </div>
                   </div>
-                  <div className="col-span-2 sm:col-span-1">
-                    <InputField className="max-w-[220px]" error={fieldErrors.inDate} label="วันที่รถเข้า" step="60" type="datetime-local" value={form.inDate} onChange={(value) => updateForm('inDate', value)} />
-                  </div>
-                  <div className="col-span-2 sm:col-span-1">
-                    <InputField className="max-w-[220px]" error={fieldErrors.outDate} label="วันที่รถออก" step="60" type="datetime-local" value={form.outDate} onChange={(value) => updateForm('outDate', value)} />
-                  </div>
-                </div>
-              </FormSection>
+                </FormSection>
+              ) : null}
 
-              <FormSection
+              {!isAdvanceInvoice ? <FormSection
                 description="กรอกข้อมูลสินค้า น้ำหนัก และราคาที่ใช้คำนวณอ้างอิง"
                 title="สินค้าและน้ำหนัก"
               >
@@ -647,9 +726,9 @@ export function AdvancePaymentsPageClient() {
                     <MoneyInputField error={fieldErrors.pricePerKg} label="ราคา/กก. *" value={form.pricePerKg} onChange={(value) => updateForm('pricePerKg', value)} />
                   </div>
                 </div>
-              </FormSection>
+              </FormSection> : null}
 
-              <FormSection
+              {!isAdvanceInvoice ? <FormSection
                 description="รวบรวมข้อมูลตัวรถและรูปประกอบในจุดเดียว"
                 title="ข้อมูลรถ"
               >
@@ -680,7 +759,7 @@ export function AdvancePaymentsPageClient() {
                             <div className="text-center text-xs text-slate-400 py-2">ยังไม่มีรูปภาพรถที่แนบมา</div>
                           ) : null}
                           {vehiclePhotoFiles.map((file) => (
-                            <div key={file.id} className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-xs">
+                            <div key={file.id} className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2 text-xs">
                               {file.url ? (
                                 <button
                                   className="min-w-0 flex-1 truncate text-left font-medium text-slate-700 hover:text-emerald-700 hover:underline"
@@ -703,7 +782,7 @@ export function AdvancePaymentsPageClient() {
                     </Field>
                   </div>
                 </div>
-              </FormSection>
+              </FormSection> : null}
 
               <FormSection
                 description="ข้อมูลเสริมสำหรับการติดตามเอกสารและการตรวจสอบย้อนหลัง"
@@ -718,9 +797,13 @@ export function AdvancePaymentsPageClient() {
             </div>
             <div className="rounded-md border border-slate-100 bg-slate-50 p-4">
               <div className="text-sm font-semibold text-slate-800">สรุปก่อนบันทึก</div>
-              <SummaryLine label="น้ำหนักสุทธิ x ราคา" value={formatMoney(computedAmount)} />
-              <SummaryLine label="ยอดมัดจำ" value={formatMoney(Number(form.amount) || 0)} />
-              <SummaryLine label="ส่วนต่าง" value={formatMoney((Number(form.amount) || 0) - computedAmount)} />
+              {!isAdvanceInvoice ? <SummaryLine label="น้ำหนักสุทธิ x ราคา" value={formatMoney(computedAmount)} /> : null}
+              <SummaryLine label="ประเภท" value={isAdvanceInvoice ? 'มัดจำล่วงหน้ายังไม่ส่งของ' : 'มัดจำส่งของรอคัดแยก'} />
+              <SummaryLine label="VAT" value={form.vatType === 'INCLUDE' ? 'มี VAT' : 'ไม่มี VAT'} />
+              {form.vatType === 'INCLUDE' ? <SummaryLine label="ยอดก่อน VAT" value={formatMoney(taxBreakdown.subtotalAmount)} /> : null}
+              {form.vatType === 'INCLUDE' ? <SummaryLine label="ยอด VAT" value={formatMoney(taxBreakdown.vatAmount)} /> : null}
+              <SummaryLine label="ยอดรวมมัดจำ" value={formatMoney(taxBreakdown.totalAmount)} />
+              {!isAdvanceInvoice ? <SummaryLine label="ส่วนต่าง" value={formatMoney(taxBreakdown.totalAmount - computedAmount)} /> : null}
               <div className="mt-4 flex gap-2">
                 <Button disabled={isSaving} type="button" onClick={submitForm}><Save className="mr-1 h-4 w-4" />{isSaving ? 'กำลังบันทึก...' : editingAdvanceId ? 'บันทึกการแก้ไข' : 'บันทึก ADV'}</Button>
                 <Button type="button" variant="outline" onClick={closeForm}>ปิด</Button>
@@ -731,14 +814,15 @@ export function AdvancePaymentsPageClient() {
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm">
-            <KpiCard label="ยอดมัดจำในหน้านี้" tone="slate" value={formatMoney(data?.summary.totalAdvance ?? 0)} />
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 text-sm">
             <KpiCard label="ยังไม่อนุมัติ" tone="pending" value={`${data?.summary.pendingCount ?? 0}`} />
             <KpiCard label="ใช้หักบิลแล้ว" tone="allocated" value={formatMoney(data?.summary.totalAllocated ?? 0)} />
-            <KpiCard label="คงเหลือ" tone="amber" value={formatMoney(data?.summary.totalRemaining ?? 0)} />
+            <div className="col-span-2 md:col-span-1">
+              <KpiCard label="คงเหลือ" tone="amber" value={formatMoney(data?.summary.totalRemaining ?? 0)} />
+            </div>
           </div>
 
-          <div className="space-y-2 rounded-md bg-white p-3 shadow">
+          <div className="space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-2">
               <Input className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหา ADV / ใบชั่งใหญ่ / ผู้ขาย / ทะเบียน..." type="search" value={q} onChange={(event) => { setQ(event.target.value); setPage(1) }} />
 
@@ -748,7 +832,7 @@ export function AdvancePaymentsPageClient() {
                 className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 md:hidden"
                 onClick={() => setShowMobileFilters(true)}
               >
-                <span>🔍</span> ตัวกรอง {(dateFrom || dateTo || statuses.length > 0) ? '(1)' : ''}
+                ตัวกรอง {(dateFrom || dateTo || statuses.length > 0) ? '(1)' : ''}
               </button>
 
               <div className="hidden md:flex flex-wrap items-center gap-2">
@@ -759,10 +843,6 @@ export function AdvancePaymentsPageClient() {
               </div>
 
               {hasActiveFilters ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
-              <div className="hidden md:block">
-                <ExportButton href={exportHref} />
-              </div>
-              <Button className="hidden md:inline-flex ml-auto h-9" size="sm" type="button" onClick={openForm}><Plus className="mr-1 h-4 w-4" />สร้าง</Button>
             </div>
 
             {/* Desktop Status Filters */}
@@ -787,11 +867,15 @@ export function AdvancePaymentsPageClient() {
                   }}
                 />
               ))}
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <ExportButton href={exportHref} />
+                <Button className="h-9" size="sm" type="button" onClick={openForm}><Plus className="mr-1 h-4 w-4" />สร้าง</Button>
+              </div>
             </div>
           </div>
 
           {/* Floating Action Button (FAB) for Mobile */}
-          <div className="fixed bottom-6 right-6 z-40 md:hidden">
+          <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 md:hidden">
             <button
               className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg active:scale-95 transition-transform"
               onClick={openForm}
@@ -804,20 +888,32 @@ export function AdvancePaymentsPageClient() {
 
           {/* Bottom Sheet Filter for Mobile */}
           {showMobileFilters ? (
-            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
-              <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 animate-slide-up max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                  <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
+            <MobileFilterSheet
+              title="ตัวกรองเพิ่มเติม"
+              visibleClassName="md:hidden"
+              onClose={() => setShowMobileFilters(false)}
+              footer={(
+                <>
                   <button
-                    className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                    onClick={() => setShowMobileFilters(false)}
                     type="button"
+                    className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    onClick={() => {
+                      clearFilters()
+                      setShowMobileFilters(false)
+                    }}
                   >
-                    &times;
+                    ล้างตัวกรอง
                   </button>
-                </div>
-
-                <div className="space-y-4">
+                  <button
+                    type="button"
+                    className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
+                    onClick={() => setShowMobileFilters(false)}
+                  >
+                    ใช้ตัวกรอง
+                  </button>
+                </>
+              )}
+            >
                   <div>
                     <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                     <div className="flex items-center gap-2">
@@ -862,29 +958,7 @@ export function AdvancePaymentsPageClient() {
                       })}
                     </div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    onClick={() => {
-                      clearFilters()
-                      setShowMobileFilters(false)
-                    }}
-                  >
-                    ล้างตัวกรอง
-                  </button>
-                  <button
-                    type="button"
-                    className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
-                    onClick={() => setShowMobileFilters(false)}
-                  >
-                    ใช้ตัวกรอง
-                  </button>
-                </div>
-              </div>
-            </div>
+            </MobileFilterSheet>
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 md:hidden">
@@ -894,15 +968,15 @@ export function AdvancePaymentsPageClient() {
           {/* Mobile Card List */}
           <div className="block md:hidden space-y-3">
             {isLoading ? (
-              <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-100">กำลังโหลดข้อมูล</div>
+              <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow border border-slate-100">กำลังโหลดข้อมูล</div>
             ) : null}
             {!isLoading && (data?.rows ?? []).length === 0 ? (
-              <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-100">ยังไม่มีรายการจ่ายเงินล่วงหน้า</div>
+              <div className="rounded-xl bg-white p-8 text-center text-slate-400 shadow border border-slate-100">ยังไม่มีรายการจ่ายเงินล่วงหน้า</div>
             ) : null}
             {!isLoading && (data?.rows ?? []).map((row) => (
               <div
                 key={row.id}
-                className="rounded-md border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+                className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
                 onClick={() => void loadDetail(row.id)}
               >
                 <div className="flex justify-between items-start mb-2">
@@ -915,13 +989,15 @@ export function AdvancePaymentsPageClient() {
                 </div>
                 <div className="text-xs text-slate-500 space-y-1 mb-3">
                   {row.productName ? <div>สินค้า: <span className="font-semibold text-slate-700">{row.productName}</span></div> : null}
+                  <div>ประเภท: <span className="font-semibold text-slate-700">{row.advanceTypeLabel}</span></div>
+                  {row.invoiceNo ? <div>Invoice: <span className="font-semibold text-slate-700">{row.invoiceNo}</span></div> : null}
                   {row.largeScaleDocNo ? <div>ใบชั่งใหญ่: <span className="font-semibold text-slate-700">{row.largeScaleDocNo}</span></div> : null}
                   {row.plateNo ? <div>ทะเบียนรถ: <span className="font-semibold text-slate-700">{row.plateNo}</span></div> : null}
                 </div>
                 <div className="flex justify-between items-end border-t border-slate-100 pt-2.5">
                   <div className="text-xs text-slate-500 space-y-0.5">
                     <span>น้ำหนักสุทธิ: <span className="font-semibold text-slate-700">{formatMoney(row.netWeight)}</span> กก.</span>
-                    <div className="block">ยอดมัดจำ: <span className="font-semibold text-slate-700">{formatMoney(row.amount)}</span></div>
+                    <div className="block">ยอดรวมมัดจำ: <span className="font-semibold text-slate-700">{formatMoney(row.totalAmount)}</span></div>
                     {row.allocatedAmount > 0 ? <div className="block text-emerald-700">หักแล้ว: <span className="font-semibold">{formatMoney(row.allocatedAmount)}</span></div> : null}
                   </div>
                   <div className="text-right">
@@ -938,7 +1014,7 @@ export function AdvancePaymentsPageClient() {
               {listControls}
             </div>
             <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {advancePaymentColumns.map((column) => {
                   const style = columnResize.getColumnStyle(column.key);
@@ -950,11 +1026,11 @@ export function AdvancePaymentsPageClient() {
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={columnResize.getResizeHandleProps('advanceDate', 'วันที่')} sortKey="advanceDate" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="ผู้ขาย" resizeProps={columnResize.getResizeHandleProps('supplierName', 'ผู้ขาย')} sortKey="supplierName" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="ใบชั่งใหญ่" resizeProps={columnResize.getResizeHandleProps('largeScaleDocNo', 'ใบชั่งใหญ่')} sortKey="largeScaleDocNo" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="อ้างอิง" resizeProps={columnResize.getResizeHandleProps('largeScaleDocNo', 'อ้างอิง')} sortKey="largeScaleDocNo" onSort={changeSort} />
                   <ResizableTableHead label="ทะเบียนรถ" resizeProps={columnResize.getResizeHandleProps('plateNo', 'ทะเบียนรถ')} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} sortKey="productName" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'น้ำหนักสุทธิ')} sortKey="netWeight" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดมัดจำ" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดมัดจำ')} sortKey="amount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดรวมมัดจำ" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดรวมมัดจำ')} sortKey="amount" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="นำไปหักแล้ว" resizeProps={columnResize.getResizeHandleProps('allocatedAmount', 'นำไปหักแล้ว')} sortKey="allocatedAmount" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="คงเหลือ" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'คงเหลือ')} sortKey="remainingAmount" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
@@ -969,11 +1045,11 @@ export function AdvancePaymentsPageClient() {
                     <td className="p-2 whitespace-nowrap text-xs font-semibold text-slate-700">{row.docNo}</td>
                     <td className="p-2 whitespace-nowrap text-xs font-semibold text-slate-700">{row.advanceDate}</td>
                     <td className="p-2 text-xs font-semibold text-slate-700">{row.supplierName}</td>
-                    <td className="p-2 text-xs font-semibold text-slate-700">{row.largeScaleDocNo || '-'}</td>
+                    <td className="p-2 text-xs font-semibold text-slate-700">{row.invoiceNo || row.largeScaleDocNo || '-'}</td>
                     <td className="p-2 whitespace-nowrap text-xs font-semibold text-slate-700">{row.plateNo || '-'}</td>
                     <td className="p-2 text-xs font-semibold text-slate-700">{row.productName || '-'}</td>
                     <TableNumberCell value={formatMoney(row.netWeight)} />
-                    <TableNumberCell value={formatMoney(row.amount)} />
+                    <TableNumberCell value={formatMoney(row.totalAmount)} />
                     <TableNumberCell value={formatMoney(row.allocatedAmount)} />
                     <TableNumberCell tone="amber" value={formatMoney(row.remainingAmount)} />
                     <td className="p-2"><StatusDot status={row.status} label={row.statusLabel} /></td>
@@ -1029,19 +1105,50 @@ export function AdvancePaymentsPageClient() {
       }}>
         <DialogContent className="max-h-[90vh] max-w-5xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" fallbackTitle="รายละเอียด ADV" hideClose>
           <DialogHeader className="p-4 bg-slate-900 text-white shrink-0">
-            <div className="flex items-start justify-between gap-3 w-full">
-              <div>
-                <DialogTitle className="text-white">{detail?.docNo ? `รายละเอียด ${detail.docNo}` : 'รายละเอียด ADV'}</DialogTitle>
-                <DialogDescription className="text-slate-300">กดที่รายการเพื่อดูข้อมูลเอกสาร การหักบิลย้อนหลัง และ timeline ของรายการ ADV</DialogDescription>
+            <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+              <div className="min-w-0">
+                <DialogTitle className="truncate text-white">{detail?.docNo ? `รายละเอียด ${detail.docNo}` : 'รายละเอียด ADV'}</DialogTitle>
+                <DialogDescription className="truncate text-slate-300">กดที่รายการเพื่อดูข้อมูลเอกสาร การหักบิลย้อนหลัง และ timeline ของรายการ ADV</DialogDescription>
               </div>
-              <button className="rounded-md px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white transition-colors outline-none focus:outline-none focus:ring-0 cursor-pointer" type="button" onClick={() => setIsDetailOpen(false)}>✕</button>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <Button
+                  className="h-9 border-emerald-600 bg-emerald-600 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white"
+                  disabled={!detail}
+                  type="button"
+                  variant="outline"
+                  onClick={() => detail && handlePrint(detail)}
+                >
+                  พิมพ์
+                </Button>
+                <Button
+                  className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white"
+                  disabled={!detail?.canEdit}
+                  title={!detail?.canEdit ? detail?.lockedReason ?? 'รายการนี้ยังแก้ไขไม่ได้' : undefined}
+                  type="button"
+                  variant="outline"
+                  onClick={() => detail ? openEditForm(detail) : undefined}
+                >
+                  แก้ไข
+                </Button>
+                <Button
+                  className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white"
+                  disabled={!detail?.canCancel}
+                  title={!detail?.canCancel ? detail?.lockedReason ?? 'รายการนี้ยังยกเลิกไม่ได้' : undefined}
+                  type="button"
+                  variant="outline"
+                  onClick={() => detail ? openCancelDialog(detail) : undefined}
+                >
+                  ยกเลิก
+                </Button>
+                <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setIsDetailOpen(false)}>ปิด</Button>
+              </div>
             </div>
           </DialogHeader>
           {isDetailLoading ? <div className="flex-1 p-8 text-center text-sm text-slate-500 bg-white">กำลังโหลดรายละเอียด...</div> : null}
           {!isDetailLoading && detail ? (
             <div className="flex-1 overflow-y-auto space-y-4 p-4 bg-slate-50">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Metric label="ยอดมัดจำ" value={formatMoney(detail.amount)} />
+                <Metric label="ยอดรวมมัดจำ" value={formatMoney(detail.totalAmount)} />
                 <Metric label="ใช้หักบิลแล้ว" value={formatMoney(detail.allocatedAmount)} />
                 <div className="col-span-2 sm:col-span-1">
                   <Metric label="คงเหลือ" tone="amber" value={formatMoney(detail.remainingAmount)} />
@@ -1052,12 +1159,17 @@ export function AdvancePaymentsPageClient() {
               </div>
 
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm col-span-2 lg:col-span-1">
+                <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm col-span-2 lg:col-span-1">
                   <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลเอกสาร</div>
                   <DetailGrid
                     items={[
                       ['ผู้ขาย', detail.supplierName],
                       ['สาขา', detail.branchName],
+                      ['ประเภท ADV', detail.advanceTypeLabel],
+                      ['เลข invoice', detail.invoiceNo || '-'],
+                      ['VAT', detail.vatTypeLabel],
+                      ['ยอดก่อน VAT', formatMoney(detail.subtotalAmount)],
+                      ['ยอด VAT', formatMoney(detail.vatAmount)],
                       ['วันที่เอกสาร', formatDateDisplay(detail.advanceDate)],
                       ['วันที่รถเข้า', formatDateTimeDisplay(detail.inDate)],
                       ['วันที่รถออก', formatDateTimeDisplay(detail.outDate)],
@@ -1082,7 +1194,7 @@ export function AdvancePaymentsPageClient() {
                 </div>
 
                 <div className="space-y-4 col-span-2 lg:col-span-1">
-                  <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
+                  <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
                     <div className="mb-3 text-sm font-semibold text-slate-900">การติดตามสถานะ</div>
                     <DetailGrid
                       items={[
@@ -1096,7 +1208,7 @@ export function AdvancePaymentsPageClient() {
                     />
                   </div>
 
-                  <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
+                  <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
                     <div className="mb-3 text-sm font-semibold text-slate-900">รายการหักบิล</div>
                     {detail.allocations.length === 0 ? <div className="text-sm text-slate-400">ยังไม่มีการใช้ ADV หักบิล</div> : (
                       <div className="space-y-2">
@@ -1122,7 +1234,7 @@ export function AdvancePaymentsPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="mb-3 text-sm font-semibold text-slate-900">Timeline</div>
                 {detail.timeline.length === 0 ? <div className="text-sm text-slate-400">ยังไม่มี timeline ของรายการนี้</div> : (
                   <div className="space-y-3">
@@ -1144,34 +1256,6 @@ export function AdvancePaymentsPageClient() {
               </div>
             </div>
           ) : null}
-          <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t bg-slate-50 shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => detail && handlePrint(detail)}
-            >
-              พิมพ์เอกสาร
-            </Button>
-            <Button
-              disabled={!detail?.canEdit}
-              title={!detail?.canEdit ? detail?.lockedReason ?? 'รายการนี้ยังแก้ไขไม่ได้' : undefined}
-              type="button"
-              variant="outline"
-              onClick={() => detail ? openEditForm(detail) : undefined}
-            >
-              แก้ไข
-            </Button>
-            <Button
-              disabled={!detail?.canCancel}
-              title={!detail?.canCancel ? detail?.lockedReason ?? 'รายการนี้ยังยกเลิกไม่ได้' : undefined}
-              type="button"
-              variant="outline"
-              onClick={() => detail ? openCancelDialog(detail) : undefined}
-            >
-              ยกเลิก
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setIsDetailOpen(false)}>ปิด</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1179,12 +1263,12 @@ export function AdvancePaymentsPageClient() {
         setIsCancelDialogOpen(open)
         if (!open) closeCancelDialog()
       }}>
-        <DialogContent className="max-w-lg" fallbackTitle="ยกเลิกรายการ ADV">
+        <DialogContent hideClose mobileAppShell={false} className="max-w-lg rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 outline-none focus:outline-none" fallbackTitle="ยกเลิกรายการ ADV">
           <DialogHeader>
             <DialogTitle>ยกเลิกรายการ ADV {detail?.docNo ?? ''}</DialogTitle>
             <DialogDescription>ระบบจะเปลี่ยนสถานะเป็นยกเลิกและเก็บเหตุผลไว้ใน timeline</DialogDescription>
           </DialogHeader>
-          <div className="px-4 pb-4">
+          <div className="bg-slate-50 p-4">
             <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="advance-payment-cancel-note">เหตุผลการยกเลิก *</label>
             <textarea
               id="advance-payment-cancel-note"
@@ -1223,7 +1307,7 @@ function productOptionLabel(option: OptionRow) {
 
 function FormSection({ children, description, title }: { children: React.ReactNode; description: string; title: string }) {
   return (
-    <div className="rounded-md border border-slate-100 p-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-4">
         <div className="text-sm font-semibold text-slate-900">{title}</div>
         <div className="mt-1 text-xs text-slate-500">{description}</div>
@@ -1355,60 +1439,11 @@ function toggleStatusFilter(value: string, setStatuses: Dispatch<SetStateAction<
 }
 
 function KpiCard({ label, tone, value }: { label: string; tone: 'amber' | 'allocated' | 'pending' | 'slate'; value: string }) {
-  const configs = {
-    slate: {
-      bg: 'bg-slate-100 text-slate-600',
-      emoji: '📋',
-      labelColor: 'text-slate-500',
-      valueColor: 'text-slate-900',
-    },
-    pending: {
-      bg: 'bg-amber-100 text-amber-600',
-      emoji: '⏱️',
-      labelColor: 'text-amber-600',
-      valueColor: 'text-amber-700',
-    },
-    allocated: {
-      bg: 'bg-emerald-100 text-emerald-600',
-      emoji: '✅',
-      labelColor: 'text-emerald-600',
-      valueColor: 'text-emerald-700',
-    },
-    amber: {
-      bg: 'bg-blue-100 text-blue-600',
-      emoji: '💰',
-      labelColor: 'text-blue-600',
-      valueColor: 'text-blue-700',
-    },
-  }
-
-  const numericValue = parseFloat(value.replace(/[^0-9.-]/g, ''))
-  const isZero = isNaN(numericValue) ? false : numericValue === 0
-
-  const config = isZero
-    ? {
-        bg: 'bg-slate-100 text-slate-600',
-        emoji: configs[tone].emoji,
-        labelColor: 'text-slate-500',
-        valueColor: 'text-slate-900',
-      }
-    : configs[tone]
-
-  return (
-    <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 flex-1">
-      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${config.bg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
-        {config.emoji}
-      </div>
-      <div>
-        <div className={`text-xs ${config.labelColor}`}>{label}</div>
-        <div className={`font-bold ${config.valueColor}`}>{value}</div>
-      </div>
-    </div>
-  )
+  return <SharedKpiCard label={label} tone={tone} value={value} />
 }
 
-function Metric({ label, tone, value }: { label: string; tone?: 'amber'; value: string }) {
-  return <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-lg font-bold ${tone === 'amber' ? 'text-amber-700' : 'text-slate-900'}`}>{value}</div></div>
+function Metric({ label, tone = 'slate', value }: { label: string; tone?: 'amber' | 'slate'; value: string }) {
+  return <SharedKpiCard label={label} tone={tone} value={value} />
 }
 
 function StatusDot({ label, status }: { label: string; status: string }) {

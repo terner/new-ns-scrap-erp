@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getErrorMessage, readJsonResponse } from '@/lib/api-client'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/Dialog'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { SlidersHorizontal } from 'lucide-react'
@@ -248,11 +249,10 @@ export function AuditLogPageClient() {
   return (
     <section className="space-y-4">
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden lg:block rounded-md bg-white p-4 shadow">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="hidden lg:block">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Audit & Activity Log</h2>
-            <p className="mt-1 text-sm text-slate-500">ตรวจสอบประวัติ user activity, auth event, user management และ permission-sensitive actions</p>
           </div>
           <button className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 h-9 flex items-center shrink-0" disabled={isLoading} type="button" onClick={() => void loadRows()}>
             {isLoading ? 'กำลังโหลด...' : 'รีเฟรช'}
@@ -261,10 +261,9 @@ export function AuditLogPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="lg:hidden rounded-md bg-white p-3.5 shadow space-y-2.5 animate-fade-in">
+      <div className="space-y-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
         <div>
           <h2 className="text-lg font-bold text-slate-900">Audit & Activity Log</h2>
-          <p className="mt-0.5 text-xs text-slate-500">ประวัติ user activity, auth event, และ sensitive actions</p>
         </div>
         <div className="flex gap-2">
           <input className="flex-1 rounded-md border px-3 h-9 text-sm border-slate-300 bg-white" placeholder="ค้นหา..." value={query} onChange={(event) => {
@@ -287,20 +286,31 @@ export function AuditLogPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองกิจกรรม</h4>
+        <MobileFilterSheet
+          footer={
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  resetFilters()
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4">
+              <button
+                type="button"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          }
+          onClose={() => setShowMobileFilters(false)}
+          title="ตัวกรองกิจกรรม"
+        >
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-slate-600">กลุ่ม</span>
                 <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={group} onChange={(event) => {
@@ -347,36 +357,14 @@ export function AuditLogPageClient() {
                   {pageSizeOptions.map((size) => <option key={size} value={size}>{size} รายการ</option>)}
                 </select>
               </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  resetFilters()
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         {eventGroups.filter((item) => item.value !== 'all').map((item) => (
           <button
             key={item.value}
-            className={`rounded-md border bg-white p-3 text-left shadow-sm transition hover:bg-slate-50 ${group === item.value ? 'border-slate-500 bg-slate-50' : 'border-slate-100'}`}
+            className={`rounded-xl border bg-white p-3 text-left shadow-sm transition hover:bg-slate-50 ${group === item.value ? 'border-slate-500 bg-slate-50' : 'border-slate-100'}`}
             type="button"
             onClick={() => {
               setGroup(item.value)
@@ -391,18 +379,18 @@ export function AuditLogPageClient() {
       </div>
 
       {/* Desktop Filter Panel (Hidden on Mobile) */}
-      <div className="hidden lg:block rounded-md bg-white p-4 shadow">
+      <div className="hidden rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:block">
         <div className="grid gap-3 lg:grid-cols-5">
           <label className="block text-sm font-medium lg:col-span-2">
             ค้นหา
-            <input className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 outline-none focus:border-slate-700 text-sm" placeholder="event, user, metadata, user agent" value={query} onChange={(event) => {
+            <input className="mt-1.5 h-9 w-full rounded-md border border-slate-300 bg-white px-3 outline-none focus:border-slate-700 text-sm" placeholder="event, user, metadata, user agent" value={query} onChange={(event) => {
               setQuery(event.target.value)
               setPage(1)
             }} />
           </label>
           <label className="block text-sm font-medium">
             กลุ่ม
-            <select className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 outline-none focus:border-slate-700 text-sm" value={group} onChange={(event) => {
+            <select className="mt-1.5 h-9 w-full rounded-md border border-slate-300 bg-white px-3 outline-none focus:border-slate-700 text-sm" value={group} onChange={(event) => {
               setGroup(event.target.value as EventGroup)
               setPage(1)
             }}>
@@ -411,7 +399,7 @@ export function AuditLogPageClient() {
           </label>
           <label className="block text-sm font-medium">
             Event Type
-            <input className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 outline-none focus:border-slate-700 text-sm" list="audit-event-types" placeholder="app_user.updated" value={eventType} onChange={(event) => {
+            <input className="mt-1.5 h-9 w-full rounded-md border border-slate-300 bg-white px-3 outline-none focus:border-slate-700 text-sm" list="audit-event-types" placeholder="app_user.updated" value={eventType} onChange={(event) => {
               setEventType(event.target.value)
               setPage(1)
             }} />
@@ -421,7 +409,7 @@ export function AuditLogPageClient() {
           </label>
           <label className="block text-sm font-medium">
             ต่อหน้า
-            <select className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 outline-none focus:border-slate-700 text-sm" value={pageSize} onChange={(event) => {
+            <select className="mt-1.5 h-9 w-full rounded-md border border-slate-300 bg-white px-3 outline-none focus:border-slate-700 text-sm" value={pageSize} onChange={(event) => {
               setPageSize(Number(event.target.value))
               setPage(1)
             }}>
@@ -430,26 +418,26 @@ export function AuditLogPageClient() {
           </label>
           <label className="block text-sm font-medium">
             ผู้ทำรายการ
-            <input className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 outline-none focus:border-slate-700 text-sm" placeholder="username/display" value={actor} onChange={(event) => {
+            <input className="mt-1.5 h-9 w-full rounded-md border border-slate-300 bg-white px-3 outline-none focus:border-slate-700 text-sm" placeholder="username/display" value={actor} onChange={(event) => {
               setActor(event.target.value)
               setPage(1)
             }} />
           </label>
           <label className="block text-sm font-medium">
             เป้าหมาย
-            <input className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 outline-none focus:border-slate-700 text-sm" placeholder="username/display" value={target} onChange={(event) => {
+            <input className="mt-1.5 h-9 w-full rounded-md border border-slate-300 bg-white px-3 outline-none focus:border-slate-700 text-sm" placeholder="username/display" value={target} onChange={(event) => {
               setTarget(event.target.value)
               setPage(1)
             }} />
           </label>
           <div className="flex items-end gap-2 lg:col-span-3">
             <button className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 h-9 flex items-center shrink-0" type="button" onClick={resetFilters}>ล้าง filter</button>
-            <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 h-9 flex items-center shrink-0 ml-auto" disabled={isLoading || data.rows.length === 0} type="button" onClick={() => exportAuditCsv(sortedRows)}>Export CSV หน้านี้</button>
+            <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 h-9 flex items-center shrink-0 ml-auto" disabled={isLoading || data.rows.length === 0} type="button" onClick={() => exportAuditCsv(sortedRows)}>ส่งออก Excel</button>
           </div>
         </div>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-md border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 text-sm text-slate-600">
           <div>พบทั้งหมด <span className="font-semibold text-slate-900">{data.total.toLocaleString('th-TH')}</span> รายการ</div>
           <div className="flex items-center gap-2">
@@ -467,8 +455,8 @@ export function AuditLogPageClient() {
 
         {/* Desktop Table View (Hidden on Mobile) */}
         {!isLoading && (
-          <div className="hidden overflow-x-auto lg:block">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
                 {auditColumns.map((column, index) => {
                   const style = columnResize.getColumnStyle(column.key)
@@ -557,19 +545,19 @@ export function AuditLogPageClient() {
 
       {selectedRow ? (
         <Dialog open={!!selectedRow} onOpenChange={() => setSelectedRow(null)}>
-          <DialogContent className="max-w-3xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
-            <div className="border-b border-slate-800 px-5 py-4 bg-slate-900 shrink-0 flex items-center justify-between">
+          <DialogContent className="max-w-3xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
+            <div className="border-b border-slate-800 px-5 py-4 bg-slate-900 shrink-0 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <DialogTitle className="text-lg font-bold text-slate-100">{eventTitle(selectedRow.eventType)}</DialogTitle>
                 <p className="mt-0.5 text-xs text-slate-400">ID: {selectedRow.id}</p>
               </div>
-              <button className="text-2xl text-slate-400 hover:text-slate-200 ml-2" type="button" onClick={() => setSelectedRow(null)}>&times;</button>
+              <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={() => setSelectedRow(null)}>ปิด</button>
             </div>
             
             <div className="space-y-4 p-5 bg-slate-50 flex-1 overflow-y-auto">
               <div className="grid gap-4 md:grid-cols-2">
                 {/* ข้อมูลเหตุการณ์ */}
-                <div className="rounded-lg border border-slate-100 bg-white p-4 shadow-sm">
+                <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                   <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">ข้อมูลเหตุการณ์</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
                     <DetailItem label="กลุ่ม" value={eventGroup(selectedRow.eventType)} />
@@ -579,7 +567,7 @@ export function AuditLogPageClient() {
                 </div>
 
                 {/* ผู้ทำและเป้าหมาย */}
-                <div className="rounded-lg border border-slate-100 bg-white p-4 shadow-sm">
+                <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                   <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">ผู้ทำและเป้าหมาย</div>
                   <div className="grid grid-cols-1 gap-3">
                     <DetailItem label="ผู้ทำรายการ" value={userLabel(selectedRow.actor)} />
@@ -589,7 +577,7 @@ export function AuditLogPageClient() {
               </div>
 
               {/* ข้อมูลระบบและเมทาดาตา */}
-              <div className="rounded-lg border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                 <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">ข้อมูลระบบและเมทาดาตา</div>
                 <div className="space-y-4">
                   <DetailItem label="User Agent" value={selectedRow.userAgent || '-'} />
@@ -601,9 +589,6 @@ export function AuditLogPageClient() {
               </div>
             </div>
             
-            <div className="flex justify-end border-t border-slate-100 bg-white px-5 py-4 shrink-0">
-              <button className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={() => setSelectedRow(null)}>ปิด</button>
-            </div>
           </DialogContent>
         </Dialog>
       ) : null}

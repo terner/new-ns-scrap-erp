@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -48,7 +50,7 @@ type PettyAdvanceRecipientOption = SearchComboboxOption & {
   bankName: string
   type: string
 }
-type PettyAdvanceColumnKey = 'action' | 'amount' | 'date' | 'docNo' | 'recipientName' | 'remaining' | 'returned' | 'status' | 'type'
+type PettyAdvanceColumnKey = 'action' | 'amount' | 'date' | 'docNo' | 'recipientName' | 'remaining' | 'returned' | 'spent' | 'status' | 'type'
 type PettyAdvanceSortKey = Exclude<PettyAdvanceColumnKey, 'action'>
 type SortDirection = 'asc' | 'desc'
 
@@ -58,6 +60,7 @@ const pettyAdvanceColumns: Array<ResizableColumnDefinition<PettyAdvanceColumnKey
   { key: 'type', defaultWidth: 150, minWidth: 120 },
   { key: 'recipientName', defaultWidth: 260, minWidth: 130 },
   { key: 'amount', defaultWidth: 110, minWidth: 90 },
+  { key: 'spent', defaultWidth: 110, minWidth: 90 },
   { key: 'returned', defaultWidth: 110, minWidth: 90 },
   { key: 'remaining', defaultWidth: 110, minWidth: 90 },
   { key: 'status', defaultWidth: 120, minWidth: 100 },
@@ -181,8 +184,10 @@ export function DailyPettyAdvancePageClient() {
 
   const summary = {
     active: rows.filter((row) => row.status === 'active').length,
+    count: rows.filter((row) => row.status !== 'cancelled').length,
     remaining: rows.filter((row) => row.status === 'active').reduce((sum, row) => sum + row.remaining, 0),
     returned: rows.reduce((sum, row) => sum + row.returned, 0),
+    spent: rows.reduce((sum, row) => sum + row.spent, 0),
     total: rows.reduce((sum, row) => sum + row.amount, 0),
   }
 
@@ -200,6 +205,7 @@ export function DailyPettyAdvancePageClient() {
     })
     return Array.from(byRecipient.values()).sort((left, right) => right.remaining - left.remaining).slice(0, 10)
   }, [rows])
+
 
   const activeAccounts = useMemo(() => accounts.filter((account) => account.active), [accounts])
   const hasActiveFilters = Boolean(search.trim() || type || status !== 'active')
@@ -331,15 +337,15 @@ export function DailyPettyAdvancePageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid grid-cols-2 gap-2.5 text-sm sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 text-sm">
         <SummaryCard label="ค้างคืน" tone="amber" value={String(summary.active)} />
         <SummaryCard label="ยอดยืมทั้งหมด" tone="blue" value={formatMoney(summary.total)} />
-        <SummaryCard label="คืนแล้ว" tone="emerald" value={formatMoney(summary.returned)} />
+        <SummaryCard label="ใช้จ่าย/คืนแล้ว" tone="emerald" value={formatMoney(summary.spent + summary.returned)} />
         <SummaryCard label="ยอดคงค้าง" tone="red" value={formatMoney(summary.remaining)} />
       </div>
 
       {topRecipients.length ? (
-        <div className="rounded-md bg-white p-4 shadow">
+        <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
           <div className="mb-2 font-bold text-slate-700">Top 10 ผู้รับเงินที่ค้างคืน</div>
           <div className="grid gap-2 text-sm md:grid-cols-2">
             {topRecipients.map((recipient) => (
@@ -352,7 +358,7 @@ export function DailyPettyAdvancePageClient() {
         </div>
       ) : null}
 
-      <div className="rounded-md bg-white p-3 shadow">
+      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <input autoComplete="off" className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-100" placeholder="ค้นหาเลขที่ / ผู้รับเงิน / หมายเหตุ" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
 
@@ -362,7 +368,7 @@ export function DailyPettyAdvancePageClient() {
             className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 lg:hidden"
             onClick={() => setShowMobileFilters(true)}
           >
-            <span>🔍</span> ตัวกรอง {(type || status !== 'active') ? '(1)' : ''}
+            ตัวกรอง {(type || status !== 'active') ? '(1)' : ''}
           </button>
 
           {hasActiveFilters ? (
@@ -370,7 +376,6 @@ export function DailyPettyAdvancePageClient() {
               ล้าง filter
             </button>
           ) : null}
-          <button className="hidden lg:inline-flex items-center justify-center ml-auto h-9 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ ยืมเงินใหม่</button>
         </div>
 
         {/* Desktop Filters */}
@@ -387,12 +392,13 @@ export function DailyPettyAdvancePageClient() {
             <SegmentFilterButton active={status === 'active'} label="ค้างคืน" onClick={() => setStatus(status === 'active' ? '' : 'active')} />
             <SegmentFilterButton active={status === 'closed'} label="ปิดแล้ว" onClick={() => setStatus(status === 'closed' ? '' : 'closed')} />
             <SegmentFilterButton active={status === 'cancelled'} label="ยกเลิก" onClick={() => setStatus(status === 'cancelled' ? '' : 'cancelled')} />
+            <button className="ml-auto inline-flex h-9 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ ยืมเงินใหม่</button>
           </div>
         </div>
       </div>
 
       {/* Floating Action Button (FAB) for Mobile */}
-      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
+      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 lg:hidden">
         <button
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform hover:bg-blue-700"
           onClick={openCreateForm}
@@ -405,20 +411,33 @@ export function DailyPettyAdvancePageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 animate-slide-up max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
+        <MobileFilterSheet
+          title="ตัวกรองเพิ่มเติม"
+          onClose={() => setShowMobileFilters(false)}
+          footer={(
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  setSearch('')
+                  setType('')
+                  setStatus('active')
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4">
+              <button
+                type="button"
+                className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          )}
+        >
               <div>
                 <span className="mb-2 block text-xs font-semibold text-slate-600">ประเภท</span>
                 <div className="flex flex-wrap gap-2">
@@ -493,41 +512,20 @@ export function DailyPettyAdvancePageClient() {
                   </button>
                 </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  setSearch('')
-                  setType('')
-                  setStatus('active')
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <form ref={formRef} noValidate className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onSubmit={saveForm}>
-            <div className="flex items-center justify-between bg-slate-900 px-5 py-4">
+          <form ref={formRef} noValidate className="w-full max-w-3xl overflow-hidden rounded-md bg-slate-900 shadow-xl animate-in fade-in zoom-in-95 duration-150" onSubmit={saveForm}>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4">
               <h3 className="font-bold text-white">{form.id ? 'แก้ไขรายการยืมเงิน' : 'บันทึกรายการยืมเงิน'}</h3>
-              <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={() => setFormOpen(false)}>&times;</button>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
+                <button className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+              </div>
             </div>
-            <div className="space-y-5 p-5">
+            <div className="space-y-5 bg-slate-50 p-5">
               <section className="space-y-3">
                 <h4 className="text-sm font-semibold text-slate-900">ข้อมูลการจ่าย</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -568,23 +566,22 @@ export function DailyPettyAdvancePageClient() {
                 <TextAreaField error={fieldErrors.notes} fieldName="notes" label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
               </div>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
-              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
-              <button className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
-            </div>
           </form>
         </div>
       ) : null}
 
       {returningRow ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <form noValidate className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onSubmit={saveReturn}>
-            <div className="flex items-center justify-between bg-slate-900 px-5 py-4">
+          <form noValidate className="w-full max-w-md overflow-hidden rounded-md bg-slate-900 shadow-xl animate-in fade-in zoom-in-95 duration-150" onSubmit={saveReturn}>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4">
               <h3 className="font-bold text-white">คืนเงิน — {returningRow.docNo} / {returningRow.recipientName}</h3>
-              <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={() => setReturningRow(null)}>&times;</button>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={() => setReturningRow(null)}>ยกเลิก</button>
+                <button className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60" disabled={isSaving} type="submit">{isSaving ? 'กำลังส่งอนุมัติ...' : 'ส่งอนุมัติคืนเงิน'}</button>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 p-5 text-sm">
-              <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">ยอดยืม: <b>{formatMoney(returningRow.amount)}</b> · คืนแล้ว: <b>{formatMoney(returningRow.returned)}</b> · <span className="font-bold text-red-700">คงค้าง: {formatMoney(returningRow.remaining)}</span></div>
+            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-5 text-sm">
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 col-span-2">ยอดยืม: <b>{formatMoney(returningRow.amount)}</b> · ใช้ไปแล้ว: <b>{formatMoney(returningRow.spent)}</b> · คืนแล้ว: <b>{formatMoney(returningRow.returned)}</b> · <span className="font-bold text-red-700">คงค้าง: {formatMoney(returningRow.remaining)}</span></div>
               <div className="col-span-2 sm:col-span-1">
                 <TextField label="วันที่คืน" required type="date" value={returnForm.date} onChange={(value) => setReturnForm({ ...returnForm, date: value })} />
               </div>
@@ -603,10 +600,6 @@ export function DailyPettyAdvancePageClient() {
               <div className="col-span-2">
                 <TextAreaField label="หมายเหตุ" value={returnForm.notes} onChange={(value) => setReturnForm({ ...returnForm, notes: value })} />
               </div>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
-              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setReturningRow(null)}>ยกเลิก</button>
-              <button className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="submit">{isSaving ? 'กำลังส่งอนุมัติ...' : 'ส่งอนุมัติคืนเงิน'}</button>
             </div>
           </form>
         </div>
@@ -654,8 +647,63 @@ export function DailyPettyAdvancePageClient() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-        <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        {/* Mobile Card List */}
+        <div className="block divide-y divide-slate-100/60 lg:hidden">
+        {isLoading ? (
+          <div className="p-8 text-center text-slate-500">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && pagedRows.map((row) => (
+          <div
+            key={row.id}
+            className="cursor-pointer p-4 transition-colors active:bg-slate-50"
+            onClick={() => setDetailRow(row)}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="font-bold text-slate-800 text-sm">{row.docNo}</span>
+              <StatusBadge status={row.status} />
+            </div>
+            <div className="flex justify-between items-center text-xs text-slate-500 mb-3">
+              <span className={row.type === 'DIRECTOR_LOAN' ? 'text-purple-700 font-semibold' : 'text-amber-700 font-semibold'}>
+                {typeLabel(row.type)}
+              </span>
+              <span>วันที่จ่าย: {formatDateDisplay(row.date)}</span>
+            </div>
+            <div className="text-sm font-semibold text-slate-700 mb-3">
+              {row.recipientName}
+            </div>
+            <div className="flex justify-between items-end border-t border-slate-100 pt-2.5">
+              <div className="text-xs text-slate-500">
+                {row.spent > 0 ? (
+                  <span className="block">ใช้ไปแล้ว: <span className="font-semibold text-blue-700">{formatMoney(row.spent)}</span></span>
+                ) : null}
+                {row.pendingReturn > 0 ? (
+                  <span className="block">รออนุมัติคืน: <span className="font-semibold text-amber-700">{formatMoney(row.pendingReturn)}</span></span>
+                ) : null}
+                {row.returned > 0 ? (
+                  <span className="block">คืนแล้ว: <span className="font-semibold text-emerald-700">{formatMoney(row.returned)}</span></span>
+                ) : null}
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-slate-500">
+                  ยอดยืม: <span className="font-semibold text-slate-700">{formatMoney(row.amount)}</span>
+                </div>
+                <div className="mt-0.5">
+                  <span className="text-xs text-slate-500">คงค้าง: </span>
+                  <span className={`font-bold text-sm tabular-nums ${row.remaining > 1 ? 'text-red-700' : 'text-emerald-700'}`}>
+                    {formatMoney(row.remaining)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        {!isLoading && filteredRows.length === 0 ? (
+          <div className="p-8 text-center text-slate-400">ยังไม่มีรายการ</div>
+        ) : null}
+        </div>
+
+        <div className="hidden overflow-x-auto lg:block">
+        <table className="ns-table w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {pettyAdvanceColumns.map((column) => {
               const style = columnResize.getColumnStyle(column.key);
@@ -669,6 +717,7 @@ export function DailyPettyAdvancePageClient() {
               <ResizableTableHead label="ประเภท" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="type" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} />
               <ResizableTableHead label="ผู้รับเงิน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="recipientName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('recipientName', 'ผู้รับเงิน')} />
               <ResizableTableHead align="right" label="ยอดยืม" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="amount" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดยืม')} />
+              <ResizableTableHead align="right" label="ใช้ไปแล้ว" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="spent" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('spent', 'ใช้ไปแล้ว')} />
               <ResizableTableHead align="right" label="คืนแล้ว" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="returned" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('returned', 'คืนแล้ว')} />
               <ResizableTableHead align="right" label="คงค้าง" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="remaining" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('remaining', 'คงค้าง')} />
               <ResizableTableHead align="center" label="สถานะ" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="status" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
@@ -676,7 +725,7 @@ export function DailyPettyAdvancePageClient() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-semibold">
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && pagedRows.map((row) => (
               <tr key={row.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setDetailRow(row)}>
                 <td className="p-2 font-mono text-xs">{row.docNo}</td>
@@ -684,16 +733,18 @@ export function DailyPettyAdvancePageClient() {
                 <td className="p-2"><span className={row.type === 'DIRECTOR_LOAN' ? 'text-purple-700' : 'text-amber-700'}>{typeLabel(row.type)}</span></td>
                 <td className="p-2 font-medium">{row.recipientName}</td>
                 <td className="p-2 pr-4 text-right tabular-nums">{formatMoney(row.amount)}</td>
+                <td className="p-2 pr-4 text-right text-blue-700 tabular-nums">{row.spent > 0 ? <button className="hover:underline" type="button" onClick={(event) => { event.stopPropagation(); setDetailRow(row) }}>{formatMoney(row.spent)}</button> : '-'}</td>
                 <td className="p-2 pr-4 text-right text-emerald-700 tabular-nums">{formatMoney(row.returned)}</td>
                 <td className={`p-2 pr-4 text-right font-bold tabular-nums ${row.remaining > 1 ? 'text-red-700' : 'text-emerald-700'}`}>{formatMoney(row.remaining)}</td>
                 <td className="p-2 text-center"><StatusBadge status={row.status} /></td>
                 <td className="space-x-1 whitespace-nowrap p-2 text-right">
+                  <button className="text-xs text-blue-600 hover:underline" title="ดูรายละเอียด" type="button" onClick={(event) => { event.stopPropagation(); setDetailRow(row) }}>ดู</button>
                   {row.status === 'active' && row.remaining > 0 && row.pendingReturn <= 0 ? <button className="rounded-md bg-emerald-600 px-2 py-1 text-xs text-white" type="button" onClick={(event) => { event.stopPropagation(); openReturnForm(row) }}>คืนเงิน</button> : null}
                   {row.status === 'active' ? <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button> : null}
                 </td>
               </tr>
             ))}
-            {!isLoading && filteredRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>ยังไม่มีรายการ</td></tr> : null}
+            {!isLoading && filteredRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={10}>ยังไม่มีรายการ</td></tr> : null}
           </tbody>
         </table>
         </div>
@@ -707,40 +758,44 @@ function DetailModal({ onClose, onReturn, row }: { onClose: () => void; onReturn
   const canReturn = row.status === 'active' && row.remaining > 0 && row.pendingReturn <= 0
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" onClick={onClose}>
-      <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between bg-slate-900 px-5 py-4">
+      <div className="w-full max-w-4xl overflow-hidden rounded-md bg-slate-900 shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(event) => event.stopPropagation()}>
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4">
           <div>
             <h3 className="text-lg font-bold text-white">รายละเอียด {row.docNo} — {row.recipientName}</h3>
             <div className="mt-0.5 text-xs text-slate-300">{typeLabel(row.type)} · วันที่จ่าย {formatDateDisplay(row.date)} · จำนวน {formatMoney(row.amount)} บาท</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {canReturn ? (
-              <button className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 outline-none" type="button" onClick={() => onReturn(row)}>
+              <button className="h-9 rounded-md bg-emerald-600 px-4 text-sm font-normal text-white outline-none hover:bg-emerald-700" type="button" onClick={() => onReturn(row)}>
                 คืนเงิน
               </button>
             ) : null}
-            <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={onClose}>&times;</button>
+            <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={onClose}>ปิด</button>
           </div>
         </div>
-        <div className="space-y-4 p-5 text-sm">
+        <div className="space-y-4 bg-slate-50 p-5 text-sm">
           {/* สรุปยอดเงิน */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-center">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 text-center">
               <div className="text-xs text-blue-700 font-semibold">ยอดยืม</div>
               <div className="text-lg font-bold mt-1 text-blue-900">{formatMoney(row.amount)}</div>
             </div>
-            <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-center">
+            <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3 text-center">
+              <div className="text-xs text-amber-700 font-semibold">ใช้ไปแล้ว</div>
+              <div className="text-lg font-bold mt-1 text-amber-900">{formatMoney(row.spent)}</div>
+            </div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 text-center">
               <div className="text-xs text-emerald-700 font-semibold">คืนแล้ว</div>
               <div className="text-lg font-bold mt-1 text-emerald-900">{formatMoney(row.returned)}</div>
             </div>
-            <div className="rounded-lg border border-red-100 bg-red-50/50 p-3 text-center">
+            <div className="rounded-xl border border-red-100 bg-red-50/50 p-3 text-center">
               <div className="text-xs text-red-700 font-semibold">คงค้าง</div>
               <div className="text-lg font-bold mt-1 text-red-900">{formatMoney(row.remaining)}</div>
             </div>
           </div>
 
           {/* ข้อมูลบัญชีและผู้รับ */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลการยืมและผู้รับ</div>
             <div className="grid grid-cols-1 gap-y-3">
               <DetailItem label="บัญชีรับเงินของกรรมการ/พนักงาน" value={row.recipientAccountLabel || '-'} />
@@ -751,14 +806,14 @@ function DetailModal({ onClose, onReturn, row }: { onClose: () => void; onReturn
 
           <div>
             <div className="mb-2 font-bold text-slate-800">บิลค่าใช้จ่ายที่จ่ายจากเงินก้อนนี้</div>
-            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4 text-center text-slate-400">ยังไม่มีบิลที่ link อยู่ใน payload ปัจจุบัน</div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center text-slate-400">ยังไม่มีบิลที่ link อยู่ใน payload ปัจจุบัน</div>
           </div>
 
           <div>
             <div className="mb-2 font-bold text-emerald-700">ประวัติการคืนเงิน ({returns.length} ครั้ง)</div>
             {returns.length ? (
-              <div className="overflow-x-auto rounded-lg border border-slate-100 bg-white">
-                <table className="w-full text-xs">
+              <div className="overflow-x-auto rounded-md border border-slate-100 bg-white">
+                <table className="ns-table w-full text-xs">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
                       <th className="p-2 text-left">วันที่</th>
@@ -780,13 +835,9 @@ function DetailModal({ onClose, onReturn, row }: { onClose: () => void; onReturn
                 </table>
               </div>
             ) : (
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 py-4 text-center text-slate-400">ยังไม่มีประวัติคืนเงิน</div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 py-4 text-center text-slate-400">ยังไม่มีประวัติคืนเงิน</div>
             )}
           </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
-          {canReturn ? <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700" type="button" onClick={() => onReturn(row)}>คืนเงิน</button> : null}
-          <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
     </div>
@@ -820,53 +871,8 @@ function StatusBadge({ status }: { status: string }) {
   return <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500"><span className="size-1.5 rounded-full bg-slate-400" />ยกเลิก</span>
 }
 
-function SummaryCard({ label, tone, value }: { label: string; tone?: 'amber' | 'blue' | 'emerald' | 'red'; value: string }) {
-  const configs = {
-    slate: {
-      bg: 'bg-slate-100 text-slate-600',
-      emoji: '📋',
-      labelColor: 'text-slate-500',
-      valueColor: 'text-slate-900',
-    },
-    amber: {
-      bg: 'bg-amber-100 text-amber-600',
-      emoji: '⏱️',
-      labelColor: 'text-amber-600',
-      valueColor: 'text-amber-700',
-    },
-    blue: {
-      bg: 'bg-blue-100 text-blue-600',
-      emoji: '💰',
-      labelColor: 'text-blue-600',
-      valueColor: 'text-blue-700',
-    },
-    emerald: {
-      bg: 'bg-emerald-100 text-emerald-600',
-      emoji: '✅',
-      labelColor: 'text-emerald-600',
-      valueColor: 'text-emerald-700',
-    },
-    red: {
-      bg: 'bg-red-100 text-red-600',
-      emoji: '🚨',
-      labelColor: 'text-red-600',
-      valueColor: 'text-red-700',
-    },
-  }
-
-  const config = configs[tone || 'slate']
-
-  return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-slate-100 bg-white p-3 shadow-sm sm:gap-4 sm:p-5">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg sm:h-12 sm:w-12 sm:text-xl ${config.bg}`}>
-        {config.emoji}
-      </div>
-      <div>
-        <div className={`text-xs ${config.labelColor}`}>{label}</div>
-        <div className={`font-mono text-lg font-bold sm:text-2xl ${config.valueColor}`}>{value}</div>
-      </div>
-    </div>
-  )
+function SummaryCard({ label, tone = 'slate', value, className = '' }: { label: string; tone?: 'amber' | 'blue' | 'emerald' | 'red' | 'slate'; value: string; className?: string }) {
+  return <SharedKpiCard className={className} label={label} tone={tone} value={value} />
 }
 
 function ReadOnlyField(props: { label: string; value: string }) {
@@ -946,7 +952,7 @@ function TextAreaField(props: { error?: string; fieldName?: string; label: strin
       <span className="mb-1 block text-xs font-medium text-slate-600">{props.label}</span>
       <textarea
         aria-invalid={Boolean(props.error)}
-        className={`w-full rounded-md border bg-white px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-100 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 text-slate-900'}`}
+        className={`w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-100 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 text-slate-900'}`}
         rows={props.rows ?? 3}
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}

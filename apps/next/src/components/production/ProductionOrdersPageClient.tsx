@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/Dialog'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
-import { Plus } from 'lucide-react'
+import { Download, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
 type Category = { availableForSale: boolean; code: string; name: string; stockEffect: string }
@@ -113,16 +116,9 @@ const productionOrderColumns: Array<ResizableColumnDefinition<ProductionOrderCol
 const productionMovementColumnCount = 10
 const productStockColumnCount = 5
 
-function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolean; label: string; onClick: () => void; tone?: 'amber' | 'dark' | 'emerald' | 'red' | 'slate' }) {
-  const activeClass = {
-    amber: 'border-amber-600 bg-amber-600 text-white',
-    dark: 'border-slate-700 bg-slate-700 text-white',
-    emerald: 'border-emerald-600 bg-emerald-600 text-white',
-    red: 'border-red-600 bg-red-600 text-white',
-    slate: 'border-slate-500 bg-slate-500 text-white',
-  }[tone]
-  const idleClass = tone === 'amber' ? 'border-slate-300 bg-white hover:bg-amber-50' : tone === 'emerald' ? 'border-slate-300 bg-white hover:bg-emerald-50' : tone === 'red' ? 'border-slate-300 bg-white hover:bg-red-50' : 'border-slate-300 bg-white hover:bg-slate-100'
-  return <button className={`rounded-md border px-3.5 py-1.5 text-sm font-medium ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
+function MatchButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void; tone?: 'amber' | 'dark' | 'emerald' | 'red' | 'slate' }) {
+  const className = active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${className}`} type="button" onClick={onClick}>{label}</button>
 }
 
 function formatDateLocal(d: Date) {
@@ -221,6 +217,14 @@ export function ProductionOrdersPageClient() {
   const currentRows = useMemo(() => data?.rows ?? [], [data?.rows])
   const totalPages = data?.summary.totalPages ?? 1
   const activeMobileFilterCount = (dateFrom || dateTo ? 1 : 0) + (status ? 1 : 0)
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams({ direction, format: 'xlsx', sort })
+    if (search.trim()) params.set('search', search.trim())
+    if (status) params.set('status', status)
+    if (dateFrom) params.set('dateFrom', dateFrom)
+    if (dateTo) params.set('dateTo', dateTo)
+    return `/api/production/orders?${params.toString()}`
+  }, [dateFrom, dateTo, direction, search, sort, status])
   const listControls = (
     <>
       <div className="flex items-center gap-3">
@@ -292,7 +296,7 @@ export function ProductionOrdersPageClient() {
       {error ? <Alert tone="red" title="โหลดข้อมูลใบสั่งผลิตไม่ได้" text={error} /> : null}
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden lg:block mb-3 space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden lg:block mb-3 space-y-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <input
             className="min-w-[260px] flex-1 rounded-md border px-3 py-2 text-sm h-9 border-slate-300"
@@ -314,7 +318,6 @@ export function ProductionOrdersPageClient() {
               ล้างตัวกรอง
             </button>
           ) : null}
-          <button className="ml-auto rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 h-9 flex items-center" type="button" onClick={() => setModalMode('create')}>+ ใบสั่งผลิตใหม่</button>
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
           <div className="flex flex-wrap items-center gap-4">
@@ -335,20 +338,24 @@ export function ProductionOrdersPageClient() {
               <MatchButton active={status === 'Cancelled'} label="ยกเลิก" onClick={() => { setStatus('Cancelled'); setPage(1) }} tone="red" />
             </div>
           </div>
-          <span className="text-xs text-slate-500">พบ <b className="text-slate-700">{data?.summary.total ?? 0}</b> ใบ</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">พบ <b className="text-slate-700">{data?.summary.total ?? 0}</b> ใบ</span>
+            <Button asChild className="gap-2" size="sm" variant="export">
+              <a href={exportHref}>
+                <Download className="size-4" />
+                <span>ส่งออก Excel</span>
+              </a>
+            </Button>
+            <button className="flex h-9 items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700" type="button" onClick={() => setModalMode('create')}>+ ใบสั่งผลิตใหม่</button>
+          </div>
         </div>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-3 space-y-2 rounded-md bg-white p-3 shadow lg:hidden animate-fade-in">
+      <div className="mb-3 space-y-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden animate-fade-in">
         <div className="flex gap-2 items-center">
-          <input 
-            className="min-w-[150px] flex-1 rounded-md border px-3 h-9 text-sm border-slate-300" 
-            placeholder="ค้นหาใบสั่งผลิต..." 
-            type="search" 
-            value={search} 
-            onChange={(event) => { setSearch(event.target.value); setPage(1) }} 
-          />
+          <input            className="min-w-[150px] flex-1 rounded-md border px-3 h-9 text-sm border-slate-300"
+            placeholder="ค้นหาใบสั่งผลิต..."            type="search"            value={search}            onChange={(event) => { setSearch(event.target.value); setPage(1) }}          />
           <button className="h-9 rounded-md bg-slate-100 px-2.5 text-xs text-slate-700" type="button" onClick={() => void loadData()}>
             Refresh
           </button>
@@ -360,24 +367,41 @@ export function ProductionOrdersPageClient() {
             ตัวกรอง {activeMobileFilterCount > 0 ? `(${activeMobileFilterCount})` : ''}
           </button>
         </div>
+        <Button asChild className="w-full gap-2" size="sm" variant="export">
+          <a href={exportHref}>
+            <Download className="size-4" />
+            <span>ส่งออก Excel</span>
+          </a>
+        </Button>
       </div>
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800">ตัวกรองใบสั่งผลิต</h4>
+        <MobileFilterSheet
+          footer={
+            <>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                onClick={() => setShowMobileFilters(false)}
                 type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  clearFilters()
+                  setShowMobileFilters(false)
+                }}
               >
-                &times;
+                ล้างตัวกรอง
               </button>
-            </div>
-
-            <div className="space-y-4">
+              <button
+                type="button"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </>
+          }
+          onClose={() => setShowMobileFilters(false)}
+          title="ตัวกรองใบสั่งผลิต"
+        >
               <div>
                 <span className="mb-1 block text-xs font-semibold text-slate-600">ช่วงเวลา</span>
                 <div className="flex flex-wrap gap-2">
@@ -402,9 +426,7 @@ export function ProductionOrdersPageClient() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     className={`h-9 rounded-md text-xs font-medium border outline-none ${
-                      status === '' 
-                        ? 'border-slate-700 bg-slate-700 text-white' 
-                        : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
+                      status === ''                        ? 'border-slate-700 bg-slate-700 text-white'                        : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
                     }`}
                     type="button"
                     onClick={() => { setStatus(''); setPage(1) }}
@@ -413,9 +435,7 @@ export function ProductionOrdersPageClient() {
                   </button>
                   <button
                     className={`h-9 rounded-md text-xs font-medium border outline-none ${
-                      status === 'Open' 
-                        ? 'border-slate-700 bg-slate-700 text-white' 
-                        : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
+                      status === 'Open'                        ? 'border-slate-700 bg-slate-700 text-white'                        : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
                     }`}
                     type="button"
                     onClick={() => { setStatus('Open'); setPage(1) }}
@@ -424,9 +444,7 @@ export function ProductionOrdersPageClient() {
                   </button>
                   <button
                     className={`h-9 rounded-md text-xs font-medium border outline-none ${
-                      status === 'In Production' 
-                        ? 'border-amber-600 bg-amber-600 text-white' 
-                        : 'border-slate-300 text-slate-700 bg-white hover:bg-amber-50'
+                      status === 'In Production'                        ? 'border-slate-700 bg-slate-700 text-white'                        : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
                     }`}
                     type="button"
                     onClick={() => { setStatus('In Production'); setPage(1) }}
@@ -435,9 +453,7 @@ export function ProductionOrdersPageClient() {
                   </button>
                   <button
                     className={`h-9 rounded-md text-xs font-medium border outline-none ${
-                      status === 'Partially Completed' 
-                        ? 'border-amber-600 bg-amber-600 text-white' 
-                        : 'border-slate-300 text-slate-700 bg-white hover:bg-amber-50'
+                      status === 'Partially Completed'                        ? 'border-slate-700 bg-slate-700 text-white'                        : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
                     }`}
                     type="button"
                     onClick={() => { setStatus('Partially Completed'); setPage(1) }}
@@ -446,9 +462,7 @@ export function ProductionOrdersPageClient() {
                   </button>
                   <button
                     className={`h-9 rounded-md text-xs font-medium border outline-none ${
-                      status === 'Completed' 
-                        ? 'border-emerald-600 bg-emerald-600 text-white' 
-                        : 'border-slate-300 text-slate-700 bg-white hover:bg-emerald-50'
+                      status === 'Completed'                        ? 'border-slate-700 bg-slate-700 text-white'                        : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
                     }`}
                     type="button"
                     onClick={() => { setStatus('Completed'); setPage(1) }}
@@ -457,9 +471,7 @@ export function ProductionOrdersPageClient() {
                   </button>
                   <button
                     className={`h-9 rounded-md text-xs font-medium border outline-none ${
-                      status === 'Cancelled' 
-                        ? 'border-red-600 bg-red-600 text-white' 
-                        : 'border-slate-300 text-slate-700 bg-white hover:bg-red-50'
+                      status === 'Cancelled'                        ? 'border-slate-700 bg-slate-700 text-white'                        : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
                     }`}
                     type="button"
                     onClick={() => { setStatus('Cancelled'); setPage(1) }}
@@ -475,36 +487,14 @@ export function ProductionOrdersPageClient() {
                   {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  clearFilters()
-                  setShowMobileFilters(false)
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-              <button
-                type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                ใช้ตัวกรอง
-              </button>
-            </div>
-          </div>
-        </div>
+        </MobileFilterSheet>
       ) : null}
 
       <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between lg:hidden">
         {listControls}
       </div>
 
-      {isLoading ? <div className="rounded-md bg-white p-10 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
+      {isLoading ? <div className="rounded-xl bg-white p-10 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
       {!isLoading ? (
         <>
           {/* Desktop Table View */}
@@ -513,7 +503,7 @@ export function ProductionOrdersPageClient() {
               {listControls}
             </div>
             <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {productionOrderColumns.map((column, index) => {
                   const style = index === productionOrderColumns.length - 1
@@ -628,7 +618,7 @@ export function ProductionOrdersPageClient() {
         </>
       ) : null}
       {!isLoading && currentRows.length === 0 ? (
-        <div className="rounded-md bg-white p-12 text-center text-slate-400 shadow lg:hidden">
+        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm lg:hidden">
           <div className="mb-2 text-3xl font-semibold">ใบสั่งผลิต</div>
           <div>ยังไม่มีใบสั่งผลิต</div>
         </div>
@@ -655,11 +645,11 @@ function OrderCard({ onOpen, row }: { onOpen: () => void; row: ProductionOrderRo
   const yieldPct = row.inputQty > 0 ? (row.outputQty / row.inputQty) * 100 : 0
   const wipQty = Math.max(0, row.wipQty ?? 0)
   return (
-    <div className={`relative cursor-pointer overflow-hidden rounded-lg border-2 p-4 shadow-md transition hover:shadow-xl ${cardClass(row.status)}`} onClick={onOpen}>
+    <div className={`relative cursor-pointer overflow-hidden rounded-xl border p-4 shadow-sm transition hover:shadow-md ${cardClass(row.status)}`} onClick={onOpen}>
       <div className="absolute right-2.5 top-2.5"><StatusBadge status={row.status} /></div>
       <div className="mb-1 font-mono text-sm text-slate-500">{row.docNo}</div>
       <div className="mb-3 text-sm text-slate-600">{formatDateDisplay(row.date)} · {row.branchName}</div>
-      <div className="mb-3 rounded-lg border border-slate-200 bg-white/80 p-3.5">
+      <div className="mb-3 rounded-xl border border-slate-200 bg-white/80 p-3.5">
         <div className="mb-1 text-xs font-semibold text-slate-500 uppercase tracking-wide">สินค้าที่ผลิต</div>
         <div className="text-base font-bold leading-tight text-amber-700 truncate">{row.productName || 'ยังไม่ได้กำหนดสินค้า'}</div>
         <div className="mt-1 text-sm text-slate-600 truncate">{row.productCode || row.productId || '-'} · {row.warehouseName}</div>
@@ -670,7 +660,7 @@ function OrderCard({ onOpen, row }: { onOpen: () => void; row: ProductionOrderRo
         <MiniMetric label="ผลิต" tone="emerald" value={row.outputQty} />
       </div>
       {row.inputQty > 0 ? (
-        <div className="mb-3 bg-white/40 p-2 rounded-lg border border-slate-200/50">
+        <div className="mb-3 bg-white/40 p-2 rounded-xl border border-slate-200/50">
           <div className="mb-1 flex justify-between text-sm"><span className="text-slate-600 font-medium">Yield (สัดส่วนผลิต)</span><span className={`font-bold ${yieldPct >= 90 ? 'text-emerald-700' : yieldPct >= 70 ? 'text-blue-700' : 'text-amber-700'}`}>{yieldPct.toFixed(1)}%</span></div>
           <div className="h-2.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full bg-blue-500" style={{ width: `${Math.min(100, yieldPct)}%` }} /></div>
         </div>
@@ -1136,16 +1126,41 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                 {isCreate ? 'เปิดงานผลิตใหม่โดยยังไม่กระทบสต็อก' : `${row?.productName || '-'} · ${row?.branchName || '-'}`}
               </DialogDescription>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {!isCreate && row ? (
-                <div className="flex flex-wrap gap-2">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              {isCreate ? (
+                <>
+                  <button
+                    className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white transition-colors hover:border-rose-700 hover:bg-rose-700"
+                    type="button"
+                    onClick={() => onClose(false)}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                    disabled={isSaving}
+                    type="button"
+                    onClick={() => void submitCreate()}
+                  >
+                    {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+                  </button>
+                </>
+              ) : row ? (
+                <>
                   {rowWipQty <= 0 && row.status !== 'Completed' && row.status !== 'Cancelled' ? (
-                    <button className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => void patchOrder('complete')}>จบงาน</button>
+                    <button className="h-9 rounded-md bg-emerald-600 px-4 text-sm font-normal text-white hover:bg-emerald-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => void patchOrder('complete')}>จบงาน</button>
                   ) : null}
                   {row.inputCount <= 0 && row.outputCount <= 0 && row.status !== 'Cancelled' ? (
-                    <button className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => void patchOrder('cancel')}>ยกเลิก</button>
+                    <button className="h-9 rounded-md border border-slate-700 bg-slate-800 px-4 text-sm font-normal text-white hover:bg-slate-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => void patchOrder('cancel')}>ยกเลิก</button>
                   ) : null}
-                </div>
+                  <button
+                    className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white transition-colors hover:border-rose-700 hover:bg-rose-700"
+                    type="button"
+                    onClick={() => onClose(false)}
+                  >
+                    ปิด
+                  </button>
+                </>
               ) : null}
             </div>
           </div>
@@ -1165,17 +1180,13 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
           ) : null}
 
           {!isCreate ? (
-            <div className="flex overflow-x-auto rounded-md border-b border-slate-100 bg-white shadow">
-              {[
-                ['header', 'Header'],
-                ['input', `Input (${row?.inputCount ?? 0})`],
-                ['output', `Output (${row?.outputCount ?? 0})`],
-              ].map(([key, label]) => (
-                <button key={key} className={`whitespace-nowrap border-b-2 px-5 py-3 text-sm font-medium ${tab === key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} type="button" onClick={() => setTab(key as typeof tab)}>
-                  {label}
-                </button>
-              ))}
-            </div>
+            <Tabs className="gap-0" value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
+              <TabsList className="w-full flex-nowrap overflow-x-auto" variant="line">
+                <TabsTrigger value="header" variant="line">Header</TabsTrigger>
+                <TabsTrigger value="input" variant="line">Input ({row?.inputCount ?? 0})</TabsTrigger>
+                <TabsTrigger value="output" variant="line">Output ({row?.outputCount ?? 0})</TabsTrigger>
+              </TabsList>
+            </Tabs>
           ) : null}
 
           {(isCreate || tab === 'header') ? (
@@ -1245,7 +1256,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
               </div>
             ) : (
               <div className="grid gap-3 lg:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h4 className="mb-4 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">ข้อมูลใบสั่งผลิต</h4>
                   <div className="grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
                     <ReadField label="เลขที่เอกสาร" value={row?.docNo ?? '-'} />
@@ -1254,7 +1265,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                     <ReadField label="สินค้าเป้าหมาย" value={row?.productName ?? '-'} />
                   </div>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h4 className="mb-4 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">การผลิตและคลัง</h4>
                   <div className="grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
                     <ReadField label="สาขา" value={row?.branchName ?? '-'} />
@@ -1340,25 +1351,6 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
           ) : null}
         </div>
 
-        <div className="flex flex-wrap justify-end items-center gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-          <button 
-            className="rounded-md px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 bg-transparent border-0 outline-none transition-colors" 
-            type="button" 
-            onClick={() => onClose(false)}
-          >
-            {isCreate ? 'ยกเลิก' : 'ปิด'}
-          </button>
-          {isCreate ? (
-            <button 
-              className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50" 
-              disabled={isSaving} 
-              type="button" 
-              onClick={() => void submitCreate()}
-            >
-              {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
-            </button>
-          ) : null}
-        </div>
       </DialogContent>
     </Dialog>
   )
@@ -1385,7 +1377,7 @@ function MovementPanel({
 }) {
   const formRef = useRef<HTMLFormElement | null>(null)
   return (
-    <div className="rounded-md bg-white p-5 shadow space-y-4">
+    <div className="space-y-4 rounded-xl border border-slate-200/60 bg-white p-5 shadow-sm">
       <div className="border-b border-slate-100 pb-2">
         <h4 className="text-base font-bold text-slate-800">{title}</h4>
       </div>
@@ -1394,7 +1386,7 @@ function MovementPanel({
         <form
           ref={formRef}
           noValidate
-          className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3"
+          className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3"
           onSubmit={(event) => {
             event.preventDefault()
             onSubmit(formRef.current ?? undefined)
@@ -1414,7 +1406,7 @@ function MovementPanel({
       ) : null}
 
       <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
-        <table className="hidden min-w-full table-fixed divide-y divide-slate-200 text-sm lg:table" style={{ minWidth: 980 }}>
+        <table className="ns-table hidden min-w-full table-fixed divide-y divide-slate-200 text-sm lg:table" style={{ minWidth: 980 }}>
           <colgroup>
             <col style={{ width: 90 }} />
             <col style={{ width: 130 }} />
@@ -1570,14 +1562,13 @@ function ProductStockPreview({
   if (!stock) return null
 
   return (
-    <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4 space-y-2">
+    <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-2">
       <h5 className="font-bold text-indigo-800 text-xs flex items-center gap-1.5">
         📦 ข้อมูล Stock ปัจจุบันของสินค้าที่จะผลิต: <span className="font-normal text-slate-600">{stock.productName} ({stock.productCode})</span>
       </h5>
-      
       {/* Desktop Table View */}
       <div className="hidden lg:block overflow-x-auto rounded-md border border-indigo-100 bg-white shadow-sm">
-        <table className="min-w-full table-fixed divide-y divide-indigo-100 text-sm" style={{ minWidth: 720 }}>
+        <table className="ns-table min-w-full table-fixed divide-y divide-indigo-100 text-sm" style={{ minWidth: 720 }}>
           <colgroup>
             <col style={{ width: 230 }} />
             <col style={{ width: 90 }} />
@@ -1699,12 +1690,7 @@ function MiniMetric({ label, tone, value }: { label: string; tone: 'amber' | 'em
 }
 
 function Metric({ label, value, tone = 'normal' }: { label: string; tone?: 'normal' | 'danger'; value: string }) {
-  return (
-    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-3">
-      <div className="text-sm text-slate-500 font-semibold">{label}</div>
-      <div className={`mt-1 text-lg font-bold ${tone === 'danger' ? 'text-red-700' : 'text-slate-900'}`}>{value}</div>
-    </div>
-  )
+  return <SharedKpiCard label={label} tone={tone} value={value} />
 }
 
 function ReadField({ label, value }: { label: string; value: string }) {
