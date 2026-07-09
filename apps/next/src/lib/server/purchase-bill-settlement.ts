@@ -27,7 +27,7 @@ export async function calculatePurchaseBillSettlement(tx: PurchaseBillSettlement
       where: { bill_id: billId, NOT: { status: 'cancelled' } },
     }),
     tx.supplier_advance_allocations.findMany({
-      select: { allocated_amount: true },
+      select: { allocated_amount: true, allocated_total_amount: true },
       where: { purchase_bill_id: billId, status: 'active' },
     }),
   ])
@@ -38,7 +38,7 @@ export async function calculatePurchaseBillSettlement(tx: PurchaseBillSettlement
     sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
   ), 0)
   const advanceAllocatedAmount = advanceAllocations.reduce((sum, allocation) => (
-    sum + toNumber(allocation.allocated_amount)
+    sum + toNumber(allocation.allocated_total_amount ?? allocation.allocated_amount)
   ), 0)
   const paidAmount = roundMoney(paymentAmount + advanceAllocatedAmount)
   const totalAmount = toNumber(bill.total_amount)

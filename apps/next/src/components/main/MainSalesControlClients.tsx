@@ -38,6 +38,14 @@ type SalesPlanPayload = {
   sourceState: { limitations: string[] }
   summary: Record<string, number>
 }
+type SalesPlanDraftForm = {
+  channel: string
+  containers: string
+  customerName: string
+  kgPerContainer: string
+  productCode: string
+  sellPctLme: string
+}
 
 type CommissionSalespersonRow = {
   id: string
@@ -167,6 +175,15 @@ function num(value: unknown) {
   return typeof value === 'number' ? value : Number(value ?? 0)
 }
 
+function lmeBaseByMetalGroup(metalGroup: string, config: LmeConfig | null) {
+  if (!config) return 0
+  const group = metalGroup.toLowerCase()
+  if (group.includes('ทองแดง') || group.includes('copper')) return config.lmeCopperUSD
+  if (group.includes('ทองเหลือง') || group.includes('brass')) return config.lmeBrassUSD
+  if (group.includes('อลูมิ') || group.includes('aluminum')) return config.lmeAluminumUSD
+  return 0
+}
+
 function dateTime(value: string | null | undefined) {
   if (!value) return '-'
   const parsed = new Date(value)
@@ -237,10 +254,21 @@ export function SalesPlanPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [isFetchingLive, setIsFetchingLive] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
+  const [isPlanFormOpen, setIsPlanFormOpen] = useState(false)
   const [month, setMonth] = useState('')
   const [filterGroup, setFilterGroup] = useState('')
   const [filterChannel, setFilterChannel] = useState('')
   const [lmeForm, setLmeForm] = useState<LmeConfig | null>(null)
+  const [planDraftError, setPlanDraftError] = useState<string | null>(null)
+  const [localPlanRows, setLocalPlanRows] = useState<AnyRow[]>([])
+  const [planDraftForm, setPlanDraftForm] = useState<SalesPlanDraftForm>({
+    channel: 'export',
+    containers: '1',
+    customerName: '',
+    kgPerContainer: '25000',
+    productCode: '',
+    sellPctLme: '',
+  })
   const [planSortKey, setPlanSortKey] = useState<SalesPlanColumnKey | null>(null)
   const [planSortDirection, setPlanSortDirection] = useState<SortDirection>('asc')
   const [analysisSortKey, setAnalysisSortKey] = useState<SalesPlanAnalysisColumnKey | null>(null)
@@ -271,6 +299,41 @@ export function SalesPlanPageClient() {
   }, [])
 
   const s = data?.summary ?? {}
+  const productOptions = useMemo(() => (data?.productAnalysis ?? [])
+    .map((row) => ({
+      code: text(row.code),
+      metalGroup: text(row.metalGroup),
+      name: text(row.name),
+      stock: num(row.stock),
+      wac: num(row.wac),
+    }))
+    .filter((row) => row.code && row.name), [data?.productAnalysis])
+  const selectedDraftProduct = useMemo(() => productOptions.find((option) => option.code === planDraftForm.productCode) ?? null, [planDraftForm.productCode, productOptions])
+  const draftKgPerContainer = Math.max(0, Number(planDraftForm.kgPerContainer || 0))
+  const draftContainers = Math.max(0, Number(planDraftForm.containers || 0))
+  const draftSellPct = Math.max(0, Number(planDraftForm.sellPctLme || 0))
+  const draftTotalKg = draftContainers * draftKgPerContainer
+  const draftLme = selectedDraftProduct ? lmeBaseByMetalGroup(selectedDraftProduct.metalGroup, lmeForm) : 0
+  const draftFx = lmeForm?.fxRate ?? 0
+  const draftSellPrice = draftLme > 0 ? (draftLme / 1000) * draftFx * (draftSellPct / 100) : 0
+  const filteredServerPlanRows = useMemo(() => (data?.planRows ?? [])
+    .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
+    .filter((row) => !filterChannel || text(row.channel) === filterChannel), [data?.planRows, filterChannel, filterGroup])
+  const filteredLocalPlanRows = useMemo(() => localPlanRows
+    .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
+    .filter((row) => !filterChannel || text(row.channel) === filterChannel), [filterChannel, filterGroup, localPlanRows])
+  const mergedPlanRows = useMemo(() => [...filteredLocalPlanRows, ...filteredServerPlanRows], [filteredLocalPlanRows, filteredServerPlanRows])
+  const liveSummary = useMemo(() => ({
+    avgPctLme: mergedPlanRows.length ? mergedPlanRows.reduce((sum, row) => sum + num(row.sellPctLme), 0) / mergedPlanRows.length : 0,
+    lockedContainers: mergedPlanRows.filter((row) => text(row.status).toLowerCase().includes('lock')).reduce((sum, row) => sum + num(row.containers), 0),
+    lockedCount: mergedPlanRows.filter((row) => text(row.status).toLowerCase().includes('lock')).length,
+    pendingCount: mergedPlanRows.filter((row) => !text(row.status).toLowerCase().includes('lock')).length,
+    plansCount: mergedPlanRows.length,
+    totalContainers: mergedPlanRows.reduce((sum, row) => sum + num(row.containers), 0),
+    totalKg: mergedPlanRows.reduce((sum, row) => sum + num(row.totalKg), 0),
+    totalLockedProfit: mergedPlanRows.filter((row) => text(row.status).toLowerCase().includes('lock')).reduce((sum, row) => sum + num(row.projectedProfit), 0),
+    totalProjectedProfit: mergedPlanRows.reduce((sum, row) => sum + num(row.projectedProfit), 0),
+  }), [mergedPlanRows])
   const pendingSaleRows = useMemo(() => (data?.pendingSaleTable ?? [])
     .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup)), [data?.pendingSaleTable, filterGroup])
   const pendingSaleTotals = useMemo(() => ({
@@ -287,14 +350,14 @@ export function SalesPlanPageClient() {
     .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
     .filter((row) => !filterChannel || filterChannel), [data, filterGroup, filterChannel])
   const sortedPlanRows = useMemo(() => {
-    const rows = data?.planRows ?? []
+    const rows = mergedPlanRows
     if (!planSortKey) return rows
 
     return [...rows].sort((left, right) => {
       const result = compareSortValues(getAnySortValue(left, planSortKey), getAnySortValue(right, planSortKey))
       return planSortDirection === 'asc' ? result : -result
     })
-  }, [data?.planRows, planSortDirection, planSortKey])
+  }, [mergedPlanRows, planSortDirection, planSortKey])
   const sortedAnalysisRows = useMemo(() => {
     if (!analysisSortKey) return analysisRows
 
@@ -323,7 +386,7 @@ export function SalesPlanPageClient() {
     downloadCsv(
       `sales_plan_${month || data?.filters.month || 'current'}.csv`,
       ['Month', 'Product', 'ช่องทาง', 'Customer', 'Containers', 'Kg/ตู้', 'รวม กก.', '% LME', 'LME (USD/MT)', 'FX', 'ราคาขาย (THB/kg)', 'สถานะ'],
-      (data?.planRows ?? []).map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
+      mergedPlanRows.map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
     )
   }
 
@@ -410,6 +473,66 @@ export function SalesPlanPageClient() {
     }
   }
 
+  function resetPlanDraftForm() {
+    setPlanDraftForm({
+      channel: filterChannel || 'export',
+      containers: '1',
+      customerName: '',
+      kgPerContainer: String(lmeForm?.kgPerContainer ?? data?.lmeConfig.kgPerContainer ?? 25000),
+      productCode: '',
+      sellPctLme: '',
+    })
+    setPlanDraftError(null)
+  }
+
+  function openPlanForm() {
+    resetPlanDraftForm()
+    setIsPlanFormOpen(true)
+  }
+
+  function addDraftPlan() {
+    if (!selectedDraftProduct) {
+      setPlanDraftError('เลือกสินค้า')
+      return
+    }
+    if (!planDraftForm.customerName.trim()) {
+      setPlanDraftError('กรอกชื่อลูกค้า')
+      return
+    }
+    if (draftContainers <= 0 || draftKgPerContainer <= 0) {
+      setPlanDraftError('จำนวนตู้และ กก./ตู้ ต้องมากกว่า 0')
+      return
+    }
+    if (draftSellPct <= 0) {
+      setPlanDraftError('กรอก % LME มากกว่า 0')
+      return
+    }
+
+    const projectedProfit = draftTotalKg * (draftSellPrice - selectedDraftProduct.wac)
+    const projectedMarginPct = draftSellPrice > 0 ? ((draftSellPrice - selectedDraftProduct.wac) / draftSellPrice) * 100 : 0
+    setLocalPlanRows((rows) => [{
+      channel: planDraftForm.channel,
+      containers: draftContainers,
+      customerId: `draft:${Date.now()}`,
+      customerName: planDraftForm.customerName.trim(),
+      fx: draftFx,
+      id: `draft:${Date.now()}:${selectedDraftProduct.code}`,
+      kgPerContainer: draftKgPerContainer,
+      lme: draftLme,
+      metalGroup: selectedDraftProduct.metalGroup,
+      productId: selectedDraftProduct.code,
+      productName: selectedDraftProduct.name,
+      projectedMarginPct,
+      projectedProfit,
+      sellPctLme: draftSellPct,
+      sellPrice: draftSellPrice,
+      status: 'Draft',
+      totalKg: draftTotalKg,
+    }, ...rows])
+    resetPlanDraftForm()
+    setIsPlanFormOpen(false)
+  }
+
   return (
     <section className="space-y-4">
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -478,6 +601,7 @@ export function SalesPlanPageClient() {
           <option value="domestic">🇹🇭 ในประเทศ</option>
         </select>
         <span className="flex-1" />
+        <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center" onClick={openPlanForm} type="button">+ เพิ่มแผน</button>
         <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center" onClick={exportPlan} type="button">📥 Export CSV</button>
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -485,31 +609,31 @@ export function SalesPlanPageClient() {
           <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-lg shrink-0">📋</div>
           <div>
             <div className="text-xs text-slate-500 font-semibold mb-0.5">รายการแผน</div>
-            <div className="text-lg font-bold text-slate-800 leading-tight">{money(s.plansCount)}</div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">🔒 {money(s.lockedCount)} / ⏳ {money(s.pendingCount)}</div>
+            <div className="text-lg font-bold text-slate-800 leading-tight">{money(liveSummary.plansCount || s.plansCount)}</div>
+            <div className="text-xs text-slate-400 font-medium mt-0.5">🔒 {money(liveSummary.lockedCount || s.lockedCount)} / ⏳ {money(liveSummary.pendingCount || s.pendingCount)}</div>
           </div>
         </div>
         <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-lg shrink-0">📦</div>
           <div>
             <div className="text-xs text-slate-500 font-semibold mb-0.5">จำนวนตู้รวม</div>
-            <div className="text-lg font-bold text-blue-700 leading-tight">{money(s.totalContainers)}</div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">🔒 ล็อก {money(s.lockedContainers)}</div>
+            <div className="text-lg font-bold text-blue-700 leading-tight">{money(liveSummary.totalContainers || s.totalContainers)}</div>
+            <div className="text-xs text-slate-400 font-medium mt-0.5">🔒 ล็อก {money(liveSummary.lockedContainers || s.lockedContainers)}</div>
           </div>
         </div>
         <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0">⚖️</div>
           <div>
             <div className="text-xs text-slate-500 font-semibold mb-0.5">น้ำหนักรวม</div>
-            <div className="text-lg font-bold text-slate-800 leading-tight">{money(s.totalKg)} กก.</div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">เฉลี่ย {money(s.avgPctLme)}% LME</div>
+            <div className="text-lg font-bold text-slate-800 leading-tight">{money(liveSummary.totalKg || s.totalKg)} กก.</div>
+            <div className="text-xs text-slate-400 font-medium mt-0.5">เฉลี่ย {money(liveSummary.avgPctLme || s.avgPctLme)}% LME</div>
           </div>
         </div>
         <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg shrink-0">💰</div>
           <div>
             <div className="text-xs text-slate-500 font-semibold mb-0.5">กำไรล็อกแล้ว</div>
-            <div className={`text-lg font-bold leading-tight ${num(s.totalLockedProfit) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{money(s.totalLockedProfit)}</div>
+            <div className={`text-lg font-bold leading-tight ${num(liveSummary.totalLockedProfit || s.totalLockedProfit) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{money(liveSummary.totalLockedProfit || s.totalLockedProfit)}</div>
             <div className="text-xs text-slate-400 font-medium mt-0.5">เฉพาะที่ล็อกราคาแล้ว</div>
           </div>
         </div>
@@ -517,7 +641,7 @@ export function SalesPlanPageClient() {
           <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-lg shrink-0">📈</div>
           <div>
             <div className="text-xs text-slate-500 font-semibold mb-0.5">กำไรคาดการณ์</div>
-            <div className={`text-lg font-bold leading-tight ${num(s.totalProjectedProfit) >= 0 ? 'text-amber-600' : 'text-red-500'}`}>{money(s.totalProjectedProfit)}</div>
+            <div className={`text-lg font-bold leading-tight ${num(liveSummary.totalProjectedProfit || s.totalProjectedProfit) >= 0 ? 'text-amber-600' : 'text-red-500'}`}>{money(liveSummary.totalProjectedProfit || s.totalProjectedProfit)}</div>
             <div className="text-xs text-slate-400 font-medium mt-0.5">ถ้าขายตามแผน</div>
           </div>
         </div>
@@ -528,6 +652,66 @@ export function SalesPlanPageClient() {
         <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-semibold text-slate-600">
           📝 ตารางวางแผน — ปลดล็อก = อยู่ในขั้นเสนอ / ล็อก = ราคายืนยันแล้วและกันยอดตามแผนขาย
         </div>
+        {isPlanFormOpen ? (
+          <div className="border-b border-slate-100 bg-amber-50/40 p-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-slate-800">+ เพิ่มแผนขาย</div>
+                  <div className="text-xs text-slate-500">รอบนี้บันทึกเป็น draft บนหน้าจอก่อน เพื่อให้เริ่มวางแผนและเห็นตัวเลขในตารางได้ทันที</div>
+                </div>
+                <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setIsPlanFormOpen(false)} type="button">ปิดฟอร์ม</button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+                <label className="text-xs font-bold text-slate-600">
+                  <span className="mb-1 block">สินค้า</span>
+                  <select className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={planDraftForm.productCode} onChange={(event) => setPlanDraftForm((current) => ({ ...current, productCode: event.target.value }))}>
+                    <option value="">เลือกสินค้า</option>
+                    {productOptions.map((option) => (
+                      <option key={option.code} value={option.code}>{option.name} ({option.code})</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-bold text-slate-600">
+                  <span className="mb-1 block">ช่องทาง</span>
+                  <select className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={planDraftForm.channel} onChange={(event) => setPlanDraftForm((current) => ({ ...current, channel: event.target.value }))}>
+                    {data?.filters.channels.map((channel) => (
+                      <option key={channel.id} value={channel.id}>{channel.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-bold text-slate-600">
+                  <span className="mb-1 block">ลูกค้า</span>
+                  <input className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" onChange={(event) => setPlanDraftForm((current) => ({ ...current, customerName: event.target.value }))} placeholder="ชื่อลูกค้า" value={planDraftForm.customerName} />
+                </label>
+                <label className="text-xs font-bold text-slate-600">
+                  <span className="mb-1 block">จำนวนตู้</span>
+                  <input className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-right text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, containers: event.target.value }))} type="number" value={planDraftForm.containers} />
+                </label>
+                <label className="text-xs font-bold text-slate-600">
+                  <span className="mb-1 block">กก./ตู้</span>
+                  <input className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-right text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, kgPerContainer: event.target.value }))} type="number" value={planDraftForm.kgPerContainer} />
+                </label>
+                <label className="text-xs font-bold text-slate-600">
+                  <span className="mb-1 block">% LME</span>
+                  <input className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-right text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, sellPctLme: event.target.value }))} type="number" value={planDraftForm.sellPctLme} />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+                <PendingStatCard label="หมวด" sublabel="อิงจากสินค้า" value={selectedDraftProduct?.metalGroup || '-'} />
+                <PendingStatCard label="รวม กก." sublabel="ตู้ x กก./ตู้" value={`${money(draftTotalKg)} กก.`} />
+                <PendingStatCard label="LME / FX" sublabel={`${money(draftLme)} USD/MT`} value={money(draftFx)} />
+                <PendingStatCard label="ราคา THB/kg" sublabel={`ที่ ${money(draftSellPct)}% LME`} value={money(draftSellPrice)} />
+                <PendingStatCard label="กำไรคาดการณ์" sublabel={selectedDraftProduct ? `WAC ${money(selectedDraftProduct.wac)}` : 'เลือกสินค้าเพื่อคำนวณ'} tone={selectedDraftProduct && draftSellPrice - selectedDraftProduct.wac < 0 ? 'danger' : 'success'} value={selectedDraftProduct ? money(draftTotalKg * (draftSellPrice - selectedDraftProduct.wac)) : '-'} />
+              </div>
+              {planDraftError ? <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">{planDraftError}</div> : null}
+              <div className="flex flex-wrap justify-end gap-2">
+                <button className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={resetPlanDraftForm} type="button">ล้างฟอร์ม</button>
+                <button className="h-10 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700" onClick={addDraftPlan} type="button">เพิ่มเข้าตาราง</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Desktop view */}
         {planResize.hasCustomWidths ? (
@@ -571,7 +755,7 @@ export function SalesPlanPageClient() {
                   <td className="p-1.5 text-right text-xs text-slate-400 font-medium">{money(row.lme)}</td>
                   <td className="p-1.5 text-right text-xs text-slate-400 font-medium">{money(row.fx)}</td>
                   <td className="bg-emerald-50/20 p-1.5 text-right font-bold text-emerald-600">{money(row.sellPrice)}</td>
-                  <td className="p-1.5 text-center"><span className="inline-flex rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{text(row.status) || 'Pending'}</span></td>
+                  <td className="p-1.5 text-center"><span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ${text(row.status) === 'Draft' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>{text(row.status) || 'Pending'}</span></td>
                 </tr>
               ))}
               {!sortedPlanRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanColumns.length}>ยังไม่มีรายการในเดือนนี้</td></tr> : null}
@@ -615,7 +799,7 @@ export function SalesPlanPageClient() {
               </div>
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-400 font-semibold">สถานะ:</span>
-                <span className="rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{text(row.status) || 'Pending'}</span>
+                <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${text(row.status) === 'Draft' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>{text(row.status) || 'Pending'}</span>
               </div>
             </div>
           ))}
