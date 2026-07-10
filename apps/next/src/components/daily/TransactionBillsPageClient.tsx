@@ -31,6 +31,7 @@ import type { SalesBillDetail } from '@/lib/server/sales-bill-detail'
 
 type BillRow = {
   advanceAllocatedAmount?: number
+  advanceAllocatedSubtotalAmount?: number
   advancePaymentDocNo?: string
   advancePaymentId?: string
   branchId?: string
@@ -214,6 +215,7 @@ type Option = {
   sales_name?: string | null
   sourceLineNo?: number | null
   status?: string | null
+  subtotalAmount?: number | null
   supplier_id?: string | null
   supplier_name?: string | null
   type?: string | null
@@ -938,20 +940,27 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const formSubtotal = form.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price), 0)
   const formTotalWeight = form.items.reduce((sum, item) => sum + item.qty, 0)
   const formAfterDiscount = Math.max(0, formSubtotal - form.discountTotal)
-  const formVat = !form.hasVat || form.vatType === 'NONE' ? 0 : form.vatType === 'INCLUDE' ? formAfterDiscount * formVatRatePercent / (100 + formVatRatePercent) : formAfterDiscount * (formVatRatePercent / 100)
-  const formTotal = form.hasVat && form.vatType === 'EXCLUDE' ? formAfterDiscount + formVat : formAfterDiscount
   const selectedAdvancePayment = form.advancePaymentId
     ? activeAdvancePayments.find((option) => option.id === form.advancePaymentId)
       ?? null
     : null
   const editingAdvanceCarry = editingBill && editingBill.advancePaymentId === form.advancePaymentId
-    ? editingBill.advanceAllocatedAmount ?? 0
+    ? editingBill.advanceAllocatedSubtotalAmount ?? editingBill.advanceAllocatedAmount ?? 0
     : 0
   const availableAdvanceAmount = selectedAdvancePayment
     ? Math.max(0, (selectedAdvancePayment.remainingAmount ?? 0) + editingAdvanceCarry)
     : 0
-  const formAdvanceApplied = Math.min(formTotal, availableAdvanceAmount)
-  const formNetPayable = Math.max(0, formTotal - formAdvanceApplied)
+  const formHasVat = form.hasVat && form.vatType !== 'NONE'
+  const formTaxableBaseBeforeAdvance = formHasVat && form.vatType === 'INCLUDE'
+    ? formAfterDiscount * 100 / (100 + formVatRatePercent)
+    : formAfterDiscount
+  const formVatBeforeAdvance = formHasVat ? formTaxableBaseBeforeAdvance * (formVatRatePercent / 100) : 0
+  const formTotalBeforeAdvance = formHasVat ? formTaxableBaseBeforeAdvance + formVatBeforeAdvance : formTaxableBaseBeforeAdvance
+  const formAdvanceApplied = Math.min(formTaxableBaseBeforeAdvance, availableAdvanceAmount)
+  const formTaxableBaseAfterAdvance = Math.max(0, formTaxableBaseBeforeAdvance - formAdvanceApplied)
+  const formVat = formHasVat ? formTaxableBaseAfterAdvance * (formVatRatePercent / 100) : 0
+  const formTotal = formHasVat ? formTaxableBaseAfterAdvance + formVat : formTaxableBaseAfterAdvance
+  const formNetPayable = formTotal
   const salesSubtotal = salesForm.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - (salesForm.transactionMode === 'TRADING' ? 0 : item.discount)), 0)
   const salesAfterDiscount = Math.max(0, salesSubtotal - salesForm.discountTotal)
   const salesVat = !salesForm.hasVat || salesForm.vatType === 'NONE' ? 0 : salesForm.vatType === 'INCLUDE' ? salesAfterDiscount * formVatRatePercent / (100 + formVatRatePercent) : salesAfterDiscount * (formVatRatePercent / 100)
@@ -3628,9 +3637,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                     <SummaryLine label="ยอดรวมรายการ" value={formatMoney(formSubtotal)} />
                     {form.discountTotal > 0 ? <SummaryLine label="หักส่วนลด" tone="red" value={`-${formatMoney(form.discountTotal)}`} /> : null}
                     <SummaryLine label="หลังส่วนลด" value={formatMoney(formAfterDiscount)} />
-                    {form.hasVat ? <SummaryLine label={vatLabel} value={formatMoney(formVat)} /> : null}
+                    <SummaryLine label="ยอดสุทธิก่อนหัก ADV" value={formatMoney(formTotalBeforeAdvance)} />
                     {formAdvanceApplied > 0 ? <SummaryLine label="หัก ADV/มัดจำ" tone="red" value={`-${formatMoney(formAdvanceApplied)}`} /> : null}
-                    <SummaryLine label="ยอดสุทธิก่อนหัก ADV" value={formatMoney(formTotal)} />
+                    {form.hasVat ? <SummaryLine label={`${vatLabel} หลังหัก ADV`} value={formatMoney(formVat)} /> : null}
+                    <SummaryLine label="ยอดสุทธิหลังหัก ADV" value={formatMoney(formTotal)} />
                     <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-lg font-bold"><span>ยอดสุทธิที่ต้องจ่าย</span><span className="tabular-nums text-slate-900">{formatMoney(formNetPayable)}</span></div>
                   </div>
                 </div>
