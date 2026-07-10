@@ -2941,6 +2941,17 @@ Tailwind dependency check:
   - Why it stays this way: the page should read as an analytics dashboard, not a long report made of many tables. Users can choose the detail context they need while still keeping the primary overview and key breakdown available.
   - Runtime API behavior, analytics formulas, date filters, exports/share actions, permissions, database schema, and DB state were not changed.
 
+- 2026-07-10: UAT `/purchase/bills` supplier-advance schema alignment
+  - Investigated `https://ns-erp-uat.vercel.app/purchase/bills` after Vercel request logs showed `GET /api/purchase/bills 500` on the UAT deployment that serves branch `uat`.
+  - Verified the deployed code expects the newer supplier-advance VAT breakdown fields in `apps/next/src/app/api/purchase/bills/route.ts`, specifically:
+    - `public.supplier_advance_payments.advance_type`, `invoice_no`, `vat_type`, `vat_rate_percent`, `subtotal_amount`, `vat_amount`, `total_amount`
+    - `public.supplier_advance_allocations.allocated_subtotal_amount`, `allocated_vat_amount`, `allocated_total_amount`
+  - Verified the UAT Supabase database was still missing those columns, so the route could not read supplier-advance references for purchase bills and crashed at runtime.
+  - Applied `supabase/migrations/20260706093000_add_supplier_advance_type_vat_breakdown.sql` directly to the UAT database to align schema with the already-deployed code.
+  - What is what: the `supplier_advance_payments` / `supplier_advance_allocations` pair is now the source of truth for advance-payment type, VAT/subtotal/total breakdown, and per-bill allocated subtotal/VAT/total values shown in purchase-bill ADV flows.
+  - Why it has to be like this: `/purchase/bills` now computes ADV options and remaining values from subtotal/VAT-aware amounts, so deploying the code without the matching schema guarantees runtime failure. This is a schema-environment issue, not a page-layout issue.
+  - No application code or runtime fallback was added in this checkpoint; the fix was to bring UAT schema up to the contract already required by the deployed code.
+
 - 2026-07-10: Sales Commission drilldown table-density follow-up
   - `/sales-commission` salesperson drilldown keeps all 4 verification tables, but no longer stacks them as one long table wall and no longer renders two table panels inside one tab.
   - What is what: `ยอดรวมตามหมวด` shows Table 1, `ยอดได้คอม` shows Table 2, `ผู้ขาย` shows Table 3, and `รายการสินค้า` shows Table 4.
