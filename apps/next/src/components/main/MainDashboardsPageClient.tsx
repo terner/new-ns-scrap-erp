@@ -83,6 +83,7 @@ type SortDirection = 'asc' | 'desc'
 type DashboardAgingSortKey = 'label' | 'current' | 'd1_30' | 'd31_60' | 'd61_90' | 'over90' | 'total'
 type DashboardDetailTab = 'metrics' | 'ranking' | 'stock'
 type AnalyticsDetailTab = 'partners' | 'products' | 'sales'
+type OwnerDailyTab = 'ap' | 'ar' | 'expense' | 'loan' | 'pending'
 type DashboardAgingRow = {
   current: number
   d1_30: number
@@ -129,12 +130,20 @@ const dashboardDetailTabs: Array<{ key: DashboardDetailTab; label: string; summa
   { key: 'metrics', label: 'ตัวชี้วัดย่อย', summary: 'ซื้อ ขาย เงินสด และ Stock' },
 ]
 
+const ownerDailyTabs: Array<{ key: OwnerDailyTab; label: string }> = [
+  { key: 'ar', label: 'รับวันนี้' },
+  { key: 'ap', label: 'จ่ายวันนี้' },
+  { key: 'loan', label: 'ค่างวด/ดอกเบี้ย' },
+  { key: 'expense', label: 'ค่าใช้จ่าย' },
+  { key: 'pending', label: 'งานค้าง' },
+]
+
 const ownerDueColumns: ResizableColumnDefinition<OwnerDueSortKey>[] = [
   { key: 'name', defaultWidth: 190, minWidth: 120 },
   { key: 'docNo', defaultWidth: 140, minWidth: 100 },
-  { key: 'due', defaultWidth: 120, minWidth: 90 },
+  { key: 'due', defaultWidth: 140, minWidth: 120 },
   { key: 'amount', defaultWidth: 130, minWidth: 100 },
-  { key: 'daysOverdue', defaultWidth: 100, minWidth: 80 },
+  { key: 'daysOverdue', defaultWidth: 120, minWidth: 100 },
 ]
 
 const ownerDueApColumns = ownerDueColumns.filter((column) => column.key !== 'daysOverdue')
@@ -237,7 +246,7 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
   return (
     <section className="space-y-4">
       {mode === 'dashboard' ? <DashboardView dashboardBranchId={dashboardBranchId} dashboardCustomerId={dashboardCustomerId} dashboardGroup={dashboardGroup} dashboardProductId={dashboardProductId} dashboardSupplierId={dashboardSupplierId} data={data} date={date} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setDashboardBranchId={setDashboardBranchId} setDashboardCustomerId={setDashboardCustomerId} setDashboardGroup={setDashboardGroup} setDashboardProductId={setDashboardProductId} setDashboardSupplierId={setDashboardSupplierId} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
-      {mode === 'owner-daily' ? <OwnerDailyView data={data} /> : null}
+      {mode === 'owner-daily' ? <OwnerDailyView data={data} date={date} setDate={setDate} /> : null}
       {mode === 'daily-report' ? <DailyReportView data={data} date={date} setDate={setDate} /> : null}
       {mode === 'analytics-dashboard' ? <AnalyticsDashboardView data={data} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
@@ -863,50 +872,103 @@ function DashboardChartCard({ children, className = '', title }: { children: Rea
   return <div className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${className}`.trim()}><div className="mb-3 text-sm font-bold text-slate-800">{title}</div>{children}</div>
 }
 
-function OwnerDailyView({ data }: { data: MainPayload | null }) {
+function OwnerDailyView({ data, date, setDate }: { data: MainPayload | null; date: string; setDate: (value: string) => void }) {
+  const [activeTab, setActiveTab] = useState<OwnerDailyTab>('ar')
   const plan = data?.ownerDaily.cashPlan
   const pending = data?.ownerDaily.pending ?? {}
   const actual = data?.ownerDaily.actualActivity
   const gapPositive = (plan?.gap ?? 0) >= 0
-  const cardBg = gapPositive ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
-  const iconColor = gapPositive ? 'text-emerald-500' : 'text-rose-500'
+  const arRows = data?.ownerDaily.due.ar ?? []
+  const apRows = data?.ownerDaily.due.ap ?? []
+  const loanRows = (data?.ownerDaily.loanToday ?? []).map((row) => ({
+    amount: row.amount,
+    contractNo: row.contractNo,
+    name: `งวด ${row.installmentNo} · ครบกำหนด ${row.due}`,
+  }))
+  const expenseRows = (data?.ownerDaily.expensesToday ?? []).map((row) => ({ amount: row.amount, docNo: row.docNo, name: row.payee }))
+  const dateButtonClass = 'h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200'
+  const isToday = date === today()
+  const pendingItems = [
+    { label: 'บิลซื้อ Draft', value: String(safeNumber(pending.pendingPurchaseCount).toLocaleString('th-TH')) },
+    { label: 'บิลขาย Draft', value: String(safeNumber(pending.pendingSalesCount).toLocaleString('th-TH')) },
+    { label: 'FG พร้อมขาย', note: money(pending.fgValue), value: `${money(pending.fgQty)} กก.` },
+    { label: 'Trading Pending', note: money(pending.tradingPendingValue), value: String(safeNumber(pending.tradingPending).toLocaleString('th-TH')) },
+  ]
+  function shiftDate(days: number) {
+    const next = new Date(`${date}T00:00:00`)
+    next.setDate(next.getDate() + days)
+    setDate(next.toISOString().slice(0, 10))
+  }
 
   return (
     <>
-      <div className={`relative overflow-hidden rounded-xl p-6 shadow-sm border ${cardBg}`}>
-        <div className={`absolute right-3 top-2 text-7xl opacity-20 ${iconColor}`}>{gapPositive ? '✅' : '⚠️'}</div>
-        <div className="relative">
-          <div className="text-sm opacity-90">{gapPositive ? '✓ คาดการณ์เงินเหลือสิ้นวัน' : '⚠ คาดการณ์เงินขาด ต้องเตรียม!'}</div>
-          <div className="mt-1 font-mono text-4xl font-bold">{money(plan?.gap)}</div>
-          <div className="mt-2 text-xs opacity-90 font-medium">= 💵 เงินสด {money(plan?.available)} + 📥 คาดเข้า {money(plan?.expectedIn)} − 📤 คาดออก {money(plan?.expectedOut)}</div>
-        </div>
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
+        <span className="text-xs font-semibold text-slate-600">ข้อมูลวันที่:</span>
+        <button className={dateButtonClass} type="button" onClick={() => shiftDate(-1)}>← วันก่อน</button>
+        <DatePickerInput className="w-[140px]" value={date} onChange={setDate} />
+        <button className={`${dateButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} disabled={isToday} type="button" onClick={() => shiftDate(1)}>วันถัดไป →</button>
+        <button className={isToday ? 'h-9 rounded-md border border-slate-300 bg-slate-100 px-4 text-sm font-semibold text-slate-900 outline-none transition focus:ring-2 focus:ring-slate-200' : `${dateButtonClass} px-4`} type="button" onClick={() => setDate(today())}>วันนี้</button>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <LegacyKpi label="💵 เงินสดในมือ" sub="รวม Cash + Bank" tone="blue" value={money(plan?.available)} />
-        <LegacyKpi label="📥 คาดรับวันนี้" sub={`${data?.ownerDaily.due.ar.length ?? 0} ลูกค้าครบกำหนด`} tone="emerald" value={`+${money(plan?.expectedIn)}`} />
-        <LegacyKpi label="📤 คาดจ่ายวันนี้" sub={`AP ${money(data?.ownerDaily.due.ap.reduce((sum, row) => sum + row.amount, 0))} · Loan ${money(data?.ownerDaily.loanToday.reduce((sum, row) => sum + row.amount, 0))} · Exp ${money(data?.ownerDaily.expensesToday.reduce((sum, row) => sum + row.amount, 0))}`} tone="red" value={`-${money(plan?.expectedOut)}`} />
-      </div>
-      {(pending.tradingPending ?? 0) > 0 ? <PendingBlock color="purple" cta="→ ไป Trading Matching" title="🔄 Trading Pending รับเงิน — จ่ายซื้อ Trading แล้ว แต่ยังไม่เปิดบิลขาย" cards={[['📋 บิลซื้อ Trading', String(pending.tradingPending)], ['💸 จ่ายไปแล้ว', money(pending.tradingPaidTotal)], ['✓ Match แล้ว', money(pending.tradingMatchedTotal)], ['⏳ Pending รับเงิน', money(pending.tradingPendingValue)]]} /> : null}
-      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-        <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">📊 ที่เกิดขึ้นจริงวันนี้แล้ว</h3>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          <Tile tone="emerald" label="📥 รับเงินจริง" value={`+${money(actual?.cashIn)}`} />
-          <Tile tone="red" label="📤 จ่าย Supplier" value={`-${money(actual?.paymentOut)}`} />
-          <Tile tone="orange" label="💰 ค่าใช้จ่าย" value={`-${money(actual?.expenseOut)}`} className="col-span-2 md:col-span-1" />
-        </div>
-      </div>
-      <div className="grid gap-3 lg:grid-cols-2"><OwnerDueTable rows={data?.ownerDaily.due.ar ?? []} title="📥 ลูกหนี้ที่ควรเก็บวันนี้" type="ar" /><OwnerDueTable rows={data?.ownerDaily.due.ap ?? []} title="📤 เจ้าหนี้ที่ต้องจ่ายวันนี้" type="ap" /></div>
-      <div className="grid gap-3 lg:grid-cols-3">
-        <OwnerSmallTable rows={data?.ownerDaily.loanToday ?? []} tableKey="loan" title="🏦 ค่างวด/ดอกเบี้ยวันนี้" />
-        <OwnerSmallTable rows={(data?.ownerDaily.expensesToday ?? []).map((row) => ({ amount: row.amount, docNo: row.docNo, name: row.payee }))} tableKey="expense" title="💰 ค่าใช้จ่ายวันนี้" />
-        <Panel title="📋 รายการรอดำเนินการ">
-          <div className="space-y-3 text-sm">
-            <MiniLine label="📥 บิลซื้อ Draft" value={money(pending.pendingPurchaseCount)} />
-            <MiniLine label="📤 บิลขาย Draft" value={money(pending.pendingSalesCount)} />
-            <MiniLine label={`📦 FG พร้อมขาย (${money(pending.fgQty)} กก.)`} value={money(pending.fgValue)} />
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-slate-500">แผนเงินวันนี้</div>
+            <div className={`mt-1 font-mono text-2xl font-bold tabular-nums ${gapPositive ? 'text-emerald-700' : 'text-red-700'}`}>{money(plan?.gap)}</div>
           </div>
-        </Panel>
+          <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${gapPositive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
+            {gapPositive ? 'คงเหลือบวก' : 'ต้องเตรียมเงิน'}
+          </span>
+        </div>
+        <div className="mt-4 grid gap-3 border-t border-slate-100 pt-3 md:grid-cols-3">
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-slate-500">เงินสดพร้อมใช้</div>
+            <div className="mt-1 font-mono text-base font-bold text-slate-900 tabular-nums">{money(plan?.available)}</div>
+          </div>
+          <div className="min-w-0 md:border-l md:border-slate-100 md:pl-4">
+            <div className="text-xs font-medium text-emerald-600">คาดรับวันนี้</div>
+            <div className="mt-1 font-mono text-base font-bold text-emerald-700 tabular-nums">+{money(plan?.expectedIn)}</div>
+          </div>
+          <div className="min-w-0 md:border-l md:border-slate-100 md:pl-4">
+            <div className="text-xs font-medium text-red-600">คาดจ่ายวันนี้</div>
+            <div className="mt-1 font-mono text-base font-bold text-red-700 tabular-nums">-{money(plan?.expectedOut)}</div>
+          </div>
+        </div>
       </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-bold text-slate-800">เกิดขึ้นจริงวันนี้แล้ว</h3>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <Tile tone="emerald" label="รับเงินจริง" value={`+${money(actual?.cashIn)}`} />
+          <Tile tone="red" label="จ่าย Supplier" value={`-${money(actual?.paymentOut)}`} />
+          <Tile tone="orange" label="ค่าใช้จ่าย" value={`-${money(actual?.expenseOut)}`} className="col-span-2 md:col-span-1" />
+        </div>
+      </div>
+
+      <Tabs className="gap-2" value={activeTab} onValueChange={(value) => setActiveTab(value as OwnerDailyTab)}>
+        <TabsList className="w-full min-w-0 overflow-x-auto" variant="line">
+          {ownerDailyTabs.map((tab) => (
+            <TabsTrigger key={tab.key} className="px-3 text-xs sm:text-sm" value={tab.key} variant="line">
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      {activeTab === 'ar' ? <OwnerDueTable rows={arRows} title="ลูกหนี้ที่ควรเก็บวันนี้" type="ar" /> : null}
+      {activeTab === 'ap' ? <OwnerDueTable rows={apRows} title="เจ้าหนี้ที่ต้องจ่ายวันนี้" type="ap" /> : null}
+      {activeTab === 'loan' ? <OwnerSmallTable rows={loanRows} tableKey="loan" title="ค่างวด/ดอกเบี้ยวันนี้" /> : null}
+      {activeTab === 'expense' ? <OwnerSmallTable rows={expenseRows} tableKey="expense" title="ค่าใช้จ่ายวันนี้" /> : null}
+      {activeTab === 'pending' ? (
+        <div className="space-y-3">
+          <div className="text-sm font-bold text-slate-800">รายการรอดำเนินการ</div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {pendingItems.map((item) => (
+              <Tile key={item.label} label={item.label} sub={item.note} tone="slate" value={item.value} />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
@@ -1064,40 +1126,8 @@ function rangeLabel(mode: string) {
   return labels[mode] ?? mode
 }
 
-function LegacyKpi({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
-  const icon = label.slice(0, 2)
-  const cleanLabel = label.slice(2).trim()
-
-  return <SharedKpiCard icon={icon} label={cleanLabel} note={sub} tone={tone as KpiCardTone} value={value} />
-}
-
-function PendingBlock({ cards, color, cta, title }: { cards: [string, string][]; color: 'amber' | 'purple'; cta: string; title: string }) {
-  const text = color === 'purple' ? 'text-purple-700' : 'text-amber-700'
-  const button = color === 'purple' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
-  return (
-    <div className="bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className={`text-sm font-bold ${text}`}>{title}</h3>
-        <button className={`rounded-md ${button} px-3 py-1.5 text-xs font-bold opacity-80 outline-none`} disabled type="button">{cta}</button>
-      </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {cards.map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
-            <div className="text-xs text-slate-500">{label}</div>
-            <div className={`font-mono text-lg font-bold mt-1 ${text}`}>{value}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function Tile({ label, sub, tone, value, className }: { label: string; sub?: string; tone: KpiCardTone; value: string; className?: string }) {
   return <SharedKpiCard className={className} label={label} note={sub} tone={tone} value={value} />
-}
-
-function MiniLine({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between rounded-xl bg-slate-50 p-2 text-xs border border-slate-100"><span>{label}</span><span className="font-bold text-slate-800">{value}</span></div>
 }
 
 function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: string; type: 'ap' | 'ar' }) {
@@ -1105,7 +1135,7 @@ function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: stri
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const columns = type === 'ar' ? ownerDueColumns : ownerDueApColumns
   const columnResize = useResizableColumns(`main.owner-daily.due.${type}.v1`, columns)
-  const header = type === 'ar' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'
+  const totalTone = type === 'ar' ? 'text-emerald-700' : 'text-red-700'
   const sortedRows = useMemo(() => {
     return [...rows].sort((left, right) => compareDashboardValues(ownerDueValue(left, sortKey), ownerDueValue(right, sortKey), sortDirection))
   }, [rows, sortDirection, sortKey])
@@ -1118,13 +1148,13 @@ function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: stri
   }
 
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
-      <div className={`flex justify-between border-b p-3 font-bold text-sm ${header}`}>
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="flex justify-between gap-3 border-b border-slate-200 bg-white p-3 text-sm font-bold text-slate-800">
         <span>{title} ({rows.length})</span>
         <div className="flex items-center gap-2">
-          <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
+          <span className={`font-mono tabular-nums ${totalTone}`}>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
           {columnResize.hasCustomWidths ? (
-            <button className="rounded border border-slate-200 bg-white/70 px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-white hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
+            <button className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-slate-50 hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
               คืนค่าเดิมตาราง
             </button>
           ) : null}
@@ -1143,7 +1173,7 @@ function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: stri
             <tr>
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ชื่อ" resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อ')} sortKey="name" onSort={handleSort} />
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="บิล" resizeProps={columnResize.getResizeHandleProps('docNo', 'บิล')} sortKey="docNo" onSort={handleSort} />
-              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="Due" resizeProps={columnResize.getResizeHandleProps('due', 'Due')} sortKey="due" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ครบกำหนด" resizeProps={columnResize.getResizeHandleProps('due', 'ครบกำหนด')} sortKey="due" onSort={handleSort} />
               <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ค้าง" resizeProps={columnResize.getResizeHandleProps('amount', 'ค้าง')} sortKey="amount" onSort={handleSort} />
               {type === 'ar' ? <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="เกินวัน" resizeProps={columnResize.getResizeHandleProps('daysOverdue', 'เกินวัน')} sortKey="daysOverdue" onSort={handleSort} /> : null}
             </tr>
@@ -1165,7 +1195,7 @@ function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: stri
             {rows.length === 0 && (
               <tr>
                 <td className="py-4 text-center text-slate-400" colSpan={columns.length}>
-                  {type === 'ar' ? 'ไม่มีลูกหนี้ครบกำหนด ✓' : 'ไม่มี ✓'}
+                  {type === 'ar' ? 'ไม่มีลูกหนี้ครบกำหนด' : 'ไม่มีรายการครบกำหนดจ่าย'}
                 </td>
               </tr>
             )}
@@ -1183,7 +1213,7 @@ function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: stri
             </div>
             <div className="flex justify-between items-center text-slate-500 text-xs">
               <span>บิล: <span className="font-mono">{row.docNo}</span></span>
-              <span>Due: {row.due}</span>
+              <span>ครบกำหนด: {row.due}</span>
             </div>
             {type === 'ar' && row.daysOverdue ? (
               <div className="text-right text-xs font-semibold text-red-600">
@@ -1194,7 +1224,7 @@ function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: stri
         ))}
         {rows.length === 0 && (
           <div className="py-6 text-center text-slate-400 text-xs">
-            {type === 'ar' ? 'ไม่มีลูกหนี้ครบกำหนด ✓' : 'ไม่มี ✓'}
+            {type === 'ar' ? 'ไม่มีลูกหนี้ครบกำหนด' : 'ไม่มีรายการครบกำหนดจ่าย'}
           </div>
         )}
       </div>
@@ -1218,13 +1248,13 @@ function OwnerSmallTable({ rows, tableKey, title }: { rows: OwnerSmallRow[]; tab
   }
 
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
-      <div className="flex justify-between border-b bg-amber-50 text-amber-700 p-3 font-bold border-amber-100 text-sm">
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="flex justify-between gap-3 border-b border-slate-200 bg-white p-3 text-sm font-bold text-slate-800">
         <span>{title} ({rows.length})</span>
         <div className="flex items-center gap-2">
-          <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
+          <span className="font-mono text-amber-700 tabular-nums">{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
           {columnResize.hasCustomWidths ? (
-            <button className="rounded border border-slate-200 bg-white/70 px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-white hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
+            <button className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-slate-50 hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
               คืนค่าเดิมตาราง
             </button>
           ) : null}
@@ -1256,7 +1286,7 @@ function OwnerSmallTable({ rows, tableKey, title }: { rows: OwnerSmallRow[]; tab
             ))}
             {rows.length === 0 && (
               <tr>
-                <td className="py-4 text-center text-slate-400" colSpan={3}>ไม่มี ✓</td>
+                <td className="py-4 text-center text-slate-400" colSpan={3}>ไม่มีรายการ</td>
               </tr>
             )}
           </tbody>
@@ -1277,7 +1307,7 @@ function OwnerSmallTable({ rows, tableKey, title }: { rows: OwnerSmallRow[]; tab
           </div>
         ))}
         {rows.length === 0 && (
-          <div className="py-4 text-center text-slate-400 text-xs">ไม่มี ✓</div>
+          <div className="py-4 text-center text-slate-400 text-xs">ไม่มีรายการ</div>
         )}
       </div>
     </div>
