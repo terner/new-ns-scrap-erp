@@ -1677,6 +1677,15 @@ async function optionsPayload(allowedBranchCodes?: string[] | null) {
         status: true,
         subtotal_amount: true,
         supplier_id: true,
+        supplier_advance_allocations: {
+          select: {
+            allocated_amount: true,
+            allocated_subtotal_amount: true,
+          },
+          where: {
+            status: 'active',
+          },
+        },
         vat_amount: true,
         vat_type: true,
       },
@@ -1760,7 +1769,11 @@ async function optionsPayload(allowedBranchCodes?: string[] | null) {
   return {
     advancePayments: advancePayments.map((advance) => {
       const subtotalAmount = toNumber(advance.subtotal_amount) || toNumber(advance.amount)
-      const remainingAmount = Math.min(toNumber(advance.remaining_amount), subtotalAmount)
+      const allocatedBaseAmount = advance.supplier_advance_allocations.reduce((sum, allocation) => (
+        sum + (toNumber(allocation.allocated_subtotal_amount) || toNumber(allocation.allocated_amount))
+      ), 0)
+      const remainingBaseAmount = Math.max(0, roundMoney(subtotalAmount - allocatedBaseAmount))
+      const remainingAmount = Math.min(toNumber(advance.remaining_amount), remainingBaseAmount)
       return {
         active: ['partially_paid', 'paid', 'partially_allocated', 'allocated'].includes(advance.status) && remainingAmount > 0.01,
         advanceDate: toDateOnly(advance.advance_date),
@@ -1768,7 +1781,7 @@ async function optionsPayload(allowedBranchCodes?: string[] | null) {
         branch_id: branchCodeById.get(advance.branch_id) ?? null,
         invoiceNo: advance.invoice_no ?? '',
         id: advance.doc_no,
-        label: `${advance.doc_no}${advance.invoice_no ? ` · INV ${advance.invoice_no}` : ''} · ${advance.vat_type === 'NONE' ? 'ไม่มี VAT' : 'มี VAT'} · คงเหลือฐาน ${remainingAmount.toLocaleString('th-TH')} บาท`,
+        label: `${advance.doc_no} · ใช้หักได้ ${remainingAmount.toLocaleString('th-TH')} บาท`,
         name: advance.doc_no,
         remainingAmount,
         status: advance.status,
