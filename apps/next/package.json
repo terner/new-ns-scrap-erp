@@ -47,7 +47,7 @@
     "react": "^19.2.6",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.6",
-    "read-excel-file": "^9.2.0",
+    "read-excel-file": "9.2.0",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
     "write-excel-file": "^4.1.1",
@@ -65,9 +65,5 @@
     "prisma": "^7.8.0",
     "tailwindcss": "^4.3.0",
     "typescript": "^5.7.3"
-  },
-  "overrides": {
-    "@hono/node-server": "^1.19.13",
-    "postcss": "$postcss"
   }
 }
