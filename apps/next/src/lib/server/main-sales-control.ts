@@ -3,7 +3,7 @@ import { outwardCustomerReference } from '@/lib/server/customer-reference'
 import { requireBusinessCode } from '@/lib/business-code'
 import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
-import { getSalesPlanLmeConfig, type SalesPlanLmeConfig } from '@/lib/server/sales-plan-lme'
+import { getSalesPlanLmeConfig, type SalesPlanLmeConfig } from './sales-plan-lme'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
 
@@ -37,6 +37,11 @@ type PendingProductRow = {
   soldQty: number
   soldValue: number
   wac: number
+}
+
+function isCostPoolEligibleMetalGroup(metalGroup: string) {
+  const normalized = metalGroup.toLowerCase()
+  return ['ทองแดง', 'ทองเหลือง', 'copper', 'brass'].some((key) => normalized.includes(key))
 }
 
 function jsonNumber(value: unknown) {
@@ -127,7 +132,7 @@ function activeStatus(status?: string | null) {
 }
 
 function activePoSellStatus(status?: string | null) {
-  return activeStatus(status) && !['canceled', 'closed', 'completed', 'fully matched', 'received'].includes((status ?? '').toLowerCase())
+  return activeStatus(status) && !['canceled', 'closed', 'completed', 'fully matched', 'received', 'short closed'].includes((status ?? '').toLowerCase())
 }
 
 async function productsContext() {
@@ -412,6 +417,14 @@ async function buildSalesPlanningSnapshot() {
     }),
     lmeConfig: config,
     metalGroups: Array.from(new Set(refs.map((product) => product.metalGroup).filter(Boolean))).sort(),
+    planProductOptions: refs
+      .filter((product) => isCostPoolEligibleMetalGroup(product.metalGroup))
+      .map((product) => ({
+        code: product.code,
+        metalGroup: product.metalGroup,
+        name: product.name,
+        wac: product.wac,
+      })),
     pendingSaleTable,
     pendingSaleTotals,
     productDetails: details,
@@ -420,7 +433,7 @@ async function buildSalesPlanningSnapshot() {
     reconTotals,
     sourceState: {
       basis: 'Sales planning design source from PO Sell, WTO pending_out, PO Buy, purchase bills, trading deals, stock ledger, and product master.',
-      limitations: ['LME reference pricing รองรับ manual + live fetch แล้ว แต่การบันทึกแผนขาย, matching, และ sales-plan locks ยังปิดอยู่จนกว่าจะออกแบบ persistence/audit ครบ'],
+      limitations: ['LME reference pricing บันทึกได้แล้ว แต่การบันทึกแผนขาย, matching, และ sales-plan locks ยังปิดอยู่จนกว่าจะออกแบบ persistence/audit ครบ'],
       writeActionsEnabled: false,
     },
     summary,
@@ -464,7 +477,9 @@ export async function buildSalesPlan() {
       metalGroups: pending.metalGroups,
       month: new Date().toISOString().slice(0, 7),
     },
+    customers: pending.customers,
     lmeConfig: config,
+    planProductOptions: pending.planProductOptions,
     pendingSaleTable: pending.pendingSaleTable.map((row) => ({
       avgPrice: row.avgPrice,
       lockedBuy: row.lockedBuy,

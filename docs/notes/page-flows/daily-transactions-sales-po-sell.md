@@ -60,7 +60,7 @@ POS เป็น customer commitment/reservation ฝั่งขาย ก่อ
 
 - `GET /api/sales/po-sell - list/filter`
 - `POST /api/sales/po-sell - create POS`
-- `PATCH /api/sales/po-sell - edit/cancel POS`
+- `PATCH /api/sales/po-sell - edit/cancel/short-close POS`
 
 ### Data Contract
 
@@ -87,9 +87,11 @@ POS เป็น customer commitment/reservation ฝั่งขาย ก่อ
 - qty > 0 แยกตามหน่วย
 - SB allocation ต้องไม่เกิน POS remaining
 - แก้ไข/ยกเลิกได้เฉพาะ POS ที่ยังเป็น `Open` และยังไม่มี downstream active Sales Bill / PO Sell allocation
+- `ปิดส่งไม่ครบ` ทำได้เมื่อ POS ยังมี `remaining_qty` และสถานะเอกสารเป็น `Open` หรือ `ออกบิลบางส่วน`; ต้องกรอกเหตุผล และห้ามลบประวัติยอดที่เคยตัดขายไปแล้ว
 - lock เมื่อมี downstream active SB allocation หรือ direct Sales Bill reference
 - ยกเลิกต้องกรอกหมายเหตุ และระบบเปลี่ยนสถานะเป็น `Cancelled` โดยไม่ลบเอกสาร
 - ถ้า POS ถูกตัดไปบางส่วนแล้ว (`remaining_qty < qty` หรือ `cut_amount > 0` แต่ยังเหลือ quantity) list ต้องแสดงสถานะ `ออกบิลบางส่วน` แทน `เปิดอยู่`
+- ถ้า POS ถูกปิดส่งไม่ครบ ต้องแสดงสถานะ `ปิดส่งไม่ครบ` และไม่ให้ถูกเลือกไปตัดบิลขายใหม่
 
 ## Side Effects
 

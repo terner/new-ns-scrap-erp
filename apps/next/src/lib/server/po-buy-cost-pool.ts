@@ -150,10 +150,10 @@ export async function syncPoBuyCostPoolEntries(
       if (hasUsage) {
         throw new Error(`ไม่สามารถลบ Cost Pool ของ PO Buy ${po.doc_no} แถว ${entry.source_line_id ?? '-'} ได้ เพราะถูกใช้งานแล้ว`)
       }
-      if (entry.status !== 'Reversed') {
+      if (entry.status !== 'Cancelled') {
         await tx.stock_cost_pool_entries.update({
           data: {
-            status: 'Reversed',
+            status: 'Cancelled',
             updated_at: new Date(),
             updated_by: params.actor,
           },

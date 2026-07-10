@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { KpiCard as SharedKpiCard, type KpiCardTone } from '@/components/ui/KpiCard'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 
 type AnyRow = Record<string, number | string | boolean | null | undefined>
@@ -31,14 +33,25 @@ type LmeConfig = {
   updatedBy: string
 }
 type SalesPlanPayload = {
+  customers?: Array<{ active: boolean; code: string; id: string; name: string }>
   filters: { channels: { id: string; name: string }[]; metalGroups: string[]; month: string }
   lmeConfig: LmeConfig
   pendingSaleTable: AnyRow[]
   pendingSaleTotals: Record<string, number>
   planRows: AnyRow[]
+  planProductOptions?: Array<{ code: string; metalGroup: string; name: string; wac: number }>
   productAnalysis: AnyRow[]
   sourceState: { limitations: string[] }
   summary: Record<string, number>
+}
+type SalesPlanDraftForm = {
+  channel: string
+  containers: string
+  customerId: string
+  kgPerContainer: string
+  lmeCf: string
+  productCode: string
+  sellPctLme: string
 }
 
 type CommissionSalespersonRow = {
@@ -169,6 +182,15 @@ function num(value: unknown) {
   return typeof value === 'number' ? value : Number(value ?? 0)
 }
 
+function lmeBaseByMetalGroup(metalGroup: string, config: LmeConfig | null) {
+  if (!config) return 0
+  const group = metalGroup.toLowerCase()
+  if (group.includes('ทองแดง') || group.includes('copper')) return config.lmeCopperUSD
+  if (group.includes('ทองเหลือง') || group.includes('brass')) return config.lmeBrassUSD
+  if (group.includes('อลูมิ') || group.includes('aluminum')) return config.lmeAluminumUSD
+  return 0
+}
+
 function dateTime(value: string | null | undefined) {
   if (!value) return '-'
   const parsed = new Date(value)
@@ -236,13 +258,25 @@ export function SalesPlanPageClient() {
   const [data, setData] = useState<SalesPlanPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [isFetchingLive, setIsFetchingLive] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
+  const [isPlanFormOpen, setIsPlanFormOpen] = useState(false)
+  const [lmeForm, setLmeForm] = useState<LmeConfig | null>(null)
   const [month, setMonth] = useState('')
   const [filterGroup, setFilterGroup] = useState('')
   const [filterChannel, setFilterChannel] = useState('')
-  const [lmeForm, setLmeForm] = useState<LmeConfig | null>(null)
+  const [planDraftError, setPlanDraftError] = useState<string | null>(null)
+  const [localPlanRows, setLocalPlanRows] = useState<AnyRow[]>([])
+  const [planDraftForm, setPlanDraftForm] = useState<SalesPlanDraftForm>({
+    channel: 'export',
+    containers: '1',
+    customerId: '',
+    kgPerContainer: '25000',
+    lmeCf: '',
+    productCode: '',
+    sellPctLme: '',
+  })
   const [planSortKey, setPlanSortKey] = useState<SalesPlanColumnKey | null>(null)
   const [planSortDirection, setPlanSortDirection] = useState<SortDirection>('asc')
   const [analysisSortKey, setAnalysisSortKey] = useState<SalesPlanAnalysisColumnKey | null>(null)
@@ -273,6 +307,62 @@ export function SalesPlanPageClient() {
   }, [])
 
   const s = data?.summary ?? {}
+  const productOptions = useMemo(() => (data?.planProductOptions ?? [])
+    .map((row) => ({
+      code: text(row.code),
+      metalGroup: text(row.metalGroup),
+      name: text(row.name),
+      wac: num(row.wac),
+    }))
+    .filter((row) => row.code && row.name), [data?.planProductOptions])
+  const productSearchOptions = useMemo<SearchComboboxOption[]>(() => productOptions.map((option) => ({
+    description: option.metalGroup || undefined,
+    id: option.code,
+    label: `${option.name} (${option.code})`,
+    searchText: `${option.code} ${option.name} ${option.metalGroup}`.toLowerCase(),
+  })), [productOptions])
+  const customerOptions = useMemo(() => (data?.customers ?? [])
+    .map((row) => ({
+      active: Boolean(row.active),
+      code: text(row.code),
+      id: text(row.id),
+      name: text(row.name),
+    }))
+    .filter((row) => row.active && row.id && row.name), [data?.customers])
+  const customerSearchOptions = useMemo<SearchComboboxOption[]>(() => customerOptions.map((option) => ({
+    description: option.name,
+    id: option.id,
+    label: option.code ? `${option.code} - ${option.name}` : option.name,
+    searchText: `${option.id} ${option.code} ${option.name}`.toLowerCase(),
+  })), [customerOptions])
+  const selectedDraftProduct = useMemo(() => productOptions.find((option) => option.code === planDraftForm.productCode) ?? null, [planDraftForm.productCode, productOptions])
+  const selectedDraftCustomer = useMemo(() => customerOptions.find((option) => option.id === planDraftForm.customerId) ?? null, [customerOptions, planDraftForm.customerId])
+  const draftKgPerContainer = Math.max(0, Number(planDraftForm.kgPerContainer || 0))
+  const draftContainers = Math.max(0, Number(planDraftForm.containers || 0))
+  const draftTotalKg = draftContainers * draftKgPerContainer
+  const draftBaseLme = selectedDraftProduct ? lmeBaseByMetalGroup(selectedDraftProduct.metalGroup, lmeForm) : 0
+  const draftFx = lmeForm?.fxRate ?? 0
+  const draftSellPct = Math.max(0, Number(planDraftForm.sellPctLme || 0))
+  const draftLmeCf = Math.max(0, Number(planDraftForm.lmeCf || 0))
+  const draftSellPrice = draftLmeCf > 0 ? (draftLmeCf / 1000) * draftFx : 0
+  const filteredServerPlanRows = useMemo(() => (data?.planRows ?? [])
+    .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
+    .filter((row) => !filterChannel || text(row.channel) === filterChannel), [data?.planRows, filterChannel, filterGroup])
+  const filteredLocalPlanRows = useMemo(() => localPlanRows
+    .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
+    .filter((row) => !filterChannel || text(row.channel) === filterChannel), [filterChannel, filterGroup, localPlanRows])
+  const mergedPlanRows = useMemo(() => [...filteredLocalPlanRows, ...filteredServerPlanRows], [filteredLocalPlanRows, filteredServerPlanRows])
+  const liveSummary = useMemo(() => ({
+    avgPctLme: mergedPlanRows.length ? mergedPlanRows.reduce((sum, row) => sum + num(row.sellPctLme), 0) / mergedPlanRows.length : 0,
+    lockedContainers: mergedPlanRows.filter((row) => text(row.status).toLowerCase().includes('lock')).reduce((sum, row) => sum + num(row.containers), 0),
+    lockedCount: mergedPlanRows.filter((row) => text(row.status).toLowerCase().includes('lock')).length,
+    pendingCount: mergedPlanRows.filter((row) => !text(row.status).toLowerCase().includes('lock')).length,
+    plansCount: mergedPlanRows.length,
+    totalContainers: mergedPlanRows.reduce((sum, row) => sum + num(row.containers), 0),
+    totalKg: mergedPlanRows.reduce((sum, row) => sum + num(row.totalKg), 0),
+    totalLockedProfit: mergedPlanRows.filter((row) => text(row.status).toLowerCase().includes('lock')).reduce((sum, row) => sum + num(row.projectedProfit), 0),
+    totalProjectedProfit: mergedPlanRows.reduce((sum, row) => sum + num(row.projectedProfit), 0),
+  }), [mergedPlanRows])
   const pendingSaleRows = useMemo(() => (data?.pendingSaleTable ?? [])
     .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup)), [data?.pendingSaleTable, filterGroup])
   const pendingSaleTotals = useMemo(() => ({
@@ -289,14 +379,14 @@ export function SalesPlanPageClient() {
     .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
     .filter((row) => !filterChannel || filterChannel), [data, filterGroup, filterChannel])
   const sortedPlanRows = useMemo(() => {
-    const rows = data?.planRows ?? []
+    const rows = mergedPlanRows
     if (!planSortKey) return rows
 
     return [...rows].sort((left, right) => {
       const result = compareSortValues(getAnySortValue(left, planSortKey), getAnySortValue(right, planSortKey))
       return planSortDirection === 'asc' ? result : -result
     })
-  }, [data?.planRows, planSortDirection, planSortKey])
+  }, [mergedPlanRows, planSortDirection, planSortKey])
   const sortedAnalysisRows = useMemo(() => {
     if (!analysisSortKey) return analysisRows
 
@@ -325,7 +415,7 @@ export function SalesPlanPageClient() {
     downloadCsv(
       `sales_plan_${month || data?.filters.month || 'current'}.csv`,
       ['Month', 'Product', 'ช่องทาง', 'Customer', 'Containers', 'Kg/ตู้', 'รวม กก.', '% LME', 'LME (USD/MT)', 'FX', 'ราคาขาย (THB/kg)', 'สถานะ'],
-      (data?.planRows ?? []).map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
+      mergedPlanRows.map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
     )
   }
 
@@ -412,59 +502,123 @@ export function SalesPlanPageClient() {
     }
   }
 
+  function resetPlanDraftForm() {
+    setPlanDraftForm({
+      channel: filterChannel || 'export',
+      containers: '1',
+      customerId: '',
+      kgPerContainer: String(lmeForm?.kgPerContainer ?? data?.lmeConfig.kgPerContainer ?? 25000),
+      lmeCf: '',
+      productCode: '',
+      sellPctLme: '',
+    })
+    setPlanDraftError(null)
+  }
+
+  function updateDraftProduct(productCode: string) {
+    setPlanDraftForm((current) => ({ ...current, productCode }))
+  }
+
+  function updateDraftSellPct(value: string) {
+    setPlanDraftForm((current) => ({ ...current, sellPctLme: value }))
+  }
+
+  function updateDraftLmeCf(value: string) {
+    setPlanDraftForm((current) => ({ ...current, lmeCf: value }))
+  }
+
+  function openPlanForm() {
+    resetPlanDraftForm()
+    setIsPlanFormOpen(true)
+  }
+
+  function addDraftPlan() {
+    if (!selectedDraftProduct) {
+      setPlanDraftError('เลือกสินค้า')
+      return
+    }
+    if (!selectedDraftCustomer) {
+      setPlanDraftError('เลือกลูกค้า')
+      return
+    }
+    if (draftContainers <= 0 || draftKgPerContainer <= 0) {
+      setPlanDraftError('จำนวนตู้และ กก./ตู้ ต้องมากกว่า 0')
+      return
+    }
+    if (draftSellPct <= 0) {
+      setPlanDraftError('กรอก % LME มากกว่า 0')
+      return
+    }
+    if (draftLmeCf <= 0) {
+      setPlanDraftError('กรอก LME cf มากกว่า 0')
+      return
+    }
+
+    const projectedProfit = draftTotalKg * (draftSellPrice - selectedDraftProduct.wac)
+    const projectedMarginPct = draftSellPrice > 0 ? ((draftSellPrice - selectedDraftProduct.wac) / draftSellPrice) * 100 : 0
+    setLocalPlanRows((rows) => [{
+      channel: planDraftForm.channel,
+      containers: draftContainers,
+      customerId: selectedDraftCustomer.id,
+      customerName: selectedDraftCustomer.name,
+      fx: draftFx,
+      id: `draft:${Date.now()}:${selectedDraftProduct.code}`,
+      kgPerContainer: draftKgPerContainer,
+      lme: draftLmeCf,
+      metalGroup: selectedDraftProduct.metalGroup,
+      productId: selectedDraftProduct.code,
+      productName: selectedDraftProduct.name,
+      projectedMarginPct,
+      projectedProfit,
+      sellPctLme: draftSellPct,
+      sellPrice: draftSellPrice,
+      status: 'Draft',
+      totalKg: draftTotalKg,
+    }, ...rows])
+    resetPlanDraftForm()
+    setIsPlanFormOpen(false)
+  }
+
   return (
     <section className="space-y-4">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-2xl font-extrabold tracking-tight text-slate-700">📊 LME Reference Pricing <span className="text-lg font-semibold text-slate-400">(Real-time + Manual)</span></h2>
-            <div className="mt-1 text-sm font-medium text-slate-400">ดึงค่า API มาเติมเฉพาะ LME/FX แล้วแก้มือและบันทึกได้ ส่วน กก./ตู้ ต้องกรอกเอง</div>
+            <h2 className="text-base font-bold text-slate-800">LME Reference Pricing</h2>
+            <p className="mt-1 text-sm text-slate-500">แก้ค่า LME, FX และ กก./ตู้ แล้วกดบันทึกเพื่อคำนวณ Sales Plan ใหม่</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
-              className="h-11 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 text-sm font-bold text-white shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isFetchingLive || isSavingConfig}
               onClick={handleFetchLive}
               type="button"
             >
-              {isFetchingLive ? 'กำลัง Fetch...' : '↻ Fetch Live (USD/THB + Metals)'}
+              {isFetchingLive ? 'กำลังดึงข้อมูล' : 'Fetch Live'}
             </button>
             <button
-              className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-10 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isLoading || isSavingConfig || !lmeForm}
               onClick={handleSaveConfig}
               type="button"
             >
-              {isSavingConfig ? 'กำลังบันทึก...' : '💾 บันทึก'}
+              {isSavingConfig ? 'กำลังบันทึก' : 'บันทึกค่า'}
             </button>
           </div>
         </div>
-        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <LmeEditableCard label="🥉 ทองแดง LME (USD/MT)" value={lmeForm?.lmeCopperUSD ?? 0} onChange={(value) => updateLmeField('lmeCopperUSD', value)} />
-          <LmeEditableCard label="🌟 ทองเหลือง LME (USD/MT)" value={lmeForm?.lmeBrassUSD ?? 0} onChange={(value) => updateLmeField('lmeBrassUSD', value)} />
-          <LmeEditableCard label="⚪ อลูมิเนียม LME (USD/MT)" value={lmeForm?.lmeAluminumUSD ?? 0} onChange={(value) => updateLmeField('lmeAluminumUSD', value)} />
-          <LmeEditableCard label="💱 USD/THB" value={lmeForm?.fxRate ?? 0} onChange={(value) => updateLmeField('fxRate', value)} />
-          <LmeEditableCard label="📦 กก./ตู้" manualOnly value={lmeForm?.kgPerContainer ?? 0} onChange={(value) => updateLmeField('kgPerContainer', value)} />
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <LmeEditableField label="ทองแดง LME" suffix="USD/MT" value={lmeForm?.lmeCopperUSD ?? 0} onChange={(value) => updateLmeField('lmeCopperUSD', value)} />
+          <LmeEditableField label="ทองเหลือง LME" suffix="USD/MT" value={lmeForm?.lmeBrassUSD ?? 0} onChange={(value) => updateLmeField('lmeBrassUSD', value)} />
+          <LmeEditableField label="อลูมิเนียม LME" suffix="USD/MT" value={lmeForm?.lmeAluminumUSD ?? 0} onChange={(value) => updateLmeField('lmeAluminumUSD', value)} />
+          <LmeEditableField label="USD/THB" value={lmeForm?.fxRate ?? 0} onChange={(value) => updateLmeField('fxRate', value)} />
+          <LmeEditableField label="กก./ตู้" suffix="กก." value={lmeForm?.kgPerContainer ?? 0} onChange={(value) => updateLmeField('kgPerContainer', value)} />
         </div>
-        <div className="mt-4 flex flex-col gap-2 text-sm md:flex-row md:items-center md:justify-between">
-          <div className="inline-flex items-center gap-2 rounded-2xl bg-blue-50 px-3 py-2 font-semibold text-blue-700">
-            <span>⏰ {dateTime(lmeForm?.updatedAt)}</span>
-            <span className="text-slate-400">โดย</span>
-            <span>{text(lmeForm?.updatedBy)}</span>
-          </div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">source: {text(lmeForm?.source || data?.lmeConfig.source)}</div>
+        <div className="mt-3 flex flex-col gap-1 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
+          <span>อัปเดตล่าสุด {dateTime(lmeForm?.updatedAt)} โดย {text(lmeForm?.updatedBy)}</span>
+          <span>source: {text(lmeForm?.source || data?.lmeConfig.source)}</span>
         </div>
-        <div className="mt-3 text-sm text-slate-400">
-          {text(lmeForm?.liveFetchNote || data?.lmeConfig.liveFetchNote || 'Live fetch: USD/THB จาก exchangerate-api · Metals จาก metals.dev (demo key) — ถ้า fetch fail ให้กรอกเอง')}
-        </div>
-        {formError ? <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{formError}</div> : null}
-      </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5 text-sm">
-        <LmeStat label="🥉 ทองแดง LME" value={`${money(data?.lmeConfig.lmeCopperUSD)} USD/MT`} />
-        <LmeStat label="🌟 ทองเหลือง LME" value={`${money(data?.lmeConfig.lmeBrassUSD)} USD/MT`} />
-        <LmeStat label="💱 USD/THB" value={money(data?.lmeConfig.fxRate)} />
-        <LmeStat label="📦 กก./ตู้" value={`${money(data?.lmeConfig.kgPerContainer)} กก.`} />
-        <div className="text-xs text-slate-400 font-medium self-center px-2">ค่าชุดนี้ใช้คำนวณทั้งหน้า Sales Plan และแก้ไขได้จากกล่องด้านบน</div>
+        <div className="mt-2 text-xs text-slate-400">{text(lmeForm?.liveFetchNote || data?.lmeConfig.liveFetchNote)}</div>
+        {formError ? <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">{formError}</div> : null}
       </div>
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <label className="text-xs font-bold text-slate-500">เดือน</label>
@@ -480,57 +634,14 @@ export function SalesPlanPageClient() {
           <option value="domestic">🇹🇭 ในประเทศ</option>
         </select>
         <span className="flex-1" />
+        <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center" onClick={openPlanForm} type="button">+ เพิ่มแผน</button>
         <button className="flex h-9 items-center justify-center rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-emerald-700 outline-none focus:outline-none focus:ring-0" onClick={exportPlan} type="button">ส่งออก Excel</button>
       </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-lg shrink-0">📋</div>
-          <div>
-            <div className="text-xs text-slate-500 font-semibold mb-0.5">รายการแผน</div>
-            <div className="text-lg font-bold text-slate-800 leading-tight">{money(s.plansCount)}</div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">🔒 {money(s.lockedCount)} / ⏳ {money(s.pendingCount)}</div>
-          </div>
-        </div>
-        <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-lg shrink-0">📦</div>
-          <div>
-            <div className="text-xs text-slate-500 font-semibold mb-0.5">จำนวนตู้รวม</div>
-            <div className="text-lg font-bold text-blue-700 leading-tight">{money(s.totalContainers)}</div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">🔒 ล็อก {money(s.lockedContainers)}</div>
-          </div>
-        </div>
-        <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0">⚖️</div>
-          <div>
-            <div className="text-xs text-slate-500 font-semibold mb-0.5">น้ำหนักรวม</div>
-            <div className="text-lg font-bold text-slate-800 leading-tight">{money(s.totalKg)} กก.</div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">เฉลี่ย {money(s.avgPctLme)}% LME</div>
-          </div>
-        </div>
-        <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg shrink-0">💰</div>
-          <div>
-            <div className="text-xs text-slate-500 font-semibold mb-0.5">กำไรล็อกแล้ว</div>
-            <div className={`text-lg font-bold leading-tight ${num(s.totalLockedProfit) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{money(s.totalLockedProfit)}</div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">เฉพาะที่ล็อกราคาแล้ว</div>
-          </div>
-        </div>
-        <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-lg shrink-0">📈</div>
-          <div>
-            <div className="text-xs text-slate-500 font-semibold mb-0.5">กำไรคาดการณ์</div>
-            <div className={`text-lg font-bold leading-tight ${num(s.totalProjectedProfit) >= 0 ? 'text-amber-600' : 'text-red-500'}`}>{money(s.totalProjectedProfit)}</div>
-            <div className="text-xs text-slate-400 font-medium mt-0.5">ถ้าขายตามแผน</div>
-          </div>
-        </div>
-      </div>
-
       {/* 1. Sales Plan Section */}
       <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-semibold text-slate-600">
           📝 ตารางวางแผน — ปลดล็อก = อยู่ในขั้นเสนอ / ล็อก = ราคายืนยันแล้วและกันยอดตามแผนขาย
         </div>
-
         {/* Desktop view */}
         {planResize.hasCustomWidths ? (
           <div className="hidden justify-end px-4 pt-3 lg:flex">
@@ -573,7 +684,7 @@ export function SalesPlanPageClient() {
                   <td className="p-1.5 text-right text-xs text-slate-400 font-medium">{money(row.lme)}</td>
                   <td className="p-1.5 text-right text-xs text-slate-400 font-medium">{money(row.fx)}</td>
                   <td className="bg-emerald-50/20 p-1.5 text-right font-bold text-emerald-600">{money(row.sellPrice)}</td>
-                  <td className="p-1.5 text-center"><span className="inline-flex rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{text(row.status) || 'Pending'}</span></td>
+                  <td className="p-1.5 text-center"><span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ${text(row.status) === 'Draft' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>{text(row.status) || 'Pending'}</span></td>
                 </tr>
               ))}
               {!sortedPlanRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanColumns.length}>ยังไม่มีรายการในเดือนนี้</td></tr> : null}
@@ -636,12 +747,7 @@ export function SalesPlanPageClient() {
           <PendingStatCard label="🔒 ล๊อกขายรอส่ง" sublabel="PO Sell (Open)" value={`${money(pendingSaleTotals.totalLockedSell)} กก.`} />
           <PendingStatCard label="📦 PO ซื้อรอส่ง" sublabel="PO Buy (Open)" value={`${money(pendingSaleTotals.totalLockedBuy)} กก.`} />
           <PendingStatCard label="🏷 STOCK" sublabel="ของจริงในคลัง" value={`${money(pendingSaleTotals.totalStock)} กก.`} />
-          <PendingStatCard
-            label="⚖ รอขายจริง (รวม)"
-            sublabel={num(pendingSaleTotals.shortageCount) > 0 ? `ขาด ${money(pendingSaleTotals.shortageCount)} รายการ` : '✓ ครบทุกรายการ'}
-            tone={num(pendingSaleTotals.totalRealPending) < 0 ? 'danger' : 'success'}
-            value={`${money(pendingSaleTotals.totalRealPending)} กก.`}
-          />
+          <PendingStatCard label="⚖ รอขายจริง (รวม)" sublabel={num(pendingSaleTotals.shortageCount) > 0 ? `ขาด ${money(pendingSaleTotals.shortageCount)} รายการ` : '✓ ครบทุกรายการ'} tone={num(pendingSaleTotals.totalRealPending) < 0 ? 'danger' : 'success'} value={`${money(pendingSaleTotals.totalRealPending)} กก.`} />
         </div>
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -663,10 +769,7 @@ export function SalesPlanPageClient() {
                 const shortage = num(row.realPendingSale) < 0
                 return (
                   <tr className={`transition-colors hover:bg-slate-50/50 ${shortage ? 'bg-red-50/40' : ''}`} key={text(row.productId)}>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800">{text(row.productName)}</div>
-                      <div className="font-mono text-xs font-semibold text-slate-400">{text(row.productCode)}</div>
-                    </td>
+                    <td className="px-4 py-3"><div className="font-semibold text-slate-800">{text(row.productName)}</div><div className="font-mono text-xs font-semibold text-slate-400">{text(row.productCode)}</div></td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-500">{text(row.metalGroup)}</td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-800">{money(row.pendingSaleQty)}</td>
                     <td className="px-4 py-3 text-right text-slate-700">{money(row.pendingSaleValue)}</td>
@@ -678,26 +781,8 @@ export function SalesPlanPageClient() {
                   </tr>
                 )
               })}
-              {!pendingSaleRows.length ? (
-                <tr>
-                  <td className="px-4 py-8 text-center text-xs font-semibold text-slate-400" colSpan={9}>ยังไม่มีข้อมูล ทองแดง / ทองเหลือง — เมื่อมี PO Buy / บิลซื้อ / PO Sell ระบบจะคำนวณให้อัตโนมัติ</td>
-                </tr>
-              ) : null}
+              {!pendingSaleRows.length ? <tr><td className="px-4 py-8 text-center text-xs font-semibold text-slate-400" colSpan={9}>ยังไม่มีข้อมูล ทองแดง / ทองเหลือง — เมื่อมี PO Buy / บิลซื้อ / PO Sell ระบบจะคำนวณให้อัตโนมัติ</td></tr> : null}
             </tbody>
-            {pendingSaleRows.length ? (
-              <tfoot className="border-t border-slate-200 bg-slate-50/50 font-bold text-slate-700">
-                <tr>
-                  <td className="px-4 py-3 text-xs" colSpan={2}>รวม</td>
-                  <td className="px-4 py-3 text-right text-xs">{money(pendingSaleTotals.totalPendingSaleQty)}</td>
-                  <td className="px-4 py-3 text-right text-xs">{money(pendingSaleTotals.totalPendingSaleValue)}</td>
-                  <td className="px-4 py-3 text-right text-xs text-amber-700">{money(pendingSaleTotals.totalLockedSell)}</td>
-                  <td className="px-4 py-3 text-right text-xs text-blue-700">{money(pendingSaleTotals.totalLockedBuy)}</td>
-                  <td className="px-4 py-3 text-right text-xs">{money(pendingSaleTotals.totalStock)}</td>
-                  <td className={`px-4 py-3 text-right text-xs ${num(pendingSaleTotals.totalRealPending) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{money(pendingSaleTotals.totalRealPending)}</td>
-                  <td className="px-4 py-3" />
-                </tr>
-              </tfoot>
-            ) : null}
           </table>
         </div>
         <div className="space-y-3 bg-slate-50/20 p-4 lg:hidden">
@@ -919,6 +1004,99 @@ export function SalesPlanPageClient() {
       </div>
 
       {error ? <ErrorBox text={error} /> : null}
+
+      <Dialog open={isPlanFormOpen} onOpenChange={(open) => {
+        setIsPlanFormOpen(open)
+        if (!open) setPlanDraftError(null)
+      }}>
+        <DialogContent aria-labelledby="sales-plan-draft-title" className="max-h-[90vh] max-w-6xl overflow-hidden rounded-md border-0 bg-slate-900 !p-0 shadow-2xl outline-none focus:outline-none flex flex-col" hideClose>
+          <DialogHeader className="shrink-0 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <DialogTitle id="sales-plan-draft-title" className="truncate text-white">+ เพิ่มแผนขาย</DialogTitle>
+                <DialogDescription className="text-slate-300">
+                  บันทึกเป็น draft บนหน้าจอก่อน เพื่อเริ่มวางแผนและเห็นตัวเลขในตารางได้ทันที
+                </DialogDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button className="h-9 rounded-md border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-700" onClick={resetPlanDraftForm} type="button">ล้างฟอร์ม</button>
+                <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-700" onClick={() => setIsPlanFormOpen(false)} type="button">ยกเลิก</button>
+                <button className="h-9 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700" onClick={addDraftPlan} type="button">เพิ่มเข้าตาราง</button>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="overflow-y-auto bg-slate-50 p-5">
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-sm font-bold text-slate-700">1</div>
+                  <div className="text-sm font-bold text-slate-800">ข้อมูลแผนขาย</div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <SearchCombobox
+                    inputClassName="h-10 border-slate-300 bg-white text-sm font-medium text-slate-700"
+                    inputId="sales-plan-draft-product"
+                    label="สินค้า *"
+                    options={productSearchOptions}
+                    placeholder="ค้นหารหัสหรือชื่อสินค้า"
+                    value={planDraftForm.productCode}
+                    onChange={updateDraftProduct}
+                  />
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">ช่องทาง *</span>
+                    <select className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={planDraftForm.channel} onChange={(event) => setPlanDraftForm((current) => ({ ...current, channel: event.target.value }))}>
+                      {data?.filters.channels.map((channel) => (
+                        <option key={channel.id} value={channel.id}>{channel.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <SearchCombobox
+                    inputClassName="h-10 border-slate-300 bg-white text-sm font-medium text-slate-700"
+                    inputId="sales-plan-draft-customer"
+                    label="ลูกค้า *"
+                    options={customerSearchOptions}
+                    placeholder="ค้นหารหัสหรือชื่อลูกค้า"
+                    value={planDraftForm.customerId}
+                    onChange={(value) => setPlanDraftForm((current) => ({ ...current, customerId: value }))}
+                  />
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">จำนวนตู้ *</span>
+                    <input className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-right text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, containers: event.target.value }))} type="number" value={planDraftForm.containers} />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">กก./ตู้ *</span>
+                    <input className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-right text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, kgPerContainer: event.target.value }))} type="number" value={planDraftForm.kgPerContainer} />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">% LME *</span>
+                    <input className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-right text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" min="0" onChange={(event) => updateDraftSellPct(event.target.value)} type="number" value={planDraftForm.sellPctLme} />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">LME cf (USD/MT) *</span>
+                    <input className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-right text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" min="0" onChange={(event) => updateDraftLmeCf(event.target.value)} type="number" value={planDraftForm.lmeCf} />
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-sm font-bold text-slate-700">2</div>
+                  <div className="text-sm font-bold text-slate-800">ผลคำนวณแผนขาย</div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <PendingStatCard label="หมวด" sublabel="อิงจากสินค้า" value={selectedDraftProduct?.metalGroup || '-'} />
+                  <PendingStatCard label="รวม กก." sublabel="ตู้ x กก./ตู้" value={`${money(draftTotalKg)} กก.`} />
+                  <PendingStatCard label="LME base / FX" sublabel={`${money(draftBaseLme)} USD/MT`} value={money(draftFx)} />
+                  <PendingStatCard label="% LME / LME cf" sublabel={`${money(draftLmeCf)} USD/MT`} value={`${money(draftSellPct)}%`} />
+                  <PendingStatCard label="ราคา THB/kg" sublabel="คำนวณจาก LME cf x FX" value={money(draftSellPrice)} />
+                  <PendingStatCard label="กำไรคาดการณ์" sublabel={selectedDraftProduct ? `WAC ${money(selectedDraftProduct.wac)}` : 'เลือกสินค้าเพื่อคำนวณ'} tone={selectedDraftProduct && draftSellPrice - selectedDraftProduct.wac < 0 ? 'danger' : 'success'} value={selectedDraftProduct ? money(draftTotalKg * (draftSellPrice - selectedDraftProduct.wac)) : '-'} />
+                </div>
+                {planDraftError ? <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">{planDraftError}</div> : null}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }
@@ -1878,25 +2056,21 @@ function Panel({ children, title }: { children: ReactNode; title: string }) {
   )
 }
 
-function LmeStat({ label, value }: { label: string; value: string }) {
-  const icon = label.slice(0, 2)
-  const cleanLabel = label.slice(2).trim()
-  return <SharedKpiCard className="flex-1 w-full" icon={icon} label={cleanLabel} tone="slate" value={value} />
-}
-
-function LmeEditableCard({ label, manualOnly = false, onChange, value }: { label: string; manualOnly?: boolean; onChange: (value: string) => void; value: number }) {
+function LmeEditableField({ label, onChange, suffix, value }: { label: string; onChange: (value: string) => void; suffix?: string; value: number }) {
   return (
-    <label className="block">
-      <div className="mb-2 flex items-center justify-between gap-2 text-sm font-bold text-slate-500">
-        <span>{label}</span>
-        {manualOnly ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-extrabold text-amber-700">กรอกเอง</span> : null}
+    <label className="block rounded-md border border-slate-200 bg-slate-50 p-3">
+      <span className="mb-2 block text-xs font-bold text-slate-500">{label}</span>
+      <div className="flex items-center gap-2">
+        <input
+          className="h-10 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-200"
+          min={0}
+          onChange={(event) => onChange(event.target.value)}
+          step="0.01"
+          type="number"
+          value={Number.isFinite(value) ? value : 0}
+        />
+        {suffix ? <span className="w-14 text-xs font-semibold text-slate-400">{suffix}</span> : null}
       </div>
-      <input
-        className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-right text-2xl font-extrabold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        onChange={(event) => onChange(event.target.value)}
-        type="number"
-        value={Number.isFinite(value) ? value : 0}
-      />
     </label>
   )
 }

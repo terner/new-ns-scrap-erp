@@ -733,7 +733,7 @@ function poSellSnapshotItems(items: unknown): PoSellSnapshotItem[] {
 
 function isInactivePoSellStatus(status: string | null | undefined) {
   const normalized = (status ?? '').trim().toLowerCase()
-  return ['cancelled', 'canceled', 'closed', 'completed', 'fully matched', 'received', 'void'].includes(normalized)
+  return ['cancelled', 'canceled', 'closed', 'completed', 'fully matched', 'received', 'short closed', 'void'].includes(normalized)
 }
 
 function allocatePoSellForSalesBill(poSell: PoSellForAllocation, billItems: SalesItemSnapshot[]) {
@@ -981,7 +981,7 @@ async function salesOptionsPayload(scope: Awaited<ReturnType<typeof salesBranchS
       take: 500,
       where: {
         ...(allowedBranchIds ? { branch_id: { in: allowedBranchIds } } : {}),
-        status: { notIn: ['cancelled', 'canceled', 'closed', 'completed', 'fully matched', 'received', 'void', 'Cancelled', 'Canceled', 'Closed', 'Completed'] },
+        status: { notIn: ['cancelled', 'canceled', 'closed', 'completed', 'fully matched', 'received', 'short closed', 'void', 'Cancelled', 'Canceled', 'Closed', 'Completed', 'Short Closed'] },
       },
     }),
     prisma.purchase_bills.findMany({

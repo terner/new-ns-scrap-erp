@@ -33,7 +33,7 @@ function activeBillStatus(status?: string | null) {
 }
 
 function activeCommitmentStatus(status?: string | null) {
-  return !['cancelled', 'canceled', 'closed', 'completed', 'fully matched', 'received', 'void', 'voided', 'reversed'].includes((status ?? '').toLowerCase())
+  return !['cancelled', 'canceled', 'closed', 'completed', 'fully matched', 'received', 'short closed', 'void', 'voided', 'reversed'].includes((status ?? '').toLowerCase())
 }
 
 function firstDayOfCurrentMonth() {
