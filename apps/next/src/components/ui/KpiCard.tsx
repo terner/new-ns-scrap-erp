@@ -1,5 +1,13 @@
 import type { ReactNode } from 'react'
+import { ArrowDown, ArrowRight, ArrowUp, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+export type KpiCardDelta = {
+  direction?: 'down' | 'flat' | 'up'
+  label?: ReactNode
+  tone?: 'bad' | 'good' | 'neutral'
+  value: ReactNode
+}
 
 export type KpiCardTone =
   | 'amber'
@@ -46,8 +54,21 @@ const toneStyles: Record<KpiCardTone, { icon: string; label: string; value: stri
   yellow: { icon: 'bg-amber-100 text-amber-700', label: 'text-amber-600', value: 'text-amber-700' },
 }
 
+const deltaStyles: Record<NonNullable<KpiCardDelta['tone']>, { icon: string; text: string }> = {
+  bad: { icon: 'bg-red-50 text-red-600', text: 'text-red-600' },
+  good: { icon: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600' },
+  neutral: { icon: 'bg-slate-100 text-slate-500', text: 'text-slate-500' },
+}
+
+const deltaIcons: Record<NonNullable<KpiCardDelta['direction']>, LucideIcon> = {
+  down: ArrowDown,
+  flat: ArrowRight,
+  up: ArrowUp,
+}
+
 export function KpiCard({
   className,
+  delta,
   icon,
   label,
   note,
@@ -55,6 +76,7 @@ export function KpiCard({
   value,
 }: {
   className?: string
+  delta?: KpiCardDelta
   icon?: ReactNode
   label: ReactNode
   note?: ReactNode
@@ -62,6 +84,9 @@ export function KpiCard({
   value: ReactNode
 }) {
   const style = toneStyles[tone] ?? toneStyles.slate
+  const deltaTone = delta?.tone ?? 'neutral'
+  const deltaStyle = deltaStyles[deltaTone]
+  const DeltaIcon = deltaIcons[delta?.direction ?? 'flat']
 
   return (
     <div className={cn('flex min-w-0 items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5', className)}>
@@ -72,7 +97,18 @@ export function KpiCard({
       ) : null}
       <div className="min-w-0 flex-1">
         <div className={cn('truncate text-xs font-medium', style.label)}>{label}</div>
-        <div className={cn('mt-0.5 break-words font-mono text-base font-bold leading-tight tabular-nums sm:text-xl', style.value)}>{value}</div>
+        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <div className={cn('min-w-0 break-words font-mono text-base font-bold leading-tight tabular-nums sm:text-xl', style.value)}>{value}</div>
+          {delta ? (
+            <div className={cn('inline-flex shrink-0 items-center gap-1.5 text-xs font-bold tabular-nums', deltaStyle.text)}>
+              <span className={cn('inline-flex size-4 items-center justify-center rounded-full', deltaStyle.icon)}>
+                <DeltaIcon aria-hidden="true" className="size-3" />
+              </span>
+              <span>{delta.value}</span>
+              {delta.label ? <span className="font-medium text-slate-400">{delta.label}</span> : null}
+            </div>
+          ) : null}
+        </div>
         {note ? <div className="mt-1 truncate text-xs font-medium text-slate-500">{note}</div> : null}
       </div>
     </div>

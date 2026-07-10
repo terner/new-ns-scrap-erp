@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
-import { KpiCard as SharedKpiCard, type KpiCardTone } from '@/components/ui/KpiCard'
+import { KpiCard as SharedKpiCard, type KpiCardDelta, type KpiCardTone } from '@/components/ui/KpiCard'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
@@ -20,6 +20,7 @@ type MainPayload = {
     cashComposition: { label: string; value: number }[]
     historical: { cogs: number; expenses: number; revenue: number; rows: number }
     kpi: Record<string, number>
+    kpiDelta?: Record<string, { amount: number; pct: number }>
     monthlyTrend: { expense: number; gp: number; label: string; purchase: number; sales: number }[]
     sections: {
       cash: Record<string, number>
@@ -107,6 +108,9 @@ type DailyGroupProductRow = MainPayload['dailyReport']['groupBreakdown'][number]
 type DailyGroupProductSortKey = keyof DailyGroupProductRow | 'spread'
 type CashAccountRow = MainPayload['dailyReport']['cashMovement']['accounts'][number]
 type CashAccountSortKey = keyof CashAccountRow | 'net'
+type DashboardKpiDeltaValue = NonNullable<MainPayload['dashboard']['kpiDelta']>[string]
+
+const DELTA_PERCENT_FORMATTER = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 1 })
 
 const dashboardAgingColumns: ResizableColumnDefinition<DashboardAgingSortKey>[] = [
   { key: 'label', defaultWidth: 150, minWidth: 110 },
@@ -306,6 +310,7 @@ function DashboardView(props: {
     }))
   }, [data?.filterOptions.products])
   const k = data?.dashboard.kpi ?? {}
+  const kpiDelta = data?.dashboard.kpiDelta ?? {}
   const section = data?.dashboard.sections
   const analytics = data?.dailyReport.analytics
   const purchaseWeight = section?.purchase.qty ?? 0
@@ -608,12 +613,12 @@ function DashboardView(props: {
           </div>
         ) : null}
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <DashboardKpi label="Revenue" sub="ยอดขาย" tone="blue" value={money(k.revenue)} />
-          <DashboardKpi label="Expenses" sub="ค่าใช้จ่าย + COGS" tone="red" value={money(k.expenses)} />
-          <DashboardKpi label="Net Profit" sub="กำไรสุทธิ" tone={(k.netProfit ?? 0) >= 0 ? 'emerald' : 'red'} value={money(k.netProfit)} />
-          <DashboardKpi label="Cash Balance" sub="เงินสด/ธนาคาร" tone="cyan" value={money(k.cashBalance)} />
-          <DashboardKpi label="AR ลูกหนี้" sub="Receivable" tone="purple" value={money(k.ar)} />
-          <DashboardKpi label="AP เจ้าหนี้" sub="Payable" tone="orange" value={money(k.ap)} />
+          <DashboardKpi delta={dashboardDelta(kpiDelta.revenue)} label="Revenue" sub="ยอดขาย" tone="blue" value={money(k.revenue)} />
+          <DashboardKpi delta={dashboardDelta(kpiDelta.expenses, false)} label="Expenses" sub="ค่าใช้จ่าย + COGS" tone="red" value={money(k.expenses)} />
+          <DashboardKpi delta={dashboardDelta(kpiDelta.netProfit)} label="Net Profit" sub="กำไรสุทธิ" tone={(k.netProfit ?? 0) >= 0 ? 'emerald' : 'red'} value={money(k.netProfit)} />
+          <DashboardKpi delta={dashboardDelta(kpiDelta.cashBalance)} label="Cash Balance" sub="เงินสด/ธนาคาร" tone="cyan" value={money(k.cashBalance)} />
+          <DashboardKpi delta={dashboardDelta(kpiDelta.ar, false)} label="AR ลูกหนี้" sub="Receivable" tone="purple" value={money(k.ar)} />
+          <DashboardKpi delta={dashboardDelta(kpiDelta.ap, false)} label="AP เจ้าหนี้" sub="Payable" tone="orange" value={money(k.ap)} />
         </div>
         <div className="mb-4 grid gap-3 lg:grid-cols-2">
           <DashboardChartCard title="Revenue vs Expense (Monthly)">
@@ -864,8 +869,24 @@ function cashAccountValue(row: CashAccountRow, key: CashAccountSortKey) {
   return row[key]
 }
 
-function DashboardKpi({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
-  return <SharedKpiCard label={label} note={sub} tone={tone as KpiCardTone} value={value} />
+function DashboardKpi({ delta, label, sub, tone, value }: { delta?: KpiCardDelta; label: string; sub: string; tone: string; value: string }) {
+  return <SharedKpiCard delta={delta} label={label} note={sub} tone={tone as KpiCardTone} value={value} />
+}
+
+function dashboardDelta(delta?: DashboardKpiDeltaValue, goodWhenHigher = true): KpiCardDelta | undefined {
+  if (!delta) return undefined
+  const amount = safeNumber(delta.amount)
+  const direction: NonNullable<KpiCardDelta['direction']> = amount > 0 ? 'up' : amount < 0 ? 'down' : 'flat'
+  const tone: NonNullable<KpiCardDelta['tone']> = amount === 0 ? 'neutral' : (amount > 0) === goodWhenHigher ? 'good' : 'bad'
+  return {
+    direction,
+    tone,
+    value: formatDeltaPercent(delta),
+  }
+}
+
+function formatDeltaPercent(delta: DashboardKpiDeltaValue) {
+  return `${DELTA_PERCENT_FORMATTER.format(Math.abs(safeNumber(delta.pct)))}%`
 }
 
 function DashboardChartCard({ children, className = '', title }: { children: ReactNode; className?: string; title: string }) {
