@@ -71,10 +71,7 @@ function activeStatus(status?: string | null) {
 }
 
 async function runReadBatch<T extends readonly unknown[]>(tasks: { [K in keyof T]: () => Promise<T[K]> }) {
-  const results: unknown[] = []
-  for (const task of tasks) {
-    results.push(await task())
-  }
+  const results = await Promise.all(tasks.map((task) => task()))
   return results as unknown as T
 }
 
