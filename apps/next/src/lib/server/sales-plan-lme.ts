@@ -27,7 +27,7 @@ const defaultSalesPlanLmeConfig: SalesPlanLmeConfigInput = {
   lmeAluminumUSD: 2400,
   lmeBrassUSD: 7000,
   lmeCopperUSD: 9000,
-  liveFetchNote: 'USD/THB และ LME แก้ไขได้จากหน้านี้ ส่วน กก./ตู้ ต้องกรอกเอง',
+  liveFetchNote: 'Live fetch: USD/THB จาก exchangerate-api และ Metals จาก metals.dev (demo key) — ส่วน กก./ตู้ ต้องกรอกเอง',
   source: 'default',
 }
 
@@ -64,13 +64,13 @@ export async function saveSalesPlanLmeConfig(
   const row = await prisma.system_settings.upsert({
     where: { key: SALES_PLAN_LME_CONFIG_KEY },
     create: {
-      description: 'Sales Plan LME reference pricing config',
+      description: 'Sales Plan LME reference pricing config (manual + live fetched values)',
       key: SALES_PLAN_LME_CONFIG_KEY,
       updated_by: currentActor(context),
       value: JSON.stringify(parsed),
     },
     update: {
-      description: 'Sales Plan LME reference pricing config',
+      description: 'Sales Plan LME reference pricing config (manual + live fetched values)',
       updated_at: new Date(),
       updated_by: currentActor(context),
       value: JSON.stringify(parsed),
@@ -108,7 +108,9 @@ async function fetchUsdThbRate() {
     cache: 'no-store',
     headers: { Accept: 'application/json' },
   })
-  if (!response.ok) return { error: `ExchangeRate API ตอบกลับ ${response.status}` as const }
+  if (!response.ok) {
+    return { error: `ExchangeRate API ตอบกลับ ${response.status}` as const }
+  }
   const rate = parseFxRatePayload(await response.json())
   if (!rate) return { error: 'อ่านค่า USD/THB จาก ExchangeRate API ไม่ได้' as const }
   return { rate }
@@ -122,9 +124,13 @@ async function fetchMetalsValues() {
     cache: 'no-store',
     headers: { Accept: 'application/json' },
   })
-  if (!response.ok) return { error: `Metals.dev ตอบกลับ ${response.status}` as const }
+  if (!response.ok) {
+    return { error: `Metals.dev ตอบกลับ ${response.status}` as const }
+  }
   const metals = parseMetalsPayload(await response.json())
-  if (!metals.copper && !metals.aluminum) return { error: 'อ่านค่าทองแดง/อลูมิเนียมจาก Metals.dev ไม่ได้' as const }
+  if (!metals.copper && !metals.aluminum) {
+    return { error: 'อ่านค่าทองแดง/อลูมิเนียมจาก Metals.dev ไม่ได้' as const }
+  }
   return metals
 }
 
@@ -134,6 +140,7 @@ export async function fetchLiveSalesPlanLmeConfig(currentConfig: SalesPlanLmeCon
     fetchMetalsValues(),
   ])
 
+  const fetchedAt = new Date().toISOString()
   const notes: string[] = ['Live fetch: USD/THB จาก exchangerate-api และ Metals จาก metals.dev']
   if ('error' in fxResult) notes.push(`USD/THB ใช้ค่าเดิม (${fxResult.error})`)
   if ('error' in metalsResult) notes.push(`Metals ใช้ค่าเดิม (${metalsResult.error})`)
@@ -146,7 +153,7 @@ export async function fetchLiveSalesPlanLmeConfig(currentConfig: SalesPlanLmeCon
     lmeAluminumUSD: 'error' in metalsResult ? currentConfig.lmeAluminumUSD : (metalsResult.aluminum ?? currentConfig.lmeAluminumUSD),
     lmeBrassUSD: currentConfig.lmeBrassUSD,
     lmeCopperUSD: 'error' in metalsResult ? currentConfig.lmeCopperUSD : (metalsResult.copper ?? currentConfig.lmeCopperUSD),
-    liveFetchNote: `${notes.join(' · ')} · fetched ${new Date().toISOString()}`,
+    liveFetchNote: `${notes.join(' · ')} · fetched ${fetchedAt}`,
     source: 'mixed',
   })
 }
