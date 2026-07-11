@@ -32,6 +32,8 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 - ช่วยวางแผนขาย/LME ก่อนสร้าง commitment หรือ stock issue
 - แสดง locked/approved plan state ถ้ามี
 - แสดง read model/report ตาม filter ของหน้า
+- ให้เลือกตารางวิเคราะห์ผู้บริหารหรือสต๊อกว่างขายคงเหลือผ่าน line tabs เพื่อแสดงทีละรายการ
+- ให้เลือกตารางวิเคราะห์ผู้บริหารหรือสต๊อกว่างขายคงเหลือผ่าน line tabs เพื่อแสดงทีละรายการ
 - รองรับ search/filter/date range/sort/export ตาม design baseline
 - drilldown ไป source document หรือ source report ที่เกี่ยวข้อง
 - แสดง created/document/due/as-of date แยกกันตาม Document Aging Policy
