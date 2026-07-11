@@ -33,7 +33,8 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 - แสดง locked/approved plan state ถ้ามี
 - แสดง read model/report ตาม filter ของหน้า
 - ให้เลือกตารางวิเคราะห์ผู้บริหารหรือสต๊อกว่างขายคงเหลือผ่าน line tabs เพื่อแสดงทีละรายการ
-- ให้เลือกตารางวิเคราะห์ผู้บริหารหรือสต๊อกว่างขายคงเหลือผ่าน line tabs เพื่อแสดงทีละรายการ
+- แสดงตารางรอขายตามผลิตภัณฑ์พร้อมต้นทุน Pool, ราคาเสนอ, % LME, กำไร/Margin, รอขายจริง, ล็อกขาย, PO ซื้อรอส่ง และ STOCK เพื่อใช้ตัดสินใจขาย
+- ราคาเสนอที่ดีสุด, % LME, กำไร และ Margin ในตารางรอขายต้องอิงรายการในตารางวางแผนการขายของสินค้าเดียวกันเท่านั้น; หากไม่มีแผน ให้แสดง `-` โดยไม่เติมจากราคา LME กลาง
 - รองรับ search/filter/date range/sort/export ตาม design baseline
 - drilldown ไป source document หรือ source report ที่เกี่ยวข้อง
 - แสดง created/document/due/as-of date แยกกันตาม Document Aging Policy
