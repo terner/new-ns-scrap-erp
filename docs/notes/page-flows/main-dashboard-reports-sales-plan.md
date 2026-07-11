@@ -57,6 +57,49 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 ### Current API
 
 - `GET /api/sales-plan`
+- `POST /api/sales-plan`
+  - `action = fetch-live`
+  - `action = save-config`
+
+## Draft Plan Entry Form
+
+### Purpose
+
+- ใช้จำลองการวางแผนขายบนหน้าจอโดยยังไม่ commit ลง source transaction
+- ช่วยให้ผู้ใช้เห็นตัวเลขในตารางวางแผนทันที
+
+### Form Fields
+
+| Field | Source / behavior | Required |
+|---|---|---|
+| `สินค้า` | เลือกจากรายการสินค้าใน `productAnalysis` ของหน้า | Yes |
+| `ช่องทาง` | เลือกจาก `filters.channels` | Yes |
+| `ลูกค้า` | กรอกข้อความชื่อคู่ค้าโดยตรง | Yes |
+| `จำนวนตู้` | กรอกจำนวนตู้ | Yes |
+| `กก./ตู้` | default จาก `LME Reference Pricing.kgPerContainer` แต่แก้ได้ในฟอร์ม | Yes |
+| `LME cf (USD/MT)` | default จาก LME ตามหมวดสินค้าที่เลือก แต่ผู้ใช้แก้ได้สำหรับแผนนี้ | Yes |
+| `% LME` | กรอกเปอร์เซ็นต์ที่ใช้คำนวณราคาเสนอขาย | Yes |
+
+### Derived / Read-Only Preview
+
+| Preview card | Formula / source |
+|---|---|
+| `หมวด` | มาจากสินค้า (`metalGroup`) |
+| `รวม กก.` | `จำนวนตู้ x กก./ตู้` |
+| `LME cf / FX` | LME cf ที่ระบุในแผน + FX ล่าสุด |
+| `ราคา THB/kg` | `(LME cf / 1000) x FX x (%LME / 100)` |
+
+### Validation Rules
+
+- ต้องเลือก `สินค้า`
+- ต้องกรอก `ลูกค้า`
+- `จำนวนตู้`, `กก./ตู้`, `LME cf`, และ `% LME` ต้องมากกว่า 0
+- ถ้า validation ไม่ผ่าน ต้องไม่เพิ่ม row ลงตาราง draft
+
+### Add-To-Table Behavior
+
+- ปุ่ม `เพิ่มเข้าตาราง` สร้าง row สถานะ `Draft` ใน local client state ของหน้าเท่านั้น
+- การ refresh หน้า / reload browser ทำให้ draft ที่ยังไม่ persisted หายได้
 
 ### Data Contract
 
