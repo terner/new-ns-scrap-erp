@@ -32,6 +32,7 @@ import {
   mapWeightTicketRow,
   mutableTicketErrorMessage,
   nextWeightTicketDocNo,
+  requireWeightTicketBranchDocumentCode,
   type WeightTicketRow,
   weightTicketAuditSnapshot,
 } from '@/lib/server/weight-tickets'
@@ -249,7 +250,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     })))
 
     const updated = await prisma.$transaction(async (tx) => {
-      const branchCode = String(branch.code ?? '').replace(/\D/g, '').slice(-2).padStart(2, '0')
+      const branchCode = requireWeightTicketBranchDocumentCode(branch.code)
       const mustRenumber = existing.branch_id !== branch.id
       const docNo = mustRenumber
         ? await (async () => {

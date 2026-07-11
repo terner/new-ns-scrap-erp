@@ -2843,12 +2843,12 @@ model salespersons {
 model weight_tickets {
   doc_no                            String                              @unique
   doc_type                          String
-  status                            String                              @default("received")
+  status                            String
   document_date                     DateTime                            @db.Date
   party_name                        String
   vehicle_no                        String
   remark                            String?
-  entered_by                        String?
+  entered_by                        String
   image_count                       Int                                 @default(0)
   vehicle_image_count               Int                                 @default(0)
   vehicle_image_names               String[]                            @default([])

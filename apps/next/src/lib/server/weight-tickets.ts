@@ -278,11 +278,19 @@ export function branchScopeIds(context: AppAuthContext) {
 }
 
 export function enteredByLabel(context: AppAuthContext) {
-  // NSERP-85: show only the system Display Name for the weighing staff on
-  // weight tickets / receipts. If display_name is missing it shows '-'
-  // rather than leaking the account email, so the underlying user record is the
-  // single source of truth for the staff's name.
-  return context.appUser?.displayName ?? '-'
+  const displayName = context.appUser?.displayName?.trim()
+  if (!displayName) {
+    throw new Error('ไม่พบชื่อผู้ใช้สำหรับบันทึกใบรับ-ส่งของ กรุณากำหนดชื่อพนักงานก่อนสร้างเอกสาร')
+  }
+  return displayName
+}
+
+export function requireWeightTicketBranchDocumentCode(code: string | null | undefined) {
+  const value = code?.trim()
+  if (!value || !/^\d{2}$/.test(value)) {
+    throw new Error('รหัสสาขาสำหรับออกเลขที่ใบรับ-ส่งของต้องเป็นตัวเลข 2 หลัก')
+  }
+  return value
 }
 
 export function defaultTicketStatus(_type: WeightTicketType): WeightTicketStatus {
@@ -839,7 +847,7 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
     })(),
     containerDeductionWeight: toNumber(line.container_deduction_weight).toString(),
     containerDeductionWeightValue: toNumber(line.container_deduction_weight),
-    deductionMode: (line.deduction_mode ?? 'none') as 'none' | 'kg' | 'percent',
+    deductionMode: line.deduction_mode as 'none' | 'kg' | 'percent',
     deductionValue: toNumber(line.deduction_value).toString(),
     deductionWeight: toNumber(line.deduct_weight),
     grossWeight: toNumber(line.gross_weight).toString(),
@@ -985,7 +993,7 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
     pendingOutHistory,
     productSummaries,
     remark: row.remark ?? '',
-    status: (row.status ?? defaultTicketStatus(row.doc_type as WeightTicketType)) as WeightTicketStatus,
+    status: row.status as WeightTicketStatus,
     totals: {
       containerDeductionWeight: toNumber(row.container_deduction_weight),
       deductionWeight: toNumber(row.deduct_weight),

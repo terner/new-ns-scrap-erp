@@ -29,6 +29,7 @@ import {
   mapWeightTicketRow,
   nextWeightTicketDocNo,
   parseWeightTicketQuery,
+  requireWeightTicketBranchDocumentCode,
   weightTicketAuditSnapshot,
   weightTicketOrderBy,
   weightTicketWhere,
@@ -281,7 +282,7 @@ export async function POST(request: Request) {
 
     const created = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('weight_tickets.doc_no'))`
-      const branchCode = String(branch.code ?? '').replace(/\D/g, '').slice(-2).padStart(2, '0')
+      const branchCode = requireWeightTicketBranchDocumentCode(branch.code)
       const docNo = await nextWeightTicketDocNo(tx, values.type, branchCode, documentDate)
       const partySnapshot = weightTicketPartySnapshot({ customer, supplier, type: values.type })
       const createdTicket = await tx.weight_tickets.create({
