@@ -309,6 +309,7 @@ export function SalesPlanPageClient() {
   const [analysisSortDirection, setAnalysisSortDirection] = useState<SortDirection>('asc')
   const [remainingSortKey, setRemainingSortKey] = useState<SalesPlanRemainingColumnKey | null>(null)
   const [remainingSortDirection, setRemainingSortDirection] = useState<SortDirection>('asc')
+  const [salesPlanInsightTab, setSalesPlanInsightTab] = useState<'analysis' | 'remaining'>('analysis')
   const planResize = useResizableColumns('main.sales-plan.plan.v1', salesPlanColumns)
   const analysisResize = useResizableColumns('main.sales-plan.analysis.v1', salesPlanAnalysisColumns)
   const remainingResize = useResizableColumns('main.sales-plan.remaining.v2', salesPlanRemainingColumns)
@@ -1028,7 +1029,15 @@ export function SalesPlanPageClient() {
         </div>
       </div>
 
+      <Tabs value={salesPlanInsightTab} onValueChange={(value) => setSalesPlanInsightTab(value as 'analysis' | 'remaining')}>
+        <TabsList aria-label="ตารางวิเคราะห์แผนขาย" className="flex-wrap overflow-x-auto" variant="line">
+          <TabsTrigger value="analysis" variant="line">วิเคราะห์แผนขาย vs สต๊อกว่างขาย</TabsTrigger>
+          <TabsTrigger value="remaining" variant="line">สต๊อกว่างขายคงเหลือ</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* 2. Analysis Section */}
+      {salesPlanInsightTab === 'analysis' ? (
       <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4">
           <div>
@@ -1130,7 +1139,8 @@ export function SalesPlanPageClient() {
         </div>
       </div>
 
-      {/* 3. Containers Remaining Section */}
+      ) : (
+      /* 3. Containers Remaining Section */
       <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/50 p-4">
           <h3 className="font-bold text-slate-800 text-sm">📦 สต๊อกว่างขาย คงเหลือหลังหักล็อกราคา — เดือน {(month || data?.filters.month) ?? ''}</h3>
@@ -1222,6 +1232,7 @@ export function SalesPlanPageClient() {
           {!sortedRemainingRows.length ? <div className="text-center text-slate-500 py-4 font-semibold text-xs">ไม่มีสต๊อกทองแดง/ทองเหลือง</div> : null}
         </div>
       </div>
+      )}
 
       {error ? <ErrorBox text={error} /> : null}
     </section>
