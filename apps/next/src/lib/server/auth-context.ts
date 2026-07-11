@@ -46,9 +46,15 @@ function serializeInternalId(value: bigint | null | undefined) {
   return value == null ? null : value.toString()
 }
 
-const appUserAuthInclude = {
+const appUserAuthSelect = {
+  active: true,
+  auth_user_id: true,
+  display_name: true,
+  email: true,
+  id: true,
+  must_change_password: true,
   app_user_branch_access: {
-    include: {
+    select: {
       branches: {
         select: {
           code: true,
@@ -57,12 +63,22 @@ const appUserAuthInclude = {
     },
   },
   app_user_roles: {
-    include: {
+    select: {
       app_roles: {
-        include: {
+        select: {
+          active: true,
+          branch_scope: true,
+          code: true,
+          id: true,
+          name: true,
           app_role_permissions: {
-            include: {
-              app_permissions: true,
+            select: {
+              app_permissions: {
+                select: {
+                  active: true,
+                  code: true,
+                },
+              },
             },
           },
         },
@@ -73,12 +89,24 @@ const appUserAuthInclude = {
 
 async function findAppUserWithAuth(where: Parameters<typeof prisma.app_users.findUnique>[0]['where']) {
   return prisma.app_users.findUnique({
-    include: appUserAuthInclude,
+    select: appUserAuthSelect,
     where,
   })
 }
 
 type AppUserWithAuth = NonNullable<Awaited<ReturnType<typeof findAppUserWithAuth>>>
+
+function fallbackUsername(appUser: Pick<AppUserWithAuth, 'display_name' | 'email' | 'id'>, user: User) {
+  const email = appUser.email?.trim() || user.email?.trim()
+  if (email) return email
+
+  const displayName = appUser.display_name?.trim()
+  if (displayName) {
+    return displayName.toLowerCase().replace(/\s+/g, '.')
+  }
+
+  return String(appUser.id)
+}
 
 function buildAppUserContext(appUser: AppUserWithAuth | null, user: User): AppAuthContext {
   if (!appUser) {
@@ -114,7 +142,7 @@ function buildAppUserContext(appUser: AppUserWithAuth | null, user: User): AppAu
       email: appUser.email,
       id: appUser.id,
       mustChangePassword: appUser.must_change_password,
-      username: appUser.username,
+      username: fallbackUsername(appUser, user),
     },
     authUser: user,
     fallbackRole: null,
@@ -172,7 +200,7 @@ export async function getCurrentAuthContext(): Promise<AppAuthContext> {
   const email = user.email?.trim()
   if (email) {
     const emailMatches = await prisma.app_users.findMany({
-      include: appUserAuthInclude,
+      select: appUserAuthSelect,
       orderBy: [{ created_at: 'desc' }],
       take: 2,
       where: {
