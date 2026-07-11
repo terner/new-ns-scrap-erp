@@ -217,12 +217,13 @@ const impurityProductIdPattern = /\[impurity_product_id:([^\]]+)\]/i
 const impurityProductNamePattern = /\[impurity_product_name:([^\]]+)\]/i
 
 const attachmentValueSchema = z.string().trim().min(1).max(4_000_000, 'ข้อมูลรูปภาพใหญ่เกินไป')
+const weightNumberSchema = z.coerce.number().finite().min(0).multipleOf(0.01, 'กรอกทศนิยมได้ไม่เกิน 2 ตำแหน่ง')
 
 const weightTicketLinePayloadSchema = z.object({
-  containerDeductionWeight: z.coerce.number().finite().min(0).default(0),
+  containerDeductionWeight: weightNumberSchema.default(0),
   deductionMode: deductionModeEnum,
-  deductionValue: z.coerce.number().finite().min(0).default(0),
-  grossWeight: z.coerce.number().finite().min(0, 'กรอกน้ำหนักอย่างน้อย 0'),
+  deductionValue: weightNumberSchema.default(0),
+  grossWeight: weightNumberSchema,
   id: z.string().trim().min(1).max(80),
   imageNames: z.array(attachmentValueSchema).default([]),
   impurityId: z.preprocess(blankToEmpty, z.string().max(80).default('')),
@@ -679,21 +680,25 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
 }
 
 export function calculateLineTotals(line: Pick<WeightTicketLine, 'containerDeductionWeight' | 'deductionMode' | 'deductionValue' | 'grossWeight'>) {
-  const grossWeight = Math.max(0, toNumber(line.grossWeight))
-  const containerDeductionWeight = Math.min(Math.max(0, toNumber(line.containerDeductionWeight)), grossWeight)
-  const netBeforeImpurityWeight = Math.max(0, grossWeight - containerDeductionWeight)
+  const grossWeight = roundWeight(Math.max(0, toNumber(line.grossWeight)))
+  const containerDeductionWeight = roundWeight(Math.min(Math.max(0, toNumber(line.containerDeductionWeight)), grossWeight))
+  const netBeforeImpurityWeight = roundWeight(Math.max(0, grossWeight - containerDeductionWeight))
   const rawDeduction = line.deductionMode === 'percent'
     ? netBeforeImpurityWeight * Math.max(0, toNumber(line.deductionValue)) / 100
     : line.deductionMode === 'kg'
       ? Math.max(0, toNumber(line.deductionValue))
       : 0
-  const deductionWeight = Math.min(rawDeduction, netBeforeImpurityWeight)
+  const deductionWeight = roundWeight(Math.min(rawDeduction, netBeforeImpurityWeight))
   return {
     containerDeductionWeight,
     deductionWeight,
     grossWeight,
-    netWeight: Math.max(0, grossWeight - containerDeductionWeight - deductionWeight),
+    netWeight: roundWeight(Math.max(0, grossWeight - containerDeductionWeight - deductionWeight)),
   }
+}
+
+export function roundWeight(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'containerDeductionWeight' | 'deductionMode' | 'deductionValue' | 'grossWeight' | 'id'> & { parentId?: string; impurityId?: string; impuritySourceLineId?: string }>) {
@@ -739,7 +744,7 @@ export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'conta
     }
   })
 
-  return lines.reduce((summary, line) => {
+  const totals = lines.reduce((summary, line) => {
     const isImpurity = !!line.parentId && toNumber(line.grossWeight) === 0 && !!line.impurityId && line.deductionMode !== 'none';
     if (isImpurity) return summary
     
@@ -750,6 +755,12 @@ export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'conta
     summary.netWeight += totals.netWeight
     return summary
   }, { containerDeductionWeight: 0, deductionWeight: 0, grossWeight: 0, netWeight: 0 })
+  return {
+    containerDeductionWeight: roundWeight(totals.containerDeductionWeight),
+    deductionWeight: roundWeight(totals.deductionWeight),
+    grossWeight: roundWeight(totals.grossWeight),
+    netWeight: roundWeight(totals.netWeight),
+  }
 }
 
 export function findOptionLabel(options: OptionItem[], id: string) {

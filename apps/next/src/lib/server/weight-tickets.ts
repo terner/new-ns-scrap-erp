@@ -8,6 +8,7 @@ import {
   OTHER_PRODUCT_IMPURITY_ID,
   OTHER_PRODUCT_IMPURITY_LABEL,
   parseImpurityProductMeta,
+  roundWeight,
   type WeightTicketFormValues,
   type WeightTicketStatus,
   type WeightTicketType,
@@ -415,18 +416,18 @@ export function buildWeightTicketLineRows(
     const impurity = impurityId == null ? null : impurityById.get(impurityId)
 
     return {
-      container_deduction_weight: lineTotals.containerDeductionWeight,
-      deduct_weight: lineTotals.deductionWeight,
+      container_deduction_weight: roundWeight(lineTotals.containerDeductionWeight),
+      deduct_weight: roundWeight(lineTotals.deductionWeight),
       deduction_mode: line.deductionMode,
-      deduction_value: line.deductionMode === 'none' ? 0 : Number(line.deductionValue),
-      gross_weight: lineTotals.grossWeight,
+      deduction_value: line.deductionMode === 'none' ? 0 : roundWeight(Number(line.deductionValue)),
+      gross_weight: roundWeight(lineTotals.grossWeight),
       image_count: line.imageNames.length,
       image_names: line.imageNames,
       impurity_id: impurityId ?? null,
       impurity_name: isOtherProductImpurity ? OTHER_PRODUCT_IMPURITY_LABEL : impurity?.name ?? null,
       impurity_source_line_no: line.impuritySourceLineId ? lineNoById.get(line.impuritySourceLineId) ?? null : null,
       line_no: index + 1,
-      net_weight: lineTotals.netWeight,
+      net_weight: roundWeight(lineTotals.netWeight),
       note: appendImpurityProductMeta(line.note, {
         id: isOtherProductImpurity ? (line.impurityProductId ?? '') : '',
         name: isOtherProductImpurity ? (impurityProduct?.name ?? '') : '',
@@ -498,18 +499,18 @@ export function buildWeightTicketProductSummaryRows(
   })
 
   const summaryRows = [...grouped.values()].map((summary) => ({
-    billed_weight: summary.billedWeight,
-    container_deduction_weight: summary.containerDeductionWeight,
+    billed_weight: roundWeight(summary.billedWeight),
+    container_deduction_weight: roundWeight(summary.containerDeductionWeight),
     created_at: new Date(),
-    deduct_weight: summary.deductWeight,
-    gross_weight: summary.grossWeight,
+    deduct_weight: roundWeight(summary.deductWeight),
+    gross_weight: roundWeight(summary.grossWeight),
     has_mixed_deduction_profiles: summary.mixedProfiles.size > 1,
     line_count: summary.lineCount,
     lineIds: summary.lineIds,
-    net_weight: summary.netWeight,
+    net_weight: roundWeight(summary.netWeight),
     product_id: summary.productId,
     product_name: summary.productName,
-    remaining_weight: summary.netWeight,
+    remaining_weight: roundWeight(summary.netWeight),
     updated_at: new Date(),
     weight_ticket_id: ticketId,
   }))
