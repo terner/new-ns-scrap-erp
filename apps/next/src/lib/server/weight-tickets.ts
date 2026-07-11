@@ -67,14 +67,6 @@ export type WeightTicketRow = Prisma.weight_ticketsGetPayload<{
     branches: true
     customers: true
     suppliers: true
-    warehouses: {
-      select: {
-        code: true
-        id: true
-        name: true
-        type: true
-      }
-    }
     weight_ticket_product_summaries: {
       include: {
         products: {
@@ -1021,8 +1013,7 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
     vehicleImageCount: row.vehicle_image_count ?? 0,
     vehicleImageNames: row.vehicle_image_names ?? [],
     vehicleNo: row.vehicle_no,
-    warehouseId: row.warehouse_id?.toString() ?? null,
-    warehouseName: row.warehouses?.name ?? row.warehouse_name ?? '',
+    warehouseName: row.warehouse_name ?? '',
   }
 }
 
@@ -1039,8 +1030,6 @@ export function weightTicketAuditSnapshot(row: ReturnType<typeof mapWeightTicket
     totals: row.totals,
     type: row.type,
     vehicleNo: row.vehicleNo,
-    warehouseId: row.warehouseId,
-    warehouseName: row.warehouseName,
   }
 }
 
@@ -1063,7 +1052,6 @@ export const weightTicketInclude = {
   branches: true,
   customers: true,
   suppliers: true,
-  warehouses: { select: { code: true, id: true, name: true, type: true } },
   weight_ticket_product_summaries: {
     include: {
       products: {

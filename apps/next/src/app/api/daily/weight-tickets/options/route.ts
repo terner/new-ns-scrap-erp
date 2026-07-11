@@ -22,7 +22,7 @@ export async function GET() {
         ...(scopedBranchIds.length ? { code: { in: scopedBranchIds } } : {}),
       },
     })
-    const [suppliers, customers, impurities, warehouses] = await Promise.all([
+    const [suppliers, customers, impurities] = await Promise.all([
       prisma.suppliers.findMany({
         orderBy: [{ name: 'asc' }, { code: 'asc' }],
         select: {
@@ -64,20 +64,6 @@ export async function GET() {
         select: { active: true, id: true, name: true },
         where: { active: true },
       }),
-      prisma.warehouses.findMany({
-        orderBy: [{ branch_id: 'asc' }, { code: 'asc' }, { name: 'asc' }],
-        select: {
-          branches: { select: { code: true } },
-          code: true,
-          id: true,
-          name: true,
-          type: true,
-        },
-        where: {
-          active: true,
-          branch_id: { in: branches.map((branch) => branch.id) },
-        },
-      }),
     ])
 
     return NextResponse.json({
@@ -110,13 +96,6 @@ export async function GET() {
       impurities: impurities.map((impurity) => ({
         id: impurity.id.toString(),
         label: impurity.name,
-      })),
-      warehouses: warehouses.map((warehouse) => ({
-        branchId: warehouse.branches?.code ?? '',
-        code: requireBusinessCode(warehouse.code, `คลัง ${warehouse.id}`),
-        id: warehouse.id.toString(),
-        name: warehouse.name,
-        type: warehouse.type ?? '',
       })),
     })
   } catch (caught) {

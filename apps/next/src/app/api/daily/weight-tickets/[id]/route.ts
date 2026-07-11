@@ -45,7 +45,6 @@ const ticketInclude = {
   branches: true,
   customers: true,
   suppliers: true,
-  warehouses: { select: { code: true, id: true, name: true, type: true } },
   weight_ticket_product_summaries: {
     include: {
       products: {
@@ -184,20 +183,6 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     if (!branch || (scopedBranchIds.length && !scopedBranches.some((item) => item.id === branch.id))) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือไม่มีสิทธิ์ใช้งาน', fieldErrors: { branchId: ['เลือกสาขา'] } }, { status: 400 })
-    }
-    const headerWarehouseId = values.type === 'WTI' ? parseInternalBigIntId(values.warehouseId) : null
-    const headerWarehouse = headerWarehouseId == null
-      ? null
-      : await prisma.warehouses.findFirst({
-        select: { code: true, id: true, name: true, type: true },
-        where: { active: true, branch_id: branch.id, id: headerWarehouseId },
-      })
-    if (values.type === 'WTI' && !headerWarehouse) {
-      return NextResponse.json({
-        code: 'BAD_REQUEST',
-        error: 'คลังไม่ถูกต้อง ถูกปิดใช้งาน หรืออยู่คนละสาขา',
-        fieldErrors: { warehouseId: ['เลือกคลังของสาขานี้'] },
-      }, { status: 400 })
     }
     try {
       await assertWeightTicketPartyForType({ branchId: branch.id, customer, supplier, type: values.type })
@@ -371,11 +356,12 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       if (bridgeRows.length) {
         await tx.weight_ticket_product_summary_lines.createMany({ data: bridgeRows })
       }
+      const warehouseName = values.warehouseName || null
+
       await tx.weight_tickets.update({
-        data: {
+        data: { 
           image_count: imageCount,
-          warehouse_id: headerWarehouse?.id ?? null,
-          warehouse_name: headerWarehouse?.name ?? null,
+          warehouse_name: warehouseName,
         },
         where: { id: existing.id },
       })

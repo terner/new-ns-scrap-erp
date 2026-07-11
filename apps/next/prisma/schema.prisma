@@ -2865,7 +2865,6 @@ model weight_tickets {
   branch_id                         BigInt
   supplier_id                       BigInt?
   customer_id                       BigInt?
-  warehouse_id                      BigInt?
   id                                BigInt                              @id @default(autoincrement())
   container_deduction_weight        Decimal                             @default(0) @db.Decimal(18, 2)
   warehouse_name                    String?
@@ -2880,7 +2879,6 @@ model weight_tickets {
   branches                          branches                            @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   customers                         customers?                          @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   suppliers                         suppliers?                          @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  warehouses                        warehouses?                         @relation(fields: [warehouse_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([branch_id], map: "idx_weight_tickets_branch")
   @@index([branch_id, document_date(sort: Desc), doc_no(sort: Desc)], map: "idx_weight_tickets_wti_branch_bill_options", where: raw("((cancelled_at IS NULL) AND (doc_type = 'WTI'::text) AND (status = ANY (ARRAY['received'::text, 'partially_billed'::text])))"))
@@ -2891,7 +2889,6 @@ model weight_tickets {
   @@index([document_date(sort: Desc), doc_no(sort: Desc)], map: "idx_weight_tickets_wti_bill_options", where: raw("((cancelled_at IS NULL) AND (doc_type = 'WTI'::text) AND (status = ANY (ARRAY['received'::text, 'partially_billed'::text])))"))
   @@index([status], map: "idx_weight_tickets_status")
   @@index([supplier_id], map: "idx_weight_tickets_supplier")
-  @@index([warehouse_id], map: "idx_weight_tickets_warehouse_id", where: raw("(warehouse_id IS NOT NULL)"))
   @@schema("public")
 }
 
@@ -3760,7 +3757,6 @@ model warehouses {
   stock_transfers_to                                                  stock_transfers[]         @relation("stock_transfers_to_warehouse_idTowarehouses")
   branches                                                            branches?                 @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   weight_ticket_lines                                                 weight_ticket_lines[]
-  weight_tickets                                                      weight_tickets[]
 
   @@schema("public")
 }

@@ -140,7 +140,6 @@ export type WeightTicketRecord = {
   vehicleImageCount: number
   vehicleImageNames: string[]
   vehicleNo: string
-  warehouseId?: string | null
   warehouseName?: string | null
 }
 
@@ -315,14 +314,14 @@ export const weightTicketFormSchema = z.object({
     .min(2, 'กรอกทะเบียนรถ')
     .max(24, 'ทะเบียนรถยาวเกินไป')
     .regex(/^[\p{L}\p{M}\p{N}\s.-]+$/u, 'ทะเบียนรถมีรูปแบบไม่ถูกต้อง'),
-  warehouseId: z.preprocess(blankToEmpty, z.string().max(80).default('')),
+  warehouseName: z.string().trim().max(100, 'ชื่อโกดังยาวเกินไป').optional().nullable(),
 }).superRefine((value, ctx) => {
   if (value.type === 'WTI') {
-    if (!value.warehouseId) {
+    if (!value.warehouseName || value.warehouseName.trim().length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'เลือกคลัง',
-        path: ['warehouseId'],
+        message: 'กรอกโกดัง',
+        path: ['warehouseName'],
       })
     }
   }
@@ -523,7 +522,6 @@ export const weightTicketRecordSchema = z.object({
   vehicleImageCount: z.number().int().nonnegative(),
   vehicleImageNames: z.array(z.string()),
   vehicleNo: z.string(),
-  warehouseId: z.string().optional().nullable(),
   warehouseName: z.string().optional().nullable(),
 })
 

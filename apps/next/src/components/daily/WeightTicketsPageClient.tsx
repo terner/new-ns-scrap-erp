@@ -61,7 +61,6 @@ type FormState = {
   type: WeightTicketType
   vehicleImageFiles: AttachmentPreview[]
   vehicleNo: string
-  warehouseId: string
   warehouseName: string
 }
 
@@ -70,7 +69,6 @@ type WeightTicketOptionsPayload = {
   customers?: Array<{ branchIds?: string[]; code?: string | null; id: string; name: string }>
   impurities?: Array<{ id: string; label: string }>
   suppliers?: Array<{ branchIds?: string[]; code?: string | null; id: string; name: string }>
-  warehouses?: Array<{ branchId: string; code: string; id: string; name: string; type: string }>
 }
 
 type WeightTicketProductsPayload = {
@@ -114,7 +112,6 @@ function initialForm(type: WeightTicketType = 'WTI'): FormState {
     type,
     vehicleImageFiles: [],
     vehicleNo: '',
-    warehouseId: '',
     warehouseName: '',
   }
 }
@@ -126,7 +123,7 @@ function hasEnteredTicketData(form: FormState) {
     || form.remark.trim()
     || form.vehicleNo.trim()
     || form.vehicleImageFiles.length
-    || form.warehouseId
+    || form.warehouseName.trim()
     || form.lines.some((line) => (
       line.productId
       || line.grossWeight
@@ -413,7 +410,6 @@ function ticketToFormState(ticket: WeightTicketRecord): FormState {
     type: ticket.type,
     vehicleImageFiles: ticket.vehicleImageNames.map(createAttachmentPreview),
     vehicleNo: ticket.vehicleNo,
-    warehouseId: ticket.warehouseId ?? '',
     warehouseName: ticket.warehouseName ?? '',
   }
 }
@@ -507,7 +503,6 @@ export function WeightTicketsPageClient({
   const [branches, setBranches] = useState<OptionItem[]>([])
   const [suppliers, setSuppliers] = useState<OptionItem[]>([])
   const [customers, setCustomers] = useState<OptionItem[]>([])
-  const [warehouses, setWarehouses] = useState<OptionItem[]>([])
   const [products, setProducts] = useState<OptionItem[]>([])
   const [stockOptions, setStockOptions] = useState<WtoStockOptionsState>({})
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
@@ -529,10 +524,6 @@ export function WeightTicketsPageClient({
     if (!form.branchId) return []
     return options.filter((option) => option.branchIds?.includes(form.branchId))
   }, [customers, form.branchId, form.type, suppliers])
-  const headerWarehouseOptions = useMemo(() => {
-    if (!form.branchId) return []
-    return warehouses.filter((option) => option.branchIds?.includes(form.branchId))
-  }, [form.branchId, warehouses])
   const totals = useMemo(() => calculateTicketTotals(form.lines), [form.lines])
 
   const isImpurityProduct = useCallback((p: OptionItem) => {
@@ -639,14 +630,6 @@ export function WeightTicketsPageClient({
               searchText: [code, customer.name].filter(Boolean).join(' '),
             }
           }))
-          setWarehouses((data.warehouses ?? []).map((warehouse) => ({
-            branchIds: [warehouse.branchId],
-            code: warehouse.code,
-            description: [warehouse.type, warehouse.code].filter(Boolean).join(' · '),
-            id: warehouse.id,
-            label: warehouse.name,
-            searchText: `${warehouse.code} ${warehouse.name} ${warehouse.type}`,
-          })))
           setImpurities((data.impurities ?? []).filter((impurity) => !isOtherProductImpurityLabel(impurity.label)))
           void loadProducts(controller.signal)
         }
@@ -814,7 +797,7 @@ export function WeightTicketsPageClient({
     if (!form.branchId) next.branchId = 'เลือกสาขา'
     if (!form.partyId) next.partyId = form.type === 'WTI' ? 'เลือกผู้ขาย' : 'เลือกลูกค้า'
     if (form.vehicleNo.trim().length < 2) next.vehicleNo = 'กรอกทะเบียนรถ'
-    if (form.type === 'WTI' && !form.warehouseId) next.warehouseId = 'เลือกคลัง'
+    if (form.type === 'WTI' && (!form.warehouseName || form.warehouseName.trim().length === 0)) next.warehouseName = 'กรอกโกดัง'
 
     const parentLines = getMainParentLines(form.lines)
 
@@ -1210,7 +1193,7 @@ export function WeightTicketsPageClient({
       branchId: true,
       partyId: true,
       vehicleNo: true,
-      warehouseId: true,
+      warehouseName: true,
     }
     form.lines.forEach((line) => {
       nextTouched[`line-${line.id}-product`] = true
@@ -1264,7 +1247,7 @@ export function WeightTicketsPageClient({
         type: form.type,
         vehicleImageNames: form.vehicleImageFiles.map((file) => file.rawValue),
         vehicleNo: form.vehicleNo.trim(),
-        warehouseId: form.type === 'WTI' ? form.warehouseId : '',
+        warehouseName: form.warehouseName.trim() || null,
       })
       setLoadError('')
       setLoadedTicket(ticket)
@@ -1399,8 +1382,6 @@ export function WeightTicketsPageClient({
 	                      lines: current.lines.map((line) => ({ ...line, warehouseId: '', warehouseName: '', warehouseType: '' })),
 	                      partyId: currentParty ? current.partyId : '',
 	                      partyName: currentParty?.label ?? '',
-	                      warehouseId: '',
-	                      warehouseName: '',
 	                    }
 	                  })
 	                }}
@@ -1439,26 +1420,14 @@ export function WeightTicketsPageClient({
                   onChange={(event) => updateForm('vehicleNo', normalizeVehicleNo(event.target.value))}
                 />
               </FieldBlock>
-              {form.type === 'WTI' ? (
-                <SearchCombobox
-                  disabled={!form.branchId}
-                  error={showError('warehouseId')}
-                  inputId="weight-ticket-warehouse"
-                  label="คลัง*"
-                  options={headerWarehouseOptions}
-                  placeholder={!form.branchId ? 'เลือกสาขาก่อน' : 'ค้นหารหัสหรือชื่อคลัง'}
-                  value={form.warehouseId}
-                  onChange={(value) => {
-                    const warehouse = headerWarehouseOptions.find((option) => option.id === value)
-                    markTouched('warehouseId')
-                    setForm((current) => ({
-                      ...current,
-                      warehouseId: value,
-                      warehouseName: warehouse?.label ?? '',
-                    }))
-                  }}
+              <FieldBlock error={showError('warehouseName')} label={form.type === 'WTI' ? "โกดัง*" : "โกดัง"}>
+                <Input
+                  placeholder="เช่น โกดัง A"
+                  value={form.warehouseName}
+                  onBlur={() => markTouched('warehouseName')}
+                  onChange={(event) => updateForm('warehouseName', event.target.value)}
                 />
-              ) : null}
+              </FieldBlock>
               <FieldBlock label="รูปภาพรถส่งของ">
                 <AttachmentProfileGrid
                   id="weight-vehicle-images"
