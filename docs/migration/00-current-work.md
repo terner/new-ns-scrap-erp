@@ -3015,4 +3015,5 @@ Tailwind dependency check:
   - Existing Data URL rows remain readable as migration-boundary legacy data so historical WTI/WTO evidence and PDF/LINE output do not break. New uploads do not use that legacy encoding.
   - What is what: Supabase Storage owns image bytes; WTI/WTO transaction rows own references to evidence used by the document.
   - Why it has to be like this: embedding image bytes in PostgreSQL arrays inflates request bodies, transaction rows, backups, and notification work. A Storage reference keeps the transaction contract small while preserving the current document/PDF/LINE read flow.
+  - The reusable attachment grid and its attachment preview contract were extracted from the large create/edit page into `WeightTicketAttachmentGrid.tsx`. This is a behavior-preserving first split that keeps image UI and accepted file types owned by the attachment module.
   - Why it has to be like this: saving incomplete field data must not create billing workload, snapshot outbound cost, or notify external LINE recipients before the responsible user confirms the physical receipt/delivery.
