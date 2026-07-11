@@ -19,11 +19,8 @@ export type AppAuthContext = {
     email: string | null
     id: bigint
     mustChangePassword: boolean
-    username: string
   } | null
   authUser: User
-  fallbackRole: string | null
-  isAdmin: boolean
   permissionCodes: Set<string>
   roles: AppRoleSummary[]
 }
@@ -36,10 +33,6 @@ export class AuthContextError extends Error {
     this.name = 'AuthContextError'
     this.status = status
   }
-}
-
-function metadataRole(user: User) {
-  return String(user.app_metadata?.role ?? user.user_metadata?.role ?? '').toLowerCase() || null
 }
 
 function serializeInternalId(value: bigint | null | undefined) {
@@ -67,6 +60,11 @@ const appUserAuthInclude = {
           },
         },
       },
+    },
+  },
+  app_user_permission_overrides: {
+    include: {
+      app_permissions: true,
     },
   },
 } as const
@@ -98,14 +96,20 @@ function buildAppUserContext(appUser: AppUserWithAuth | null, user: User): AppAu
       .filter((permission) => permission.active)
       .map((permission) => permission.code)),
   )
+  for (const override of appUser.app_user_permission_overrides) {
+    if (!override.app_permissions.active) continue
+    if (override.effect === 'deny') {
+      permissionCodes.delete(override.app_permissions.code)
+    } else if (override.effect === 'allow') {
+      permissionCodes.add(override.app_permissions.code)
+    }
+  }
   const roleSummaries = roles.map((role) => ({
     branchScope: role.branch_scope,
     code: role.code,
     id: role.id,
     name: role.name,
   }))
-  const isAdmin = roleSummaries.some((role) => role.code === 'admin' || role.code === 'owner')
-
   return {
     appUser: {
       active: appUser.active,
@@ -114,11 +118,8 @@ function buildAppUserContext(appUser: AppUserWithAuth | null, user: User): AppAu
       email: appUser.email,
       id: appUser.id,
       mustChangePassword: appUser.must_change_password,
-      username: appUser.username,
     },
     authUser: user,
-    fallbackRole: null,
-    isAdmin,
     permissionCodes,
     roles: roleSummaries,
   }
@@ -188,30 +189,11 @@ export async function getCurrentAuthContext(): Promise<AppAuthContext> {
     }
   }
 
-  const legacyProfile = await prisma.user_profiles.findUnique({
-    where: {
-      user_id: user.id,
-    },
-  })
-  const fallbackRole = String(legacyProfile?.role ?? metadataRole(user) ?? '').toLowerCase() || null
-  const isActive = legacyProfile?.active !== false
-
-  if (!isActive) {
-    throw new AuthContextError('บัญชีนี้ถูกปิดใช้งาน', 403)
-  }
-
-  return {
-    appUser: null,
-    authUser: user,
-    fallbackRole,
-    isAdmin: fallbackRole === 'admin' || fallbackRole === 'owner',
-    permissionCodes: new Set(),
-    roles: fallbackRole ? [{ branchScope: 'all', code: fallbackRole, id: null, name: fallbackRole }] : [],
-  }
+  throw new AuthContextError('ไม่พบข้อมูลผู้ใช้งานในระบบ', 403)
 }
 
 export function hasPermission(context: AppAuthContext, permissionCode: string) {
-  return context.isAdmin || context.permissionCodes.has(permissionCode)
+  return context.permissionCodes.has(permissionCode)
 }
 
 export function requirePermission(context: AppAuthContext, permissionCode: string) {
@@ -224,14 +206,10 @@ export function getBranchCodeIntersection(
   context: AppAuthContext,
   requestedBranchCode?: string | null
 ): string[] | null {
-  if (context.isAdmin) {
-    if (requestedBranchCode && requestedBranchCode !== 'all') {
-      return [requestedBranchCode]
-    }
-    return null
-  }
-
   const allowedCodes = context.appUser?.branchIds ?? []
+  if (!allowedCodes.length) {
+    return requestedBranchCode && requestedBranchCode !== 'all' ? [requestedBranchCode] : null
+  }
   if (requestedBranchCode && requestedBranchCode !== 'all') {
     if (allowedCodes.includes(requestedBranchCode)) {
       return [requestedBranchCode]
@@ -263,8 +241,6 @@ export function serializeAuthContext(context: AppAuthContext) {
       id: context.authUser.id,
     },
     email: context.authUser.email,
-    fallbackRole: context.fallbackRole,
-    isAdmin: context.isAdmin,
     mustChangePassword: context.appUser?.mustChangePassword ?? false,
     permissions: Array.from(context.permissionCodes).sort(),
     roles: context.roles.map((role) => ({
@@ -274,7 +250,7 @@ export function serializeAuthContext(context: AppAuthContext) {
     user: context.appUser
       ? {
         displayName: context.appUser.displayName,
-        username: context.appUser.username,
+        email: context.appUser.email,
       }
       : null,
   }
