@@ -187,12 +187,20 @@ function lmeBaseByMetalGroup(metalGroup: string, config: LmeConfig | null) {
   return 0
 }
 
-function getPlanStatus(value: unknown): 'locked' | 'pending' {
-  return text(value).toLowerCase().includes('lock') ? 'locked' : 'pending'
+function getPlanStatus(value: unknown): 'locked' | 'pending' | 'po_created' {
+  const normalized = text(value).toLowerCase()
+  if (normalized.includes('po_created')) return 'po_created'
+  return normalized.includes('lock') ? 'locked' : 'pending'
 }
 
 function getPlanStatusLabel(value: unknown) {
-  return getPlanStatus(value) === 'locked' ? 'Locked %' : 'Pending'
+  const status = getPlanStatus(value)
+  if (status === 'po_created') return 'PO Created'
+  return status === 'locked' ? 'Locked %' : 'Pending'
+}
+
+function canOpenPoSell(value: unknown) {
+  return getPlanStatus(value) === 'locked'
 }
 
 function dateTime(value: string | null | undefined) {
@@ -265,14 +273,13 @@ export function SalesPlanPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [isFetchingLive, setIsFetchingLive] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
+  const [isSavingPlan, setIsSavingPlan] = useState(false)
   const [isPlanFormOpen, setIsPlanFormOpen] = useState(false)
   const [month, setMonth] = useState('')
   const [filterGroup, setFilterGroup] = useState('')
   const [filterChannel, setFilterChannel] = useState('')
   const [lmeForm, setLmeForm] = useState<LmeConfig | null>(null)
   const [planDraftError, setPlanDraftError] = useState<string | null>(null)
-  const [localPlanRows, setLocalPlanRows] = useState<AnyRow[]>([])
-  const [planStatusOverrides, setPlanStatusOverrides] = useState<Record<string, 'locked' | 'pending'>>({})
   const [planDraftForm, setPlanDraftForm] = useState<SalesPlanDraftForm>({
     channel: 'export',
     containers: '1',
@@ -330,22 +337,52 @@ export function SalesPlanPageClient() {
   const filteredServerPlanRows = useMemo(() => (data?.planRows ?? [])
     .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
     .filter((row) => !filterChannel || text(row.channel) === filterChannel), [data?.planRows, filterChannel, filterGroup])
-  const filteredLocalPlanRows = useMemo(() => localPlanRows
-    .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
-    .filter((row) => !filterChannel || text(row.channel) === filterChannel), [filterChannel, filterGroup, localPlanRows])
-  const mergedPlanRows = useMemo(() => [...filteredLocalPlanRows, ...filteredServerPlanRows], [filteredLocalPlanRows, filteredServerPlanRows])
-  const planRowsWithStatus = useMemo<AnyRow[]>(() => mergedPlanRows.map((row) => {
-    const rowId = text(row.id)
-    const status = planStatusOverrides[rowId] ?? getPlanStatus(row.status)
+  const planRowsWithStatus = useMemo<AnyRow[]>(() => filteredServerPlanRows.map((row) => {
+    const status = getPlanStatus(row.status)
     return {
       ...row,
-      poSell: status === 'locked' ? 'ready' : 'pending',
+      poSell: status === 'po_created' ? text(row.poSell) : status === 'locked' ? 'ready' : 'pending',
       status,
       statusLabel: getPlanStatusLabel(status),
     }
-  }), [mergedPlanRows, planStatusOverrides])
-  const pendingSaleRows = useMemo(() => (data?.pendingSaleTable ?? [])
-    .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup)), [data?.pendingSaleTable, filterGroup])
+  }), [filteredServerPlanRows])
+  const pendingSaleRows = useMemo<AnyRow[]>(() => {
+    const bestPlanByProduct = new Map<string, { price: number; pct: number }>()
+    planRowsWithStatus.forEach((plan) => {
+      const price = num(plan.sellPrice)
+      const pct = num(plan.sellPctLme)
+      if (price <= 0 || pct <= 0) return
+      const keys = [text(plan.productId), text(plan.productCode)].map((key) => key.trim().toLowerCase()).filter(Boolean)
+      keys.forEach((key) => {
+        const current = bestPlanByProduct.get(key)
+        if (!current || price > current.price) bestPlanByProduct.set(key, { pct, price })
+      })
+    })
+
+    return (data?.pendingSaleTable ?? [])
+      .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
+      .map((row): AnyRow => {
+        const plan = bestPlanByProduct.get(text(row.productCode).trim().toLowerCase()) ?? bestPlanByProduct.get(text(row.productId).trim().toLowerCase())
+        if (!plan) return { ...row, bestPlanPct: 0, bestPlanPrice: 0, projectedMarginPct: 0, projectedProfit: 0 }
+
+        const poolCost = num(row.avgPrice)
+        const pendingQty = num(row.pendingSaleQty)
+        const projectedProfit = pendingQty * (plan.price - poolCost)
+        return {
+          ...row,
+          bestPlanPct: plan.pct,
+          bestPlanPrice: plan.price,
+          projectedMarginPct: poolCost > 0 ? ((plan.price - poolCost) / poolCost) * 100 : 0,
+          projectedProfit,
+        }
+      })
+      .sort((left, right) => {
+        const leftHasPlan = num(left.bestPlanPrice) > 0 && num(left.bestPlanPct) > 0
+        const rightHasPlan = num(right.bestPlanPrice) > 0 && num(right.bestPlanPct) > 0
+        if (leftHasPlan !== rightHasPlan) return leftHasPlan ? -1 : 1
+        return num(right.pendingSaleQty) - num(left.pendingSaleQty)
+      })
+  }, [data?.pendingSaleTable, filterGroup, planRowsWithStatus])
   const pendingSaleTotals = useMemo(() => ({
     count: pendingSaleRows.length,
     shortageCount: pendingSaleRows.filter((row) => num(row.realPendingSale) < 0).length,
@@ -396,7 +433,7 @@ export function SalesPlanPageClient() {
     downloadCsv(
       `sales_plan_${month || data?.filters.month || 'current'}.csv`,
       ['Month', 'Product', 'ช่องทาง', 'Customer', 'Containers', 'Kg/ตู้', 'รวม กก.', '% LME', 'LME (USD/MT)', 'FX', 'ราคาขาย (THB/kg)', 'สถานะ'],
-      mergedPlanRows.map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
+      planRowsWithStatus.map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
     )
   }
 
@@ -495,18 +532,9 @@ export function SalesPlanPageClient() {
     setPlanDraftError(null)
   }
 
-  function removeLocalPlanRow(rowId: string) {
-    setLocalPlanRows((rows) => rows.filter((row) => text(row.id) !== rowId))
-    setPlanStatusOverrides((current) => {
-      const next = { ...current }
-      delete next[rowId]
-      return next
-    })
-  }
-
   function openPoSellForRow(rowId: string) {
     if (typeof window === 'undefined') return
-    const params = new URLSearchParams({ source: 'sales-plan', salesPlanRowId: rowId })
+    const params = new URLSearchParams({ source: 'sales-plan', salesPlanId: rowId })
     window.location.assign(`/sales/po-sell?${params.toString()}`)
   }
   function openPlanForm() {
@@ -514,11 +542,42 @@ export function SalesPlanPageClient() {
     setIsPlanFormOpen(true)
   }
 
-  function handlePlanStatusChange(rowId: string, nextStatus: 'locked' | 'pending') {
-    setPlanStatusOverrides((current) => ({ ...current, [rowId]: nextStatus }))
+  function handleDraftProductChange(productCode: string) {
+    const product = productOptions.find((option) => option.code === productCode)
+    setPlanDraftForm((current) => ({
+      ...current,
+      lmeCf: product ? String(lmeBaseByMetalGroup(product.metalGroup, lmeForm)) : '',
+      productCode,
+    }))
   }
 
-  function addDraftPlan() {
+  function handleDraftCustomerChange(customerCode: string) {
+    const customer = customerOptions.find((option) => option.code === customerCode)
+    setPlanDraftForm((current) => ({
+      ...current,
+      customerCode: customer?.code ?? '',
+      customerName: customer?.name ?? '',
+    }))
+  }
+
+  async function handlePlanStatusChange(rowId: string, nextStatus: 'locked' | 'pending') {
+    if (nextStatus !== 'locked') return
+    setPlanDraftError(null)
+    setIsSavingPlan(true)
+    try {
+      await dailyFetchJson<{ planRow: AnyRow }>('/api/sales-plan', {
+        body: JSON.stringify({ action: 'lock-plan', planId: rowId }),
+        method: 'POST',
+      })
+      await loadSalesPlan()
+    } catch (caught) {
+      setPlanDraftError(caught instanceof Error ? caught.message : 'ล็อกแผนขายไม่ได้')
+    } finally {
+      setIsSavingPlan(false)
+    }
+  }
+
+  async function addDraftPlan() {
     if (!selectedDraftProduct) {
       setPlanDraftError('เลือกสินค้า')
       return
@@ -536,29 +595,33 @@ export function SalesPlanPageClient() {
       return
     }
 
-    const projectedProfit = draftTotalKg * (draftSellPrice - selectedDraftProduct.wac)
-    const projectedMarginPct = draftSellPrice > 0 ? ((draftSellPrice - selectedDraftProduct.wac) / draftSellPrice) * 100 : 0
-    setLocalPlanRows((rows) => [{
-      channel: planDraftForm.channel,
-      containers: draftContainers,
-      customerId: `draft:${Date.now()}`,
-      customerName: planDraftForm.customerName.trim(),
-      fx: draftFx,
-      id: `draft:${Date.now()}:${selectedDraftProduct.code}`,
-      kgPerContainer: draftKgPerContainer,
-      lme: draftLme,
-      metalGroup: selectedDraftProduct.metalGroup,
-      productId: selectedDraftProduct.code,
-      productName: selectedDraftProduct.name,
-      projectedMarginPct,
-      projectedProfit,
-      sellPctLme: draftSellPct,
-      sellPrice: draftSellPrice,
-      status: 'pending',
-      totalKg: draftTotalKg,
-    }, ...rows])
-    resetPlanDraftForm()
-    setIsPlanFormOpen(false)
+    setIsSavingPlan(true)
+    setPlanDraftError(null)
+    try {
+      await dailyFetchJson<{ planRow: AnyRow }>('/api/sales-plan', {
+        body: JSON.stringify({
+          action: 'create-plan',
+          plan: {
+            channelCode: planDraftForm.channel,
+            containers: draftContainers,
+            customerCode: planDraftForm.customerCode,
+            kgPerContainer: draftKgPerContainer,
+            lmeCf: draftLmeCf,
+            planMonth: month || data?.filters.month || new Date().toISOString().slice(0, 7),
+            productCode: selectedDraftProduct.code,
+            sellPctLme: draftSellPct,
+          },
+        }),
+        method: 'POST',
+      })
+      resetPlanDraftForm()
+      setIsPlanFormOpen(false)
+      await loadSalesPlan()
+    } catch (caught) {
+      setPlanDraftError(caught instanceof Error ? caught.message : 'บันทึกแผนขายไม่ได้')
+    } finally {
+      setIsSavingPlan(false)
+    }
   }
 
   return (
@@ -686,8 +749,13 @@ export function SalesPlanPageClient() {
                 <button className="h-10 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700" onClick={addDraftPlan} type="button">เพิ่มเข้าตาราง</button>
               </div>
             </div>
-          </div>
-        ) : null}
+            <DialogFooter className="shrink-0">
+              <button className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={resetPlanDraftForm} type="button">ล้างฟอร์ม</button>
+              <button className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setIsPlanFormOpen(false)} type="button">ยกเลิก</button>
+              <button className="h-10 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSavingPlan} onClick={addDraftPlan} type="button">{isSavingPlan ? 'กำลังบันทึก...' : 'เพิ่มเข้าตาราง'}</button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Desktop view */}
         {planResize.hasCustomWidths ? (
@@ -732,23 +800,24 @@ export function SalesPlanPageClient() {
                   <td className="p-1.5 text-right text-xs text-slate-400 font-medium">{money(row.fx)}</td>
                   <td className="bg-emerald-50/20 p-1.5 text-right font-bold text-emerald-600">{money(row.sellPrice)}</td>
                   <td className="p-1.5 text-center">
-                    {getPlanStatus(row.status) === 'locked' ? (
+                    {canOpenPoSell(row.status) ? (
                       <button className="inline-flex h-8 items-center justify-center rounded-md bg-violet-600 px-3 text-xs font-semibold text-white hover:bg-violet-700" onClick={() => openPoSellForRow(text(row.id))} type="button">เปิด PO ขาย</button>
+                    ) : getPlanStatus(row.status) === 'po_created' ? (
+                      <span className="text-xs font-semibold text-violet-600">{text(row.poSell) || 'เปิด PO แล้ว'}</span>
                     ) : (
                       <span className="text-xs font-semibold text-slate-400">รอล็อก</span>
                     )}
                   </td>
                   <td className="p-1.5 text-center">
                     <div className="flex flex-col items-center gap-1.5">
-                      {getPlanStatus(row.status) === 'locked' ? (
+                      {getPlanStatus(row.status) !== 'pending' ? (
                         <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{getPlanStatusLabel(row.status)}</span>
                       ) : (
                         <>
                           <span className="inline-flex rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Pending</span>
-                          <button className="inline-flex h-8 items-center justify-center rounded-md bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-600" onClick={() => handlePlanStatusChange(text(row.id), 'locked')} type="button">Lock %</button>
+                          <button className="inline-flex h-8 items-center justify-center rounded-md bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSavingPlan} onClick={() => handlePlanStatusChange(text(row.id), 'locked')} type="button">Lock %</button>
                         </>
                       )}
-                      {text(row.id).startsWith('draft:') ? <button className="text-xs font-semibold text-rose-500 hover:text-rose-600" onClick={() => removeLocalPlanRow(text(row.id))} type="button">ลบ</button> : null}
                     </div>
                   </td>
                 </tr>
@@ -794,19 +863,21 @@ export function SalesPlanPageClient() {
               </div>
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-400 font-semibold">สถานะ:</span>
-                {getPlanStatus(row.status) === 'locked' ? (
+                {getPlanStatus(row.status) !== 'pending' ? (
                   <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{getPlanStatusLabel(row.status)}</span>
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Pending</span>
-                    <button className="inline-flex h-8 items-center justify-center rounded-md bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-600" onClick={() => handlePlanStatusChange(text(row.id), 'locked')} type="button">Lock %</button>
+                    <button className="inline-flex h-8 items-center justify-center rounded-md bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSavingPlan} onClick={() => handlePlanStatusChange(text(row.id), 'locked')} type="button">Lock %</button>
                   </div>
                 )}
               </div>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-400 font-semibold">PO ขาย:</span>
-                {getPlanStatus(row.status) === 'locked' ? (
+                {canOpenPoSell(row.status) ? (
                   <button className="inline-flex h-8 items-center justify-center rounded-md bg-violet-600 px-3 text-xs font-semibold text-white hover:bg-violet-700" onClick={() => openPoSellForRow(text(row.id))} type="button">เปิด PO ขาย</button>
+                ) : getPlanStatus(row.status) === 'po_created' ? (
+                  <span className="text-xs font-semibold text-violet-600">{text(row.poSell) || 'เปิด PO แล้ว'}</span>
                 ) : (
                   <span className="text-xs font-semibold text-slate-400">รอล็อก</span>
                 )}
