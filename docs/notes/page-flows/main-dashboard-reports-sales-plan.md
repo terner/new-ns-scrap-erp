@@ -4,7 +4,7 @@ tags:
   - page-flow
   - menu
 status: accepted-baseline
-updated: 2026-07-10
+updated: 2026-07-11
 route: /sales-plan
 ---
 
@@ -31,7 +31,8 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 
 - ช่วยวางแผนขาย/LME ก่อนสร้าง commitment หรือ stock issue
 - รองรับการแก้ `LME Reference Pricing` บนหน้าเดียวกันเพื่อใช้คำนวณ Sales Plan
-- รองรับการเพิ่ม `draft plan` บนหน้าจอเพื่อจำลองแผนขายและเห็นตัวเลขในตารางทันที
+- รองรับการเพิ่ม Sales Plan ลงตาราง `sales_plans` เพื่อให้ refresh/reopen แล้วยังอยู่
+- ช่องทางขายในฟอร์มต้องใช้ `sales_channels.code` จาก master data โดยตรง เพื่อให้รหัสที่บันทึกตรงกับ foreign key ของแผนขาย
 - แสดง locked/approved plan state ถ้ามี
 - แสดง read model/report ตาม filter ของหน้า
 - ให้เลือกตารางวิเคราะห์ผู้บริหารหรือสต๊อกว่างขายคงเหลือผ่าน line tabs เพื่อแสดงทีละรายการ
@@ -44,8 +45,8 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 
 ## Non-Responsibilities
 
-- draft plan ที่ผู้ใช้เพิ่มบนหน้าไม่ถือเป็น persisted transaction
-- ไม่สร้างหรือแก้ business transaction ต้นทาง เช่น PO Sell / Sales Bill / Stock Issue
+- Sales Plan ไม่ตัด stock และไม่สร้าง AR จนกว่าจะเปิดเอกสารขายปลายทาง
+- ไม่สร้างหรือแก้ Sales Bill / Stock Issue
 - ไม่เขียน stock_ledger หรือ bank_statement
 - ไม่เปลี่ยนสถานะเอกสารต้นทาง
 - ไม่เป็น source of truth แทนเอกสาร/fact table ต้นทาง
@@ -57,7 +58,7 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 | 1 | เปิดหน้า | โหลด read model จาก Current API |
 | 2 | แก้ค่า LME / FX / กก./ตู้ | ระบบใช้ค่าหน้า `LME Reference Pricing` เป็นฐานคำนวณทั้งหน้า |
 | 3 | กด `Fetch Live` | ดึงค่า live มาเติมฟอร์มเฉพาะ field ที่รองรับ แล้วผู้ใช้กดบันทึกอีกครั้งถ้าต้องการใช้จริง |
-| 4 | กด `+ เพิ่มแผน` | เปิด draft form เพื่อจำลองรายการแผนขายบนหน้าจอ |
+| 4 | กด `+ เพิ่มแผน` | เปิดฟอร์มเพิ่มแผน แล้วบันทึกลง `sales_plans` เป็นสถานะ `draft` |
 | 5 | กรองข้อมูล | apply filter/date/search/sort ฝั่ง API หรือ client ตาม contract |
 | 6 | ตรวจรายละเอียด | drilldown ไป source document/report ที่เกี่ยวข้อง |
 | 7 | Export/print | ส่งออกข้อมูลตาม filter ปัจจุบันโดยไม่แก้ source |
@@ -70,6 +71,14 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 - `POST /api/sales-plan`
   - `action = fetch-live`
   - `action = save-config`
+  - `action = create-plan`
+  - `action = lock-plan`
+
+### Persistence Tables
+
+- `public.sales_plans` เก็บแผนขายรายเดือน, สินค้า, ลูกค้า, ช่องทาง, ตู้/กก., `LME cf`, `FX`, `% LME`, ราคา THB/kg, สถานะ, และ link กลับ `po_sells`
+- สถานะหลัก: `draft` -> `locked` -> `po_created`
+- `po_sell_id` ถูกเติมเมื่อสร้าง PO Sell จากแผนสำเร็จเท่านั้น
 
 ## LME Reference Pricing
 
@@ -101,12 +110,12 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 - หลังบันทึก หน้า Sales Plan ต้อง reload/read ใหม่ด้วยค่า config ล่าสุด
 - ต้องแสดง `updatedAt`, `updatedBy`, และ `source` ของ config ที่ใช้งานอยู่
 
-## Draft Plan Entry Form
+## Sales Plan Entry Form
 
 ### Purpose
 
-- ใช้จำลองการวางแผนขายบนหน้าจอโดยยังไม่ commit ลง source transaction
-- ช่วยให้ผู้ใช้เห็นตัวเลขในตารางวางแผนและ KPI รวมทันที
+- ใช้บันทึกการวางแผนขายลงฐานข้อมูลก่อนเปิด PO Sell
+- ช่วยให้ผู้ใช้เห็นตัวเลขในตารางวางแผนและ KPI รวมทันทีหลัง API reload
 
 ### Form Fields
 
@@ -152,17 +161,16 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 
 ### Add-To-Table Behavior
 
-- ปุ่ม `เพิ่มเข้าตาราง` สร้าง row สถานะ `Draft`
-- row draft ถูกเก็บใน local client state ของหน้าเท่านั้น
-- row draft ต้องถูก merge กับ `planRows` จาก server เพื่อแสดงในตารางวางแผนและใช้คำนวณ KPI สรุปด้านบน
-- การ refresh หน้า / reload browser ทำให้ draft ที่ยังไม่ persisted หายได้
+- ปุ่ม `เพิ่มเข้าตาราง` เรียก `POST /api/sales-plan` ด้วย `action = create-plan`
+- server validate สินค้า/ลูกค้า/ช่องทางจาก Master Data และคำนวณ `totalKg` กับ `sellPrice`
+- หลังบันทึก หน้า reload `GET /api/sales-plan`; refresh/reopen browser ต้องยังเห็นข้อมูลจาก `sales_plans`
+- แผนเริ่มที่สถานะ `draft` และต้องกด `Lock %` ก่อนเปิด PO Sell
 
 ### Current Limitation
 
-- `ลูกค้า` ยังเป็น free text ไม่ได้ lookup/select จาก Master Customer
-- draft plan ยังไม่มี document number หรือ persisted identifier ฝั่ง database
-- ยังไม่มี workflow `lock/unlock`, approval, หรือ trace กลับไป `PO Sell` / `Sales Bill`
-- export ปัจจุบันรวม row draft ที่อยู่บนหน้าจอร่วมกับ row จาก server
+- ยังไม่มี unlock/cancel UI สำหรับ Sales Plan
+- ยังไม่มี approval workflow แยกจาก `Lock %`
+- stock reservation ยังเกิดจาก PO Sell/Sales Bill flow ไม่ใช่จาก Sales Plan draft
 
 ### Data Contract
 
@@ -174,7 +182,7 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 ## Validation / Status Rules
 
 - plan ที่ lock แล้วต้อง trace ไป POS/SB ได้
-- row draft ต้องถูกติดสถานะ `Draft` ชัดเจนและแยกจาก row ที่ persisted
+- row `draft` ต้องถูกติดสถานะ `Pending` ชัดเจน
 - ยังไม่ใช่ stock/AR movement
 - ตัวเลขต้อง reconcile กับ source facts ที่ระบุ
 - filter/export ต้องใช้ condition ชุดเดียวกับตาราง
@@ -185,23 +193,24 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 
 - `save-config` เปลี่ยนเฉพาะ config สำหรับคำนวณหน้า Sales Plan
 - `fetch-live` เปลี่ยนเฉพาะค่าที่อยู่ในฟอร์มบนหน้า จนกว่าจะกดบันทึก
-- `add draft plan` เปลี่ยนเฉพาะ local client state ของหน้า
+- `create-plan` เพิ่มแถวใน `sales_plans` เท่านั้น ยังไม่ตัด stock
+- `lock-plan` เปลี่ยนสถานะ `sales_plans` จาก `draft` เป็น `locked`
+- การสร้าง PO Sell จาก Sales Plan บันทึก `po_sells` และ update `sales_plans.po_sell_id/status = po_created` ใน transaction เดียวกัน
 - export/print/report generation ไม่ mutate source data
 
 ## Current Code Baseline
 
-- Current `apps/next` page/API code is accepted as the P2 proof baseline as of 2026-06-11.
-- This page is primarily a read-model/report surface, but current runtime also supports page-level `LME config` editing and local `draft plan` simulation.
-- Current APIs are `GET /api/sales-plan` and `POST /api/sales-plan` for LME config actions.
+- Current `apps/next` page/API code is accepted as the Sales Plan persistence baseline as of 2026-07-11.
+- This page is a read-model/report surface plus Sales Plan persistence surface for create/lock before PO Sell.
+- Current APIs are `GET /api/sales-plan`, `GET /api/sales-plan?planId=...`, and `POST /api/sales-plan` for LME config plus Sales Plan actions.
 - No transaction, stock ledger, bank statement, AP/AR settlement, or source document status side effect is expected from this page.
 - Future changes should reconcile formula/source/cutoff details here before changing runtime behavior.
 
 ## Current Gap
 
-- ฟอร์ม `เพิ่มแผนขาย` ยังเป็น draft-only และยังไม่ persisted
-- `ลูกค้า` ยังเป็น text input แทน master lookup
-- ยังไม่มี lock/approval flow และ source trace ไป `PO Sell` / `Sales Bill`
-- ถ้าจะเปลี่ยนจาก draft-on-screen ไปเป็น persisted plan ต้องออกแบบ schema, permission, audit trail, และ reconcile rule เพิ่ม
+- ยังไม่มี unlock/cancel แผนขาย
+- ยังไม่มี approval workflow แยกจากปุ่ม `Lock %`
+- ยังไม่มี browser QA รอบนี้
 
 ## Implementation Checklist
 
@@ -211,6 +220,6 @@ sales plan/LME planning ก่อน PO Sell/stock issue
 - [ ] Verify legacy formula if current implementation is incomplete
 - [ ] Define drilldown route/source document links
 - [ ] Confirm export/print and date cutoff behavior
-- [ ] Decide whether customer field stays free text or changes to master lookup
-- [ ] Decide persistence model for draft plan / lock plan
+- [x] Decide whether customer field stays free text or changes to master lookup
+- [x] Decide persistence model for draft plan / lock plan
 - [ ] Update this file when report formula changes

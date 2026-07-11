@@ -6,6 +6,7 @@ import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { getSalesPlanLmeConfig, type SalesPlanLmeConfig } from './sales-plan-lme'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
+import { listSalesPlans } from './sales-plans'
 
 type JsonItem = Prisma.JsonObject
 
@@ -187,11 +188,12 @@ function poSellItems(row: { items: unknown; product_id: bigint | null; qty: unkn
 async function buildSalesPlanningSnapshot() {
   const config = await getSalesPlanLmeConfig()
   const { byKey, refs } = await productsContext()
-  const [poSells, poBuys, stockRows, customers, tradingDeals, purchaseBills] = await Promise.all([
+  const [poSells, poBuys, stockRows, customers, salesChannels, tradingDeals, purchaseBills] = await Promise.all([
     prisma.po_sells.findMany({ include: { customers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000 }),
     prisma.po_buys.findMany({ orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000 }),
     prisma.stock_ledger.findMany({ orderBy: [{ date: 'desc' }], take: 50000 }),
     prisma.customers.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    prisma.sales_channels.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, code: true, id: true, name: true }, where: { active: true } }),
     prisma.trading_deals.findMany({ orderBy: [{ date: 'desc' }], take: 10000, where: { NOT: { status: { in: ['Cancelled', 'cancelled'] } } } }),
     prisma.purchase_bills.findMany({ include: { purchase_bill_items: { orderBy: { line_no: 'asc' }, where: { item_status: 'active' } } }, orderBy: [{ date: 'desc' }], take: 10000, where: { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] } } }),
   ])
@@ -420,6 +422,10 @@ async function buildSalesPlanningSnapshot() {
   }
 
   return {
+    channels: salesChannels.map((channel) => {
+      const code = requireBusinessCode(channel.code, `ช่องทางขาย ${channel.id}`)
+      return { id: code, name: channel.name }
+    }),
     customers: customers.map((customer) => {
       const code = requireBusinessCode(customer.code, `ลูกค้า ${customer.id}`)
       return { active: customer.active ?? true, code, id: code, name: customer.name }
@@ -452,8 +458,16 @@ async function buildSalesPlanningSnapshot() {
 export async function buildSalesPlan() {
   const pending = await buildSalesPlanningSnapshot()
   const config = pending.lmeConfig
+  const month = new Date().toISOString().slice(0, 7)
+  const planRows = await listSalesPlans(month)
+  const lockedKgByProduct = new Map<string, number>()
+  planRows.forEach((plan) => {
+    if (!['locked', 'po_created'].includes(String(plan.status))) return
+    const key = String(plan.productId).trim().toLowerCase()
+    lockedKgByProduct.set(key, (lockedKgByProduct.get(key) ?? 0) + Number(plan.totalKg ?? 0))
+  })
   const remainRows = pending.reconciliation.map((row) => {
-    const lockedKg = 0
+    const lockedKg = lockedKgByProduct.get(row.productCode.trim().toLowerCase()) ?? 0
     const remainingKg = Math.max(0, row.stockQty - lockedKg)
     const base = lmeBaseFor(row.metalGroup, config)
     const pct = lmeBuyPercentFor(row.metalGroup)
@@ -482,9 +496,9 @@ export async function buildSalesPlan() {
 
   return {
     filters: {
-      channels: [{ id: 'export', name: 'ส่งออก' }, { id: 'domestic', name: 'ในประเทศ' }],
+      channels: pending.channels,
       metalGroups: pending.metalGroups,
-      month: new Date().toISOString().slice(0, 7),
+      month,
     },
     customers: pending.customers,
     lmeConfig: config,
@@ -508,23 +522,23 @@ export async function buildSalesPlan() {
       stockWAC: row.stockWAC,
     })),
     pendingSaleTotals: pending.pendingSaleTotals,
-    planRows: [],
+    planRows,
     productAnalysis: remainRows,
     sourceState: {
       basis: 'Sales Plan design source from current stock, WTO pending_out, and LME reference values.',
-      limitations: ['LME reference pricing บันทึกได้แล้ว แต่ Add plan, remove plan, lock/unlock price และ stock reservation ยังปิดอยู่จนกว่าจะออกแบบ persistence/audit ครบ'],
-      writeActionsEnabled: false,
+      limitations: ['บันทึกแผนขายและล็อก % ได้แล้ว การหักสต๊อกจริงจะเกิดเมื่อเปิด PO ขายจากแผน'],
+      writeActionsEnabled: true,
     },
     summary: {
       avgPctLme: remainRows.length ? remainRows.reduce((sum, row) => sum + row.bestPlanPct, 0) / remainRows.length : 0,
-      lockedContainers: 0,
-      lockedCount: 0,
-      pendingCount: 0,
-      plansCount: 0,
+      lockedContainers: planRows.filter((row) => ['locked', 'po_created'].includes(String(row.status))).reduce((sum, row) => sum + Number(row.containers ?? 0), 0),
+      lockedCount: planRows.filter((row) => ['locked', 'po_created'].includes(String(row.status))).length,
+      pendingCount: planRows.filter((row) => String(row.status) === 'draft').length,
+      plansCount: planRows.length,
       stockRemainingKg: remainRows.reduce((sum, row) => sum + row.remainingKg, 0),
       stockRemainingValue: remainRows.reduce((sum, row) => sum + row.value, 0),
-      totalContainers: 0,
-      totalKg: 0,
+      totalContainers: planRows.reduce((sum, row) => sum + Number(row.containers ?? 0), 0),
+      totalKg: planRows.reduce((sum, row) => sum + Number(row.totalKg ?? 0), 0),
       totalLockedProfit: 0,
       totalProjectedProfit: remainRows.reduce((sum, row) => sum + row.projectedProfit, 0),
     },
