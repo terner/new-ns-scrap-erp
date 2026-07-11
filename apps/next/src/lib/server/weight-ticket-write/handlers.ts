@@ -6,7 +6,6 @@ import {
   validateWtoStockAvailability,
   type WtoPreservedCostSnapshot,
 } from '@/lib/server/stock-holds'
-import { buildWeightTicketLineRows } from '@/lib/server/weight-tickets'
 
 type TxClient = Prisma.TransactionClient
 type PartyReference = {
@@ -15,7 +14,6 @@ type PartyReference = {
 } | null
 type WarehouseMap = Awaited<ReturnType<typeof resolveWtoWarehousesForLines>>
 type CreatedWeightTicketLine = Parameters<typeof createActiveWtoPendingOut>[1]['lines'][number]
-type WeightTicketLineRows = ReturnType<typeof buildWeightTicketLineRows>
 
 export function weightTicketPartySnapshot(input: {
   customer: PartyReference
@@ -46,7 +44,12 @@ export async function resolveWeightTicketWarehousesForWrite(tx: TxClient, input:
 
 export async function validateWeightTicketStockForWrite(tx: TxClient, input: {
   branchId: bigint
-  lineRows: WeightTicketLineRows
+  lineRows: Array<{
+    net_weight: Prisma.Decimal | number
+    product_id: bigint
+    product_name: string
+    warehouse_id: bigint | null
+  }>
   type: WeightTicketFormValues['type']
 }) {
   if (input.type !== 'WTO') return

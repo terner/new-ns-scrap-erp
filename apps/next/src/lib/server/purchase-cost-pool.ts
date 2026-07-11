@@ -119,10 +119,10 @@ export async function syncPurchaseBillCostPoolEntries(
       if (hasUsage) {
         throw new Error(`ไม่สามารถลบหรือยกเลิก Cost Pool ของ ${bill.doc_no} แถว ${lineKey || '-'} ได้ เพราะถูกใช้งานแล้ว`)
       }
-      if (entry.status !== 'Reversed') {
+      if (entry.status !== 'Cancelled') {
         await tx.stock_cost_pool_entries.update({
           data: {
-            status: 'Reversed',
+            status: 'Cancelled',
             updated_at: new Date(),
             updated_by: params.actor,
           },

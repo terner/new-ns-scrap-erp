@@ -19,8 +19,10 @@ export type AppAuthContext = {
     email: string | null
     id: bigint
     mustChangePassword: boolean
+    username: string
   } | null
   authUser: User
+  isAdmin: boolean
   permissionCodes: Set<string>
   roles: AppRoleSummary[]
 }
@@ -39,9 +41,15 @@ function serializeInternalId(value: bigint | null | undefined) {
   return value == null ? null : value.toString()
 }
 
-const appUserAuthInclude = {
+const appUserAuthSelect = {
+  active: true,
+  auth_user_id: true,
+  display_name: true,
+  email: true,
+  id: true,
+  must_change_password: true,
   app_user_branch_access: {
-    include: {
+    select: {
       branches: {
         select: {
           code: true,
@@ -50,12 +58,22 @@ const appUserAuthInclude = {
     },
   },
   app_user_roles: {
-    include: {
+    select: {
       app_roles: {
-        include: {
+        select: {
+          active: true,
+          branch_scope: true,
+          code: true,
+          id: true,
+          name: true,
           app_role_permissions: {
-            include: {
-              app_permissions: true,
+            select: {
+              app_permissions: {
+                select: {
+                  active: true,
+                  code: true,
+                },
+              },
             },
           },
         },
@@ -71,12 +89,24 @@ const appUserAuthInclude = {
 
 async function findAppUserWithAuth(where: Parameters<typeof prisma.app_users.findUnique>[0]['where']) {
   return prisma.app_users.findUnique({
-    include: appUserAuthInclude,
+    select: appUserAuthSelect,
     where,
   })
 }
 
 type AppUserWithAuth = NonNullable<Awaited<ReturnType<typeof findAppUserWithAuth>>>
+
+function fallbackUsername(appUser: Pick<AppUserWithAuth, 'display_name' | 'email' | 'id'>, user: User) {
+  const email = appUser.email?.trim() || user.email?.trim()
+  if (email) return email
+
+  const displayName = appUser.display_name?.trim()
+  if (displayName) {
+    return displayName.toLowerCase().replace(/\s+/g, '.')
+  }
+
+  return String(appUser.id)
+}
 
 function buildAppUserContext(appUser: AppUserWithAuth | null, user: User): AppAuthContext {
   if (!appUser) {
@@ -110,6 +140,7 @@ function buildAppUserContext(appUser: AppUserWithAuth | null, user: User): AppAu
     id: role.id,
     name: role.name,
   }))
+  const isAdmin = roleSummaries.some((role) => role.code === 'admin' || role.code === 'owner')
   return {
     appUser: {
       active: appUser.active,
@@ -118,8 +149,10 @@ function buildAppUserContext(appUser: AppUserWithAuth | null, user: User): AppAu
       email: appUser.email,
       id: appUser.id,
       mustChangePassword: appUser.must_change_password,
+      username: fallbackUsername(appUser, user),
     },
     authUser: user,
+    isAdmin,
     permissionCodes,
     roles: roleSummaries,
   }
@@ -162,38 +195,12 @@ export async function getCurrentAuthContext(): Promise<AppAuthContext> {
     throw new AuthContextError('กรุณาเข้าสู่ระบบ', 401)
   }
 
-  const appUser = await findAppUserWithAuth({
-    auth_user_id: user.id,
-  })
-
-  if (appUser) {
-    return buildAppUserContext(appUser, user)
-  }
-
-  const email = user.email?.trim()
-  if (email) {
-    const emailMatches = await prisma.app_users.findMany({
-      include: appUserAuthInclude,
-      orderBy: [{ created_at: 'desc' }],
-      take: 2,
-      where: {
-        email: {
-          equals: email,
-          mode: 'insensitive',
-        },
-      },
-    })
-
-    if (emailMatches.length === 1) {
-      return buildAppUserContext(emailMatches[0], user)
-    }
-  }
-
-  throw new AuthContextError('ไม่พบข้อมูลผู้ใช้งานในระบบ', 403)
+  const appUser = await findAppUserWithAuth({ auth_user_id: user.id })
+  return buildAppUserContext(appUser, user)
 }
 
 export function hasPermission(context: AppAuthContext, permissionCode: string) {
-  return context.permissionCodes.has(permissionCode)
+  return context.isAdmin || context.permissionCodes.has(permissionCode)
 }
 
 export function requirePermission(context: AppAuthContext, permissionCode: string) {
@@ -206,6 +213,12 @@ export function getBranchCodeIntersection(
   context: AppAuthContext,
   requestedBranchCode?: string | null
 ): string[] | null {
+  if (context.isAdmin) {
+    if (requestedBranchCode && requestedBranchCode !== 'all') {
+      return [requestedBranchCode]
+    }
+    return null
+  }
   const allowedCodes = context.appUser?.branchIds ?? []
   if (!allowedCodes.length) {
     return requestedBranchCode && requestedBranchCode !== 'all' ? [requestedBranchCode] : null
@@ -241,6 +254,7 @@ export function serializeAuthContext(context: AppAuthContext) {
       id: context.authUser.id,
     },
     email: context.authUser.email,
+    isAdmin: context.isAdmin,
     mustChangePassword: context.appUser?.mustChangePassword ?? false,
     permissions: Array.from(context.permissionCodes).sort(),
     roles: context.roles.map((role) => ({
@@ -251,6 +265,7 @@ export function serializeAuthContext(context: AppAuthContext) {
       ? {
         displayName: context.appUser.displayName,
         email: context.appUser.email,
+        username: context.appUser.username,
       }
       : null,
   }

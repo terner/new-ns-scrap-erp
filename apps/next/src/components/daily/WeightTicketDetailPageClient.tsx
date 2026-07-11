@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronLeft, ChevronRight, ClipboardList, Package2, Printer, RotateCcw, Scale, SquarePen, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Package2, Printer, RotateCcw, Scale, SquarePen, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
@@ -20,7 +20,7 @@ import {
 import { WeightTicketStockReturnDialog, type StockReturnPayload } from '@/components/daily/WeightTicketStockReturnDialog'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
-import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, type WeightTicketStatus, typeLabels, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
+import { cancelWeightTicket, confirmWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, type WeightTicketStatus, typeLabels, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
 import { getErrorMessage } from '@/lib/api-client'
 
 function formatDateTime(value?: string | null) {
@@ -36,10 +36,10 @@ function formatDateTime(value?: string | null) {
   })
 }
 
-function timelineLabel(eventKey: string, action: string) {
+function timelineLabel(eventKey: string, action: string, type: WeightTicketRecord['type']) {
   if (action === 'created') return 'สร้างเอกสาร'
   if (action === 'edited') return 'แก้ไขเอกสาร'
-  if (action === 'confirmed') return 'ยืนยันใบส่งของ'
+  if (action === 'confirmed') return type === 'WTI' ? 'ยืนยันรับของ' : 'ยืนยันส่งของ'
   if (action === 'cancelled') return 'ยกเลิกเอกสาร'
   if (action === 'status_synced') return 'ปรับสถานะปัจจุบัน'
   if (action === 'usage_status_changed') return 'เปลี่ยนสถานะจากการใช้งาน'
@@ -112,6 +112,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
   const [cancelNote, setCancelNote] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
   const [previewImage, setPreviewImage] = useState<{ fileName: string; url: string } | null>(null)
   const [isPrinting, setIsPrinting] = useState(false)
   const [canReturnStock, setCanReturnStock] = useState(false)
@@ -213,6 +214,18 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
     }
   }
 
+  async function handleConfirmTicket() {
+    if (!ticket) return
+    setIsConfirming(true)
+    try {
+      setTicket(await confirmWeightTicket(ticket.id))
+    } catch (caught) {
+      window.alert(getErrorMessage(caught, 'ยืนยันใบรับ-ส่งของไม่ได้'))
+    } finally {
+      setIsConfirming(false)
+    }
+  }
+
   async function handlePrintReceipt() {
     if (!ticket) return
     setIsPrinting(true)
@@ -265,6 +278,12 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
+          {ticket.status === 'draft' ? (
+            <Button disabled={isConfirming} type="button" onClick={() => void handleConfirmTicket()}>
+              <CheckCircle2 className="mr-2 size-4" />
+              {isConfirming ? 'กำลังยืนยัน...' : ticket.type === 'WTI' ? 'ยืนยันรับของ' : 'ยืนยันส่งของ'}
+            </Button>
+          ) : null}
           <Button disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
             <Printer className="mr-2 size-4" />
             {isPrinting ? 'กำลังเตรียมใบพิมพ์...' : ticket.type === 'WTI' ? 'พิมพ์ใบรับสินค้า' : 'พิมพ์ใบส่งของ'}
@@ -364,7 +383,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
               <div className="grid gap-4 md:grid-cols-2">
                 <DetailItem label={ticket.type === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} value={ticket.partyName} />
                 <DetailItem label="ทะเบียนรถ" value={ticket.vehicleNo} />
-                <DetailItem label="โกดัง" value={ticket.warehouseName || '-'} />
+                <DetailItem label="โกดัง" value={ticket.godownName || '-'} />
               </div>
               <div>
                 <div className="mb-2 text-sm font-semibold text-slate-500">รูปภาพรถส่งของ</div>
@@ -665,7 +684,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                   <div className={cn('absolute left-0 top-1.5 size-[18px] rounded-full border-2 bg-white', timelineDotClass(event.action))} />
                   <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-medium text-slate-900">{timelineLabel(event.eventKey, event.action)}</div>
+                      <div className="font-medium text-slate-900">{timelineLabel(event.eventKey, event.action, ticket.type)}</div>
                       <div className="text-sm text-slate-500 font-medium">{formatDateTime(event.occurredAt)}</div>
                     </div>
                     <div className="mt-1 text-sm text-slate-600">{event.actorName}</div>

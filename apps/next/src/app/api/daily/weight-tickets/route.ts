@@ -14,7 +14,7 @@ import { assertWeightTicketImpurityRules, assertWeightTicketPartyForType, Weight
 import {
   WtoPendingOutError,
 } from '@/lib/server/stock-holds'
-import { applyWeightTicketCreateSideEffects, resolveWeightTicketWarehousesForWrite, validateWeightTicketStockForWrite, weightTicketPartySnapshot } from '@/lib/server/weight-ticket-write/handlers'
+import { resolveWeightTicketWarehousesForWrite, weightTicketPartySnapshot } from '@/lib/server/weight-ticket-write/handlers'
 import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import {
   bangkokDateInput,
@@ -29,12 +29,12 @@ import {
   mapWeightTicketRow,
   nextWeightTicketDocNo,
   parseWeightTicketQuery,
+  requireWeightTicketBranchDocumentCode,
   weightTicketAuditSnapshot,
   weightTicketOrderBy,
   weightTicketWhere,
 } from '@/lib/server/weight-tickets'
 import { syncWeightTicketToGoogleSheets } from '@/lib/server/google-sheets-sync'
-import { enqueueNotificationJob, executeNotificationJob } from '@/lib/server/line-notification-jobs'
 import { applyWorksheetTableLayout, XLSX } from '@/lib/server/xlsx'
 
 export const runtime = 'nodejs'
@@ -99,7 +99,7 @@ async function buildWeightTicketWorkbook(rows: WeightTicketMappedRow[]) {
     คู่ค้า: row.partyName,
     สาขา: row.branchName,
     ทะเบียนรถ: row.vehicleNo,
-    คลัง: row.warehouseName,
+    โกดัง: row.godownName,
     น้ำหนักรวม: row.totals.grossWeight,
     หักภาชนะ: row.totals.containerDeductionWeight,
     น้ำหนักสุทธิ: row.totals.netWeight,
@@ -174,7 +174,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'daily.weight_tickets.view')
+    requirePermission(context, 'daily.weight_tickets.create')
 
     const values = weightTicketFormSchema.parse(await request.json())
     const scopedBranchIds = branchScopeIds(context)
@@ -282,7 +282,7 @@ export async function POST(request: Request) {
 
     const created = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('weight_tickets.doc_no'))`
-      const branchCode = String(branch.code ?? '').replace(/\D/g, '').slice(-2).padStart(2, '0')
+      const branchCode = requireWeightTicketBranchDocumentCode(branch.code)
       const docNo = await nextWeightTicketDocNo(tx, values.type, branchCode, documentDate)
       const partySnapshot = weightTicketPartySnapshot({ customer, supplier, type: values.type })
       const createdTicket = await tx.weight_tickets.create({
@@ -296,6 +296,7 @@ export async function POST(request: Request) {
           entered_by: enteredBy,
           container_deduction_weight: totals.containerDeductionWeight,
           gross_weight: totals.grossWeight,
+          godown_name: values.godownName,
           image_count: values.vehicleImageNames.length,
           net_weight: totals.netWeight,
           party_name: partySnapshot.partyName,
@@ -311,16 +312,7 @@ export async function POST(request: Request) {
       })
       const warehouseByCode = await resolveWeightTicketWarehousesForWrite(tx, { branchId: branch.id, lines: values.lines, type: values.type })
       const lineRows = buildWeightTicketLineRows(createdTicket.id, values, productByCode, impurityById, warehouseByCode)
-      await validateWeightTicketStockForWrite(tx, { branchId: branch.id, lineRows, type: values.type })
       const createdLines = await Promise.all(lineRows.map((data) => tx.weight_ticket_lines.create({ data })))
-      await applyWeightTicketCreateSideEffects(tx, {
-        actor,
-        branchId: branch.id,
-        createdLines,
-        documentNo: docNo,
-        type: values.type,
-        weightTicketId: createdTicket.id,
-      })
       const imageCount = values.vehicleImageNames.length + createdLines.reduce((sum, line) => sum + (line.image_count ?? 0), 0)
       const { summaryRows } = buildWeightTicketProductSummaryRows(createdTicket.id, createdLines)
       const createdSummaries = await Promise.all(summaryRows.map(({ lineIds, ...data }) => tx.weight_ticket_product_summaries.create({ data })))
@@ -337,12 +329,9 @@ export async function POST(request: Request) {
       if (bridgeRows.length) {
         await tx.weight_ticket_product_summary_lines.createMany({ data: bridgeRows })
       }
-      const warehouseName = values.warehouseName || null
-
       await tx.weight_tickets.update({
         data: { 
           image_count: imageCount,
-          warehouse_name: warehouseName,
         },
         where: { id: createdTicket.id },
       })
@@ -366,30 +355,6 @@ export async function POST(request: Request) {
     const usage = await getWeightTicketUsageCounts(prisma, created.id)
     const mapped = mapWeightTicketRow(created, usage)
     await syncWeightTicketToGoogleSheets('create', mapped)
-
-    // Trigger auto-send to LINE if enabled for specific type
-    const autoSendKey = mapped.type === 'WTI' ? 'LINE_AUTO_SEND_WTI' : 'LINE_AUTO_SEND_WTO'
-    const autoSendConfig = await prisma.system_settings.findUnique({
-      where: { key: autoSendKey },
-    })
-    if (autoSendConfig?.value === 'true') {
-      try {
-        // Auto-send: enqueue แล้ว execute ทันที (ไม่รอ worker) ตามแนวทาง A
-        const enqueueResult = await enqueueNotificationJob(mapped.documentNo, {
-          requestedBy: enteredBy,
-          force: false,
-        })
-        for (const job of enqueueResult.jobs) {
-          try {
-            await executeNotificationJob(job.id, { force: false })
-          } catch (err) {
-            console.error('[weight-ticket-auto-send] failed to execute job:', job.id, err)
-          }
-        }
-      } catch (err) {
-        console.error('[weight-ticket-auto-send] failed to enqueue LINE notification:', err)
-      }
-    }
 
     await recordAuditLog({
       action: 'create',

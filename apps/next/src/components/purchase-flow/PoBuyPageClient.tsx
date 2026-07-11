@@ -246,7 +246,8 @@ function poBuyStatusLabel(status: string) {
 }
 
 function canShortClosePoBuy(row: PoBuyRow) {
-  return poBuyStatusKey(row.status) === 'partial' && row.remainingQty > 0
+  const statusKey = poBuyStatusKey(row.status)
+  return (statusKey === 'open' || statusKey === 'partial') && row.remainingQty > 0
 }
 
 function shouldShowShortCloseButton(row: PoBuyRow) {
@@ -1091,7 +1092,7 @@ export function PoBuyPageClient() {
                     <button
                       className={`${rowWarningActionButtonClass} ml-1.5 disabled:cursor-not-allowed disabled:opacity-50`}
                       disabled={!canShortClosePoBuy(row)}
-                      title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อรับสินค้าบางส่วนแล้ว'}
+                      title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อ PO ยังไม่รับหรือรับสินค้าบางส่วน และยังมียอดคงเหลือ'}
                       type="button"
                       onClick={(event) => { event.stopPropagation(); openShortCloseDialog(row) }}
                     >
@@ -1794,7 +1795,7 @@ function PoBuyDetailModal({
               <UiButton
                 className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white"
                 disabled={!canShortClosePoBuy(row)}
-                title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อรับสินค้าบางส่วนแล้ว'}
+                title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อ PO ยังไม่รับหรือรับสินค้าบางส่วน และยังมียอดคงเหลือ'}
                 type="button"
                 variant="outline"
                 onClick={() => {

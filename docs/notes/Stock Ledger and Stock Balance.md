@@ -188,7 +188,7 @@ available_as_of = qty_as_of - pending_out_as_of
 | `GET /api/daily/weight-tickets/options` | ตรง target | เป็น page-scoped options สำหรับ branch/supplier/customer/impurity; warehouse options แยกตาม branch + product |
 | `GET /api/daily/weight-tickets/stock-options` | เพิ่มแล้ว | ส่งคลัง `RM/FG` ของสาขาและ `onHand/onHold/available` ตาม product ที่เลือก ใช้ใน WTO create/edit |
 | `GET /api/daily/weight-tickets/products` | ตรงบางส่วน | ส่ง product options พร้อม `thumbnailUrl` แล้ว; ไม่ควรส่ง stock ทุกคลังมากับ route นี้ เพราะจะหนักและขึ้นกับ branch/warehouse |
-| `POST /api/daily/weight-tickets` | ตรง target สำหรับ hold | สร้าง WTI/WTO header/line/summary ได้, WTI/WTO ไม่เขียน stock ledger เอง, WTO validate warehouse/available และสร้าง active hold |
+| `POST /api/daily/weight-tickets` | ตรง target สำหรับ draft | สร้าง WTI/WTO header/line/summary เท่านั้น, ไม่เขียน stock ledger และ WTO draft ยังไม่ validate/สร้าง active hold |
 | `PUT /api/daily/weight-tickets/{id}` | ตรง target สำหรับ hold | edit เอกสารได้เมื่อยังไม่ถูกใช้; WTO release hold เดิมและ rebuild hold ใหม่ใน transaction |
 | `PATCH /api/daily/weight-tickets/{id}` | ตรง target สำหรับ hold | cancel/status action; WTO mark active hold เป็น `cancelled` |
 | `POST/PATCH /api/purchase/bills` | ตรง target หลักสำหรับ PB Stock ledger | create เขียน `PB`; cancel/supplier swap append `PB-CANCEL`; edit append `PB-EDIT-REV` แล้ว append `PB` state ใหม่ โดยไม่ delete/rebuild ledger เดิม |
@@ -241,7 +241,7 @@ stock balance key  = branch + warehouse + product + lot/status flags
 - stock คงเหลือจะรู้จริงหลังมีทั้ง `product + branch + warehouse`
 - ก่อน save ต้อง validate ว่า line-level warehouse เป็นคลัง `RM` หรือ `FG` ที่ active และอยู่ในสาขาเดียวกัน
 - `WTO` ต้อง validate จาก `available_qty` ไม่ใช่ `on_hand_qty`
-- เมื่อ save `WTO` ต้องสร้าง active `pending_out` ตาม `สินค้า + สาขา + คลัง + จำนวน`
+- เมื่อยืนยัน `WTO` ต้องตรวจ stock ล่าสุดแล้วสร้าง active `pending_out` ตาม `สินค้า + สาขา + คลัง + จำนวน` ใน transaction เดียวกัน
 - movement จริงยังเกิดตอนบันทึก `SB`
 - `SB` ต้อง validate active hold ซ้ำใน transaction, consume hold, แล้วเขียน stock-out ledger
 
@@ -257,7 +257,7 @@ stock balance key  = branch + warehouse + product + lot/status flags
 
 กติกา:
 
-- `WTO save` ต้องสร้าง active `pending_out`
+- `WTO draft save` ต้องไม่สร้าง active `pending_out`; `WTO confirm` เป็น owner ของการสร้าง reservation
 - `WTO edit` ที่ยังไม่ถูกใช้ ต้อง rebuild `pending_out` ให้ตรงข้อมูลใหม่
 - `WTO cancel` ที่ยังไม่ถูกใช้ ต้อง release `pending_out`
 - `SB save from WTO` ต้อง consume `pending_out` แล้วสร้าง `stock_ledger.ref_type = SB`
@@ -378,7 +378,7 @@ SB-CANCEL คืน 50 kg @ 40
 - `WTI save` = บันทึกหลักฐานรับของจริง แต่ยังไม่เขียน stock ledger
 - `PB Stock save` = รับ stock เข้า โดยอ้าง `WTI`; qty/value เข้าและ WAC ปัจจุบันเปลี่ยนตามราคาซื้อของบิล
 - `PB Stock cancel` = reverse stock-in เดิมด้วย `PB-CANCEL` โดยใช้ unit cost/value เดิมของ PB แล้วให้ WAC คำนวณใหม่จาก stock ที่เหลือ
-- `WTO save` = บันทึกหลักฐานส่งของจริง / intended warehouse และสร้าง active `pending_out` แต่ยังไม่เขียน stock ledger
+- `WTO draft save` = บันทึกเอกสารและ intended warehouse เท่านั้น; `WTO confirm` = ตรวจ stock และสร้าง active `pending_out`; ทั้งสองขั้นยังไม่เขียน stock ledger
 - `SB Stock save` = consume `pending_out` แล้วตัด stock ออกโดยอ้าง `WTO`; ยอดขายคิดจากน้ำหนักขายสุทธิใน SB แต่ stock/COGS consume ต้องอิงน้ำหนัก source จาก WTO ที่ถูกนำไปออกบิล
 - ถ้า `SB` ขายไม่ครบตาม WTO ต้องเหลือ `pending_out` สำหรับ action `รับของคืน`; ห้ามนำ remaining นี้ไปเปิด SB ใบอื่นแบบเงียบ ๆ
 - `รับของคืน` ต้องให้ผู้ใช้กรอกน้ำหนักที่ชั่งกลับมาจริงและกดยืนยันก่อนคืน stock เข้า available

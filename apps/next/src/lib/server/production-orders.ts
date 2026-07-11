@@ -696,7 +696,7 @@ export async function reverseProductionOutput(orderDocNo: string, outputDocNo: s
         }
         await tx.stock_cost_pool_entries.update({
           data: {
-            status: 'Reversed',
+            status: 'Cancelled',
             updated_by: actor,
             updated_at: new Date(),
           },

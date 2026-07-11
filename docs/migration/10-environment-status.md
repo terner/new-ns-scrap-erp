@@ -41,7 +41,8 @@ Git branch boundary:
 
 ### Staging / UAT
 
-- Project ref: `oolzfvqhovmjhiocfqdw`
+- Active project ref: `ekeomeumqjvbhgwyaqwe`
+- Previous project ref: `oolzfvqhovmjhiocfqdw` (superseded for the current customer UAT deployment)
 - Current meaning in this project: customer-facing UAT database/environment
 - Purpose: user testing, customer UAT, migration rehearsal, release validation
 - Expected usage:
@@ -50,6 +51,18 @@ Git branch boundary:
   - let customer/user validate business flow
   - run reconciliation checks before any production cutover
 - Should be a separate Supabase project, not another database inside the same project
+
+Status update on 2026-07-11:
+- The active customer UAT deployment is `https://ns-erp-uat.vercel.app` and its Vercel Production environment now points Supabase URL, anon/publishable key, service-role/secret key, and PostgreSQL pooler connection to project ref `ekeomeumqjvbhgwyaqwe`.
+- The project started with no `public` tables or Auth users. Before restore, a local UAT snapshot was created under `/tmp/ns-erp-dev-to-uat-20260711-143907`.
+- Dev project `fhglqymcdmrgbsbadnwr` was cloned into the new UAT project for `public` schema/data, `auth.users`, `auth.identities`, and `supabase_migrations.schema_migrations`.
+- Exact reconciliation passed with no per-table row-count differences: both environments have 140 public base tables and 32,737 public rows, 44 Auth users, 43 Auth identities, 117 public RLS policies, 90 RLS-enabled public tables, 15 public routines, and 106 migration-history rows.
+- Supabase Storage objects were not copied in this PostgreSQL clone. Storage buckets, object metadata, and binary files must be provisioned or migrated as a separate controlled step before UAT flows that depend on stored PDFs/images are accepted.
+- Applied UAT migrations `20260711173000`, `20260711190000`, and `20260711200000` to project `ekeomeumqjvbhgwyaqwe` after a scoped WTI/WTO backup. The confirmation-owned WTO hold migration released 5 active holds that belonged to draft WTO documents. Post-migration checks found 0 draft active holds and 0 WTI/WTO reconciliation issues; weight columns are `numeric(18,2)`, and the active-hold guard trigger plus Warehouse FK are installed.
+- Superseded correction: WTI header `โกดัง` is a required physical-location text field, not the RM/WIP/FG stock Warehouse dimension. Corrective migration `20260711213000` removes the mistakenly added header `warehouse_id`; WTO continues using real `warehouses.id` per line, while WTI stock Warehouse is resolved automatically by the downstream stock/PB flow rather than selected in the WTI form.
+- UAT release source is the separate `uat-origin` repository (`nserprich99-creator/ns-erp`) production branch `main`, not the old watcharathat Preview project. Commit `e0e70892` was fast-forwarded to that branch and Vercel reported a successful production deployment. `https://ns-erp-uat.vercel.app/` and `/api/health` both returned HTTP 200 after deployment.
+- The new UAT Supabase project initially had no Storage buckets. Bucket `weight-ticket-pdfs` is now provisioned as public with a 10 MB file limit and allowed MIME types PDF/JPEG/PNG/WebP; service-role upload, public read, and delete health checks passed.
+- The locally stored `UAT_VERCEL_TOKEN` is no longer valid. GitHub-to-Vercel automatic deployment works, but direct Vercel CLI/API operations require a replacement token before they can be used again.
 
 Status update on 2026-07-01:
 - Customer UAT Supabase is available at project ref `oolzfvqhovmjhiocfqdw`.
@@ -312,10 +325,10 @@ Current Next status as of 2026-05-17:
 - `/admin/transaction-ledger` exists as a Next read-only ledger view over `accounts` and `bank_statement`, protected by `finance.cash.view`, with account balance cards, table filters, summary totals, account verification helper, linked purchase/sales bill badges, source payee enrichment, running balance, non-destructive duplicate diagnostics, and XLSX export; write/edit/delete mutations are intentionally deferred until audit/reconciliation rules are defined.
 - `/admin/audit` reads the redesigned Audit / Activity feed for users with `system.audit.view`, with group/search/actor/target/event-type filters, server pagination, current-page CSV export, and detail metadata modal. The new dev-target source of truth is split into append-only `app_audit_logs` for trace-critical security/write/permission events and `app_activity_logs` for user/session/page/action activity; legacy `app_auth_events`, `audit_logs`, and deletion log tables are retained as compatibility/history sources only.
 - Functional Next pages now use normalized client/server error handling for implemented pages (`customers`, `suppliers`, `products`, `/admin/users-permissions`, `/admin/audit`): API errors return a consistent `{ code, error, fieldErrors }` shape where applicable, Zod validation returns field errors, DB/internal errors are sanitized, and the UI maps auth/permission/conflict/network/invalid-response cases to Thai user-facing messages.
-- Login prefill is supported for test-only convenience:
-  - local dev uses `DEV_LOGIN_IDENTIFIER` / `DEV_LOGIN_PASSWORD`
-  - Vercel production can temporarily enable test prefill through `NEXT_PUBLIC_ENABLE_TEST_LOGIN_PREFILL=1`, `NEXT_PUBLIC_TEST_LOGIN_IDENTIFIER`, and `NEXT_PUBLIC_TEST_LOGIN_PASSWORD`
-  - `NEXT_PUBLIC_*` values are visible to anyone visiting the site; remove these env vars before real UAT or production use, and never commit real credentials to git
+- Login and authorization security baseline:
+  - Login credential prefill has been removed from every environment. The Login page never reads or sends default email/password values from environment variables.
+  - Authorization requires a direct `auth.users.id -> app_users.auth_user_id` link. Email matching, legacy `user_profiles.role`, and Auth metadata role fallbacks are not accepted.
+  - Retired login-prefill environment variables must not be restored; browser-exposed `NEXT_PUBLIC_*` variables must never contain credentials
 - Supabase Auth email URL checklist:
   - Supabase Dashboard > Authentication > URL Configuration > `Site URL` should be `https://new-ns-scrap-erp.vercel.app`
   - add redirect allow-list entries for `https://new-ns-scrap-erp.vercel.app/**` and local dev such as `http://localhost:3000/**`

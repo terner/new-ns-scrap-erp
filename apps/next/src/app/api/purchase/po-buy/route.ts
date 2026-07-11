@@ -943,8 +943,8 @@ export async function PATCH(request: Request) {
       if (existing.status === PO_BUY_STATUS.RECEIVED || toNumber(existing.remaining_qty) <= 0.0001) {
         return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Buy นี้รับครบแล้ว ไม่สามารถปิดรับไม่ครบได้' }, { status: 400 })
       }
-      if (existing.status !== PO_BUY_STATUS.PARTIAL) {
-        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ปิดรับไม่ครบได้เฉพาะ PO Buy ที่รับบางส่วนแล้ว' }, { status: 400 })
+      if (existing.status !== PO_BUY_STATUS.OPEN && existing.status !== PO_BUY_STATUS.PARTIAL) {
+        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ปิดรับไม่ครบได้เฉพาะ PO Buy ที่ยังไม่รับหรือรับบางส่วน' }, { status: 400 })
       }
 
       const shortClosedAt = new Date()

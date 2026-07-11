@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/Input'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { WeightTicketAttachmentGrid as AttachmentProfileGrid, type WeightTicketAttachmentPreview as AttachmentPreview } from '@/components/daily/WeightTicketAttachmentGrid'
 import { ApiError, getErrorMessage } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import {
@@ -21,7 +22,7 @@ import {
   calculateTicketTotals,
   createWeightTicketLine,
   decodeStoredImageAsset,
-  encodeStoredImageAsset,
+  encodeStoredImageReference,
   formatWeight,
   getWeightTicket,
   isOtherProductImpurityId,
@@ -37,13 +38,6 @@ import {
   type WeightTicketLine,
   type WeightTicketType,
 } from '@/lib/weight-tickets'
-
-type AttachmentPreview = {
-  fileName: string
-  id: string
-  rawValue: string
-  url: string
-}
 
 type FormWeightTicketLine = WeightTicketLine & {
   imageFiles: AttachmentPreview[]
@@ -67,7 +61,7 @@ type FormState = {
   type: WeightTicketType
   vehicleImageFiles: AttachmentPreview[]
   vehicleNo: string
-  warehouseName: string
+  godownName: string
 }
 
 type WeightTicketOptionsPayload = {
@@ -118,8 +112,27 @@ function initialForm(type: WeightTicketType = 'WTI'): FormState {
     type,
     vehicleImageFiles: [],
     vehicleNo: '',
-    warehouseName: '',
+    godownName: '',
   }
+}
+
+function hasEnteredTicketData(form: FormState) {
+  return Boolean(
+    form.branchId
+    || form.partyId
+    || form.remark.trim()
+    || form.vehicleNo.trim()
+    || form.vehicleImageFiles.length
+    || form.godownName.trim()
+    || form.lines.some((line) => (
+      line.productId
+      || line.grossWeight
+      || line.containerDeductionWeight
+      || line.deductionValue
+      || line.note.trim()
+      || line.imageFiles.length
+    )),
+  )
 }
 
 function makeFileId() {
@@ -203,22 +216,24 @@ function createAttachmentPreview(fileName: string): AttachmentPreview {
   }
 }
 
-async function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error(`อ่านไฟล์ ${file.name} ไม่สำเร็จ`))
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-    reader.readAsDataURL(file)
-  })
-}
-
 async function createAttachmentPreviewFromFile(file: File): Promise<AttachmentPreview> {
-  const dataUrl = await fileToDataUrl(file)
+  const body = new FormData()
+  body.set('file', file)
+  const response = await fetch('/api/daily/weight-tickets/attachments', { body, method: 'POST' })
+  const payload = await response.json().catch(() => ({})) as {
+    error?: string
+    fileName?: string
+    storageKey?: string
+    url?: string
+  }
+  if (!response.ok || !payload.fileName || !payload.storageKey || !payload.url) {
+    throw new Error(payload.error || `อัปโหลดไฟล์ ${file.name} ไม่สำเร็จ`)
+  }
   return {
-    fileName: file.name,
+    fileName: payload.fileName,
     id: makeFileId(),
-    rawValue: encodeStoredImageAsset(file.name, dataUrl),
-    url: dataUrl,
+    rawValue: encodeStoredImageReference(payload.fileName, payload.url, payload.storageKey),
+    url: payload.url,
   }
 }
 
@@ -395,7 +410,7 @@ function ticketToFormState(ticket: WeightTicketRecord): FormState {
     type: ticket.type,
     vehicleImageFiles: ticket.vehicleImageNames.map(createAttachmentPreview),
     vehicleNo: ticket.vehicleNo,
-    warehouseName: ticket.warehouseName ?? '',
+    godownName: ticket.godownName,
   }
 }
 
@@ -782,7 +797,7 @@ export function WeightTicketsPageClient({
     if (!form.branchId) next.branchId = 'เลือกสาขา'
     if (!form.partyId) next.partyId = form.type === 'WTI' ? 'เลือกผู้ขาย' : 'เลือกลูกค้า'
     if (form.vehicleNo.trim().length < 2) next.vehicleNo = 'กรอกทะเบียนรถ'
-    if (form.type === 'WTI' && (!form.warehouseName || form.warehouseName.trim().length === 0)) next.warehouseName = 'กรอกโกดัง'
+    if (!form.godownName || form.godownName.trim().length === 0) next.godownName = 'กรอกโกดัง'
 
     const parentLines = getMainParentLines(form.lines)
 
@@ -1130,15 +1145,23 @@ export function WeightTicketsPageClient({
 
   async function appendLineImages(lineId: string, files: FileList | null) {
     if (!files?.length) return
-    const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
-    updateLine(lineId, (line) => ({ ...line, imageFiles: [...getLineImages(line), ...nextFiles] }))
-    markTouched(`line-${lineId}-images`)
+    try {
+      const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
+      updateLine(lineId, (line) => ({ ...line, imageFiles: [...getLineImages(line), ...nextFiles] }))
+      markTouched(`line-${lineId}-images`)
+    } catch (caught) {
+      setLoadError(getErrorMessage(caught, 'อัปโหลดรูปสินค้าไม่สำเร็จ'))
+    }
   }
 
   async function appendVehicleImages(files: FileList | null) {
     if (!files?.length) return
-    const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
-    setForm((current) => ({ ...current, vehicleImageFiles: [...current.vehicleImageFiles, ...nextFiles] }))
+    try {
+      const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
+      setForm((current) => ({ ...current, vehicleImageFiles: [...current.vehicleImageFiles, ...nextFiles] }))
+    } catch (caught) {
+      setLoadError(getErrorMessage(caught, 'อัปโหลดรูปรถไม่สำเร็จ'))
+    }
   }
 
   function removeVehicleImage(fileId: string) {
@@ -1154,6 +1177,15 @@ export function WeightTicketsPageClient({
     } else {
       router.push(`/daily/weight-ticket-list?type=${form.type}`)
     }
+  }
+
+  function changeTicketType(nextType: WeightTicketType) {
+    if (nextType === form.type) return
+    if (hasEnteredTicketData(form) && !window.confirm('การเปลี่ยนประเภทจะล้างข้อมูลในฟอร์มทั้งหมด ยืนยันเปลี่ยนประเภทหรือไม่?')) return
+    setForm(initialForm(nextType))
+    setTouched({})
+    setActiveLineId('')
+    setStockOptions({})
   }
 
   async function saveTicket() {
@@ -1215,7 +1247,7 @@ export function WeightTicketsPageClient({
         type: form.type,
         vehicleImageNames: form.vehicleImageFiles.map((file) => file.rawValue),
         vehicleNo: form.vehicleNo.trim(),
-        warehouseName: form.warehouseName.trim() || null,
+        godownName: form.godownName.trim(),
       })
       setLoadError('')
       setLoadedTicket(ticket)
@@ -1278,13 +1310,7 @@ export function WeightTicketsPageClient({
           </div>
       ) : (
         <div>
-          <Tabs value={form.type} onValueChange={(value) => setForm((current) => ({
-            ...current,
-            lines: current.lines.map((line) => ({ ...line, warehouseId: '', warehouseName: '', warehouseType: '' })),
-            partyId: '',
-            partyName: '',
-            type: value as WeightTicketType,
-          }))}>
+          <Tabs value={form.type} onValueChange={(value) => changeTicketType(value as WeightTicketType)}>
             <TabsList className="w-full justify-start" variant="line">
               <TabsTrigger value="WTI" variant="line">ใบรับของ WTI</TabsTrigger>
               <TabsTrigger value="WTO" variant="line">ใบส่งของ WTO</TabsTrigger>
@@ -1394,13 +1420,13 @@ export function WeightTicketsPageClient({
                   onChange={(event) => updateForm('vehicleNo', normalizeVehicleNo(event.target.value))}
                 />
               </FieldBlock>
-              <FieldBlock error={showError('warehouseName')} label={form.type === 'WTI' ? "โกดัง*" : "โกดัง"}>
-                <Input
-                  placeholder="เช่น โกดัง A"
-                  value={form.warehouseName}
-                  onBlur={() => markTouched('warehouseName')}
-                  onChange={(event) => updateForm('warehouseName', event.target.value)}
-                />
+	              <FieldBlock error={showError('godownName')} label="โกดัง*">
+	                <Input
+	                  placeholder="เช่น โกดัง A"
+	                  value={form.godownName}
+	                  onBlur={() => markTouched('godownName')}
+	                  onChange={(event) => updateForm('godownName', event.target.value)}
+	                />
               </FieldBlock>
               <FieldBlock label="รูปภาพรถส่งของ">
                 <AttachmentProfileGrid
@@ -2486,91 +2512,6 @@ function ProductImagePicker({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
-
-function AttachmentProfileGrid({
-  id,
-  addLabel,
-  disabled = false,
-  emptyLabel,
-  files,
-  onAppend,
-  onPreview,
-  onRemove,
-  noWrapper = false,
-}: {
-  id?: string
-  addLabel: string
-  disabled?: boolean
-  emptyLabel: string
-  files: AttachmentPreview[]
-  onAppend: (files: FileList | null) => void
-  onPreview: (file: AttachmentPreview) => void
-  onRemove: (fileId: string) => void
-  noWrapper?: boolean
-}) {
-  const content = (
-    <div className="flex flex-wrap gap-3" id={id}>
-      {files.map((file) => (
-        <div className="w-28 min-w-0" key={file.id}>
-          <button
-            className="group relative block h-28 w-28 overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm ring-1 ring-slate-100 hover:border-slate-400"
-            disabled={!file.url}
-            title={file.fileName}
-            type="button"
-            onClick={() => file.url ? onPreview(file) : undefined}
-          >
-            {file.url ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt={file.fileName} className="h-full w-full object-cover" src={file.url} />
-                <span className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-2 py-1.5 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
-                  เปิดรูปภาพ
-                </span>
-              </>
-            ) : (
-              <span className="flex h-full w-full items-center justify-center px-2 text-center text-xs text-slate-400">รูปเดิม</span>
-            )}
-          </button>
-          <div className="mt-2 truncate text-xs text-slate-600" title={file.fileName}>{file.fileName}</div>
-          <button className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline" disabled={disabled} type="button" onClick={() => onRemove(file.id)}>
-            <Trash2 className="h-3 w-3" />
-            ลบ
-          </button>
-        </div>
-      ))}
-      <label className={cn(
-        "flex h-28 w-28 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-center text-xs font-medium text-slate-500 shadow-sm hover:border-slate-400 hover:bg-slate-50",
-        disabled ? "cursor-not-allowed opacity-60 hover:border-slate-300 hover:bg-white" : "cursor-pointer",
-      )}>
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
-          <ImagePlus className="h-5 w-5" />
-        </span>
-        {files.length === 0 ? emptyLabel : addLabel}
-        <input
-          accept="image/*"
-          className="hidden"
-          disabled={disabled}
-          multiple
-          type="file"
-          onChange={(event) => {
-            onAppend(event.target.files)
-            event.target.value = ''
-          }}
-        />
-      </label>
-    </div>
-  )
-
-  if (noWrapper) {
-    return content
-  }
-
-  return (
-    <div className="rounded-md border border-slate-100 bg-slate-50 p-3">
-      {content}
     </div>
   )
 }

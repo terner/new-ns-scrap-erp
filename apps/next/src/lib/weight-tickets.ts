@@ -140,7 +140,7 @@ export type WeightTicketRecord = {
   vehicleImageCount: number
   vehicleImageNames: string[]
   vehicleNo: string
-  warehouseName?: string | null
+  godownName: string
 }
 
 export type OptionItem = {
@@ -155,7 +155,7 @@ export type OptionItem = {
   searchText?: string
 }
 
-export type WeightTicketSortBy = 'createdAt' | 'documentNo' | 'partyName' | 'netWeight' | 'branchName' | 'vehicleNo' | 'warehouseName' | 'deductionWeight' | 'impurityDeduction' | 'status' | 'updatedAt'
+export type WeightTicketSortBy = 'createdAt' | 'documentNo' | 'partyName' | 'netWeight' | 'branchName' | 'vehicleNo' | 'godownName' | 'deductionWeight' | 'impurityDeduction' | 'status' | 'updatedAt'
 export type WeightTicketSortDir = 'asc' | 'desc'
 
 export type StoredImageAsset = {
@@ -217,12 +217,13 @@ const impurityProductIdPattern = /\[impurity_product_id:([^\]]+)\]/i
 const impurityProductNamePattern = /\[impurity_product_name:([^\]]+)\]/i
 
 const attachmentValueSchema = z.string().trim().min(1).max(4_000_000, 'ข้อมูลรูปภาพใหญ่เกินไป')
+const weightNumberSchema = z.coerce.number().finite().min(0).multipleOf(0.01, 'กรอกทศนิยมได้ไม่เกิน 2 ตำแหน่ง')
 
 const weightTicketLinePayloadSchema = z.object({
-  containerDeductionWeight: z.coerce.number().finite().min(0).default(0),
+  containerDeductionWeight: weightNumberSchema.default(0),
   deductionMode: deductionModeEnum,
-  deductionValue: z.coerce.number().finite().min(0).default(0),
-  grossWeight: z.coerce.number().finite().min(0, 'กรอกน้ำหนักอย่างน้อย 0'),
+  deductionValue: weightNumberSchema.default(0),
+  grossWeight: weightNumberSchema,
   id: z.string().trim().min(1).max(80),
   imageNames: z.array(attachmentValueSchema).default([]),
   impurityId: z.preprocess(blankToEmpty, z.string().max(80).default('')),
@@ -313,17 +314,8 @@ export const weightTicketFormSchema = z.object({
     .min(2, 'กรอกทะเบียนรถ')
     .max(24, 'ทะเบียนรถยาวเกินไป')
     .regex(/^[\p{L}\p{M}\p{N}\s.-]+$/u, 'ทะเบียนรถมีรูปแบบไม่ถูกต้อง'),
-  warehouseName: z.string().trim().max(100, 'ชื่อโกดังยาวเกินไป').optional().nullable(),
+  godownName: z.string().trim().min(1, 'กรอกโกดัง').max(100, 'ชื่อโกดังยาวเกินไป'),
 }).superRefine((value, ctx) => {
-  if (value.type === 'WTI') {
-    if (!value.warehouseName || value.warehouseName.trim().length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'กรอกโกดัง',
-        path: ['warehouseName'],
-      })
-    }
-  }
   if (value.type !== 'WTO') return
   const parentBucketByKey = new Map<string, number>()
   value.lines.forEach((line, index) => {
@@ -521,7 +513,7 @@ export const weightTicketRecordSchema = z.object({
   vehicleImageCount: z.number().int().nonnegative(),
   vehicleImageNames: z.array(z.string()),
   vehicleNo: z.string(),
-  warehouseName: z.string().optional().nullable(),
+  godownName: z.string(),
 })
 
 const weightTicketListResultSchema = z.object({
@@ -632,6 +624,10 @@ export function encodeStoredImageAsset(fileName: string, dataUrl: string) {
   return JSON.stringify({ dataUrl, fileName })
 }
 
+export function encodeStoredImageReference(fileName: string, url: string, storageKey: string) {
+  return JSON.stringify({ fileName, storageKey, url })
+}
+
 export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
   const trimmed = rawValue.trim()
 
@@ -659,12 +655,23 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
   }
 
   try {
-    const parsed = JSON.parse(trimmed) as { dataUrl?: unknown; fileName?: unknown }
+    const parsed = JSON.parse(trimmed) as { dataUrl?: unknown; fileName?: unknown; url?: unknown }
     if (typeof parsed.fileName === 'string' && typeof parsed.dataUrl === 'string' && parsed.dataUrl.startsWith('data:image/')) {
       return {
         fileName: parsed.fileName,
         rawValue,
         url: parsed.dataUrl,
+      }
+    }
+    if (
+      typeof parsed.fileName === 'string'
+      && typeof parsed.url === 'string'
+      && (parsed.url.startsWith('http://') || parsed.url.startsWith('https://'))
+    ) {
+      return {
+        fileName: parsed.fileName,
+        rawValue,
+        url: parsed.url,
       }
     }
   } catch {
@@ -679,21 +686,25 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
 }
 
 export function calculateLineTotals(line: Pick<WeightTicketLine, 'containerDeductionWeight' | 'deductionMode' | 'deductionValue' | 'grossWeight'>) {
-  const grossWeight = Math.max(0, toNumber(line.grossWeight))
-  const containerDeductionWeight = Math.min(Math.max(0, toNumber(line.containerDeductionWeight)), grossWeight)
-  const netBeforeImpurityWeight = Math.max(0, grossWeight - containerDeductionWeight)
+  const grossWeight = roundWeight(Math.max(0, toNumber(line.grossWeight)))
+  const containerDeductionWeight = roundWeight(Math.min(Math.max(0, toNumber(line.containerDeductionWeight)), grossWeight))
+  const netBeforeImpurityWeight = roundWeight(Math.max(0, grossWeight - containerDeductionWeight))
   const rawDeduction = line.deductionMode === 'percent'
     ? netBeforeImpurityWeight * Math.max(0, toNumber(line.deductionValue)) / 100
     : line.deductionMode === 'kg'
       ? Math.max(0, toNumber(line.deductionValue))
       : 0
-  const deductionWeight = Math.min(rawDeduction, netBeforeImpurityWeight)
+  const deductionWeight = roundWeight(Math.min(rawDeduction, netBeforeImpurityWeight))
   return {
     containerDeductionWeight,
     deductionWeight,
     grossWeight,
-    netWeight: Math.max(0, grossWeight - containerDeductionWeight - deductionWeight),
+    netWeight: roundWeight(Math.max(0, grossWeight - containerDeductionWeight - deductionWeight)),
   }
+}
+
+export function roundWeight(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'containerDeductionWeight' | 'deductionMode' | 'deductionValue' | 'grossWeight' | 'id'> & { parentId?: string; impurityId?: string; impuritySourceLineId?: string }>) {
@@ -739,7 +750,7 @@ export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'conta
     }
   })
 
-  return lines.reduce((summary, line) => {
+  const totals = lines.reduce((summary, line) => {
     const isImpurity = !!line.parentId && toNumber(line.grossWeight) === 0 && !!line.impurityId && line.deductionMode !== 'none';
     if (isImpurity) return summary
     
@@ -750,6 +761,12 @@ export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'conta
     summary.netWeight += totals.netWeight
     return summary
   }, { containerDeductionWeight: 0, deductionWeight: 0, grossWeight: 0, netWeight: 0 })
+  return {
+    containerDeductionWeight: roundWeight(totals.containerDeductionWeight),
+    deductionWeight: roundWeight(totals.deductionWeight),
+    grossWeight: roundWeight(totals.grossWeight),
+    netWeight: roundWeight(totals.netWeight),
+  }
 }
 
 export function findOptionLabel(options: OptionItem[], id: string) {
@@ -883,7 +900,7 @@ export async function confirmWeightTicket(id: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(values),
   })
-  return readJsonResponse(response, weightTicketRecordSchema, 'ยืนยันใบส่งของไม่ได้')
+  return readJsonResponse(response, weightTicketRecordSchema, 'ยืนยันใบรับ-ส่งของไม่ได้')
 }
 
 const weightTicketLineNotifyResultSchema = z.object({

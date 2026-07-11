@@ -31,7 +31,7 @@ updated: 2026-07-01
 | Table | Role | Notes |
 |---|---|---|
 | `stock_ledger` | movement fact | ใช้ aggregate เป็น stock balance; row เดิมไม่ควรถูกแก้จากหน้า ledger |
-| `stock_holds` | pending_out reservation fact | `WTO` สร้าง active pending_out, `SB` consume pending_out, `SB cancel` reopen pending_out เฉพาะกรณียังไม่มี return-from-WTO/SB |
+| `stock_holds` | pending_out reservation fact | `WTO confirm` สร้าง active pending_out (draft ไม่สร้าง), `SB` consume pending_out, `SB cancel` reopen pending_out เฉพาะกรณียังไม่มี return-from-WTO/SB |
 | `weight_ticket_status_logs` | WTI/WTO lifecycle | บันทึก created/edited/cancelled/usage status change |
 | `weight_ticket_usage_logs` | WTI/WTO usage fact | บันทึก `WTI -> PB` และ `WTO -> SB` allocation/release |
 | `sales_bill_source_allocations` | SB source/cost allocation fact | ผูก `SB` line กลับไปที่ `WTO`/stock source; สำหรับ WTO ต้องเก็บ `weight_ticket_product_summary_id` เพื่อ trace cost source โดยตรง |
