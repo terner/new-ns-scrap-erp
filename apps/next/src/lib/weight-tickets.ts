@@ -635,6 +635,10 @@ export function encodeStoredImageAsset(fileName: string, dataUrl: string) {
   return JSON.stringify({ dataUrl, fileName })
 }
 
+export function encodeStoredImageReference(fileName: string, url: string, storageKey: string) {
+  return JSON.stringify({ fileName, storageKey, url })
+}
+
 export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
   const trimmed = rawValue.trim()
 
@@ -662,12 +666,23 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
   }
 
   try {
-    const parsed = JSON.parse(trimmed) as { dataUrl?: unknown; fileName?: unknown }
+    const parsed = JSON.parse(trimmed) as { dataUrl?: unknown; fileName?: unknown; url?: unknown }
     if (typeof parsed.fileName === 'string' && typeof parsed.dataUrl === 'string' && parsed.dataUrl.startsWith('data:image/')) {
       return {
         fileName: parsed.fileName,
         rawValue,
         url: parsed.dataUrl,
+      }
+    }
+    if (
+      typeof parsed.fileName === 'string'
+      && typeof parsed.url === 'string'
+      && (parsed.url.startsWith('http://') || parsed.url.startsWith('https://'))
+    ) {
+      return {
+        fileName: parsed.fileName,
+        rawValue,
+        url: parsed.url,
       }
     }
   } catch {

@@ -3007,4 +3007,12 @@ Tailwind dependency check:
   - Draft WTO detail now states `ยังไม่จอง stock` beside the confirmation action. The reservation remains confirmation-owned; saving a draft does not reserve inventory.
   - What is what: WTI and WTO are separate document contracts even though they share one creation surface. WTI uses Supplier and a header Warehouse ID; WTO uses Customer and a Warehouse ID per line.
   - Why it has to be like this: carrying values across document types can create a visually valid but semantically invalid document. A full reset makes the type boundary explicit and prevents stale party/warehouse data from crossing the contract.
+
+- 2026-07-11: WTI/WTO attachment payload boundary
+  - New vehicle and line evidence images are uploaded to the configured WTI/WTO Supabase Storage bucket through authenticated `POST /api/daily/weight-tickets/attachments` before the document payload is saved.
+  - The write payload now stores only compact file metadata (`fileName`, public `url`, and `storageKey`) in the existing image reference arrays. It no longer stores new image binary Data URLs in transaction rows.
+  - Upload accepts only JPEG, PNG, and WebP up to 10 MB and requires WTI/WTO create or edit permission. Missing Storage configuration fails explicitly; there is no bucket-name fallback in the upload route.
+  - Existing Data URL rows remain readable as migration-boundary legacy data so historical WTI/WTO evidence and PDF/LINE output do not break. New uploads do not use that legacy encoding.
+  - What is what: Supabase Storage owns image bytes; WTI/WTO transaction rows own references to evidence used by the document.
+  - Why it has to be like this: embedding image bytes in PostgreSQL arrays inflates request bodies, transaction rows, backups, and notification work. A Storage reference keeps the transaction contract small while preserving the current document/PDF/LINE read flow.
   - Why it has to be like this: saving incomplete field data must not create billing workload, snapshot outbound cost, or notify external LINE recipients before the responsible user confirms the physical receipt/delivery.

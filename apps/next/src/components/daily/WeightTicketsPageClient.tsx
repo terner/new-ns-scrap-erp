@@ -21,7 +21,7 @@ import {
   calculateTicketTotals,
   createWeightTicketLine,
   decodeStoredImageAsset,
-  encodeStoredImageAsset,
+  encodeStoredImageReference,
   formatWeight,
   getWeightTicket,
   isOtherProductImpurityId,
@@ -225,22 +225,24 @@ function createAttachmentPreview(fileName: string): AttachmentPreview {
   }
 }
 
-async function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error(`อ่านไฟล์ ${file.name} ไม่สำเร็จ`))
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-    reader.readAsDataURL(file)
-  })
-}
-
 async function createAttachmentPreviewFromFile(file: File): Promise<AttachmentPreview> {
-  const dataUrl = await fileToDataUrl(file)
+  const body = new FormData()
+  body.set('file', file)
+  const response = await fetch('/api/daily/weight-tickets/attachments', { body, method: 'POST' })
+  const payload = await response.json().catch(() => ({})) as {
+    error?: string
+    fileName?: string
+    storageKey?: string
+    url?: string
+  }
+  if (!response.ok || !payload.fileName || !payload.storageKey || !payload.url) {
+    throw new Error(payload.error || `อัปโหลดไฟล์ ${file.name} ไม่สำเร็จ`)
+  }
   return {
-    fileName: file.name,
+    fileName: payload.fileName,
     id: makeFileId(),
-    rawValue: encodeStoredImageAsset(file.name, dataUrl),
-    url: dataUrl,
+    rawValue: encodeStoredImageReference(payload.fileName, payload.url, payload.storageKey),
+    url: payload.url,
   }
 }
 
@@ -1166,15 +1168,23 @@ export function WeightTicketsPageClient({
 
   async function appendLineImages(lineId: string, files: FileList | null) {
     if (!files?.length) return
-    const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
-    updateLine(lineId, (line) => ({ ...line, imageFiles: [...getLineImages(line), ...nextFiles] }))
-    markTouched(`line-${lineId}-images`)
+    try {
+      const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
+      updateLine(lineId, (line) => ({ ...line, imageFiles: [...getLineImages(line), ...nextFiles] }))
+      markTouched(`line-${lineId}-images`)
+    } catch (caught) {
+      setLoadError(getErrorMessage(caught, 'อัปโหลดรูปสินค้าไม่สำเร็จ'))
+    }
   }
 
   async function appendVehicleImages(files: FileList | null) {
     if (!files?.length) return
-    const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
-    setForm((current) => ({ ...current, vehicleImageFiles: [...current.vehicleImageFiles, ...nextFiles] }))
+    try {
+      const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
+      setForm((current) => ({ ...current, vehicleImageFiles: [...current.vehicleImageFiles, ...nextFiles] }))
+    } catch (caught) {
+      setLoadError(getErrorMessage(caught, 'อัปโหลดรูปรถไม่สำเร็จ'))
+    }
   }
 
   function removeVehicleImage(fileId: string) {
@@ -2603,7 +2613,7 @@ function AttachmentProfileGrid({
         </span>
         {files.length === 0 ? emptyLabel : addLabel}
         <input
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp"
           className="hidden"
           disabled={disabled}
           multiple
