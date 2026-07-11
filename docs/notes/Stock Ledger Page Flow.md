@@ -51,7 +51,7 @@ updated: 2026-06-11
 ## What Must Not Appear
 
 - `WTI` save เพราะใบรับของเป็น source evidence ก่อนสร้าง `PB`
-- `WTO` save เพราะเป็น source evidence + pending_out ก่อนสร้าง `SB`
+- `WTO` confirm เพราะเป็นจุดสร้าง pending_out ก่อนนำเอกสารที่ยืนยันแล้วไปสร้าง `SB`; draft ยังไม่จอง stock
 - PO Buy / PO Sell reservation
 - PMA / PMT / RCP / bank statement money movement
 - hold/reservation row จาก `stock_holds`

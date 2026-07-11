@@ -12,7 +12,7 @@ import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-ref
 import { appendWtoPendingOutEventsFromHolds, getWeightTicketPendingOutEvents } from '@/lib/server/weight-ticket-pending-out-events'
 import { buildWeightTicketEditChanges } from '@/lib/server/weight-ticket-write/edit-audit'
 import { assertWeightTicketImpurityRules, assertWeightTicketPartyForType, WeightTicketWriteValidationError } from '@/lib/server/weight-ticket-write/type-guards'
-import { applyWeightTicketEditSideEffects, resolveWeightTicketWarehousesForWrite, validateWeightTicketStockForWrite, weightTicketPartySnapshot } from '@/lib/server/weight-ticket-write/handlers'
+import { applyWeightTicketCreateSideEffects, applyWeightTicketEditSideEffects, resolveWeightTicketWarehousesForWrite, validateWeightTicketStockForWrite, weightTicketPartySnapshot } from '@/lib/server/weight-ticket-write/handlers'
 import { buildWtoEditTimelineNote, prepareWtoEditPendingOutPlan } from '@/lib/server/weight-ticket-write/wto'
 import {
   releaseActiveWtoPendingOut,
@@ -324,18 +324,22 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       })
       await tx.weight_ticket_product_summaries.deleteMany({ where: { weight_ticket_id: existing.id } })
       await tx.weight_ticket_lines.deleteMany({ where: { weight_ticket_id: existing.id } })
-      await validateWeightTicketStockForWrite(tx, { branchId: branch.id, lineRows, type: values.type })
+      if (existing.status === 'delivered') {
+        await validateWeightTicketStockForWrite(tx, { branchId: branch.id, lineRows, type: values.type })
+      }
       const createdLines = await Promise.all(lineRows.map((data) => tx.weight_ticket_lines.create({ data })))
-      const createdPendingOutHoldIds = await applyWeightTicketEditSideEffects(tx, {
-        actor,
-        branchId: branch.id,
-        createdLines,
-        documentNo: docNo,
-        preservedCostSnapshots,
-        shouldSnapshotCost: existing.status === 'delivered',
-        type: values.type,
-        weightTicketId: existing.id,
-      })
+      const createdPendingOutHoldIds = existing.status === 'delivered'
+        ? await applyWeightTicketEditSideEffects(tx, {
+          actor,
+          branchId: branch.id,
+          createdLines,
+          documentNo: docNo,
+          preservedCostSnapshots,
+          shouldSnapshotCost: true,
+          type: values.type,
+          weightTicketId: existing.id,
+        })
+        : []
       const imageCount = values.vehicleImageNames.length + createdLines.reduce((sum, line) => sum + (line.image_count ?? 0), 0)
       const { summaryRows } = buildWeightTicketProductSummaryRows(existing.id, createdLines)
       const createdSummaries = await Promise.all(summaryRows.map(({ lineIds, ...data }) => tx.weight_ticket_product_summaries.create({ data })))
@@ -473,14 +477,30 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       const confirmedAt = new Date()
       const nextStatus = existing.doc_type === 'WTO' ? 'delivered' : 'received'
       const updated = await prisma.$transaction(async (tx) => {
-        const confirmedHoldIds = existing.doc_type === 'WTO'
-          ? await snapshotActiveWtoPendingOutCosts(tx, {
+        let confirmedHoldIds: bigint[] = []
+        if (existing.doc_type === 'WTO') {
+          await validateWeightTicketStockForWrite(tx, {
+            branchId: existing.branch_id,
+            lineRows: existing.weight_ticket_lines,
+            type: 'WTO',
+          })
+          const createdHoldIds = await applyWeightTicketCreateSideEffects(tx, {
             actor,
             branchId: existing.branch_id,
-            source: 'WTO_CONFIRM',
+            createdLines: existing.weight_ticket_lines,
+            documentNo: existing.doc_no,
+            type: 'WTO',
             weightTicketId: existing.id,
           })
-          : []
+          confirmedHoldIds = createdHoldIds.length
+            ? await snapshotActiveWtoPendingOutCosts(tx, {
+              actor,
+              branchId: existing.branch_id,
+              source: 'WTO_CONFIRM',
+              weightTicketId: existing.id,
+            })
+            : []
+        }
         await tx.weight_tickets.update({
           data: {
             status: nextStatus,

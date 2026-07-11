@@ -14,7 +14,7 @@ import { assertWeightTicketImpurityRules, assertWeightTicketPartyForType, Weight
 import {
   WtoPendingOutError,
 } from '@/lib/server/stock-holds'
-import { applyWeightTicketCreateSideEffects, resolveWeightTicketWarehousesForWrite, validateWeightTicketStockForWrite, weightTicketPartySnapshot } from '@/lib/server/weight-ticket-write/handlers'
+import { resolveWeightTicketWarehousesForWrite, weightTicketPartySnapshot } from '@/lib/server/weight-ticket-write/handlers'
 import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import {
   bangkokDateInput,
@@ -311,16 +311,7 @@ export async function POST(request: Request) {
       })
       const warehouseByCode = await resolveWeightTicketWarehousesForWrite(tx, { branchId: branch.id, lines: values.lines, type: values.type })
       const lineRows = buildWeightTicketLineRows(createdTicket.id, values, productByCode, impurityById, warehouseByCode)
-      await validateWeightTicketStockForWrite(tx, { branchId: branch.id, lineRows, type: values.type })
       const createdLines = await Promise.all(lineRows.map((data) => tx.weight_ticket_lines.create({ data })))
-      await applyWeightTicketCreateSideEffects(tx, {
-        actor,
-        branchId: branch.id,
-        createdLines,
-        documentNo: docNo,
-        type: values.type,
-        weightTicketId: createdTicket.id,
-      })
       const imageCount = values.vehicleImageNames.length + createdLines.reduce((sum, line) => sum + (line.image_count ?? 0), 0)
       const { summaryRows } = buildWeightTicketProductSummaryRows(createdTicket.id, createdLines)
       const createdSummaries = await Promise.all(summaryRows.map(({ lineIds, ...data }) => tx.weight_ticket_product_summaries.create({ data })))
