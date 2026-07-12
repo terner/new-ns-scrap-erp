@@ -576,7 +576,7 @@ export function SalesPlanPageClient() {
               onClick={handleFetchLive}
               type="button"
             >
-              {isFetchingLive ? 'กำลัง Fetch...' : '↻ Fetch Live + Save (USD/THB + Metals)'}
+              {isFetchingLive ? 'กำลัง Fetch...' : '↻ Fetch Live + Save (USD/THB + LME)'}
             </button>
             <button
               className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -604,7 +604,7 @@ export function SalesPlanPageClient() {
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">source: {text(lmeForm?.source || data?.lmeConfig.source)}</div>
         </div>
         <div className="mt-3 text-sm text-slate-400">
-          {text(lmeForm?.liveFetchNote || data?.lmeConfig.liveFetchNote || 'Live fetch: USD/THB จาก exchangerate-api · Metals จาก metals.dev (demo key) — ถ้า fetch fail ให้กรอกเอง')}
+          {text(lmeForm?.liveFetchNote || data?.lmeConfig.liveFetchNote || 'Live fetch: USD/THB จาก exchangerate-api · LME จาก fx678 — ถ้า fetch fail ให้กรอกเอง')}
         </div>
         {formError ? <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{formError}</div> : null}
       </div>
