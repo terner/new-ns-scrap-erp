@@ -58,3 +58,13 @@ The saved PB/SB is the business event that establishes AP/AR and is therefore th
 3. In `/admin/line-settings`, create explicit rules for `WTI,WTO`, `PB`, and `SB` and select the intended target for each rule.
 4. Set `stop after match` for the one-group-per-document policy.
 5. Create one PB and one SB in the development target and verify the job, attempt log, target group, and detail link.
+
+## Dev-target verification (2026-07-13)
+
+Dev-target `fhglqymcdmrgbsbadnwr` uses the active LINE target named `ทดสอบ` as the temporary destination for three separate rules:
+
+- `WTI,WTO` -> `ทดสอบ`
+- `PB` -> `ทดสอบ`
+- `SB` -> `ทดสอบ`
+
+Live delivery verification succeeded for Purchase Bill `PB012607-0013` and Sales Bill `SB2607-0011`. Both jobs reached `status = sent`, each recorded one successful attempt, and both resolved to the `ทดสอบ` target. These are temporary test mappings; change only each rule's target when the dedicated customer groups are registered.
