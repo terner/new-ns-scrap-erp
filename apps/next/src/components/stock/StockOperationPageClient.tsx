@@ -119,56 +119,56 @@ const config = {
 } satisfies Record<Mode, { accent: string; api: string; title: string }>
 
 const statusConvertColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'date', defaultWidth: 100 },
-  { key: 'refNo', defaultWidth: 120 },
-  { key: 'productDisplay', defaultWidth: 180 },
-  { key: 'locationDisplay', defaultWidth: 150 },
-  { key: 'qty', defaultWidth: 120 },
-  { key: 'unitCost', defaultWidth: 150 },
-  { key: 'value', defaultWidth: 110 },
-  { key: 'statusFlow', defaultWidth: 120 },
-  { key: 'note', defaultWidth: 120 },
-  { key: 'status', defaultWidth: 90 },
-  { key: 'createdBy', defaultWidth: 110 },
-  { key: 'createdAt', defaultWidth: 160 },
-  { key: 'action', defaultWidth: 90 },
+  { key: 'date', defaultWidth: 110, minWidth: 90 },
+  { key: 'refNo', defaultWidth: 140, minWidth: 110 },
+  { key: 'productDisplay', defaultWidth: 220, minWidth: 180 },
+  { key: 'locationDisplay', defaultWidth: 180, minWidth: 140 },
+  { key: 'qty', defaultWidth: 120, minWidth: 90 },
+  { key: 'unitCost', defaultWidth: 150, minWidth: 110 },
+  { key: 'value', defaultWidth: 130, minWidth: 100 },
+  { key: 'statusFlow', defaultWidth: 140, minWidth: 110 },
+  { key: 'note', defaultWidth: 140, minWidth: 110 },
+  { key: 'status', defaultWidth: 100, minWidth: 80 },
+  { key: 'createdBy', defaultWidth: 120, minWidth: 90 },
+  { key: 'createdAt', defaultWidth: 160, minWidth: 130 },
+  { key: 'action', defaultWidth: 100, minWidth: 80 },
 ]
 
 const convertColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'sourceType', defaultWidth: 110 },
-  { key: 'refNo', defaultWidth: 120 },
-  { key: 'date', defaultWidth: 100 },
-  { key: 'branchWarehouse', defaultWidth: 150 },
-  { key: 'sourceProduct', defaultWidth: 150 },
-  { key: 'sourceQty', defaultWidth: 100 },
-  { key: 'unitCost', defaultWidth: 90 },
-  { key: 'targetProduct', defaultWidth: 150 },
-  { key: 'targetQty', defaultWidth: 100 },
-  { key: 'targetUnitCost', defaultWidth: 90 },
-  { key: 'lossQty', defaultWidth: 90 },
-  { key: 'costStatus', defaultWidth: 100 },
-  { key: 'status', defaultWidth: 80 },
-  { key: 'action', defaultWidth: 150 },
+  { key: 'sourceType', defaultWidth: 120, minWidth: 100 },
+  { key: 'refNo', defaultWidth: 140, minWidth: 110 },
+  { key: 'date', defaultWidth: 110, minWidth: 90 },
+  { key: 'branchWarehouse', defaultWidth: 160, minWidth: 130 },
+  { key: 'sourceProduct', defaultWidth: 220, minWidth: 180 },
+  { key: 'sourceQty', defaultWidth: 120, minWidth: 90 },
+  { key: 'unitCost', defaultWidth: 110, minWidth: 80 },
+  { key: 'targetProduct', defaultWidth: 220, minWidth: 180 },
+  { key: 'targetQty', defaultWidth: 120, minWidth: 90 },
+  { key: 'targetUnitCost', defaultWidth: 110, minWidth: 80 },
+  { key: 'lossQty', defaultWidth: 110, minWidth: 80 },
+  { key: 'costStatus', defaultWidth: 120, minWidth: 100 },
+  { key: 'status', defaultWidth: 100, minWidth: 80 },
+  { key: 'action', defaultWidth: 160, minWidth: 130 },
 ]
 
 const adjustColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'docNo', defaultWidth: 120 },
-  { key: 'date', defaultWidth: 100 },
-  { key: 'branchWarehouse', defaultWidth: 150 },
-  { key: 'productName', defaultWidth: 180 },
-  { key: 'outputCategory', defaultWidth: 110 },
-  { key: 'systemQty', defaultWidth: 100 },
-  { key: 'onHoldQty', defaultWidth: 90 },
-  { key: 'readyQty', defaultWidth: 90 },
-  { key: 'countedQty', defaultWidth: 90 },
-  { key: 'diffQty', defaultWidth: 90 },
-  { key: 'adjustType', defaultWidth: 100 },
-  { key: 'unitPricePerKg', defaultWidth: 90 },
-  { key: 'totalValue', defaultWidth: 120 },
-  { key: 'reason', defaultWidth: 120 },
-  { key: 'createdAt', defaultWidth: 120 },
-  { key: 'updatedBy', defaultWidth: 110 },
-  { key: 'action', defaultWidth: 70 },
+  { key: 'docNo', defaultWidth: 140, minWidth: 110 },
+  { key: 'date', defaultWidth: 110, minWidth: 90 },
+  { key: 'branchWarehouse', defaultWidth: 160, minWidth: 130 },
+  { key: 'productName', defaultWidth: 220, minWidth: 180 },
+  { key: 'outputCategory', defaultWidth: 120, minWidth: 90 },
+  { key: 'systemQty', defaultWidth: 120, minWidth: 90 },
+  { key: 'onHoldQty', defaultWidth: 100, minWidth: 80 },
+  { key: 'readyQty', defaultWidth: 100, minWidth: 80 },
+  { key: 'countedQty', defaultWidth: 100, minWidth: 80 },
+  { key: 'diffQty', defaultWidth: 100, minWidth: 80 },
+  { key: 'adjustType', defaultWidth: 110, minWidth: 90 },
+  { key: 'unitPricePerKg', defaultWidth: 110, minWidth: 80 },
+  { key: 'totalValue', defaultWidth: 140, minWidth: 110 },
+  { key: 'reason', defaultWidth: 140, minWidth: 110 },
+  { key: 'createdAt', defaultWidth: 160, minWidth: 130 },
+  { key: 'updatedBy', defaultWidth: 120, minWidth: 90 },
+  { key: 'action', defaultWidth: 90, minWidth: 70 },
 ]
 
 const detailColumns: Array<ResizableColumnDefinition<string>> = [
@@ -681,32 +681,40 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
             </button>
           ) : null}
 
-        </div>
-        <div className="mt-2 grid w-full grid-cols-1 gap-2 border-t border-slate-100 pt-2 xl:grid-cols-[minmax(0,1fr)_auto]">
-          {mode === 'adjust' ? (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-500">ประเภท:</span>
-              <SegmentedButton active={!adjustTypeFilter} label="ทั้งหมด" onClick={() => setAdjustTypeFilter('')} />
-              <SegmentedButton active={adjustTypeFilter === 'LOSS'} label="นับขาด" onClick={() => setAdjustTypeFilter('LOSS')} />
-              <SegmentedButton active={adjustTypeFilter === 'GAIN'} label="นับเกิน" onClick={() => setAdjustTypeFilter('GAIN')} />
-            </div>
-          ) : null}
-          {mode === 'status-convert' ? (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-slate-500">เส้นทางสถานะ:</span>
-              <SegmentedButton active={!statusFlowFilter} label="ทั้งหมด" onClick={() => setStatusFlowFilter('')} />
-              <SegmentedButton active={statusFlowFilter === 'RM-FG'} label="RM → FG" onClick={() => setStatusFlowFilter('RM-FG')} />
-              <SegmentedButton active={statusFlowFilter === 'FG-RM'} label="FG → RM" onClick={() => setStatusFlowFilter('FG-RM')} />
-              <SegmentedButton active={statusFlowFilter === 'RM-WIP'} label="RM → WIP" onClick={() => setStatusFlowFilter('RM-WIP')} />
-              <SegmentedButton active={statusFlowFilter === 'WIP-FG'} label="WIP → FG" onClick={() => setStatusFlowFilter('WIP-FG')} />
-            </div>
-          ) : null}
-          <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
-            <a className="inline-flex h-9 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700" href={`${pathname}?new=1`}>
-              {mode === 'adjust' ? '+ ปรับสต๊อกใหม่' : mode === 'convert' ? '+ ปรับเกรดใหม่' : '+ ปรับสถานะใหม่'}
+          {mode === 'convert' ? (
+            <a className="ms-auto inline-flex h-9 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700" href={`${pathname}?new=1`}>
+              + ปรับเกรดใหม่
             </a>
-          </div>
+          ) : null}
+
         </div>
+        {mode !== 'convert' ? (
+          <div className="mt-2 grid w-full grid-cols-1 gap-2 border-t border-slate-100 pt-2 xl:grid-cols-[minmax(0,1fr)_auto]">
+            {mode === 'adjust' ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">ประเภท:</span>
+                <SegmentedButton active={!adjustTypeFilter} label="ทั้งหมด" onClick={() => setAdjustTypeFilter('')} />
+                <SegmentedButton active={adjustTypeFilter === 'LOSS'} label="นับขาด" onClick={() => setAdjustTypeFilter('LOSS')} />
+                <SegmentedButton active={adjustTypeFilter === 'GAIN'} label="นับเกิน" onClick={() => setAdjustTypeFilter('GAIN')} />
+              </div>
+            ) : null}
+            {mode === 'status-convert' ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-slate-500">เส้นทางสถานะ:</span>
+                <SegmentedButton active={!statusFlowFilter} label="ทั้งหมด" onClick={() => setStatusFlowFilter('')} />
+                <SegmentedButton active={statusFlowFilter === 'RM-FG'} label="RM → FG" onClick={() => setStatusFlowFilter('RM-FG')} />
+                <SegmentedButton active={statusFlowFilter === 'FG-RM'} label="FG → RM" onClick={() => setStatusFlowFilter('FG-RM')} />
+                <SegmentedButton active={statusFlowFilter === 'RM-WIP'} label="RM → WIP" onClick={() => setStatusFlowFilter('RM-WIP')} />
+                <SegmentedButton active={statusFlowFilter === 'WIP-FG'} label="WIP → FG" onClick={() => setStatusFlowFilter('WIP-FG')} />
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
+              <a className="inline-flex h-9 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700" href={`${pathname}?new=1`}>
+                {mode === 'adjust' ? '+ ปรับสต๊อกใหม่' : '+ ปรับสถานะใหม่'}
+              </a>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
@@ -1361,13 +1369,17 @@ function OperationTable({
             </button>
           ) : null}
         </div>
-        <table className="ns-table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
-            {columns.map((col) => (
-              <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
-            ))}
+            {columns.map((col, index) => {
+              const defs = mode === 'status-convert' ? statusConvertColumns : mode === 'convert' ? convertColumns : adjustColumns
+              const colDef = defs.find((d) => d.key === col.key)
+              return (
+                <col key={col.key} style={index === columns.length - 1 ? { minWidth: colDef?.minWidth } : columnResize.getColumnStyle(col.key)} />
+              )
+            })}
           </colgroup>
-          <thead className="border-b border-slate-100 bg-slate-100 text-slate-700">
+          <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
             <tr>
               {columns.map((column) => (
                 <ResizableTableHead
@@ -1383,21 +1395,21 @@ function OperationTable({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
+          <tbody className="divide-y divide-slate-200">
+            {isLoading ? <tr><td className="px-3 py-10 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && rows.map((row, index) => (
-              <tr key={String(row.id ?? index)} className={`hover:bg-slate-50 ${mode === 'adjust' ? 'cursor-pointer' : ''}`} onClick={mode === 'adjust' ? () => onAdjustDetail?.(row) : undefined}>
+              <tr key={String(row.id ?? index)} className={`hover:bg-slate-50 transition-colors ${mode === 'adjust' ? 'cursor-pointer' : ''}`} onClick={mode === 'adjust' ? () => onAdjustDetail?.(row) : undefined}>
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`p-2 align-top text-xs font-semibold text-slate-700 ${column.key === 'action' || column.key === 'status' || column.key === 'costStatus' ? 'overflow-visible whitespace-nowrap' : 'overflow-hidden truncate'} ${column.cellClassName ?? ''}`}
+                    className={`px-3 py-3 align-top text-slate-700 ${column.key === 'action' || column.key === 'status' || column.key === 'costStatus' ? 'overflow-visible whitespace-nowrap' : 'overflow-hidden truncate'} ${column.cellClassName ?? ''}`}
                   >
                     {formatOperationCell(mode, row, column.key, onConvertReverse, onConvertDetail, onStatusConvertReverse, onAdjustCorrect)}
                   </td>
                 ))}
               </tr>
             ))}
-            {!isLoading && !rows.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
+            {!isLoading && !rows.length ? <tr><td className="px-3 py-10 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -1455,12 +1467,12 @@ function columnsFor(mode: Mode): OperationColumn[] {
     { key: 'date', label: 'วันที่เอกสาร', sortable: true },
     { key: 'branchWarehouse', label: 'สาขา / คลัง', sortable: true },
     { key: 'sourceProduct', label: 'Source (ออก)', sortable: true },
-    { key: 'sourceQty', label: 'Qty', cellClassName: 'text-right font-mono text-red-700', headerClassName: 'text-right', sortable: true },
-    { key: 'unitCost', label: '฿/กก.', cellClassName: 'text-right font-mono', headerClassName: 'text-right', sortable: true },
+    { key: 'sourceQty', label: 'Qty (ออก)', cellClassName: 'text-right font-mono text-red-700', headerClassName: 'text-right', sortable: true },
+    { key: 'unitCost', label: '฿/กก. (ออก)', cellClassName: 'text-right font-mono', headerClassName: 'text-right', sortable: true },
     { key: 'targetProduct', label: 'Target (เข้า)', sortable: true },
-    { key: 'targetQty', label: 'Qty', cellClassName: 'text-right font-mono text-emerald-700', headerClassName: 'text-right', sortable: true },
-    { key: 'targetUnitCost', label: '฿/กก.', cellClassName: 'text-right font-mono', headerClassName: 'text-right', sortable: true },
-    { key: 'lossQty', label: 'Loss', cellClassName: 'text-right font-mono', sortable: true },
+    { key: 'targetQty', label: 'Qty (เข้า)', cellClassName: 'text-right font-mono text-emerald-700', headerClassName: 'text-right', sortable: true },
+    { key: 'targetUnitCost', label: '฿/กก. (เข้า)', cellClassName: 'text-right font-mono', headerClassName: 'text-right', sortable: true },
+    { key: 'lossQty', label: 'Loss (สูญเสีย)', cellClassName: 'text-right font-mono', headerClassName: 'text-right', sortable: true },
     { key: 'costStatus', label: 'Cost Status', cellClassName: 'text-center', headerClassName: 'text-center', sortable: true },
     { key: 'status', label: 'สถานะ', cellClassName: 'text-center', headerClassName: 'text-center', sortable: true },
     { key: 'action', label: '', cellClassName: 'text-center', headerClassName: 'text-center' },
@@ -1798,7 +1810,7 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
                     <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
                   ))}
                 </colgroup>
-                <thead className="border-b border-slate-100 bg-slate-100 text-slate-700">
+                <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
                   <tr>
                     <ResizableTableHead label="Line" resizeProps={columnResize.getResizeHandleProps('line', 'Line')} />
                     <ResizableTableHead label="Source Pool" resizeProps={columnResize.getResizeHandleProps('sourcePool', 'Source Pool')} />
@@ -1811,29 +1823,29 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
                     <ResizableTableHead align="center" label="Status" resizeProps={columnResize.getResizeHandleProps('status', 'Status')} />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-200">
                   {detail.lines.map((line) => (
-                    <tr key={`${line.lineNo}-${line.sourcePoolId ?? 'source'}`} className="hover:bg-slate-50">
-                      <td className="p-2 align-top font-mono text-xs font-semibold text-slate-700 overflow-hidden truncate">{line.lineNo}</td>
-                      <td className="p-2 align-top text-xs font-semibold text-slate-700 overflow-hidden truncate">
+                    <tr key={`${line.lineNo}-${line.sourcePoolId ?? 'source'}`} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-3 py-3 align-top font-mono text-slate-700 overflow-hidden truncate">{line.lineNo}</td>
+                      <td className="px-3 py-3 align-top text-slate-700 overflow-hidden truncate">
                         <div>{line.sourceRefNo ?? line.sourceType ?? '-'}</div>
-                        <div className="text-xs text-slate-500">Pool {line.sourcePoolId ?? '-'}{line.sourceLotNo ? ` · Lot ${line.sourceLotNo}` : ''}</div>
+                        <div className="text-xs text-slate-400">Pool {line.sourcePoolId ?? '-'}{line.sourceLotNo ? ` · Lot ${line.sourceLotNo}` : ''}</div>
                       </td>
-                      <td className="p-2 align-top text-xs font-semibold text-slate-700 overflow-hidden truncate">{line.sourceProduct}</td>
-                      <td className="p-2 align-top text-xs font-semibold text-slate-700 overflow-hidden truncate">
+                      <td className="px-3 py-3 align-top text-slate-700 overflow-hidden truncate">{line.sourceProduct}</td>
+                      <td className="px-3 py-3 align-top text-slate-700 overflow-hidden truncate">
                         <div>Pool {line.targetPoolId ?? '-'}</div>
-                        <div className="text-xs text-slate-500">{line.targetPoolStatus ?? '-'}{line.targetLotNo ? ` · Lot ${line.targetLotNo}` : ''}</div>
+                        <div className="text-xs text-slate-400">{line.targetPoolStatus ?? '-'}{line.targetLotNo ? ` · Lot ${line.targetLotNo}` : ''}</div>
                       </td>
-                      <td className="p-2 align-top text-xs font-semibold text-slate-700 overflow-hidden truncate">{line.targetProduct}</td>
-                      <td className="p-2 align-top text-right font-mono text-xs font-semibold text-slate-700 overflow-hidden truncate">{formatMoney(line.qty)}</td>
-                      <td className="p-2 align-top text-right font-mono text-xs font-semibold text-slate-700 overflow-hidden truncate">{formatMoney(line.unitCost)}</td>
-                      <td className="p-2 align-top text-right font-mono text-xs font-semibold text-slate-700 overflow-hidden truncate">{formatMoney(line.totalCost)}</td>
-                      <td className="p-2 align-top text-center overflow-hidden truncate">
+                      <td className="px-3 py-3 align-top text-slate-700 overflow-hidden truncate">{line.targetProduct}</td>
+                      <td className="px-3 py-3 align-top text-right font-mono text-slate-700 overflow-hidden truncate">{formatMoney(line.qty)}</td>
+                      <td className="px-3 py-3 align-top text-right font-mono text-slate-700 overflow-hidden truncate">{formatMoney(line.unitCost)}</td>
+                      <td className="px-3 py-3 align-top text-right font-mono text-slate-700 overflow-hidden truncate">{formatMoney(line.totalCost)}</td>
+                      <td className="px-3 py-3 align-top text-center overflow-hidden truncate">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${line.allocationStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{line.allocationStatus}</span>
                       </td>
                     </tr>
                   ))}
-                  {!detail.lines.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่พบ allocation lines สำหรับเอกสารนี้</td></tr> : null}
+                  {!detail.lines.length ? <tr><td className="px-3 py-10 text-center text-slate-400" colSpan={9}>ไม่พบ allocation lines สำหรับเอกสารนี้</td></tr> : null}
                 </tbody>
               </table>
             </div>
