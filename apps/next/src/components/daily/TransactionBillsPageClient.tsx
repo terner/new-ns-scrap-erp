@@ -1022,6 +1022,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     ? availableAdvanceAmount * (selectedAdvanceSubtotal / Math.max(selectedAdvanceSubtotal + selectedAdvanceVat, 0.000001))
     : availableAdvanceAmount
   const formAdvanceConsumed = Math.min(formTaxableBase, selectedAdvanceBaseCapacity)
+  const formTaxableBaseAfterAdvance = Math.max(0, formTaxableBase - formAdvanceConsumed)
   const formAdvanceVatRelief = formTaxableBase > 0 ? formAdvanceConsumed * (formVat / formTaxableBase) : 0
   const formAdvanceApplied = Math.min(formTotal, formAdvanceConsumed + formAdvanceVatRelief)
   const formAdvanceGrossConsumed = selectedAdvancePayment?.vatType && selectedAdvancePayment.vatType !== 'NONE'

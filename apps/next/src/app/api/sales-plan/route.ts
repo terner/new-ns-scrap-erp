@@ -67,12 +67,13 @@ export async function POST(request: Request) {
     const payload = salesPlanLmeRequestSchema.parse(await request.json())
     if (payload.action === 'fetch-live') {
       const currentConfig = await getSalesPlanLmeConfig()
+      const nextConfig = await fetchLiveSalesPlanLmeConfig(currentConfig)
+      const savedConfig = await saveSalesPlanLmeConfig({
+        ...nextConfig,
+        source: 'mixed',
+      }, context)
       return NextResponse.json({
-        lmeConfig: {
-          ...await fetchLiveSalesPlanLmeConfig(currentConfig),
-          updatedAt: currentConfig.updatedAt,
-          updatedBy: currentConfig.updatedBy,
-        },
+        lmeConfig: savedConfig,
       })
     }
     if (payload.action === 'create-plan') {
