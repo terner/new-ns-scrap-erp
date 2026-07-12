@@ -93,7 +93,16 @@ export function matchesLineNotificationRule(ticket: any, rule: any): boolean {
   return true
 }
 
-export async function resolveLineTargetsForWeightTicket(ticket: any): Promise<RoutingDecision[]> {
+export function ruleExplicitlyIncludesDocumentType(rule: any, documentType: string): boolean {
+  const conditions = rule.conditions as Record<string, unknown> | null
+  return Array.isArray(conditions?.documentTypes)
+    && conditions.documentTypes.includes(documentType)
+}
+
+export async function resolveLineTargetsForDocument(
+  ticket: any,
+  options: { allowFallback?: boolean } = {},
+): Promise<RoutingDecision[]> {
   // Query all active rules
   const rules = await prisma.line_notification_rules.findMany({
     where: { is_active: true },
@@ -110,6 +119,9 @@ export async function resolveLineTargetsForWeightTicket(ticket: any): Promise<Ro
   const resolvedTargetIds = new Set<string>()
 
   for (const rule of rules) {
+    if (options.allowFallback === false && !ruleExplicitlyIncludesDocumentType(rule, ticket.type)) {
+      continue
+    }
     if (matchesLineNotificationRule(ticket, rule)) {
       const dbTarget = targetMap.get(rule.target_id)
       if (dbTarget) {
@@ -129,6 +141,12 @@ export async function resolveLineTargetsForWeightTicket(ticket: any): Promise<Ro
         }
       }
     }
+  }
+
+  // Financial documents must have an explicit rule so they cannot leak to an
+  // unrelated default or every active LINE target.
+  if (decisions.length === 0 && options.allowFallback === false) {
+    return decisions
   }
 
   // Fallback to defaults
@@ -185,6 +203,10 @@ export async function resolveLineTargetsForWeightTicket(ticket: any): Promise<Ro
   }
 
   return decisions
+}
+
+export async function resolveLineTargetsForWeightTicket(ticket: any): Promise<RoutingDecision[]> {
+  return resolveLineTargetsForDocument(ticket)
 }
 
 export function buildFlexMessageFromTemplate(ticket: any, templateConfig: any, pdfUrl: string, detailUrl: string) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import type { Prisma } from '../../../../../generated/prisma/client'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
@@ -7,6 +8,11 @@ import { resolveLineTargetsForWeightTicket } from '@/lib/server/line-notificatio
 import { findScopedWeightTicket, getWeightTicketUsageCounts, mapWeightTicketRow, type WeightTicketRow } from '@/lib/server/weight-tickets'
 
 export const runtime = 'nodejs'
+
+const lineDocumentTypeSchema = z.enum(['WTI', 'WTO', 'PB', 'SB'])
+const lineRuleConditionsSchema = z.object({
+  documentTypes: z.array(lineDocumentTypeSchema).max(4).optional(),
+}).passthrough()
 
 const ruleSchema = z.object({
   name: z.string().trim().min(1, 'ระบุชื่อกฎ'),
@@ -16,7 +22,7 @@ const ruleSchema = z.object({
   targetId: z.string().trim().min(1, 'ระบุ LINE ID ผู้รับ'),
   templateId: z.number().nullable().optional(),
   stopAfterMatch: z.boolean().default(false),
-  conditions: z.record(z.any()).default({}),
+  conditions: lineRuleConditionsSchema.default({}),
 })
 
 export async function GET() {
@@ -58,7 +64,7 @@ export async function POST(request: Request) {
         target_id: values.targetId,
         template_id: values.templateId ? BigInt(values.templateId) : null,
         stop_after_match: values.stopAfterMatch,
-        conditions: values.conditions,
+        conditions: values.conditions as Prisma.InputJsonValue,
         created_by: auth.appUser?.email || 'admin'
       }
     })
@@ -123,7 +129,7 @@ export async function PATCH(request: Request) {
         target_id: parsedFields.targetId,
         template_id: parsedFields.templateId === undefined ? undefined : (parsedFields.templateId ? BigInt(parsedFields.templateId) : null),
         stop_after_match: parsedFields.stopAfterMatch,
-        conditions: parsedFields.conditions,
+        conditions: parsedFields.conditions as Prisma.InputJsonValue | undefined,
         updated_by: auth.appUser?.email || 'admin',
         updated_at: new Date()
       }

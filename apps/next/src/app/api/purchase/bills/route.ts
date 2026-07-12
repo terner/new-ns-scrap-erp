@@ -24,6 +24,7 @@ import { appendPurchaseBillStatusLog, createInitialPurchaseBillStatusLog, PURCHA
 import { syncPurchaseBillCostPoolEntries } from '@/lib/server/purchase-cost-pool'
 import { prisma } from '@/lib/server/prisma'
 import { refreshPurchaseBillSettlement, refreshSupplierAdvancePaymentAllocation } from '@/lib/server/purchase-bill-settlement'
+import { enqueueAndExecuteNotification } from '@/lib/server/line-notification-jobs'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
 import { appendPurchaseBillStockReversal } from '@/lib/server/stock-ledger-reversal'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
@@ -2462,6 +2463,15 @@ export async function POST(request: Request) {
     }
 
     if (!bill) throw new Error('สร้างเลขที่บิลไม่สำเร็จ')
+
+    try {
+      await enqueueAndExecuteNotification(
+        { sourceType: 'purchase_bill', documentNo: bill.doc_no },
+        { requestedBy: actor, force: false },
+      )
+    } catch (caught) {
+      console.error('[purchase_bill] LINE notification failed', caught)
+    }
 
     return NextResponse.json({ docNo: bill.doc_no, id: bill.doc_no })
   } catch (caught) {

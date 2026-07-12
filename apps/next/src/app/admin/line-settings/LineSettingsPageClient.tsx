@@ -49,6 +49,8 @@ type RoutingRule = {
   conditions: any
 }
 
+const lineDocumentTypes = ['WTI', 'WTO', 'PB', 'SB'] as const
+
 type MessageTemplate = {
   id: string
   name: string
@@ -2572,20 +2574,27 @@ export function LineSettingsPageClient() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="block text-slate-600 font-medium">ประเภทบิล (เช่น WTI, WTO)</label>
-                    <input
-                      type="text"
-                      className="w-full rounded border border-slate-300 bg-white px-2.5 py-1 text-xs"
-                      placeholder="ป้อนคอมมาแยก เช่น WTI, WTO"
-                      value={editingRule.conditions?.documentTypes?.join(', ') || ''}
-                      onChange={(e) => {
-                        const val = e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
-                        setEditingRule({
-                          ...editingRule,
-                          conditions: { ...editingRule.conditions, documentTypes: val }
-                        })
-                      }}
-                    />
+                    <label className="block text-slate-600 font-medium">ประเภทเอกสาร (WTI, WTO, PB, SB)</label>
+                    <div className="flex min-h-10 flex-wrap items-center gap-3 rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs">
+                      {lineDocumentTypes.map((documentType) => (
+                        <label key={documentType} className="flex cursor-pointer items-center gap-1.5 font-medium text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={editingRule.conditions?.documentTypes?.includes(documentType) ?? false}
+                            onChange={(event) => {
+                              const current = new Set<string>(editingRule.conditions?.documentTypes ?? [])
+                              if (event.target.checked) current.add(documentType)
+                              else current.delete(documentType)
+                              setEditingRule({
+                                ...editingRule,
+                                conditions: { ...editingRule.conditions, documentTypes: [...current] }
+                              })
+                            }}
+                          />
+                          <span>{documentType}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="space-y-1">

@@ -9,6 +9,7 @@ import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-ref
 import { currentActor, nextDailyDocNo, normalizeDate, roundMoney, toDateOnly, toNumber } from '@/lib/server/daily'
 import { requireBusinessCode } from '@/lib/business-code'
 import { isCustomerEligibleForBranch } from '@/lib/server/party-branch-eligibility'
+import { enqueueAndExecuteNotification } from '@/lib/server/line-notification-jobs'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSalesChannelReferenceByCode } from '@/lib/server/sales-channel-reference'
 import { activeSalesReceiptCount, activeSalesReceiptCountByBillId, isSalesBillActiveForCancel, salesBillCancelState } from '@/lib/server/sales-bill-cancel-policy'
@@ -2044,6 +2045,15 @@ export async function POST(request: Request) {
 
       return createdBill
     })
+
+    try {
+      await enqueueAndExecuteNotification(
+        { sourceType: 'sales_bill', documentNo: created.doc_no },
+        { requestedBy: actor, force: false },
+      )
+    } catch (caught) {
+      console.error('[sales_bill] LINE notification failed', caught)
+    }
 
     return NextResponse.json({ docNo: created.doc_no, id: created.doc_no }, { status: 201 })
   } catch (caught) {
