@@ -176,6 +176,9 @@ function num(value: unknown) {
   return typeof value === 'number' ? value : Number(value ?? 0)
 }
 
+const salesPlanNumberInputClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 text-right font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+const salesPlanReadonlyNumberInputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 text-right font-medium text-slate-700 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+
 function lmeBaseByMetalGroup(metalGroup: string, config: LmeConfig | null) {
   if (!config) return 0
   const group = metalGroup.toLowerCase()
@@ -587,7 +590,7 @@ export function SalesPlanPageClient() {
           </div>
         </div>
         <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <LmeEditableCard label="🥉 ทองแดง LME (USD/MT)" value={lmeForm?.lmeCopperUSD ?? 0} onChange={(value) => updateLmeField('lmeCopperUSD', value)} />
+          <LmeEditableCard label="🥉 ทองแดง LME (USD/MT)" readOnly value={lmeForm?.lmeCopperUSD ?? 0} onChange={(value) => updateLmeField('lmeCopperUSD', value)} />
           <LmeEditableCard label="🌟 ทองเหลือง LME (USD/MT)" value={lmeForm?.lmeBrassUSD ?? 0} onChange={(value) => updateLmeField('lmeBrassUSD', value)} />
           <LmeEditableCard label="⚪ อลูมิเนียม LME (USD/MT)" value={lmeForm?.lmeAluminumUSD ?? 0} onChange={(value) => updateLmeField('lmeAluminumUSD', value)} />
           <LmeEditableCard label="💱 USD/THB" value={lmeForm?.fxRate ?? 0} onChange={(value) => updateLmeField('fxRate', value)} />
@@ -2004,15 +2007,18 @@ function Panel({ children, title }: { children: ReactNode; title: string }) {
   )
 }
 
-function LmeEditableCard({ label, manualOnly = false, onChange, value }: { label: string; manualOnly?: boolean; onChange: (value: string) => void; value: number }) {
+function LmeEditableCard({ label, manualOnly = false, onChange, readOnly = false, value }: { label: string; manualOnly?: boolean; onChange: (value: string) => void; readOnly?: boolean; value: number }) {
   return (
     <label className="block">
       <div className="mb-2 flex items-center justify-between gap-2 text-sm font-bold text-slate-500">
         <span>{label}</span>
-        {manualOnly ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-extrabold text-amber-700">กรอกเอง</span> : null}
+        {readOnly ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-extrabold text-slate-600">API</span> : null}
+        {!readOnly && manualOnly ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-extrabold text-amber-700">กรอกเอง</span> : null}
       </div>
       <input
-        className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-right text-2xl font-extrabold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+        className={`h-14 px-4 text-2xl font-extrabold ${(readOnly || manualOnly) ? salesPlanReadonlyNumberInputClass : salesPlanNumberInputClass}`}
+        disabled={readOnly}
+        min="0"
         onChange={(event) => onChange(event.target.value)}
         type="number"
         value={Number.isFinite(value) ? value : 0}
