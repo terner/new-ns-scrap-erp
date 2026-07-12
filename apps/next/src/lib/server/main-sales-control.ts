@@ -3,7 +3,7 @@ import { outwardCustomerReference } from '@/lib/server/customer-reference'
 import { requireBusinessCode } from '@/lib/business-code'
 import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
-import { getSalesPlanLmeConfig, type SalesPlanLmeConfig } from './sales-plan-lme'
+import { getSalesPlanLmeConfigAutoRefresh, type SalesPlanLmeConfig } from './sales-plan-lme'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
 
@@ -185,7 +185,7 @@ function poSellItems(row: { items: unknown; product_id: bigint | null; qty: unkn
 }
 
 async function buildSalesPlanningSnapshot() {
-  const config = await getSalesPlanLmeConfig()
+  const config = await getSalesPlanLmeConfigAutoRefresh()
   const { byKey, refs } = await productsContext()
   const [poSells, poBuys, stockRows, customers, tradingDeals, purchaseBills] = await Promise.all([
     prisma.po_sells.findMany({ include: { customers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000 }),
