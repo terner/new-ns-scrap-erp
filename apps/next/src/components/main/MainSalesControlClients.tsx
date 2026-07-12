@@ -657,7 +657,7 @@ export function SalesPlanPageClient() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-2xl font-extrabold tracking-tight text-slate-700">📊 LME Reference Pricing <span className="text-lg font-semibold text-slate-400">(Real-time + Manual)</span></h2>
-            <div className="mt-1 text-sm font-medium text-slate-400">ดึงค่า API มาเติมเฉพาะ LME/FX แล้วแก้มือและบันทึกได้ ส่วน กก./ตู้ ต้องกรอกเอง</div>
+            <div className="mt-1 text-sm font-medium text-slate-400">กด Fetch Live เพื่อดึงและบันทึกค่า LME/FX ทันที ส่วน กก./ตู้ ต้องกรอกเอง</div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -666,7 +666,7 @@ export function SalesPlanPageClient() {
               onClick={handleFetchLive}
               type="button"
             >
-              {isFetchingLive ? 'กำลัง Fetch...' : '↻ Fetch Live (USD/THB + Metals)'}
+              {isFetchingLive ? 'กำลัง Fetch...' : '↻ Fetch Live + Save (USD/THB + LME)'}
             </button>
             <button
               className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -679,7 +679,7 @@ export function SalesPlanPageClient() {
           </div>
         </div>
         <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <LmeEditableCard label="🥉 ทองแดง LME (USD/MT)" value={lmeForm?.lmeCopperUSD ?? 0} onChange={(value) => updateLmeField('lmeCopperUSD', value)} />
+          <LmeEditableCard label="🥉 ทองแดง LME (USD/MT)" readOnly value={lmeForm?.lmeCopperUSD ?? 0} onChange={(value) => updateLmeField('lmeCopperUSD', value)} />
           <LmeEditableCard label="🌟 ทองเหลือง LME (USD/MT)" value={lmeForm?.lmeBrassUSD ?? 0} onChange={(value) => updateLmeField('lmeBrassUSD', value)} />
           <LmeEditableCard label="⚪ อลูมิเนียม LME (USD/MT)" value={lmeForm?.lmeAluminumUSD ?? 0} onChange={(value) => updateLmeField('lmeAluminumUSD', value)} />
           <LmeEditableCard label="💱 USD/THB" value={lmeForm?.fxRate ?? 0} onChange={(value) => updateLmeField('fxRate', value)} />
@@ -694,7 +694,7 @@ export function SalesPlanPageClient() {
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">source: {text(lmeForm?.source || data?.lmeConfig.source)}</div>
         </div>
         <div className="mt-3 text-sm text-slate-400">
-          {text(lmeForm?.liveFetchNote || data?.lmeConfig.liveFetchNote || 'Live fetch: USD/THB จาก exchangerate-api · Metals จาก metals.dev (demo key) — ถ้า fetch fail ให้กรอกเอง')}
+          {text(lmeForm?.liveFetchNote || data?.lmeConfig.liveFetchNote || 'Live fetch: USD/THB จาก exchangerate-api · LME จาก fx678 — ถ้า fetch fail ให้กรอกเอง')}
         </div>
         {formError ? <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{formError}</div> : null}
       </div>
@@ -2115,15 +2115,17 @@ function Panel({ children, title }: { children: ReactNode; title: string }) {
   )
 }
 
-function LmeEditableCard({ label, manualOnly = false, onChange, value }: { label: string; manualOnly?: boolean; onChange: (value: string) => void; value: number }) {
+function LmeEditableCard({ label, manualOnly = false, onChange, readOnly = false, value }: { label: string; manualOnly?: boolean; onChange: (value: string) => void; readOnly?: boolean; value: number }) {
   return (
     <label className="block">
       <div className="mb-2 flex items-center justify-between gap-2 text-sm font-bold text-slate-500">
         <span>{label}</span>
-        {manualOnly ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-extrabold text-amber-700">กรอกเอง</span> : null}
+        {readOnly ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-extrabold text-slate-600">API</span> : null}
+        {!readOnly && manualOnly ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-extrabold text-amber-700">กรอกเอง</span> : null}
       </div>
       <input
-        className={`h-14 px-4 text-2xl font-extrabold ${salesPlanNumberInputClass}`}
+        className={`h-14 px-4 text-2xl font-extrabold ${(readOnly || manualOnly) ? salesPlanReadonlyNumberInputClass : salesPlanNumberInputClass}`}
+        disabled={readOnly}
         min="0"
         onChange={(event) => onChange(event.target.value)}
         step="any"
