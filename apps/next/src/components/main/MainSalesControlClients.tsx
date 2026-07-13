@@ -189,13 +189,12 @@ function sanitizeDecimalInput(value: string) {
 const salesPlanNumberInputClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 text-right font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 const salesPlanReadonlyNumberInputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 text-right font-medium text-slate-700 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 
-function lmeBaseByMetalGroup(metalGroup: string, config: LmeConfig | null) {
-  if (!config) return 0
+function lmeDraftValueByMetalGroup(metalGroup: string, config: LmeConfig | null) {
+  if (!config) return ''
   const group = metalGroup.toLowerCase()
-  if (group.includes('ทองแดง') || group.includes('copper')) return config.lmeCopperUSD
-  if (group.includes('ทองเหลือง') || group.includes('brass')) return config.lmeBrassUSD
-  if (group.includes('อลูมิ') || group.includes('aluminum')) return config.lmeAluminumUSD
-  return 0
+  if (group.includes('ทองแดง') || group.includes('copper')) return String(config.lmeCopperUSD)
+  if (group.includes('ทองเหลือง') || group.includes('brass')) return ''
+  return ''
 }
 
 function getPlanStatus(value: unknown): 'locked' | 'pending' | 'po_created' {
@@ -542,8 +541,10 @@ export function SalesPlanPageClient() {
     setPlanDraftForm({
       channel: '',
       containers: '1',
+      customerCode: '',
       customerName: '',
       kgPerContainer: String(lmeForm?.kgPerContainer ?? data?.lmeConfig.kgPerContainer ?? 25000),
+      lmeCf: '',
       productCode: '',
       sellPctLme: '',
     })
@@ -564,7 +565,7 @@ export function SalesPlanPageClient() {
     const product = productOptions.find((option) => option.code === productCode)
     setPlanDraftForm((current) => ({
       ...current,
-      lmeCf: product ? String(lmeBaseByMetalGroup(product.metalGroup, lmeForm)) : '',
+      lmeCf: product ? lmeDraftValueByMetalGroup(product.metalGroup, lmeForm) : '',
       productCode,
     }))
   }
