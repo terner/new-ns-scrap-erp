@@ -324,7 +324,7 @@ async function buildSalesPlanningSnapshot() {
     })
   })
 
-  const reconciliation = salesPlanRefs.map((product) => {
+  const reconciliation = refs.map((product) => {
     const stock = stockByProduct.get(product.id) ?? { qty: 0, value: 0 }
     const spotRaw = spotByProduct.get(product.id) ?? { amount: 0, qty: 0 }
     const matched = matchedByProduct.get(product.id) ?? 0
