@@ -726,55 +726,57 @@ export function SalesPlanPageClient() {
             <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 text-sm sm:p-5">
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-4 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">รายละเอียดแผนขาย</h4>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-                <SearchCombobox
-                  hideLabel={false}
-                  inputClassName="h-10 text-sm font-medium text-slate-700"
-                  inputId="sales-plan-draft-product"
-                  label="สินค้า *"
-                  openOnFocus={false}
-                  options={productOptions.map((option) => ({
-                    id: option.code,
-                    label: `${option.code} - ${option.name}`,
-                    searchText: `${option.code} ${option.name} ${option.metalGroup}`,
-                  }))}
-                  placeholder="ค้นหารหัสหรือชื่อสินค้า"
-                  value={planDraftForm.productCode}
-                  onChange={handleDraftProductChange}
-                />
-                <SearchCombobox
-                  inputClassName="h-10 text-sm font-medium text-slate-700"
-                  inputId="sales-plan-draft-customer"
-                  label="ลูกค้า *"
-                  options={customerOptions.map((customer) => ({
-                    id: customer.code,
-                    label: `${customer.code} - ${customer.name}`,
-                    searchText: `${customer.code} ${customer.name}`,
-                  }))}
-                  placeholder="ค้นหารหัสหรือชื่อลูกค้า"
-                  value={planDraftForm.customerCode}
-                  onChange={handleDraftCustomerChange}
-                />
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">ช่องทางขาย</span>
-                  <input className="h-10 w-full rounded-md border border-slate-300 bg-slate-100 px-3 text-sm font-medium text-slate-700 outline-none" readOnly value={selectedDraftChannel?.name ?? (selectedDraftCustomer ? 'ไม่พบช่องทางจาก Master Customer' : 'เลือกลูกค้าก่อน')} />
-                </label>
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">จำนวนตู้</span>
-                  <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, containers: event.target.value }))} type="number" value={planDraftForm.containers} />
-                </label>
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">กก./ตู้</span>
-                  <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, kgPerContainer: event.target.value }))} type="number" value={planDraftForm.kgPerContainer} />
-                </label>
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">LME cf (USD/MT)</span>
-                  <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, lmeCf: event.target.value }))} placeholder="0.00" step="any" type="number" value={planDraftForm.lmeCf} />
-                </label>
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">% LME</span>
-                  <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, sellPctLme: event.target.value }))} type="number" value={planDraftForm.sellPctLme} />
-                </label>
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+                  <SearchCombobox
+                    hideLabel={false}
+                    inputClassName="h-10 text-sm font-medium text-slate-700"
+                    inputId="sales-plan-draft-product"
+                    label="สินค้า *"
+                    openOnFocus={false}
+                    options={productOptions.map((option) => ({
+                      id: option.code,
+                      label: `${option.code} - ${option.name}`,
+                      searchText: `${option.code} ${option.name} ${option.metalGroup}`,
+                    }))}
+                    placeholder="ค้นหารหัสหรือชื่อสินค้า"
+                    value={planDraftForm.productCode}
+                    onChange={handleDraftProductChange}
+                  />
+                  <SearchCombobox
+                    inputClassName="h-10 text-sm font-medium text-slate-700"
+                    inputId="sales-plan-draft-customer"
+                    label="ลูกค้า *"
+                    options={customerOptions.map((customer) => ({
+                      id: customer.code,
+                      label: `${customer.code} - ${customer.name}`,
+                      searchText: `${customer.code} ${customer.name}`,
+                    }))}
+                    placeholder="ค้นหารหัสหรือชื่อลูกค้า"
+                    value={planDraftForm.customerCode}
+                    onChange={handleDraftCustomerChange}
+                  />
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">ช่องทางขาย</span>
+                    <input className="h-10 w-full rounded-md border border-slate-300 bg-slate-100 px-3 text-sm font-medium text-slate-700 outline-none" readOnly value={selectedDraftChannel?.name ?? (selectedDraftCustomer ? 'ไม่พบช่องทางจาก Master Customer' : 'เลือกลูกค้าก่อน')} />
+                  </label>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">จำนวนตู้</span>
+                    <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, containers: event.target.value }))} type="number" value={planDraftForm.containers} />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">กก./ตู้</span>
+                    <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, kgPerContainer: event.target.value }))} type="number" value={planDraftForm.kgPerContainer} />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">LME cf (USD/MT)</span>
+                    <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, lmeCf: event.target.value }))} placeholder="0.00" step="any" type="number" value={planDraftForm.lmeCf} />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">% LME</span>
+                    <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, sellPctLme: event.target.value }))} type="number" value={planDraftForm.sellPctLme} />
+                  </label>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
