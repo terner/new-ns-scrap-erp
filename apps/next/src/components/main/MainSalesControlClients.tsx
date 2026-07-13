@@ -298,6 +298,78 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
+const SALES_PLAN_DEFAULT_PAGE_SIZE = 10
+const SALES_PLAN_PAGE_SIZE_OPTIONS = [10, 25] as const
+
+function pageCount(totalItems: number, pageSize: number) {
+  return Math.max(1, Math.ceil(totalItems / pageSize))
+}
+
+function paginateRows<TRow>(rows: TRow[], page: number, pageSize: number) {
+  return rows.slice((page - 1) * pageSize, page * pageSize)
+}
+
+function count(value: number) {
+  return new Intl.NumberFormat('th-TH').format(value)
+}
+
+function TablePaginationToolbar({
+  page,
+  pageSize,
+  totalItems,
+  totalPages,
+  onPageChange,
+  onPageSizeChange,
+  onResetWidths,
+}: {
+  page: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
+  onResetWidths?: (() => void) | undefined
+}) {
+  return (
+    <div className="border-b border-slate-100 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+        <div className="font-semibold text-slate-500">พบทั้งหมด {count(totalItems)} รายการ</div>
+        <div className="flex flex-wrap items-center gap-2">
+          {onResetWidths ? (
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={onResetWidths}>คืนค่าเดิมตาราง</button>
+          ) : null}
+          <select
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+            value={pageSize}
+            onChange={(event) => onPageSizeChange(Number(event.target.value))}
+          >
+            {SALES_PLAN_PAGE_SIZE_OPTIONS.map((option) => (
+              <option key={option} value={option}>{option} / หน้า</option>
+            ))}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 outline-none hover:bg-slate-50 disabled:opacity-40"
+            disabled={page <= 1}
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1 text-sm font-semibold text-slate-600">หน้า {page} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 outline-none hover:bg-slate-50 disabled:opacity-40"
+            disabled={page >= totalPages}
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function SalesPlanPageClient() {
   const [data, setData] = useState<SalesPlanPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -334,6 +406,14 @@ export function SalesPlanPageClient() {
   const [remainingSortKey, setRemainingSortKey] = useState<SalesPlanRemainingColumnKey | null>(null)
   const [remainingSortDirection, setRemainingSortDirection] = useState<SortDirection>('asc')
   const [salesPlanInsightTab, setSalesPlanInsightTab] = useState<'analysis' | 'remaining'>('analysis')
+  const [planPage, setPlanPage] = useState(1)
+  const [pendingSalePage, setPendingSalePage] = useState(1)
+  const [analysisPage, setAnalysisPage] = useState(1)
+  const [remainingPage, setRemainingPage] = useState(1)
+  const [planPageSize, setPlanPageSize] = useState(SALES_PLAN_DEFAULT_PAGE_SIZE)
+  const [pendingSalePageSize, setPendingSalePageSize] = useState(SALES_PLAN_DEFAULT_PAGE_SIZE)
+  const [analysisPageSize, setAnalysisPageSize] = useState(SALES_PLAN_DEFAULT_PAGE_SIZE)
+  const [remainingPageSize, setRemainingPageSize] = useState(SALES_PLAN_DEFAULT_PAGE_SIZE)
   const planResize = useResizableColumns('main.sales-plan.plan.v1', salesPlanColumns)
   const analysisResize = useResizableColumns('main.sales-plan.analysis.v1', salesPlanAnalysisColumns)
   const remainingResize = useResizableColumns('main.sales-plan.remaining.v1', salesPlanRemainingColumns)
@@ -509,6 +589,14 @@ export function SalesPlanPageClient() {
       return remainingSortDirection === 'asc' ? result : -result
     })
   }, [analysisRows, remainingSortDirection, remainingSortKey])
+  const totalPlanPages = useMemo(() => pageCount(sortedPlanRows.length, planPageSize), [planPageSize, sortedPlanRows.length])
+  const totalPendingSalePages = useMemo(() => pageCount(pendingSaleRows.length, pendingSalePageSize), [pendingSalePageSize, pendingSaleRows.length])
+  const totalAnalysisPages = useMemo(() => pageCount(sortedAnalysisRows.length, analysisPageSize), [analysisPageSize, sortedAnalysisRows.length])
+  const totalRemainingPages = useMemo(() => pageCount(sortedRemainingRows.length, remainingPageSize), [remainingPageSize, sortedRemainingRows.length])
+  const pagedPlanRows = useMemo(() => paginateRows(sortedPlanRows, planPage, planPageSize), [planPage, planPageSize, sortedPlanRows])
+  const pagedPendingSaleRows = useMemo(() => paginateRows(pendingSaleRows, pendingSalePage, pendingSalePageSize), [pendingSalePage, pendingSalePageSize, pendingSaleRows])
+  const pagedAnalysisRows = useMemo(() => paginateRows(sortedAnalysisRows, analysisPage, analysisPageSize), [analysisPage, analysisPageSize, sortedAnalysisRows])
+  const pagedRemainingRows = useMemo(() => paginateRows(sortedRemainingRows, remainingPage, remainingPageSize), [remainingPage, remainingPageSize, sortedRemainingRows])
   
   const remainingContainers = analysisRows.reduce((sum, row) => sum + num(row.remainingContainers), 0)
   const stockTotal = analysisRows.reduce((sum, row) => sum + num(row.stock), 0)
@@ -520,6 +608,38 @@ export function SalesPlanPageClient() {
   useEffect(() => {
     setSelectedPendingPlanIds((current) => current.filter((id) => visiblePendingPlanIds.includes(id)))
   }, [visiblePendingPlanIds])
+  useEffect(() => {
+    setPlanPage(1)
+  }, [month, planFilterChannel, planFilterGroup, planFilterProductCode])
+  useEffect(() => {
+    setPlanPage(1)
+  }, [planPageSize])
+  useEffect(() => {
+    setPendingSalePage(1)
+    setAnalysisPage(1)
+    setRemainingPage(1)
+  }, [insightFilterGroup, insightFilterProductCode])
+  useEffect(() => {
+    setPendingSalePage(1)
+  }, [pendingSalePageSize])
+  useEffect(() => {
+    setAnalysisPage(1)
+  }, [analysisPageSize])
+  useEffect(() => {
+    setRemainingPage(1)
+  }, [remainingPageSize])
+  useEffect(() => {
+    setPlanPage((current) => Math.min(current, totalPlanPages))
+  }, [totalPlanPages])
+  useEffect(() => {
+    setPendingSalePage((current) => Math.min(current, totalPendingSalePages))
+  }, [totalPendingSalePages])
+  useEffect(() => {
+    setAnalysisPage((current) => Math.min(current, totalAnalysisPages))
+  }, [totalAnalysisPages])
+  useEffect(() => {
+    setRemainingPage((current) => Math.min(current, totalRemainingPages))
+  }, [totalRemainingPages])
 
   const exportPlan = () => {
     downloadCsv(
@@ -949,12 +1069,16 @@ export function SalesPlanPageClient() {
           </DialogContent>
         </Dialog>
 
+        <TablePaginationToolbar
+          page={planPage}
+          pageSize={planPageSize}
+          totalItems={sortedPlanRows.length}
+          totalPages={totalPlanPages}
+          onPageChange={setPlanPage}
+          onPageSizeChange={setPlanPageSize}
+          onResetWidths={planResize.hasCustomWidths ? planResize.resetColumnWidths : undefined}
+        />
         {/* Desktop view */}
-        {planResize.hasCustomWidths ? (
-          <div className="hidden justify-end px-4 pt-3 lg:flex">
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={planResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
-          </div>
-        ) : null}
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: planResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
@@ -988,7 +1112,7 @@ export function SalesPlanPageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedPlanRows.map((row) => (
+              {pagedPlanRows.map((row) => (
                 <tr className="hover:bg-slate-50/50 transition-colors" key={text(row.id)}>
                   <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.productId)}><option>{text(row.productName) || '-เลือก-'}</option></select></td>
                   <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.channel)}><option>{text(row.channel) || 'ส่งออก'}</option></select></td>
@@ -1041,7 +1165,7 @@ export function SalesPlanPageClient() {
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20">
-          {sortedPlanRows.map((row) => (
+          {pagedPlanRows.map((row) => (
             <div key={text(row.id)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div className="font-bold text-slate-800 text-sm">{text(row.productName) || 'ไม่ได้ระบุสินค้า'}</div>
@@ -1105,6 +1229,14 @@ export function SalesPlanPageClient() {
           <h3 className="font-bold text-slate-800 text-sm">📋 ตารางรอขาย — ทองแดง / ทองเหลือง ({money(pendingSaleRows.length)} รายการ)</h3>
           <p className="mt-1 text-xs text-slate-500">รอขายจริง = STOCK + PO ซื้อรอส่ง − ล็อกขายรอส่ง · ยอดติดลบหมายถึงของจริงและของกำลังเข้าไม่พอกับยอดขายที่ล็อกไว้</p>
         </div>
+        <TablePaginationToolbar
+          page={pendingSalePage}
+          pageSize={pendingSalePageSize}
+          totalItems={pendingSaleRows.length}
+          totalPages={totalPendingSalePages}
+          onPageChange={setPendingSalePage}
+          onPageSizeChange={setPendingSalePageSize}
+        />
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-100">
@@ -1124,7 +1256,7 @@ export function SalesPlanPageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {pendingSaleRows.map((row) => {
+              {pagedPendingSaleRows.map((row) => {
                 const shortage = num(row.realPendingSale) < 0
                 return (
                   <tr className={`transition-colors hover:bg-slate-50/50 ${shortage ? 'bg-red-50/40' : ''}`} key={text(row.productId)}>
@@ -1168,7 +1300,7 @@ export function SalesPlanPageClient() {
           </table>
         </div>
         <div className="space-y-3 bg-slate-50/20 p-4 lg:hidden">
-          {pendingSaleRows.map((row) => {
+          {pagedPendingSaleRows.map((row) => {
             const shortage = num(row.realPendingSale) < 0
             return (
               <div key={text(row.productId)} className={`rounded-xl border p-4 shadow-sm ${shortage ? 'border-red-200 bg-red-50/40' : 'border-slate-200 bg-white'}`}>
@@ -1240,12 +1372,16 @@ export function SalesPlanPageClient() {
           </div>
         </div>
 
+        <TablePaginationToolbar
+          page={analysisPage}
+          pageSize={analysisPageSize}
+          totalItems={sortedAnalysisRows.length}
+          totalPages={totalAnalysisPages}
+          onPageChange={setAnalysisPage}
+          onPageSizeChange={setAnalysisPageSize}
+          onResetWidths={analysisResize.hasCustomWidths ? analysisResize.resetColumnWidths : undefined}
+        />
         {/* Desktop View Table */}
-        {analysisResize.hasCustomWidths ? (
-          <div className="hidden justify-end px-4 pt-3 lg:flex">
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={analysisResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
-          </div>
-        ) : null}
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: analysisResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
@@ -1270,7 +1406,7 @@ export function SalesPlanPageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedAnalysisRows.map((row) => (
+              {pagedAnalysisRows.map((row) => (
                 <tr className="hover:bg-slate-50/50 transition-colors" key={text(row.code)}>
                   <td className="p-2.5 min-w-0 overflow-hidden"><div className="font-semibold text-slate-800 truncate" title={text(row.name)}>{text(row.name)}</div><div className="font-mono text-xs text-slate-400 font-semibold truncate" title={text(row.code)}>{text(row.code)}</div></td>
                   <td className="p-2.5 text-xs text-slate-500 font-medium min-w-0 overflow-hidden"><div className="truncate" title={text(row.metalGroup)}>{text(row.metalGroup)}</div></td>
@@ -1293,7 +1429,7 @@ export function SalesPlanPageClient() {
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20 border-t border-slate-100">
-          {sortedAnalysisRows.map((row) => (
+          {pagedAnalysisRows.map((row) => (
             <div key={text(row.code)} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div>
@@ -1345,12 +1481,16 @@ export function SalesPlanPageClient() {
           </div>
         </div>
 
+        <TablePaginationToolbar
+          page={remainingPage}
+          pageSize={remainingPageSize}
+          totalItems={sortedRemainingRows.length}
+          totalPages={totalRemainingPages}
+          onPageChange={setRemainingPage}
+          onPageSizeChange={setRemainingPageSize}
+          onResetWidths={remainingResize.hasCustomWidths ? remainingResize.resetColumnWidths : undefined}
+        />
         {/* Desktop View Table */}
-        {remainingResize.hasCustomWidths ? (
-          <div className="hidden justify-end px-4 pt-3 lg:flex">
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={remainingResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
-          </div>
-        ) : null}
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: remainingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
@@ -1375,7 +1515,7 @@ export function SalesPlanPageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedRemainingRows.map((row) => (
+              {pagedRemainingRows.map((row) => (
                 <tr className={`hover:bg-slate-50/50 transition-colors ${num(row.remainingKg) > 0 ? '' : 'opacity-60'}`} key={`${text(row.code)}-remain`}>
                   <td className="p-2.5 font-mono text-xs text-slate-400 font-semibold min-w-0 overflow-hidden"><div className="truncate" title={text(row.code)}>{text(row.code)}</div></td>
                   <td className="p-2.5 text-slate-800 font-medium min-w-0 overflow-hidden"><div className="truncate" title={text(row.name)}>{text(row.name)}</div></td>
@@ -1397,7 +1537,7 @@ export function SalesPlanPageClient() {
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20 border-t border-slate-100">
-          {sortedRemainingRows.map((row) => (
+          {pagedRemainingRows.map((row) => (
             <div key={`${text(row.code)}-remain`} className={`bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3 ${num(row.remainingKg) > 0 ? '' : 'opacity-65'}`}>
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div>
