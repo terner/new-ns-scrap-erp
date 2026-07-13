@@ -531,7 +531,7 @@ export function SalesPlanPageClient() {
     })
     return keys
   }, [visiblePlanRows])
-  const bestPlanByProduct = useMemo(() => {
+  const bestVisiblePlanByProduct = useMemo(() => {
     const plans = new Map<string, { price: number; pct: number }>()
     visiblePlanRows.forEach((plan) => {
       const price = num(plan.sellPrice)
@@ -548,7 +548,7 @@ export function SalesPlanPageClient() {
     return (data?.pendingSaleTable ?? [])
       .filter((row) => matchesProductFilter(row, insightFilterProductCode))
       .map((row): AnyRow => {
-        const plan = productMatchKeys(row).map((key) => bestPlanByProduct.get(key)).find(Boolean)
+        const plan = productMatchKeys(row).map((key) => bestVisiblePlanByProduct.get(key)).find(Boolean)
         if (!plan) return { ...row, bestPlanPct: 0, bestPlanPrice: 0, projectedMarginPct: 0, projectedProfit: 0 }
 
         const poolCost = num(row.avgPrice)
@@ -568,7 +568,7 @@ export function SalesPlanPageClient() {
         if (leftHasPlan !== rightHasPlan) return leftHasPlan ? -1 : 1
         return num(right.pendingSaleQty) - num(left.pendingSaleQty)
       })
-  }, [bestPlanByProduct, data?.pendingSaleTable, insightFilterGroup, insightFilterProductCode])
+  }, [bestVisiblePlanByProduct, data?.pendingSaleTable, insightFilterGroup, insightFilterProductCode])
   const pendingSaleTotals = useMemo(() => ({
     count: pendingSaleRows.length,
     shortageCount: pendingSaleRows.filter((row) => num(row.realPendingSale) < 0).length,
@@ -580,32 +580,8 @@ export function SalesPlanPageClient() {
     totalStock: pendingSaleRows.reduce((sum, row) => sum + num(row.stock), 0),
   }), [pendingSaleRows])
   const analysisRows = useMemo(() => (data?.productAnalysis ?? [])
-    .filter((row) => productMatchKeys(row).some((key) => visiblePlanProductKeys.has(key)))
     .filter((row) => !insightFilterGroup || text(row.metalGroup).includes(insightFilterGroup))
-    .filter((row) => matchesProductFilter(row, insightFilterProductCode))
-    .map((row) => {
-      const plan = productMatchKeys(row).map((key) => bestPlanByProduct.get(key)).find(Boolean)
-      if (!plan) {
-        return {
-          ...row,
-          bestPlanPct: 0,
-          bestPlanPrice: 0,
-          projectedMarginPct: 0,
-          projectedProfit: 0,
-        }
-      }
-
-      const remainingKg = num(row.remainingKg)
-      const wac = num(row.wac)
-      const projectedProfit = remainingKg * (plan.price - wac)
-      return {
-        ...row,
-        bestPlanPct: plan.pct,
-        bestPlanPrice: plan.price,
-        projectedMarginPct: wac > 0 ? ((plan.price - wac) / wac) * 100 : 0,
-        projectedProfit,
-      }
-    }), [bestPlanByProduct, data?.productAnalysis, insightFilterGroup, insightFilterProductCode, visiblePlanProductKeys])
+    .filter((row) => matchesProductFilter(row, insightFilterProductCode)), [data?.productAnalysis, insightFilterGroup, insightFilterProductCode])
   const sortedPlanRows = useMemo(() => {
     const rows = visiblePlanRows
     if (!planSortKey) return rows
