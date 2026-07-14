@@ -36,6 +36,7 @@ Dashboard Overview เป็น management KPI view จาก operational facts.
 - Mobile แสดงเฉพาะ quick range, ช่วงวันที่, count summary และปุ่ม `ตัวกรอง`; ตัวกรองเต็มเปิดผ่าน `MobileFilterSheet` เพื่อไม่ให้หน้าเริ่มด้วย form stack ยาว และ controls ใน sheet ต้องคง `h-9` + neutral slate apply/focus treatment ไม่ใช้ปุ่มฟ้า custom
 - ห้ามแสดง hero/banner แยกสำหรับชื่อหน้า Dashboard Overview ถ้ามี title/scope จาก app shell และ filter card อยู่แล้ว เพราะกินพื้นที่และซ้ำกับข้อมูลหน้า
 - KPI 6 ใบใช้ white cards พร้อม accent สีซ้ายเท่านั้น; ห้ามทำ full-gradient ทุกใบจนทั้งหน้าดูแข่งกันเด่น และไม่ใช้ dot marker ที่เหมือนสถานะถ้าไม่มีความหมายจริง
+- KPI 6 ใบแสดง optional delta badge ใต้/ข้างตัวเลขหลักได้เฉพาะเมื่อมาจากข้อมูลจริงของช่วงก่อนหน้าที่เทียบกันได้ (`previousEquivalentRange`); badge เป็นลูกศรขึ้น/ลง/คงที่ + เปอร์เซ็นต์เล็ก ไม่ใช่ sparkline หรือกราฟแยก และสีต้องตีความตามธุรกิจ เช่น Expenses/AP เพิ่มเป็นสัญญาณลบ แต่ Revenue/Cash/Net Profit เพิ่มเป็นสัญญาณบวก
 - Filter card ห้ามใช้แถบดำหนักในหน้านี้; ช่อง input/select/search ต้องอ่านค่าและ placeholder ชัดเจน ไม่ดูเหมือนช่องว่าง
 - `Historical` แสดงเฉพาะเมื่อมี rows จริง ถ้าไม่มีข้อมูลไม่ต้องแสดง empty banner เพราะไม่ช่วยการตัดสินใจ
 - Detail metric sections ท้ายหน้าต้องไม่ซ้ำกับ KPI โดยตรง เช่น ซื้อ/ขายท้ายหน้าเน้นจำนวนบิล, น้ำหนัก, ราคาเฉลี่ย, GP/Margin แทนการย้ำยอดรวมเดิม

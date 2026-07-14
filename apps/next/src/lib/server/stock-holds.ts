@@ -771,6 +771,7 @@ export async function releaseActiveWtoPendingOut(tx: TxClient, input: {
   await tx.stock_holds.updateMany({
     data: {
       ...(input.reason === 'cancel' ? { cancelled_at: now } : { released_at: now }),
+      release_reason: input.reason,
       status: input.reason === 'cancel' ? 'cancelled' : 'released',
       updated_at: now,
       updated_by: input.actor,

@@ -8,6 +8,7 @@ import {
   OTHER_PRODUCT_IMPURITY_ID,
   OTHER_PRODUCT_IMPURITY_LABEL,
   parseImpurityProductMeta,
+  roundWeight,
   type WeightTicketFormValues,
   type WeightTicketStatus,
   type WeightTicketType,
@@ -23,7 +24,7 @@ export type WeightTicketQuery = {
   page: number
   pageSize: number
   search?: string
-  sortBy: 'createdAt' | 'documentNo' | 'netWeight' | 'partyName' | 'branchName' | 'vehicleNo' | 'warehouseName' | 'deductionWeight' | 'impurityDeduction' | 'status' | 'updatedAt'
+  sortBy: 'createdAt' | 'documentNo' | 'netWeight' | 'partyName' | 'branchName' | 'vehicleNo' | 'godownName' | 'deductionWeight' | 'impurityDeduction' | 'status' | 'updatedAt'
   sortDir: 'asc' | 'desc'
   statuses: string[]
   type?: string
@@ -61,104 +62,79 @@ type WeightTicketDownstreamAllocationRow = {
   weight_ticket_doc_no: string
 }
 
-export const weightTicketRowSelect = {
-  branch_id: true,
-  branches: true,
-  cancel_note: true,
-  cancelled_at: true,
-  container_deduction_weight: true,
-  created_at: true,
-  created_by: true,
-  customers: true,
-  deduct_weight: true,
-  doc_no: true,
-  doc_type: true,
-  document_date: true,
-  entered_by: true,
-  gross_weight: true,
-  id: true,
-  image_count: true,
-  net_weight: true,
-  party_name: true,
-  remark: true,
-  status: true,
-  stock_holds: {
-    select: {
-      cost_snapshot_at: true,
-      cost_snapshot_note: true,
-      cost_snapshot_source: true,
-      consumed_at: true,
-      consumed_by_ref_no: true,
-      hold_key: true,
-      held_at: true,
-      product_id: true,
-      qty: true,
-      released_at: true,
-      source_doc_no: true,
-      source_line_no: true,
-      status: true,
-      unit_cost_snapshot: true,
-      value_snapshot: true,
-      warehouse_id: true,
-      warehouses: {
-        select: {
-          code: true,
-          id: true,
-          name: true,
-          type: true,
-        },
-      },
-    },
-    orderBy: {
-      source_line_no: 'asc',
-    },
-  },
-  suppliers: true,
-  updated_at: true,
-  updated_by: true,
-  vehicle_image_count: true,
-  vehicle_image_names: true,
-  vehicle_no: true,
-  weight_ticket_lines: {
-    include: {
-      products: {
-        select: {
-          code: true,
-          id: true,
-          metal_group: true,
-        },
-      },
-      warehouses: {
-        select: {
-          code: true,
-          id: true,
-          name: true,
-          type: true,
-        },
-      },
-    },
-    orderBy: {
-      line_no: 'asc',
-    },
-  },
-  weight_ticket_product_summaries: {
-    include: {
-      products: {
-        select: {
-          code: true,
-          id: true,
-          metal_group: true,
-        },
-      },
-    },
-    orderBy: {
-      product_name: 'asc',
-    },
-  },
-} as const
-
 export type WeightTicketRow = Prisma.weight_ticketsGetPayload<{
-  select: typeof weightTicketRowSelect
+  include: {
+    branches: true
+    customers: true
+    suppliers: true
+    weight_ticket_product_summaries: {
+      include: {
+        products: {
+          select: {
+            code: true
+            id: true
+            metal_group: true
+          }
+        }
+      }
+      orderBy: {
+        product_name: 'asc'
+      }
+    }
+    weight_ticket_lines: {
+      include: {
+        products: {
+          select: {
+            code: true
+            id: true
+            metal_group: true
+          }
+        }
+        warehouses: {
+          select: {
+            code: true
+            id: true
+            name: true
+            type: true
+          }
+        }
+      }
+      orderBy: {
+        line_no: 'asc'
+      }
+    }
+    stock_holds: {
+      select: {
+        cost_snapshot_at: true
+        cost_snapshot_note: true
+        cost_snapshot_source: true
+        consumed_at: true
+        consumed_by_ref_no: true
+        hold_key: true
+        held_at: true
+        product_id: true
+        qty: true
+        released_at: true
+        source_doc_no: true
+        source_line_no: true
+        status: true
+        unit_cost_snapshot: true
+        value_snapshot: true
+        warehouse_id: true
+        warehouses: {
+          select: {
+            code: true
+            id: true
+            name: true
+            type: true
+          }
+        }
+      }
+      orderBy: {
+        source_line_no: 'asc'
+      }
+    }
+  }
 }>
 
 type WeightTicketStatusTimelineRow = {
@@ -223,7 +199,7 @@ export function parseWeightTicketQuery(url: URL): WeightTicketQuery {
     'partyName',
     'branchName',
     'vehicleNo',
-    'warehouseName',
+    'godownName',
     'deductionWeight',
     'impurityDeduction',
     'status',
@@ -264,8 +240,8 @@ export function weightTicketOrderBy(query: WeightTicketQuery): Prisma.weight_tic
   if (query.sortBy === 'vehicleNo') {
     return [{ vehicle_no: direction }, { created_at: 'desc' }]
   }
-  if (query.sortBy === 'warehouseName') {
-    return [{ warehouse_name: direction }, { created_at: 'desc' }]
+  if (query.sortBy === 'godownName') {
+    return [{ godown_name: direction }, { created_at: 'desc' }]
   }
   if (query.sortBy === 'deductionWeight') {
     return [{ container_deduction_weight: direction }, { created_at: 'desc' }]
@@ -303,11 +279,19 @@ export function branchScopeIds(context: AppAuthContext) {
 }
 
 export function enteredByLabel(context: AppAuthContext) {
-  // NSERP-85: show only the system Display Name for the weighing staff on
-  // weight tickets / receipts. If display_name is missing it shows '-'
-  // rather than leaking the account email, so the underlying user record is the
-  // single source of truth for the staff's name.
-  return context.appUser?.displayName ?? '-'
+  const displayName = context.appUser?.displayName?.trim()
+  if (!displayName) {
+    throw new Error('ไม่พบชื่อผู้ใช้สำหรับบันทึกใบรับ-ส่งของ กรุณากำหนดชื่อพนักงานก่อนสร้างเอกสาร')
+  }
+  return displayName
+}
+
+export function requireWeightTicketBranchDocumentCode(code: string | null | undefined) {
+  const value = code?.trim()
+  if (!value || !/^\d{2}$/.test(value)) {
+    throw new Error('รหัสสาขาสำหรับออกเลขที่ใบรับ-ส่งของต้องเป็นตัวเลข 2 หลัก')
+  }
+  return value
 }
 
 export function defaultTicketStatus(_type: WeightTicketType): WeightTicketStatus {
@@ -432,18 +416,18 @@ export function buildWeightTicketLineRows(
     const impurity = impurityId == null ? null : impurityById.get(impurityId)
 
     return {
-      container_deduction_weight: lineTotals.containerDeductionWeight,
-      deduct_weight: lineTotals.deductionWeight,
+      container_deduction_weight: roundWeight(lineTotals.containerDeductionWeight),
+      deduct_weight: roundWeight(lineTotals.deductionWeight),
       deduction_mode: line.deductionMode,
-      deduction_value: line.deductionMode === 'none' ? 0 : Number(line.deductionValue),
-      gross_weight: lineTotals.grossWeight,
+      deduction_value: line.deductionMode === 'none' ? 0 : roundWeight(Number(line.deductionValue)),
+      gross_weight: roundWeight(lineTotals.grossWeight),
       image_count: line.imageNames.length,
       image_names: line.imageNames,
       impurity_id: impurityId ?? null,
       impurity_name: isOtherProductImpurity ? OTHER_PRODUCT_IMPURITY_LABEL : impurity?.name ?? null,
       impurity_source_line_no: line.impuritySourceLineId ? lineNoById.get(line.impuritySourceLineId) ?? null : null,
       line_no: index + 1,
-      net_weight: lineTotals.netWeight,
+      net_weight: roundWeight(lineTotals.netWeight),
       note: appendImpurityProductMeta(line.note, {
         id: isOtherProductImpurity ? (line.impurityProductId ?? '') : '',
         name: isOtherProductImpurity ? (impurityProduct?.name ?? '') : '',
@@ -515,18 +499,18 @@ export function buildWeightTicketProductSummaryRows(
   })
 
   const summaryRows = [...grouped.values()].map((summary) => ({
-    billed_weight: summary.billedWeight,
-    container_deduction_weight: summary.containerDeductionWeight,
+    billed_weight: roundWeight(summary.billedWeight),
+    container_deduction_weight: roundWeight(summary.containerDeductionWeight),
     created_at: new Date(),
-    deduct_weight: summary.deductWeight,
-    gross_weight: summary.grossWeight,
+    deduct_weight: roundWeight(summary.deductWeight),
+    gross_weight: roundWeight(summary.grossWeight),
     has_mixed_deduction_profiles: summary.mixedProfiles.size > 1,
     line_count: summary.lineCount,
     lineIds: summary.lineIds,
-    net_weight: summary.netWeight,
+    net_weight: roundWeight(summary.netWeight),
     product_id: summary.productId,
     product_name: summary.productName,
-    remaining_weight: summary.netWeight,
+    remaining_weight: roundWeight(summary.netWeight),
     updated_at: new Date(),
     weight_ticket_id: ticketId,
   }))
@@ -864,7 +848,7 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
     })(),
     containerDeductionWeight: toNumber(line.container_deduction_weight).toString(),
     containerDeductionWeightValue: toNumber(line.container_deduction_weight),
-    deductionMode: (line.deduction_mode ?? 'none') as 'none' | 'kg' | 'percent',
+    deductionMode: line.deduction_mode as 'none' | 'kg' | 'percent',
     deductionValue: toNumber(line.deduction_value).toString(),
     deductionWeight: toNumber(line.deduct_weight),
     grossWeight: toNumber(line.gross_weight).toString(),
@@ -1010,7 +994,7 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
     pendingOutHistory,
     productSummaries,
     remark: row.remark ?? '',
-    status: (row.status ?? defaultTicketStatus(row.doc_type as WeightTicketType)) as WeightTicketStatus,
+    status: row.status as WeightTicketStatus,
     totals: {
       containerDeductionWeight: toNumber(row.container_deduction_weight),
       deductionWeight: toNumber(row.deduct_weight),
@@ -1029,7 +1013,7 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
     vehicleImageCount: row.vehicle_image_count ?? 0,
     vehicleImageNames: row.vehicle_image_names ?? [],
     vehicleNo: row.vehicle_no,
-    warehouseName: lineRows[0]?.warehouseName ?? pendingOutHistory[0]?.warehouseName ?? '',
+    godownName: row.godown_name,
   }
 }
 
@@ -1064,9 +1048,78 @@ export function mutableTicketErrorMessage(action: 'cancel' | 'edit', usage?: Wei
     : `แก้ไขไม่ได้ เพราะเอกสารถูกนำไปใช้กับ${usageText}แล้ว`
 }
 
+export const weightTicketInclude = {
+  branches: true,
+  customers: true,
+  suppliers: true,
+  weight_ticket_product_summaries: {
+    include: {
+      products: {
+        select: {
+          code: true,
+          id: true,
+        },
+      },
+    },
+    orderBy: {
+      product_name: 'asc',
+    },
+  },
+  weight_ticket_lines: {
+    include: {
+      products: {
+        select: {
+          code: true,
+          id: true,
+        },
+      },
+      warehouses: {
+        select: {
+          code: true,
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+    },
+    orderBy: {
+      line_no: 'asc',
+    },
+  },
+  stock_holds: {
+    select: {
+      cost_snapshot_at: true,
+      cost_snapshot_note: true,
+      cost_snapshot_source: true,
+      consumed_at: true,
+      consumed_by_ref_no: true,
+      hold_key: true,
+      held_at: true,
+      product_id: true,
+      qty: true,
+      released_at: true,
+      source_doc_no: true,
+      source_line_no: true,
+      status: true,
+      unit_cost_snapshot: true,
+      value_snapshot: true,
+      warehouse_id: true,
+      warehouses: {
+        select: {
+          code: true,
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+    },
+    orderBy: { source_line_no: 'asc' },
+  },
+} as const
+
 export async function findScopedWeightTicket(documentNo: string, scopedBranchIds: string[]) {
   return prisma.weight_tickets.findFirst({
-    select: weightTicketRowSelect,
+    include: weightTicketInclude,
     where: {
       doc_no: documentNo,
       ...(scopedBranchIds.length ? { branches: { code: { in: scopedBranchIds } } } : {}),
