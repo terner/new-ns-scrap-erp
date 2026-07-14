@@ -142,6 +142,8 @@ const initialPoSellForm = (): PoSellFormValues => ({
   salesPlanId: null,
 })
 
+const SALES_PLAN_DEFAULT_BRANCH_NAME = 'สมุทรสาคร'
+
 const poSellColumns: ResizableColumnDefinition<string>[] = [
   { key: 'docNo', minWidth: 120, defaultWidth: 140 },
   { key: 'createdAt', minWidth: 100, defaultWidth: 110 },
@@ -310,6 +312,10 @@ export function PoSellPageClient() {
   const currentPage = Math.min(page, totalPages)
   const pageRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const activeBranches = (data?.options.branches ?? []).filter((option) => option.active !== false)
+  const salesPlanDefaultBranchId = useMemo(
+    () => activeBranches.find((option) => option.name.trim() === SALES_PLAN_DEFAULT_BRANCH_NAME)?.id ?? null,
+    [activeBranches],
+  )
   const activeChannels = useMemo(() => (data?.options.salesChannels ?? []).filter((option) => option.active !== false), [data?.options.salesChannels])
   const allActiveCustomers = useMemo(
     () => (data?.options.customers ?? []).filter((option) => option.active !== false),
@@ -422,7 +428,7 @@ export function PoSellPageClient() {
         if (cancelled) return
         setEditingDocNo(null)
         setForm({
-          branchId: null,
+          branchId: salesPlanDefaultBranchId,
           channelId: String(planRow.channelId ?? planRow.channel ?? '') || null,
           customerId: String(planRow.customerId ?? ''),
           expectedDelivery: today,
@@ -446,7 +452,7 @@ export function PoSellPageClient() {
     return () => {
       cancelled = true
     }
-  }, [data, salesPlanIdFromQuery])
+  }, [data, salesPlanDefaultBranchId, salesPlanIdFromQuery])
 
   function openCancelDialog(row: PoSellRow) {
     if (!row.canCancel) {
