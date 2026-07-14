@@ -339,7 +339,7 @@ async function buildSalesPlanningSnapshot() {
     })
   })
 
-  const reconciliation = refs.map((product) => {
+  const reconciliation = salesPlanRefs.map((product) => {
     const stock = stockByProduct.get(product.id) ?? { qty: 0, value: 0 }
     const spotRaw = spotByProduct.get(product.id) ?? { amount: 0, qty: 0 }
     const matched = matchedByProduct.get(product.id) ?? 0
@@ -439,7 +439,7 @@ async function buildSalesPlanningSnapshot() {
     metalGroups: Array.from(new Set(salesPlanRefs.map((product) => product.metalGroup).filter(Boolean))).sort(),
     pendingSaleTable,
     pendingSaleTotals,
-    planProductOptions: refs.map((product) => ({
+    planProductOptions: salesPlanRefs.map((product) => ({
       code: product.code,
       id: product.code,
       metalGroup: product.metalGroup,
