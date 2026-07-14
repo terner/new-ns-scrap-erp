@@ -32,7 +32,7 @@ import {
   requireWeightTicketBranchDocumentCode,
   weightTicketAuditSnapshot,
   weightTicketOrderBy,
-  weightTicketRowSelect,
+  weightTicketInclude,
   weightTicketWhere,
 } from '@/lib/server/weight-tickets'
 import { syncWeightTicketToGoogleSheets } from '@/lib/server/google-sheets-sync'
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
     const take = isXlsx ? 10000 : query.pageSize
     const [rows, totalRows] = await Promise.all([
       prisma.weight_tickets.findMany({
-        select: weightTicketRowSelect,
+        include: weightTicketInclude,
         orderBy,
         ...(isXlsx ? {} : { skip: (query.page - 1) * query.pageSize }),
         take,
@@ -299,7 +299,7 @@ export async function POST(request: Request) {
       })
 
       return tx.weight_tickets.findUniqueOrThrow({
-        select: weightTicketRowSelect,
+        include: weightTicketInclude,
         where: { id: createdTicket.id },
       })
     })

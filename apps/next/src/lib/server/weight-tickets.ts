@@ -1058,6 +1058,7 @@ export const weightTicketInclude = {
         select: {
           code: true,
           id: true,
+          metal_group: true,
         },
       },
     },
@@ -1071,6 +1072,7 @@ export const weightTicketInclude = {
         select: {
           code: true,
           id: true,
+          metal_group: true,
         },
       },
       warehouses: {
