@@ -829,10 +829,11 @@ export function SalesPlanPageClient() {
     const cleaningSelected = targetPlanIds.length > 0
     const targetCount = cleaningSelected ? targetPlanIds.length : pendingPlanCount
     if (!targetCount) return
+    const activeMonth = month || data?.filters.month || new Date().toISOString().slice(0, 7)
     if (typeof window !== 'undefined') {
       const confirmed = window.confirm(cleaningSelected
         ? `ต้องการเคลียร์สถานะ Pending ของรายการที่เลือก ${targetCount} รายการใช่หรือไม่?`
-        : `ต้องการเคลียร์สถานะ Pending ทั้งหมด ${targetCount} รายการใช่หรือไม่?`)
+        : `ต้องการเคลียร์สถานะ Pending ทั้งหมด ${targetCount} รายการตามตัวกรองปัจจุบันของเดือน ${activeMonth} ใช่หรือไม่?`)
       if (!confirmed) return
     }
 
@@ -840,7 +841,19 @@ export function SalesPlanPageClient() {
     setIsClearingPendingPlans(true)
     try {
       await dailyFetchJson<{ deletedCount: number }>('/api/sales-plan', {
-        body: JSON.stringify({ action: 'clear-pending-plans', ...(cleaningSelected ? { planIds: targetPlanIds } : {}) }),
+        body: JSON.stringify({
+          action: 'clear-pending-plans',
+          ...(cleaningSelected
+            ? { planIds: targetPlanIds }
+            : {
+              filters: {
+                channel: planFilterChannel || undefined,
+                metalGroup: planFilterGroup || undefined,
+                month: activeMonth,
+                productCode: planFilterProductCode || undefined,
+              },
+            }),
+        }),
         method: 'POST',
       })
       if (cleaningSelected) {
