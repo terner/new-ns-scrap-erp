@@ -13,9 +13,9 @@ import { useResizableColumns, type ResizableColumnDefinition } from '@/component
 type AnyRow = Record<string, number | string | boolean | null | undefined>
 type SortDirection = 'asc' | 'desc'
 type TableColumn<TKey extends string> = ResizableColumnDefinition<TKey> & { align?: 'center' | 'left' | 'right'; label: string }
-type SalesPlanColumnKey = 'channel' | 'containers' | 'customerName' | 'fx' | 'kgPerContainer' | 'lme' | 'poSell' | 'productName' | 'sellPctLme' | 'sellPrice' | 'status' | 'totalKg'
+type SalesPlanColumnKey = 'channel' | 'containers' | 'customerName' | 'fx' | 'kgPerContainer' | 'lme' | 'poSell' | 'productName' | 'select' | 'sellPctLme' | 'sellPrice' | 'status' | 'totalKg'
 type SalesPlanAnalysisColumnKey = 'bestPlanPct' | 'bestPlanPrice' | 'lockedKg' | 'metalGroup' | 'name' | 'projectedMarginPct' | 'projectedProfit' | 'recommendation' | 'remainingKg' | 'stock' | 'wac'
-type SalesPlanRemainingColumnKey = 'code' | 'lockedContainers' | 'lockedKg' | 'metalGroup' | 'name' | 'remainingContainers' | 'remainingKg' | 'stock' | 'value' | 'wac'
+type SalesPlanRemainingColumnKey = 'lockedContainers' | 'lockedKg' | 'metalGroup' | 'name' | 'remainingContainers' | 'remainingKg' | 'stock' | 'value' | 'wac'
 type CommissionCategoryColumnKey = 'amount' | 'category' | 'qty'
 type CommissionSupplierColumnKey = 'amount' | 'bills' | 'pct' | 'qty' | 'supplier'
 type CommissionBillColumnKey = 'amount' | 'commissionStatus' | 'date' | 'docNo' | 'price' | 'productName' | 'profitDiff' | 'qty' | 'salesPrice' | 'supplierName'
@@ -52,6 +52,16 @@ type SalesPlanDraftForm = {
   lmeCf: string
   productCode: string
   sellPctLme: string
+}
+type ClearPendingPlansDialogState = {
+  filters?: {
+    channel?: string
+    metalGroup?: string
+    month: string
+    productCode?: string
+  }
+  message: string
+  planIds?: string[]
 }
 
 type CommissionSalespersonRow = {
@@ -102,6 +112,7 @@ type CommissionPayload = {
 }
 
 const salesPlanColumns: Array<TableColumn<SalesPlanColumnKey>> = [
+  { key: 'select', label: 'เลือก', defaultWidth: 72, minWidth: 64, align: 'center' },
   { key: 'productName', label: 'สินค้า', defaultWidth: 220, minWidth: 160 },
   { key: 'channel', label: 'ช่องทาง', defaultWidth: 125, minWidth: 105, align: 'center' },
   { key: 'customerName', label: 'ลูกค้า', defaultWidth: 190, minWidth: 145 },
@@ -129,8 +140,7 @@ const salesPlanAnalysisColumns: Array<TableColumn<SalesPlanAnalysisColumnKey>> =
   { key: 'recommendation', label: 'คำแนะนำ', defaultWidth: 180, minWidth: 140, align: 'center' },
 ]
 const salesPlanRemainingColumns: Array<TableColumn<SalesPlanRemainingColumnKey>> = [
-  { key: 'code', label: 'รหัส', defaultWidth: 110, minWidth: 90 },
-  { key: 'name', label: 'สินค้า', defaultWidth: 220, minWidth: 160 },
+  { key: 'name', label: 'สินค้า', defaultWidth: 250, minWidth: 190 },
   { key: 'metalGroup', label: 'หมวด', defaultWidth: 130, minWidth: 105 },
   { key: 'stock', label: 'Stock ทั้งหมด (กก.)', defaultWidth: 150, minWidth: 125, align: 'right' },
   { key: 'lockedKg', label: 'ล็อกแล้ว (กก.)', defaultWidth: 140, minWidth: 120, align: 'right' },
@@ -200,6 +210,16 @@ function matchesProductFilter(row: AnyRow, filterProductCode: string) {
   ].some((value) => normalizedProductFilterValue(value) === needle)
 }
 
+function productMatchKeys(row: AnyRow) {
+  return [
+    row.productCode,
+    row.productId,
+    row.productName,
+    row.code,
+    row.name,
+  ].map((value) => normalizedProductFilterValue(value)).filter(Boolean)
+}
+
 function lmeDraftValueByMetalGroup(metalGroup: string, config: LmeConfig | null) {
   if (!config) return ''
   const group = metalGroup.toLowerCase()
@@ -257,6 +277,16 @@ function getCommissionBillSortValue(row: CommissionBillRow, key: CommissionBillC
   return row[key] ?? ''
 }
 
+function recommendationBadgeClass(recommendation: unknown) {
+  const value = text(recommendation).trim()
+  if (value === 'ควรขาย (กำไรดี)') return 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'
+  if (value === 'พอกำไร') return 'bg-sky-100 text-sky-700 ring-1 ring-sky-200'
+  if (value === 'ขาดทุน - รอราคา') return 'bg-rose-100 text-rose-700 ring-1 ring-rose-200'
+  if (value === 'ล็อกครบแล้ว') return 'bg-slate-200 text-slate-700 ring-1 ring-slate-300'
+  if (value === 'ยังไม่มีแผนเสนอ') return 'bg-amber-100 text-amber-700 ring-1 ring-amber-200'
+  return 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'
+}
+
 function sortedByKey<TRow, TKey extends string>(
   rows: TRow[],
   key: TKey | null,
@@ -287,6 +317,78 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
+const SALES_PLAN_DEFAULT_PAGE_SIZE = 10
+const SALES_PLAN_PAGE_SIZE_OPTIONS = [10, 25] as const
+
+function pageCount(totalItems: number, pageSize: number) {
+  return Math.max(1, Math.ceil(totalItems / pageSize))
+}
+
+function paginateRows<TRow>(rows: TRow[], page: number, pageSize: number) {
+  return rows.slice((page - 1) * pageSize, page * pageSize)
+}
+
+function count(value: number) {
+  return new Intl.NumberFormat('th-TH').format(value)
+}
+
+function TablePaginationToolbar({
+  page,
+  pageSize,
+  totalItems,
+  totalPages,
+  onPageChange,
+  onPageSizeChange,
+  onResetWidths,
+}: {
+  page: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
+  onResetWidths?: (() => void) | undefined
+}) {
+  return (
+    <div className="border-b border-slate-100 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+        <div className="font-semibold text-slate-500">พบทั้งหมด {count(totalItems)} รายการ</div>
+        <div className="flex flex-wrap items-center gap-2">
+          {onResetWidths ? (
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={onResetWidths}>คืนค่าเดิมตาราง</button>
+          ) : null}
+          <select
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+            value={pageSize}
+            onChange={(event) => onPageSizeChange(Number(event.target.value))}
+          >
+            {SALES_PLAN_PAGE_SIZE_OPTIONS.map((option) => (
+              <option key={option} value={option}>{option} / หน้า</option>
+            ))}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 outline-none hover:bg-slate-50 disabled:opacity-40"
+            disabled={page <= 1}
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1 text-sm font-semibold text-slate-600">หน้า {page} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 outline-none hover:bg-slate-50 disabled:opacity-40"
+            disabled={page >= totalPages}
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function SalesPlanPageClient() {
   const [data, setData] = useState<SalesPlanPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -295,11 +397,16 @@ export function SalesPlanPageClient() {
   const [isFetchingLive, setIsFetchingLive] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
   const [isSavingPlan, setIsSavingPlan] = useState(false)
+  const [isClearingPendingPlans, setIsClearingPendingPlans] = useState(false)
   const [isPlanFormOpen, setIsPlanFormOpen] = useState(false)
+  const [clearPendingPlansDialog, setClearPendingPlansDialog] = useState<ClearPendingPlansDialogState | null>(null)
+  const [selectedPendingPlanIds, setSelectedPendingPlanIds] = useState<string[]>([])
   const [month, setMonth] = useState('')
-  const [filterGroup, setFilterGroup] = useState('')
-  const [filterChannel, setFilterChannel] = useState('')
-  const [filterProductCode, setFilterProductCode] = useState('')
+  const [planFilterGroup, setPlanFilterGroup] = useState('')
+  const [planFilterChannel, setPlanFilterChannel] = useState('')
+  const [planFilterProductCode, setPlanFilterProductCode] = useState('')
+  const [insightFilterGroup, setInsightFilterGroup] = useState('')
+  const [insightFilterProductCode, setInsightFilterProductCode] = useState('')
   const [lmeForm, setLmeForm] = useState<LmeConfig | null>(null)
   const [planDraftError, setPlanDraftError] = useState<string | null>(null)
   const [planDraftForm, setPlanDraftForm] = useState<SalesPlanDraftForm>({
@@ -319,9 +426,17 @@ export function SalesPlanPageClient() {
   const [remainingSortKey, setRemainingSortKey] = useState<SalesPlanRemainingColumnKey | null>(null)
   const [remainingSortDirection, setRemainingSortDirection] = useState<SortDirection>('asc')
   const [salesPlanInsightTab, setSalesPlanInsightTab] = useState<'analysis' | 'remaining'>('analysis')
+  const [planPage, setPlanPage] = useState(1)
+  const [pendingSalePage, setPendingSalePage] = useState(1)
+  const [analysisPage, setAnalysisPage] = useState(1)
+  const [remainingPage, setRemainingPage] = useState(1)
+  const [planPageSize, setPlanPageSize] = useState(SALES_PLAN_DEFAULT_PAGE_SIZE)
+  const [pendingSalePageSize, setPendingSalePageSize] = useState(SALES_PLAN_DEFAULT_PAGE_SIZE)
+  const [analysisPageSize, setAnalysisPageSize] = useState(SALES_PLAN_DEFAULT_PAGE_SIZE)
+  const [remainingPageSize, setRemainingPageSize] = useState(SALES_PLAN_DEFAULT_PAGE_SIZE)
   const planResize = useResizableColumns('main.sales-plan.plan.v1', salesPlanColumns)
   const analysisResize = useResizableColumns('main.sales-plan.analysis.v1', salesPlanAnalysisColumns)
-  const remainingResize = useResizableColumns('main.sales-plan.remaining.v1', salesPlanRemainingColumns)
+  const remainingResize = useResizableColumns('main.sales-plan.remaining.v2', salesPlanRemainingColumns)
 
   const loadSalesPlan = async () => {
     setError(null)
@@ -387,6 +502,9 @@ export function SalesPlanPageClient() {
     })
     return Array.from(options.values()).sort((left, right) => left.label.localeCompare(right.label, 'th', { numeric: true }))
   }, [data?.pendingSaleTable, data?.productAnalysis, productOptions])
+  const insightFilterGroupOptions = useMemo(() => Array.from(
+    new Set((data?.productAnalysis ?? []).map((row) => text(row.metalGroup).trim()).filter(Boolean)),
+  ).sort((left, right) => left.localeCompare(right, 'th', { numeric: true })), [data?.productAnalysis])
   const selectedDraftProduct = useMemo(() => productOptions.find((option) => option.code === planDraftForm.productCode) ?? null, [planDraftForm.productCode, productOptions])
   const selectedDraftCustomer = useMemo(() => customerOptions.find((option) => option.code === planDraftForm.customerCode) ?? null, [customerOptions, planDraftForm.customerCode])
   const selectedDraftChannel = useMemo(() => (data?.filters.channels ?? []).find((channel) => channel.id === planDraftForm.channel) ?? null, [data?.filters.channels, planDraftForm.channel])
@@ -399,9 +517,9 @@ export function SalesPlanPageClient() {
   const draftFx = lmeForm?.fxRate ?? 0
   const draftSellPrice = draftLmeCf > 0 ? (draftLmeCf / 1000) * draftFx * (draftSellPct / 100) : 0
   const filteredServerPlanRows = useMemo(() => (data?.planRows ?? [])
-    .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
-    .filter((row) => !filterChannel || text(row.channel).toLowerCase() === filterChannel.toLowerCase())
-    .filter((row) => matchesProductFilter(row, filterProductCode)), [data?.planRows, filterChannel, filterGroup, filterProductCode])
+    .filter((row) => !planFilterGroup || text(row.metalGroup).includes(planFilterGroup))
+    .filter((row) => !planFilterChannel || text(row.channel).toLowerCase() === planFilterChannel.toLowerCase())
+    .filter((row) => matchesProductFilter(row, planFilterProductCode)), [data?.planRows, planFilterChannel, planFilterGroup, planFilterProductCode])
   const planRowsWithStatus = useMemo<AnyRow[]>(() => filteredServerPlanRows.map((row) => {
     const status = getPlanStatus(row.status)
     return {
@@ -411,24 +529,36 @@ export function SalesPlanPageClient() {
       statusLabel: getPlanStatusLabel(status),
     }
   }), [filteredServerPlanRows])
-  const pendingSaleRows = useMemo<AnyRow[]>(() => {
-    const bestPlanByProduct = new Map<string, { price: number; pct: number }>()
-    planRowsWithStatus.forEach((plan) => {
+  const visiblePlanRows = useMemo(() => planRowsWithStatus.filter((row) => getPlanStatus(row.status) !== 'po_created'), [planRowsWithStatus])
+  const pendingPlanCount = useMemo(() => visiblePlanRows.filter((row) => getPlanStatus(row.status) === 'pending').length, [visiblePlanRows])
+  const visiblePendingPlanIds = useMemo(() => visiblePlanRows.filter((row) => getPlanStatus(row.status) === 'pending').map((row) => text(row.id)).filter(Boolean), [visiblePlanRows])
+  const selectedVisiblePendingPlanIds = useMemo(() => selectedPendingPlanIds.filter((id) => visiblePendingPlanIds.includes(id)), [selectedPendingPlanIds, visiblePendingPlanIds])
+  const allVisiblePendingSelected = visiblePendingPlanIds.length > 0 && selectedVisiblePendingPlanIds.length === visiblePendingPlanIds.length
+  const visiblePlanProductKeys = useMemo(() => {
+    const keys = new Set<string>()
+    visiblePlanRows.forEach((row) => {
+      productMatchKeys(row).forEach((key) => keys.add(key))
+    })
+    return keys
+  }, [visiblePlanRows])
+  const bestVisiblePlanByProduct = useMemo(() => {
+    const plans = new Map<string, { price: number; pct: number }>()
+    visiblePlanRows.forEach((plan) => {
       const price = num(plan.sellPrice)
       const pct = num(plan.sellPctLme)
       if (price <= 0 || pct <= 0) return
-      const keys = [text(plan.productId), text(plan.productCode)].map((key) => key.trim().toLowerCase()).filter(Boolean)
-      keys.forEach((key) => {
-        const current = bestPlanByProduct.get(key)
-        if (!current || price > current.price) bestPlanByProduct.set(key, { pct, price })
+      productMatchKeys(plan).forEach((key) => {
+        const current = plans.get(key)
+        if (!current || price > current.price) plans.set(key, { pct, price })
       })
     })
-
+    return plans
+  }, [visiblePlanRows])
+  const pendingSaleRows = useMemo<AnyRow[]>(() => {
     return (data?.pendingSaleTable ?? [])
-      .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
-      .filter((row) => matchesProductFilter(row, filterProductCode))
+      .filter((row) => matchesProductFilter(row, insightFilterProductCode))
       .map((row): AnyRow => {
-        const plan = bestPlanByProduct.get(text(row.productCode).trim().toLowerCase()) ?? bestPlanByProduct.get(text(row.productId).trim().toLowerCase())
+        const plan = productMatchKeys(row).map((key) => bestVisiblePlanByProduct.get(key)).find(Boolean)
         if (!plan) return { ...row, bestPlanPct: 0, bestPlanPrice: 0, projectedMarginPct: 0, projectedProfit: 0 }
 
         const poolCost = num(row.avgPrice)
@@ -448,7 +578,7 @@ export function SalesPlanPageClient() {
         if (leftHasPlan !== rightHasPlan) return leftHasPlan ? -1 : 1
         return num(right.pendingSaleQty) - num(left.pendingSaleQty)
       })
-  }, [data?.pendingSaleTable, filterGroup, filterProductCode, planRowsWithStatus])
+  }, [bestVisiblePlanByProduct, data?.pendingSaleTable, insightFilterGroup, insightFilterProductCode])
   const pendingSaleTotals = useMemo(() => ({
     count: pendingSaleRows.length,
     shortageCount: pendingSaleRows.filter((row) => num(row.realPendingSale) < 0).length,
@@ -460,18 +590,17 @@ export function SalesPlanPageClient() {
     totalStock: pendingSaleRows.reduce((sum, row) => sum + num(row.stock), 0),
   }), [pendingSaleRows])
   const analysisRows = useMemo(() => (data?.productAnalysis ?? [])
-    .filter((row) => !filterGroup || text(row.metalGroup).includes(filterGroup))
-    .filter((row) => matchesProductFilter(row, filterProductCode))
-    .filter((row) => !filterChannel || filterChannel), [data?.productAnalysis, filterChannel, filterGroup, filterProductCode])
+    .filter((row) => !insightFilterGroup || text(row.metalGroup).includes(insightFilterGroup))
+    .filter((row) => matchesProductFilter(row, insightFilterProductCode)), [data?.productAnalysis, insightFilterGroup, insightFilterProductCode])
   const sortedPlanRows = useMemo(() => {
-    const rows = planRowsWithStatus
+    const rows = visiblePlanRows
     if (!planSortKey) return rows
 
     return [...rows].sort((left, right) => {
       const result = compareSortValues(getAnySortValue(left, planSortKey), getAnySortValue(right, planSortKey))
       return planSortDirection === 'asc' ? result : -result
     })
-  }, [planRowsWithStatus, planSortDirection, planSortKey])
+  }, [visiblePlanRows, planSortDirection, planSortKey])
   const sortedAnalysisRows = useMemo(() => {
     if (!analysisSortKey) return analysisRows
 
@@ -488,6 +617,14 @@ export function SalesPlanPageClient() {
       return remainingSortDirection === 'asc' ? result : -result
     })
   }, [analysisRows, remainingSortDirection, remainingSortKey])
+  const totalPlanPages = useMemo(() => pageCount(sortedPlanRows.length, planPageSize), [planPageSize, sortedPlanRows.length])
+  const totalPendingSalePages = useMemo(() => pageCount(pendingSaleRows.length, pendingSalePageSize), [pendingSalePageSize, pendingSaleRows.length])
+  const totalAnalysisPages = useMemo(() => pageCount(sortedAnalysisRows.length, analysisPageSize), [analysisPageSize, sortedAnalysisRows.length])
+  const totalRemainingPages = useMemo(() => pageCount(sortedRemainingRows.length, remainingPageSize), [remainingPageSize, sortedRemainingRows.length])
+  const pagedPlanRows = useMemo(() => paginateRows(sortedPlanRows, planPage, planPageSize), [planPage, planPageSize, sortedPlanRows])
+  const pagedPendingSaleRows = useMemo(() => paginateRows(pendingSaleRows, pendingSalePage, pendingSalePageSize), [pendingSalePage, pendingSalePageSize, pendingSaleRows])
+  const pagedAnalysisRows = useMemo(() => paginateRows(sortedAnalysisRows, analysisPage, analysisPageSize), [analysisPage, analysisPageSize, sortedAnalysisRows])
+  const pagedRemainingRows = useMemo(() => paginateRows(sortedRemainingRows, remainingPage, remainingPageSize), [remainingPage, remainingPageSize, sortedRemainingRows])
   
   const remainingContainers = analysisRows.reduce((sum, row) => sum + num(row.remainingContainers), 0)
   const stockTotal = analysisRows.reduce((sum, row) => sum + num(row.stock), 0)
@@ -496,11 +633,47 @@ export function SalesPlanPageClient() {
   const remainingValueTotal = analysisRows.reduce((sum, row) => sum + num(row.value), 0)
   const projectedProfitTotal = analysisRows.reduce((sum, row) => sum + num(row.projectedProfit), 0)
 
+  useEffect(() => {
+    setSelectedPendingPlanIds((current) => current.filter((id) => visiblePendingPlanIds.includes(id)))
+  }, [visiblePendingPlanIds])
+  useEffect(() => {
+    setPlanPage(1)
+  }, [month, planFilterChannel, planFilterGroup, planFilterProductCode])
+  useEffect(() => {
+    setPlanPage(1)
+  }, [planPageSize])
+  useEffect(() => {
+    setPendingSalePage(1)
+    setAnalysisPage(1)
+    setRemainingPage(1)
+  }, [insightFilterGroup, insightFilterProductCode])
+  useEffect(() => {
+    setPendingSalePage(1)
+  }, [pendingSalePageSize])
+  useEffect(() => {
+    setAnalysisPage(1)
+  }, [analysisPageSize])
+  useEffect(() => {
+    setRemainingPage(1)
+  }, [remainingPageSize])
+  useEffect(() => {
+    setPlanPage((current) => Math.min(current, totalPlanPages))
+  }, [totalPlanPages])
+  useEffect(() => {
+    setPendingSalePage((current) => Math.min(current, totalPendingSalePages))
+  }, [totalPendingSalePages])
+  useEffect(() => {
+    setAnalysisPage((current) => Math.min(current, totalAnalysisPages))
+  }, [totalAnalysisPages])
+  useEffect(() => {
+    setRemainingPage((current) => Math.min(current, totalRemainingPages))
+  }, [totalRemainingPages])
+
   const exportPlan = () => {
     downloadCsv(
       `sales_plan_${month || data?.filters.month || 'current'}.csv`,
       ['Month', 'Product', 'ช่องทาง', 'Customer', 'Containers', 'Kg/ตู้', 'รวม กก.', '% LME', 'LME (USD/MT)', 'FX', 'ราคาขาย (THB/kg)', 'สถานะ'],
-      planRowsWithStatus.map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
+      visiblePlanRows.map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
     )
   }
 
@@ -648,6 +821,70 @@ export function SalesPlanPageClient() {
     }
   }
 
+  function togglePendingPlanSelection(planId: string, checked: boolean) {
+    setSelectedPendingPlanIds((current) => {
+      if (checked) return current.includes(planId) ? current : [...current, planId]
+      return current.filter((id) => id !== planId)
+    })
+  }
+
+  function toggleAllVisiblePendingPlans(checked: boolean) {
+    setSelectedPendingPlanIds((current) => {
+      if (checked) return Array.from(new Set([...current, ...visiblePendingPlanIds]))
+      return current.filter((id) => !visiblePendingPlanIds.includes(id))
+    })
+  }
+
+  async function handleClearPendingPlans() {
+    const targetPlanIds = selectedVisiblePendingPlanIds
+    const cleaningSelected = targetPlanIds.length > 0
+    const targetCount = cleaningSelected ? targetPlanIds.length : pendingPlanCount
+    if (!targetCount) return
+    const activeMonth = month || data?.filters.month || new Date().toISOString().slice(0, 7)
+    setClearPendingPlansDialog({
+      ...(cleaningSelected
+        ? { planIds: targetPlanIds }
+        : {
+          filters: {
+            channel: planFilterChannel || undefined,
+            metalGroup: planFilterGroup || undefined,
+            month: activeMonth,
+            productCode: planFilterProductCode || undefined,
+          },
+        }),
+      message: cleaningSelected
+        ? `ต้องการเคลียร์สถานะ Pending ของรายการที่เลือก ${targetCount} รายการใช่หรือไม่?`
+        : `ต้องการเคลียร์สถานะ Pending ทั้งหมด ${targetCount} รายการตามตัวกรองปัจจุบันของเดือน ${activeMonth} ใช่หรือไม่?`,
+    })
+  }
+
+  async function confirmClearPendingPlans() {
+    if (!clearPendingPlansDialog) return
+    const targetPlanIds = clearPendingPlansDialog.planIds ?? []
+    setFormError(null)
+    setIsClearingPendingPlans(true)
+    try {
+      await dailyFetchJson<{ deletedCount: number }>('/api/sales-plan', {
+        body: JSON.stringify({
+          action: 'clear-pending-plans',
+          ...(clearPendingPlansDialog.planIds
+            ? { planIds: clearPendingPlansDialog.planIds }
+            : { filters: clearPendingPlansDialog.filters }),
+        }),
+        method: 'POST',
+      })
+      if (targetPlanIds.length > 0) {
+        setSelectedPendingPlanIds((current) => current.filter((id) => !targetPlanIds.includes(id)))
+      }
+      setClearPendingPlansDialog(null)
+      await loadSalesPlan()
+    } catch (caught) {
+      setFormError(caught instanceof Error ? caught.message : 'เคลียร์สถานะ Pending ไม่ได้')
+    } finally {
+      setIsClearingPendingPlans(false)
+    }
+  }
+
   async function addDraftPlan() {
     if (!selectedDraftProduct) {
       setPlanDraftError('เลือกสินค้า')
@@ -750,12 +987,12 @@ export function SalesPlanPageClient() {
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
         <label className="text-xs font-bold text-slate-500">เดือน</label>
         <input className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
-        <select className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={filterGroup} onChange={(event) => setFilterGroup(event.target.value)}>
+        <select className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={planFilterGroup} onChange={(event) => setPlanFilterGroup(event.target.value)}>
           <option value="">ทุกหมวด (ทองแดง+ทองเหลือง)</option>
           <option value="ทองแดง">🥉 ทองแดง เท่านั้น</option>
           <option value="ทองเหลือง">🌟 ทองเหลือง เท่านั้น</option>
         </select>
-        <select className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={filterChannel} onChange={(event) => setFilterChannel(event.target.value)}>
+        <select className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={planFilterChannel} onChange={(event) => setPlanFilterChannel(event.target.value)}>
           <option value="">ทุกช่องทาง</option>
           {(data?.filters.channels ?? []).map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
         </select>
@@ -768,20 +1005,32 @@ export function SalesPlanPageClient() {
             openOnFocus={false}
             options={filterProductOptions}
             placeholder="ค้นหาสินค้า"
-            value={filterProductCode}
-            onChange={setFilterProductCode}
+            value={planFilterProductCode}
+            onChange={setPlanFilterProductCode}
           />
         </div>
-        {filterProductCode ? (
+        {planFilterProductCode ? (
           <button
             className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center"
-            onClick={() => setFilterProductCode('')}
+            onClick={() => setPlanFilterProductCode('')}
             type="button"
           >
             ล้างสินค้า
           </button>
         ) : null}
         <span className="flex-1" />
+        <button
+          className="rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!pendingPlanCount || isClearingPendingPlans || isSavingPlan}
+          onClick={() => handleClearPendingPlans()}
+          type="button"
+        >
+          {isClearingPendingPlans
+            ? 'กำลังเคลียร์สถานะ...'
+            : selectedVisiblePendingPlanIds.length > 0
+              ? `เคลียร์สถานะที่เลือก (${selectedVisiblePendingPlanIds.length})`
+              : `เคลียร์สถานะ Pending (${pendingPlanCount})`}
+        </button>
         <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center" onClick={openPlanForm} type="button">+ เพิ่มแผน</button>
         <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center" onClick={exportPlan} type="button">📥 Export CSV</button>
       </div>
@@ -790,6 +1039,18 @@ export function SalesPlanPageClient() {
         <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-semibold text-slate-600">
           📝 ตารางวางแผน — เพิ่มแผนแล้วเริ่มที่ `Pending` ก่อน จากนั้นค่อยกด `Lock %` เองเมื่อพร้อม และคอลัมน์ `PO ขาย` จะแยกต่างหาก
         </div>
+        <Dialog open={Boolean(clearPendingPlansDialog)} onOpenChange={(open) => { if (!open && !isClearingPendingPlans) setClearPendingPlansDialog(null) }}>
+          <DialogContent className="max-w-lg rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 animate-fade-in" fallbackTitle="ยืนยันการเคลียร์สถานะ" hideClose>
+            <DialogHeader className="border-b border-slate-800 px-5 py-4">
+              <DialogTitle className="text-lg font-bold text-slate-100">Confirm เคลียร์สถานะ</DialogTitle>
+              <p className="text-sm text-slate-300">{clearPendingPlansDialog?.message}</p>
+            </DialogHeader>
+            <DialogFooter className="shrink-0">
+              <button className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={isClearingPendingPlans} onClick={() => setClearPendingPlansDialog(null)} type="button">ยกเลิก</button>
+              <button className="h-10 rounded-md bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60" disabled={isClearingPendingPlans} onClick={confirmClearPendingPlans} type="button">{isClearingPendingPlans ? 'กำลังเคลียร์สถานะ...' : 'Confirm'}</button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <Dialog open={isPlanFormOpen} onOpenChange={setIsPlanFormOpen}>
           <DialogContent className="max-w-6xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" fallbackTitle="เพิ่มแผนขาย" hideClose>
             <DialogHeader className="border-b border-slate-800 px-5 py-4">
@@ -868,12 +1129,16 @@ export function SalesPlanPageClient() {
           </DialogContent>
         </Dialog>
 
+        <TablePaginationToolbar
+          page={planPage}
+          pageSize={planPageSize}
+          totalItems={sortedPlanRows.length}
+          totalPages={totalPlanPages}
+          onPageChange={setPlanPage}
+          onPageSizeChange={setPlanPageSize}
+          onResetWidths={planResize.hasCustomWidths ? planResize.resetColumnWidths : undefined}
+        />
         {/* Desktop view */}
-        {planResize.hasCustomWidths ? (
-          <div className="hidden justify-end px-4 pt-3 lg:flex">
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={planResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
-          </div>
-        ) : null}
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: planResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
@@ -889,17 +1154,37 @@ export function SalesPlanPageClient() {
                     activeSortKey={planSortKey ?? undefined}
                     align={column.align}
                     direction={planSortDirection}
-                    label={column.label}
-                    sortKey={column.key}
-                    onSort={changePlanSort}
-                    resizeProps={planResize.getResizeHandleProps(column.key, column.label)}
+                    label={column.key === 'select' ? (
+                      <input
+                        aria-label="เลือก Pending ทั้งหมด"
+                        checked={allVisiblePendingSelected}
+                        className="size-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                        disabled={!visiblePendingPlanIds.length}
+                        type="checkbox"
+                        onChange={(event) => toggleAllVisiblePendingPlans(event.target.checked)}
+                      />
+                    ) : column.label}
+                    sortKey={column.key === 'select' ? undefined : column.key}
+                    onSort={column.key === 'select' ? undefined : changePlanSort}
+                    resizeProps={column.key === 'select' ? undefined : planResize.getResizeHandleProps(column.key, column.label)}
                   />
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedPlanRows.map((row) => (
+              {pagedPlanRows.map((row) => (
                 <tr className="hover:bg-slate-50/50 transition-colors" key={text(row.id)}>
+                  <td className="p-1.5 text-center">
+                    {getPlanStatus(row.status) === 'pending' ? (
+                      <input
+                        aria-label={`เลือกแผนขาย ${text(row.productName)}`}
+                        checked={selectedPendingPlanIds.includes(text(row.id))}
+                        className="size-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                        type="checkbox"
+                        onChange={(event) => togglePendingPlanSelection(text(row.id), event.target.checked)}
+                      />
+                    ) : <span className="text-xs font-semibold text-slate-300">-</span>}
+                  </td>
                   <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.productId)}><option>{text(row.productName) || '-เลือก-'}</option></select></td>
                   <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.channel)}><option>{text(row.channel) || 'ส่งออก'}</option></select></td>
                   <td className="p-1.5"><select className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs bg-slate-50 outline-none" disabled value={text(row.customerId)}><option>{text(row.customerName) || '-เลือก-'}</option></select></td>
@@ -940,7 +1225,7 @@ export function SalesPlanPageClient() {
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20">
-          {sortedPlanRows.map((row) => (
+          {pagedPlanRows.map((row) => (
             <div key={text(row.id)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div className="font-bold text-slate-800 text-sm">{text(row.productName) || 'ไม่ได้ระบุสินค้า'}</div>
@@ -1004,11 +1289,19 @@ export function SalesPlanPageClient() {
           <h3 className="font-bold text-slate-800 text-sm">📋 ตารางรอขาย — ทองแดง / ทองเหลือง ({money(pendingSaleRows.length)} รายการ)</h3>
           <p className="mt-1 text-xs text-slate-500">รอขายจริง = STOCK + PO ซื้อรอส่ง − ล็อกขายรอส่ง · ยอดติดลบหมายถึงของจริงและของกำลังเข้าไม่พอกับยอดขายที่ล็อกไว้</p>
         </div>
+        <TablePaginationToolbar
+          page={pendingSalePage}
+          pageSize={pendingSalePageSize}
+          totalItems={pendingSaleRows.length}
+          totalPages={totalPendingSalePages}
+          onPageChange={setPendingSalePage}
+          onPageSizeChange={setPendingSalePageSize}
+        />
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-100">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-slate-700">รหัส / สินค้า</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">สินค้า</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">หมวด</th>
                 <th className="px-4 py-3 text-right font-semibold text-slate-700">รอขาย (กก.)</th>
                 <th className="px-4 py-3 text-right font-semibold text-slate-700">ต้นทุน Pool<br /><span className="text-xs font-medium text-slate-400">(บาท/กก.)</span></th>
@@ -1023,7 +1316,7 @@ export function SalesPlanPageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {pendingSaleRows.map((row) => {
+              {pagedPendingSaleRows.map((row) => {
                 const shortage = num(row.realPendingSale) < 0
                 return (
                   <tr className={`transition-colors hover:bg-slate-50/50 ${shortage ? 'bg-red-50/40' : ''}`} key={text(row.productId)}>
@@ -1067,7 +1360,7 @@ export function SalesPlanPageClient() {
           </table>
         </div>
         <div className="space-y-3 bg-slate-50/20 p-4 lg:hidden">
-          {pendingSaleRows.map((row) => {
+          {pagedPendingSaleRows.map((row) => {
             const shortage = num(row.realPendingSale) < 0
             return (
               <div key={text(row.productId)} className={`rounded-xl border p-4 shadow-sm ${shortage ? 'border-red-200 bg-red-50/40' : 'border-slate-200 bg-white'}`}>
@@ -1091,12 +1384,66 @@ export function SalesPlanPageClient() {
         </div>
       </div>
 
-      <Tabs value={salesPlanInsightTab} onValueChange={(value) => setSalesPlanInsightTab(value as 'analysis' | 'remaining')}>
-        <TabsList aria-label="ตารางวิเคราะห์แผนขาย" className="flex-wrap overflow-x-auto" variant="line">
-          <TabsTrigger value="analysis" variant="line">วิเคราะห์แผนขาย vs สต๊อกว่างขาย</TabsTrigger>
-          <TabsTrigger value="remaining" variant="line">สต๊อกว่างขายคงเหลือ</TabsTrigger>
-        </TabsList>
+      <Tabs className="gap-3" value={salesPlanInsightTab} onValueChange={(value) => setSalesPlanInsightTab(value as 'analysis' | 'remaining')}>
+        <div className="overflow-x-auto">
+          <TabsList
+            aria-label="ตารางวิเคราะห์แผนขาย"
+            className="inline-flex w-full max-w-max flex-nowrap gap-2 bg-transparent p-0 shadow-none"
+          >
+            <TabsTrigger
+              className="min-w-fit rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-none"
+              value="analysis"
+            >
+              วิเคราะห์แผนขาย vs สต๊อกว่างขาย
+            </TabsTrigger>
+            <TabsTrigger
+              className="min-w-fit rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-none"
+              value="remaining"
+            >
+              สต๊อกว่างขายคงเหลือ
+            </TabsTrigger>
+          </TabsList>
+        </div>
       </Tabs>
+
+      <div className="rounded-md bg-white p-3 shadow">
+        <div className="mb-2 text-xs font-medium text-slate-500">ตัวกรองข้อมูลของตารางที่เลือก</div>
+        <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-end">
+          <label className="flex min-w-[200px] flex-col gap-1 text-xs font-medium text-slate-500">
+            <span>หมวด</span>
+            <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={insightFilterGroup} onChange={(event) => setInsightFilterGroup(event.target.value)}>
+              <option value="">ทุกหมวด</option>
+              {insightFilterGroupOptions.map((group) => <option key={group} value={group}>{group}</option>)}
+            </select>
+          </label>
+          <div className="min-w-[260px] flex-1 lg:max-w-md">
+            <div className="mb-1 text-xs font-medium text-slate-500">สินค้า</div>
+            <SearchCombobox
+              hideLabel
+              inputClassName="h-9 text-sm font-medium text-slate-700"
+              inputId="sales-plan-insight-filter-product"
+              label="สินค้า"
+              openOnFocus={false}
+              options={filterProductOptions}
+              placeholder="ค้นหาสินค้าในตารางล่าง"
+              value={insightFilterProductCode}
+              onChange={setInsightFilterProductCode}
+            />
+          </div>
+          {insightFilterGroup || insightFilterProductCode ? (
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 lg:ml-auto"
+              onClick={() => {
+                setInsightFilterGroup('')
+                setInsightFilterProductCode('')
+              }}
+              type="button"
+            >
+              ล้างตัวกรอง
+            </button>
+          ) : null}
+        </div>
+      </div>
 
       {/* 2. Analysis Section */}
       {salesPlanInsightTab === 'analysis' ? (
@@ -1107,12 +1454,16 @@ export function SalesPlanPageClient() {
           </div>
         </div>
 
+        <TablePaginationToolbar
+          page={analysisPage}
+          pageSize={analysisPageSize}
+          totalItems={sortedAnalysisRows.length}
+          totalPages={totalAnalysisPages}
+          onPageChange={setAnalysisPage}
+          onPageSizeChange={setAnalysisPageSize}
+          onResetWidths={analysisResize.hasCustomWidths ? analysisResize.resetColumnWidths : undefined}
+        />
         {/* Desktop View Table */}
-        {analysisResize.hasCustomWidths ? (
-          <div className="hidden justify-end px-4 pt-3 lg:flex">
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={analysisResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
-          </div>
-        ) : null}
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: analysisResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
@@ -1137,7 +1488,7 @@ export function SalesPlanPageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedAnalysisRows.map((row) => (
+              {pagedAnalysisRows.map((row) => (
                 <tr className="hover:bg-slate-50/50 transition-colors" key={text(row.code)}>
                   <td className="p-2.5 min-w-0 overflow-hidden"><div className="font-semibold text-slate-800 truncate" title={text(row.name)}>{text(row.name)}</div><div className="font-mono text-xs text-slate-400 font-semibold truncate" title={text(row.code)}>{text(row.code)}</div></td>
                   <td className="p-2.5 text-xs text-slate-500 font-medium min-w-0 overflow-hidden"><div className="truncate" title={text(row.metalGroup)}>{text(row.metalGroup)}</div></td>
@@ -1149,7 +1500,7 @@ export function SalesPlanPageClient() {
                   <td className="p-2.5 text-right text-xs font-semibold text-slate-500 whitespace-nowrap tabular-nums pl-4">{num(row.bestPlanPct) > 0 ? `${money(row.bestPlanPct)}%` : '-'}</td>
                   <td className={`bg-emerald-50/20 p-2.5 text-right font-bold whitespace-nowrap tabular-nums pl-4 ${num(row.projectedProfit) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{num(row.bestPlanPrice) > 0 ? money(row.projectedProfit) : '-'}</td>
                   <td className={`bg-emerald-50/20 p-2.5 text-right text-xs font-bold whitespace-nowrap tabular-nums pl-4 ${num(row.projectedMarginPct) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{num(row.bestPlanPrice) > 0 ? `${money(row.projectedMarginPct)}%` : '-'}</td>
-                  <td className="p-2.5 text-center min-w-0 overflow-hidden"><div className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 truncate" title={text(row.recommendation)}>{text(row.recommendation)}</div></td>
+                  <td className="p-2.5 text-center min-w-0 overflow-hidden"><div className={`rounded-xl px-2.5 py-1 text-xs font-bold truncate ${recommendationBadgeClass(row.recommendation)}`} title={text(row.recommendation)}>{text(row.recommendation)}</div></td>
                 </tr>
               ))}
               {!sortedAnalysisRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanAnalysisColumns.length}>ไม่มีสต๊อกทองแดง/ทองเหลืองให้วิเคราะห์</td></tr> : null}
@@ -1160,7 +1511,7 @@ export function SalesPlanPageClient() {
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20 border-t border-slate-100">
-          {sortedAnalysisRows.map((row) => (
+          {pagedAnalysisRows.map((row) => (
             <div key={text(row.code)} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div>
@@ -1193,7 +1544,7 @@ export function SalesPlanPageClient() {
               </div>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-500 font-semibold">คำแนะนำ:</span>
-                <span className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{text(row.recommendation)}</span>
+                <span className={`rounded-xl px-2.5 py-1 text-xs font-bold ${recommendationBadgeClass(row.recommendation)}`}>{text(row.recommendation)}</span>
               </div>
             </div>
           ))}
@@ -1212,12 +1563,16 @@ export function SalesPlanPageClient() {
           </div>
         </div>
 
+        <TablePaginationToolbar
+          page={remainingPage}
+          pageSize={remainingPageSize}
+          totalItems={sortedRemainingRows.length}
+          totalPages={totalRemainingPages}
+          onPageChange={setRemainingPage}
+          onPageSizeChange={setRemainingPageSize}
+          onResetWidths={remainingResize.hasCustomWidths ? remainingResize.resetColumnWidths : undefined}
+        />
         {/* Desktop View Table */}
-        {remainingResize.hasCustomWidths ? (
-          <div className="hidden justify-end px-4 pt-3 lg:flex">
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={remainingResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
-          </div>
-        ) : null}
         <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: remainingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
@@ -1242,10 +1597,12 @@ export function SalesPlanPageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedRemainingRows.map((row) => (
+              {pagedRemainingRows.map((row) => (
                 <tr className={`hover:bg-slate-50/50 transition-colors ${num(row.remainingKg) > 0 ? '' : 'opacity-60'}`} key={`${text(row.code)}-remain`}>
-                  <td className="p-2.5 font-mono text-xs text-slate-400 font-semibold min-w-0 overflow-hidden"><div className="truncate" title={text(row.code)}>{text(row.code)}</div></td>
-                  <td className="p-2.5 text-slate-800 font-medium min-w-0 overflow-hidden"><div className="truncate" title={text(row.name)}>{text(row.name)}</div></td>
+                  <td className="p-2.5 min-w-0 overflow-hidden">
+                    <div className="truncate text-slate-800 font-semibold" title={text(row.name)}>{text(row.name)}</div>
+                    <div className="truncate font-mono text-xs text-slate-400 font-semibold" title={text(row.code)}>{text(row.code)}</div>
+                  </td>
                   <td className="p-2.5 text-xs text-slate-500 font-medium min-w-0 overflow-hidden"><div className="truncate" title={text(row.metalGroup)}>{text(row.metalGroup)}</div></td>
                   <td className="p-2.5 text-right text-slate-700 font-medium whitespace-nowrap tabular-nums pl-4">{money(row.stock)}</td>
                   <td className="p-2.5 text-right font-semibold text-emerald-600 whitespace-nowrap tabular-nums pl-4">{money(row.lockedKg)}</td>
@@ -1258,13 +1615,13 @@ export function SalesPlanPageClient() {
               ))}
               {!sortedRemainingRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={salesPlanRemainingColumns.length}>ไม่มีสต๊อกทองแดง/ทองเหลือง</td></tr> : null}
             </tbody>
-            {analysisRows.length ? <tfoot className="border-t border-slate-100 bg-slate-50/50 font-bold text-slate-700"><tr><td className="p-3 text-xs" colSpan={3}>รวม</td><td className="p-3 text-right text-slate-700 text-xs">{money(stockTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(lockedTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(0)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingKgTotal)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingContainers)}</td><td /><td className="p-3 text-right text-slate-700 text-xs">{money(remainingValueTotal)}</td></tr></tfoot> : null}
+            {analysisRows.length ? <tfoot className="border-t border-slate-100 bg-slate-50/50 font-bold text-slate-700"><tr><td className="p-3 text-xs" colSpan={2}>รวม</td><td className="p-3 text-right text-slate-700 text-xs">{money(stockTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(lockedTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(0)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingKgTotal)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingContainers)}</td><td /><td className="p-3 text-right text-slate-700 text-xs">{money(remainingValueTotal)}</td></tr></tfoot> : null}
           </table>
         </div>
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20 border-t border-slate-100">
-          {sortedRemainingRows.map((row) => (
+          {pagedRemainingRows.map((row) => (
             <div key={`${text(row.code)}-remain`} className={`bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3 ${num(row.remainingKg) > 0 ? '' : 'opacity-65'}`}>
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div>
