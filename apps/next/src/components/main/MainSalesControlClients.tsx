@@ -53,6 +53,16 @@ type SalesPlanDraftForm = {
   productCode: string
   sellPctLme: string
 }
+type ClearPendingPlansDialogState = {
+  filters?: {
+    channel?: string
+    metalGroup?: string
+    month: string
+    productCode?: string
+  }
+  message: string
+  planIds?: string[]
+}
 
 type CommissionSalespersonRow = {
   id: string
@@ -391,6 +401,7 @@ export function SalesPlanPageClient() {
   const [isSavingPlan, setIsSavingPlan] = useState(false)
   const [isClearingPendingPlans, setIsClearingPendingPlans] = useState(false)
   const [isPlanFormOpen, setIsPlanFormOpen] = useState(false)
+  const [clearPendingPlansDialog, setClearPendingPlansDialog] = useState<ClearPendingPlansDialogState | null>(null)
   const [selectedPendingPlanIds, setSelectedPendingPlanIds] = useState<string[]>([])
   const [month, setMonth] = useState('')
   const [planFilterGroup, setPlanFilterGroup] = useState('')
@@ -832,35 +843,42 @@ export function SalesPlanPageClient() {
     const targetCount = cleaningSelected ? targetPlanIds.length : pendingPlanCount
     if (!targetCount) return
     const activeMonth = month || data?.filters.month || new Date().toISOString().slice(0, 7)
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm(cleaningSelected
+    setClearPendingPlansDialog({
+      ...(cleaningSelected
+        ? { planIds: targetPlanIds }
+        : {
+          filters: {
+            channel: planFilterChannel || undefined,
+            metalGroup: planFilterGroup || undefined,
+            month: activeMonth,
+            productCode: planFilterProductCode || undefined,
+          },
+        }),
+      message: cleaningSelected
         ? `ต้องการเคลียร์สถานะ Pending ของรายการที่เลือก ${targetCount} รายการใช่หรือไม่?`
-        : `ต้องการเคลียร์สถานะ Pending ทั้งหมด ${targetCount} รายการตามตัวกรองปัจจุบันของเดือน ${activeMonth} ใช่หรือไม่?`)
-      if (!confirmed) return
-    }
+        : `ต้องการเคลียร์สถานะ Pending ทั้งหมด ${targetCount} รายการตามตัวกรองปัจจุบันของเดือน ${activeMonth} ใช่หรือไม่?`,
+    })
+  }
 
+  async function confirmClearPendingPlans() {
+    if (!clearPendingPlansDialog) return
+    const targetPlanIds = clearPendingPlansDialog.planIds ?? []
     setFormError(null)
     setIsClearingPendingPlans(true)
     try {
       await dailyFetchJson<{ deletedCount: number }>('/api/sales-plan', {
         body: JSON.stringify({
           action: 'clear-pending-plans',
-          ...(cleaningSelected
-            ? { planIds: targetPlanIds }
-            : {
-              filters: {
-                channel: planFilterChannel || undefined,
-                metalGroup: planFilterGroup || undefined,
-                month: activeMonth,
-                productCode: planFilterProductCode || undefined,
-              },
-            }),
+          ...(clearPendingPlansDialog.planIds
+            ? { planIds: clearPendingPlansDialog.planIds }
+            : { filters: clearPendingPlansDialog.filters }),
         }),
         method: 'POST',
       })
-      if (cleaningSelected) {
+      if (targetPlanIds.length > 0) {
         setSelectedPendingPlanIds((current) => current.filter((id) => !targetPlanIds.includes(id)))
       }
+      setClearPendingPlansDialog(null)
       await loadSalesPlan()
     } catch (caught) {
       setFormError(caught instanceof Error ? caught.message : 'เคลียร์สถานะ Pending ไม่ได้')
@@ -1023,6 +1041,18 @@ export function SalesPlanPageClient() {
         <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-semibold text-slate-600">
           📝 ตารางวางแผน — เพิ่มแผนแล้วเริ่มที่ `Pending` ก่อน จากนั้นค่อยกด `Lock %` เองเมื่อพร้อม และคอลัมน์ `PO ขาย` จะแยกต่างหาก
         </div>
+        <Dialog open={Boolean(clearPendingPlansDialog)} onOpenChange={(open) => { if (!open && !isClearingPendingPlans) setClearPendingPlansDialog(null) }}>
+          <DialogContent className="max-w-lg rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 animate-fade-in" fallbackTitle="ยืนยันการเคลียร์สถานะ" hideClose>
+            <DialogHeader className="border-b border-slate-800 px-5 py-4">
+              <DialogTitle className="text-lg font-bold text-slate-100">Confirm เคลียร์สถานะ</DialogTitle>
+              <p className="text-sm text-slate-300">{clearPendingPlansDialog?.message}</p>
+            </DialogHeader>
+            <DialogFooter className="shrink-0">
+              <button className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={isClearingPendingPlans} onClick={() => setClearPendingPlansDialog(null)} type="button">ยกเลิก</button>
+              <button className="h-10 rounded-md bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60" disabled={isClearingPendingPlans} onClick={confirmClearPendingPlans} type="button">{isClearingPendingPlans ? 'กำลังเคลียร์สถานะ...' : 'Confirm'}</button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <Dialog open={isPlanFormOpen} onOpenChange={setIsPlanFormOpen}>
           <DialogContent className="max-w-6xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" fallbackTitle="เพิ่มแผนขาย" hideClose>
             <DialogHeader className="border-b border-slate-800 px-5 py-4">
