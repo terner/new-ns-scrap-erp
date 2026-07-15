@@ -1094,7 +1094,7 @@ export function SalesPlanPageClient() {
             <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 text-sm sm:p-5">
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-4 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">รายละเอียดแผนขาย</h4>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
                   <SearchCombobox
                     hideLabel={false}
                     inputClassName="h-10 text-sm font-medium text-slate-700"
@@ -1127,6 +1127,8 @@ export function SalesPlanPageClient() {
                     <span className="mb-1 block">ช่องทางขาย</span>
                     <input className="h-10 w-full rounded-md border border-slate-300 bg-slate-100 px-3 text-sm font-medium text-slate-700 outline-none" readOnly value={selectedDraftChannel?.name ?? (selectedDraftCustomer ? 'ไม่พบช่องทางจาก Master Customer' : 'เลือกลูกค้าก่อน')} />
                   </label>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <label className="text-xs font-bold text-slate-600">
                     <span className="mb-1 block">จำนวนตู้</span>
                     <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, containers: event.target.value }))} type="number" value={planDraftForm.containers} />
