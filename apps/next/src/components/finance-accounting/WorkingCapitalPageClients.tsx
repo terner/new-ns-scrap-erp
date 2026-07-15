@@ -363,13 +363,6 @@ export function StockFinancePageClient() {
   const topProducts = data?.topProducts ?? []
   const visibleTopProducts = showAllTopProducts ? topProducts : topProducts.slice(0, 5)
   const canToggleTopProducts = topProducts.length > 5
-  const fgValue = data?.byStatus.FG ?? 0
-  const slowMovingValue = (data?.slowMoving ?? []).reduce((sum, row) => sum + row.value, 0)
-  const slowMovingCount = data?.slowMoving.length ?? 0
-  const opportunityValue = data?.summary.marginPotential ?? 0
-  const paidPct = percent(data?.summary.paidValue ?? 0, total)
-  const fgPct = percent(fgValue, total)
-  const oldStockPct = percent(oldStock?.value ?? 0, total)
 
   return (
     <section className="space-y-4">
@@ -436,8 +429,8 @@ export function StockFinancePageClient() {
         </MobileFilterSheet>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-md border border-amber-100 bg-white p-5 shadow-sm lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-md border border-amber-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="text-xs font-bold uppercase text-amber-600">ภาพรวมมูลค่าสต็อก</div>
@@ -487,21 +480,6 @@ export function StockFinancePageClient() {
             </div>
           </div>
         </Panel>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">
-        <Kpi label="Stock ทั้งหมด" value={String(data?.summary.itemCount ?? 0)} tone="slate" />
-        <Kpi label="น้ำหนักรวม" value={`${money(data?.summary.totalQty)} กก.`} tone="blue" />
-        <Kpi label="พร้อมขาย (FG)" value={`${money(fgValue)}`} tone="emerald" />
-        <Kpi label="จ่ายแล้ว" value={`${paidPct}%`} tone="amber" />
-        <Kpi label="Slow Moving" value={String(slowMovingCount)} tone="red" />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Insight tone="amber" title="เงินจม 90+ วัน" value={money(oldStock?.value)} body={`${oldStock?.count ?? 0} รายการ · ${oldStockPct}% ของมูลค่ารวม`} />
-        <Insight tone="emerald" title="พร้อมขายทันที" value={money(fgValue)} body={`${fgPct}% ของมูลค่าสต็อกอยู่ในสถานะ FG พร้อมขาย`} />
-        <Insight tone="blue" title="Slow Moving / สินค้าที่ควรรีบขาย" value={money(slowMovingValue)} body={`Top ${slowMovingCount} รายการที่ไม่ขายเกิน 60 วันตามเงื่อนไขปัจจุบัน`} />
-        <Insight tone={opportunityValue >= 0 ? 'purple' : 'red'} title="ช่องว่างราคากับมาตรฐาน" value={money(opportunityValue)} body="คำนวณจาก (ราคามาตรฐาน - WAC) x ปริมาณคงเหลือ เพื่อใช้ดู margin potential" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
