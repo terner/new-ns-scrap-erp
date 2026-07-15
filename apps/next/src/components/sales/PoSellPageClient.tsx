@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Plus, Printer } from 'lucide-react'
 import { openPoSellPrint, openPoSellPrintWindow, type PoSellPrintDocument } from '@/lib/po-sell-print'
 import { Button as UiButton } from '@/components/ui/Button'
@@ -147,6 +147,8 @@ const initialPoSellForm = (): PoSellFormValues => ({
   salesPlanId: null,
 })
 
+const SALES_PLAN_DEFAULT_BRANCH_NAME = 'สมุทรสาคร'
+
 const poSellColumns: ResizableColumnDefinition<string>[] = [
   { key: 'docNo', minWidth: 120, defaultWidth: 140 },
   { key: 'createdAt', minWidth: 100, defaultWidth: 110 },
@@ -166,7 +168,10 @@ const poSellColumns: ResizableColumnDefinition<string>[] = [
 ]
 
 export function PoSellPageClient() {
+  const handledSalesPlanQueryRef = useRef<string | null>(null)
   const latestLoadRequestRef = useRef(0)
+  const pathname = usePathname()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const salesPlanIdFromQuery = searchParams.get('salesPlanId')
   const [cancelNote, setCancelNote] = useState('')
@@ -318,6 +323,10 @@ export function PoSellPageClient() {
   const currentPage = Math.min(page, totalPages)
   const pageRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const activeBranches = (data?.options.branches ?? []).filter((option) => option.active !== false)
+  const salesPlanDefaultBranchId = useMemo(
+    () => activeBranches.find((option) => option.name.trim() === SALES_PLAN_DEFAULT_BRANCH_NAME)?.id ?? null,
+    [activeBranches],
+  )
   const activeChannels = useMemo(() => (data?.options.salesChannels ?? []).filter((option) => option.active !== false), [data?.options.salesChannels])
   const allActiveCustomers = useMemo(
     () => (data?.options.customers ?? []).filter((option) => option.active !== false),
@@ -421,6 +430,11 @@ export function PoSellPageClient() {
   }, [defaultSalesChannelForCustomer])
 
   useEffect(() => {
+    if (!salesPlanIdFromQuery) {
+      handledSalesPlanQueryRef.current = null
+      return
+    }
+    if (handledSalesPlanQueryRef.current === salesPlanIdFromQuery) return
     if (!salesPlanIdFromQuery || !data) return
     let cancelled = false
     const today = new Date().toISOString().slice(0, 10)
@@ -428,9 +442,10 @@ export function PoSellPageClient() {
     dailyFetchJson<{ planRow: Record<string, string | number | null> }>(`/api/sales-plan?planId=${encodeURIComponent(salesPlanIdFromQuery)}`)
       .then(({ planRow }) => {
         if (cancelled) return
+        handledSalesPlanQueryRef.current = salesPlanIdFromQuery
         setEditingDocNo(null)
         setForm({
-          branchId: null,
+          branchId: salesPlanDefaultBranchId,
           channelId: String(planRow.channelId ?? planRow.channel ?? '') || null,
           customerId: String(planRow.customerId ?? ''),
           expectedDelivery: today,
@@ -454,7 +469,7 @@ export function PoSellPageClient() {
     return () => {
       cancelled = true
     }
-  }, [data, salesPlanIdFromQuery])
+  }, [data, salesPlanDefaultBranchId, salesPlanIdFromQuery])
 
   function openCancelDialog(row: PoSellRow) {
     if (!row.canCancel) {
@@ -536,6 +551,11 @@ export function PoSellPageClient() {
       })
       setEditingDocNo(null)
       setShowForm(false)
+      setForm(initialPoSellForm())
+      if (!editingDocNo && parsed.data.salesPlanId && salesPlanIdFromQuery) {
+        handledSalesPlanQueryRef.current = salesPlanIdFromQuery
+        router.replace(pathname, { scroll: false })
+      }
       setSearch(saved.docNo)
       await loadData()
     } catch (caught) {
@@ -819,12 +839,9 @@ export function PoSellPageClient() {
         </div>
         <Table className="min-w-full divide-y divide-slate-200" style={{ tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}>
         <colgroup>
-          {poSellColumns.map((column, index) => {
-            if (index === poSellColumns.length - 1) {
-              return <col key={column.key} style={{ minWidth: column.minWidth }} />
-            }
-            return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
-          })}
+          {poSellColumns.map((column) => (
+            <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+          ))}
         </colgroup>
         <TableHeader>
           <tr>
@@ -980,6 +997,10 @@ export function PoSellPageClient() {
           totalCost={formTotalCost}
           onAddItem={() => setForm((current) => ({ ...current, items: [...current.items, blankPoSellItem()] }))}
           onClose={() => {
+            if (!editingDocNo && salesPlanIdFromQuery) {
+              handledSalesPlanQueryRef.current = salesPlanIdFromQuery
+              router.replace(pathname, { scroll: false })
+            }
             setEditingDocNo(null)
             setShowForm(false)
           }}

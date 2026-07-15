@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
-import { formatDateDisplay } from '@/lib/format'
+import { formatDateDisplay, sanitizeDecimalInput } from '@/lib/format'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { KpiCard } from '@/components/ui/KpiCard'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -20,6 +21,16 @@ type CommissionCategoryColumnKey = 'amount' | 'category' | 'qty'
 type CommissionSupplierColumnKey = 'amount' | 'bills' | 'pct' | 'qty' | 'supplier'
 type CommissionBillColumnKey = 'amount' | 'commissionStatus' | 'date' | 'docNo' | 'price' | 'productName' | 'profitDiff' | 'qty' | 'salesPrice' | 'supplierName'
 type CommissionSummaryColumnKey = 'amount' | 'category' | 'qty' | 'salesName'
+type CommissionDrilldownTab = 'categoryAll' | 'commissionableCategories' | 'items' | 'suppliers'
+type CommissionQuickRange = 'last7' | 'month' | 'today'
+type CommissionSalesCardFilter = 'activity' | 'all' | 'eligible'
+type CommissionMobileRow = {
+  badge?: ReactNode
+  details?: { label: string; value: ReactNode }[]
+  key: string
+  summary: { label: string; value: ReactNode }[]
+  title: ReactNode
+}
 type LmeConfig = {
   fxRate: number
   kgPerContainer: number
@@ -52,6 +63,16 @@ type SalesPlanDraftForm = {
   lmeCf: string
   productCode: string
   sellPctLme: string
+}
+type ClearPendingPlansDialogState = {
+  filters?: {
+    channel?: string
+    metalGroup?: string
+    month: string
+    productCode?: string
+  }
+  message: string
+  planIds?: string[]
 }
 
 type CommissionSalespersonRow = {
@@ -146,16 +167,16 @@ const commissionCategoryColumns: Array<TableColumn<CommissionCategoryColumnKey>>
   { key: 'amount', label: 'ยอดซื้อ (บาท)', defaultWidth: 150, minWidth: 125, align: 'right' },
 ]
 const commissionSupplierColumns: Array<TableColumn<CommissionSupplierColumnKey>> = [
-  { key: 'supplier', label: 'Supplier', defaultWidth: 260, minWidth: 180 },
+  { key: 'supplier', label: 'ผู้ขาย', defaultWidth: 260, minWidth: 180 },
   { key: 'bills', label: 'บิล', defaultWidth: 95, minWidth: 80, align: 'right' },
   { key: 'qty', label: 'น้ำหนัก (กก.)', defaultWidth: 140, minWidth: 115, align: 'right' },
   { key: 'amount', label: 'ยอดรับซื้อ (บาท)', defaultWidth: 160, minWidth: 130, align: 'right' },
-  { key: 'pct', label: '% ของ Total', defaultWidth: 130, minWidth: 110, align: 'right' },
+  { key: 'pct', label: '% ของทั้งหมด', defaultWidth: 130, minWidth: 110, align: 'right' },
 ]
 const commissionBillColumns: Array<TableColumn<CommissionBillColumnKey>> = [
   { key: 'date', label: 'วันที่', defaultWidth: 115, minWidth: 100 },
   { key: 'docNo', label: 'เลขที่บิล', defaultWidth: 140, minWidth: 115 },
-  { key: 'supplierName', label: 'Supplier', defaultWidth: 200, minWidth: 150 },
+  { key: 'supplierName', label: 'ผู้ขาย', defaultWidth: 200, minWidth: 150 },
   { key: 'productName', label: 'สินค้า', defaultWidth: 220, minWidth: 160 },
   { key: 'qty', label: 'น้ำหนัก (กก.)', defaultWidth: 130, minWidth: 110, align: 'right' },
   { key: 'price', label: 'ราคาซื้อ', defaultWidth: 120, minWidth: 100, align: 'right' },
@@ -165,10 +186,20 @@ const commissionBillColumns: Array<TableColumn<CommissionBillColumnKey>> = [
   { key: 'commissionStatus', label: 'สถานะค่าคอม', defaultWidth: 150, minWidth: 125, align: 'center' },
 ]
 const commissionSummaryColumns: Array<TableColumn<CommissionSummaryColumnKey>> = [
-  { key: 'salesName', label: 'Sales', defaultWidth: 220, minWidth: 160 },
+  { key: 'salesName', label: 'พนักงานขาย', defaultWidth: 220, minWidth: 160 },
   { key: 'category', label: 'ประเภท / หมวดสินค้า', defaultWidth: 260, minWidth: 180 },
   { key: 'qty', label: 'จำนวน KG', defaultWidth: 140, minWidth: 115, align: 'right' },
   { key: 'amount', label: 'มูลค่ารวม (บาท)', defaultWidth: 160, minWidth: 130, align: 'right' },
+]
+const commissionQuickRangeOptions: Array<{ label: string; value: CommissionQuickRange }> = [
+  { label: 'วันนี้', value: 'today' },
+  { label: '7 วัน', value: 'last7' },
+  { label: 'เดือนนี้', value: 'month' },
+]
+const commissionSalesCardFilterOptions: Array<{ label: string; value: CommissionSalesCardFilter }> = [
+  { label: 'ทั้งหมด', value: 'all' },
+  { label: 'มีรายการ', value: 'activity' },
+  { label: 'ได้คอม', value: 'eligible' },
 ]
 
 const salesPlanNumberInputClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 text-right font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
@@ -176,6 +207,20 @@ const salesPlanReadonlyNumberInputClass = 'w-full rounded-xl border border-slate
 
 function money(value: unknown) {
   return formatMoney(typeof value === 'number' ? value : Number(value ?? 0))
+}
+
+function count(value: unknown) {
+  return num(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })
+}
+
+function commissionDateRange(range: CommissionQuickRange) {
+  const end = new Date()
+  const start = new Date(end)
+  if (range === 'last7') start.setDate(start.getDate() - 6)
+  if (range === 'month') start.setDate(1)
+
+  const formatDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return { from: formatDate(start), to: formatDate(end) }
 }
 
 function text(value: unknown) {
@@ -186,12 +231,6 @@ function num(value: unknown) {
   return typeof value === 'number' ? value : Number(value ?? 0)
 }
 
-function sanitizeDecimalInput(value: string) {
-  const normalized = value.replace(/,/g, '').replace(/[^0-9.]/g, '')
-  const [whole, ...decimalParts] = normalized.split('.')
-  return decimalParts.length ? `${whole}.${decimalParts.join('')}` : whole
-}
-
 function normalizedProductFilterValue(value: unknown) {
   return text(value).trim().toLowerCase()
 }
@@ -199,7 +238,11 @@ function normalizedProductFilterValue(value: unknown) {
 function matchesProductFilter(row: AnyRow, filterProductCode: string) {
   if (!filterProductCode) return true
   const needle = normalizedProductFilterValue(filterProductCode)
-  return [row.productCode, row.productId, row.code].some((value) => normalizedProductFilterValue(value) === needle)
+  return [
+    row.productCode,
+    row.productId,
+    row.code,
+  ].some((value) => normalizedProductFilterValue(value) === needle)
 }
 
 function productMatchKeys(row: AnyRow) {
@@ -292,21 +335,13 @@ function sortedByKey<TRow, TKey extends string>(
   })
 }
 
-function csvEscape(value: string) {
-  return `"${value.replace(/"/g, '""')}"`
-}
-
-function downloadCsv(filename: string, headers: string[], rows: string[][]) {
-  const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+async function downloadExcel(filename: string, headers: string[], rows: string[][]) {
+  const { default: writeXlsxFile } = await import('write-excel-file/browser')
+  const workbook = [
+    headers.map((value) => ({ fontWeight: 'bold' as const, value })),
+    ...rows,
+  ]
+  await writeXlsxFile(workbook, { sheet: 'รายงาน' }).toFile(filename)
 }
 
 const SALES_PLAN_DEFAULT_PAGE_SIZE = 10
@@ -318,10 +353,6 @@ function pageCount(totalItems: number, pageSize: number) {
 
 function paginateRows<TRow>(rows: TRow[], page: number, pageSize: number) {
   return rows.slice((page - 1) * pageSize, page * pageSize)
-}
-
-function count(value: number) {
-  return new Intl.NumberFormat('th-TH').format(value)
 }
 
 function TablePaginationToolbar({
@@ -391,6 +422,7 @@ export function SalesPlanPageClient() {
   const [isSavingPlan, setIsSavingPlan] = useState(false)
   const [isClearingPendingPlans, setIsClearingPendingPlans] = useState(false)
   const [isPlanFormOpen, setIsPlanFormOpen] = useState(false)
+  const [clearPendingPlansDialog, setClearPendingPlansDialog] = useState<ClearPendingPlansDialogState | null>(null)
   const [selectedPendingPlanIds, setSelectedPendingPlanIds] = useState<string[]>([])
   const [month, setMonth] = useState('')
   const [planFilterGroup, setPlanFilterGroup] = useState('')
@@ -569,7 +601,7 @@ export function SalesPlanPageClient() {
         if (leftHasPlan !== rightHasPlan) return leftHasPlan ? -1 : 1
         return num(right.pendingSaleQty) - num(left.pendingSaleQty)
       })
-  }, [bestVisiblePlanByProduct, data?.pendingSaleTable, insightFilterGroup, insightFilterProductCode])
+  }, [bestVisiblePlanByProduct, data?.pendingSaleTable, insightFilterProductCode])
   const pendingSaleTotals = useMemo(() => ({
     count: pendingSaleRows.length,
     shortageCount: pendingSaleRows.filter((row) => num(row.realPendingSale) < 0).length,
@@ -660,12 +692,19 @@ export function SalesPlanPageClient() {
     setRemainingPage((current) => Math.min(current, totalRemainingPages))
   }, [totalRemainingPages])
 
-  const exportPlan = () => {
-    downloadCsv(
-      `sales_plan_${month || data?.filters.month || 'current'}.csv`,
+  const exportPlan = async () => {
+    await downloadExcel(
+      `sales_plan_${month || data?.filters.month || 'current'}.xlsx`,
       ['Month', 'Product', 'ช่องทาง', 'Customer', 'Containers', 'Kg/ตู้', 'รวม กก.', '% LME', 'LME (USD/MT)', 'FX', 'ราคาขาย (THB/kg)', 'สถานะ'],
       visiblePlanRows.map((row) => [month || text(data?.filters.month), text(row.productName), text(row.channel), text(row.customerName), money(row.containers), money(row.kgPerContainer), money(row.totalKg), money(row.sellPctLme), money(row.lme), money(row.fx), money(row.sellPrice), text(row.status)]),
     )
+  }
+
+  const clearPlanFilters = () => {
+    setMonth('')
+    setPlanFilterGroup('')
+    setPlanFilterChannel('')
+    setPlanFilterProductCode('')
   }
 
   function changePlanSort(key: SalesPlanColumnKey) {
@@ -832,35 +871,42 @@ export function SalesPlanPageClient() {
     const targetCount = cleaningSelected ? targetPlanIds.length : pendingPlanCount
     if (!targetCount) return
     const activeMonth = month || data?.filters.month || new Date().toISOString().slice(0, 7)
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm(cleaningSelected
+    setClearPendingPlansDialog({
+      ...(cleaningSelected
+        ? { planIds: targetPlanIds }
+        : {
+          filters: {
+            channel: planFilterChannel || undefined,
+            metalGroup: planFilterGroup || undefined,
+            month: activeMonth,
+            productCode: planFilterProductCode || undefined,
+          },
+        }),
+      message: cleaningSelected
         ? `ต้องการเคลียร์สถานะ Pending ของรายการที่เลือก ${targetCount} รายการใช่หรือไม่?`
-        : `ต้องการเคลียร์สถานะ Pending ทั้งหมด ${targetCount} รายการตามตัวกรองปัจจุบันของเดือน ${activeMonth} ใช่หรือไม่?`)
-      if (!confirmed) return
-    }
+        : `ต้องการเคลียร์สถานะ Pending ทั้งหมด ${targetCount} รายการตามตัวกรองปัจจุบันของเดือน ${activeMonth} ใช่หรือไม่?`,
+    })
+  }
 
+  async function confirmClearPendingPlans() {
+    if (!clearPendingPlansDialog) return
+    const targetPlanIds = clearPendingPlansDialog.planIds ?? []
     setFormError(null)
     setIsClearingPendingPlans(true)
     try {
       await dailyFetchJson<{ deletedCount: number }>('/api/sales-plan', {
         body: JSON.stringify({
           action: 'clear-pending-plans',
-          ...(cleaningSelected
-            ? { planIds: targetPlanIds }
-            : {
-              filters: {
-                channel: planFilterChannel || undefined,
-                metalGroup: planFilterGroup || undefined,
-                month: activeMonth,
-                productCode: planFilterProductCode || undefined,
-              },
-            }),
+          ...(clearPendingPlansDialog.planIds
+            ? { planIds: clearPendingPlansDialog.planIds }
+            : { filters: clearPendingPlansDialog.filters }),
         }),
         method: 'POST',
       })
-      if (cleaningSelected) {
+      if (targetPlanIds.length > 0) {
         setSelectedPendingPlanIds((current) => current.filter((id) => !targetPlanIds.includes(id)))
       }
+      setClearPendingPlansDialog(null)
       await loadSalesPlan()
     } catch (caught) {
       setFormError(caught instanceof Error ? caught.message : 'เคลียร์สถานะ Pending ไม่ได้')
@@ -929,7 +975,7 @@ export function SalesPlanPageClient() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-2xl font-extrabold tracking-tight text-slate-700">📊 LME Reference Pricing <span className="text-lg font-semibold text-slate-400">(Real-time + Manual)</span></h2>
-            <div className="mt-1 text-sm font-medium text-slate-400">กด Fetch Live เพื่อดึงและบันทึกค่า LME/FX ทันที ส่วน กก./ตู้ ต้องกรอกเอง</div>
+            <div className="mt-1 text-sm font-medium text-slate-400">กด Fetch Live เพื่อดึงและบันทึกค่า LME/FX ทันที ส่วน กก./ตู้ และทองเหลืองยังกรอกเอง</div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -968,61 +1014,77 @@ export function SalesPlanPageClient() {
         </div>
         {formError ? <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{formError}</div> : null}
       </div>
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-        <label className="text-xs font-bold text-slate-500">เดือน</label>
-        <input className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
-        <select className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={planFilterGroup} onChange={(event) => setPlanFilterGroup(event.target.value)}>
-          <option value="">ทุกหมวด (ทองแดง+ทองเหลือง)</option>
-          <option value="ทองแดง">🥉 ทองแดง เท่านั้น</option>
-          <option value="ทองเหลือง">🌟 ทองเหลือง เท่านั้น</option>
-        </select>
-        <select className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white font-medium text-slate-700 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={planFilterChannel} onChange={(event) => setPlanFilterChannel(event.target.value)}>
-          <option value="">ทุกช่องทาง</option>
-          {(data?.filters.channels ?? []).map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
-        </select>
-        <div className="min-w-[240px] flex-1 sm:max-w-sm">
-          <SearchCombobox
-            hideLabel
-            inputClassName="h-10 text-sm font-medium text-slate-700"
-            inputId="sales-plan-filter-product"
-            label="สินค้า"
-            openOnFocus={false}
-            options={filterProductOptions}
-            placeholder="ค้นหาสินค้า"
-            value={planFilterProductCode}
-            onChange={setPlanFilterProductCode}
-          />
+      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-slate-500" htmlFor="sales-plan-filter-month">เดือน:</label>
+          <input className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" id="sales-plan-filter-month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+          <div className="min-w-[240px] flex-1 sm:max-w-sm">
+            <SearchCombobox
+              hideLabel
+              inputClassName="h-9 text-sm font-normal text-slate-700"
+              inputId="sales-plan-filter-product"
+              label="สินค้า"
+              openOnFocus={false}
+              options={filterProductOptions}
+              placeholder="ค้นหาสินค้า"
+              value={planFilterProductCode}
+              onChange={setPlanFilterProductCode}
+            />
+          </div>
+          {planFilterProductCode ? (
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50" onClick={() => setPlanFilterProductCode('')} type="button">ล้างสินค้า</button>
+          ) : null}
+          <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50" onClick={clearPlanFilters} type="button">ล้างตัวกรอง</button>
         </div>
-        {planFilterProductCode ? (
-          <button
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center"
-            onClick={() => setPlanFilterProductCode('')}
-            type="button"
-          >
-            ล้างสินค้า
-          </button>
-        ) : null}
-        <span className="flex-1" />
-        <button
-          className="rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={!pendingPlanCount || isClearingPendingPlans || isSavingPlan}
-          onClick={() => handleClearPendingPlans()}
-          type="button"
-        >
-          {isClearingPendingPlans
-            ? 'กำลังเคลียร์สถานะ...'
-            : selectedVisiblePendingPlanIds.length > 0
-              ? `เคลียร์สถานะที่เลือก (${selectedVisiblePendingPlanIds.length})`
-              : `เคลียร์สถานะ Pending (${pendingPlanCount})`}
-        </button>
-        <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center" onClick={openPlanForm} type="button">+ เพิ่มแผน</button>
-        <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs h-10 flex items-center justify-center" onClick={exportPlan} type="button">📥 Export CSV</button>
+        <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-xs text-slate-500" htmlFor="sales-plan-filter-group">ประเภทโลหะ:</label>
+            <select className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" id="sales-plan-filter-group" value={planFilterGroup} onChange={(event) => setPlanFilterGroup(event.target.value)}>
+              <option value="">ทุกหมวด (ทองแดง+ทองเหลือง)</option>
+              <option value="ทองแดง">ทองแดงเท่านั้น</option>
+              <option value="ทองเหลือง">ทองเหลืองเท่านั้น</option>
+            </select>
+            <label className="ml-2 text-xs text-slate-500" htmlFor="sales-plan-filter-channel">ช่องทาง:</label>
+            <select className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" id="sales-plan-filter-channel" value={planFilterChannel} onChange={(event) => setPlanFilterChannel(event.target.value)}>
+              <option value="">ทุกช่องทาง</option>
+              {(data?.filters.channels ?? []).map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              className="flex h-9 items-center justify-center rounded-md border border-rose-200 bg-rose-50 px-3 text-sm font-normal text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!pendingPlanCount || isClearingPendingPlans || isSavingPlan}
+              onClick={() => handleClearPendingPlans()}
+              type="button"
+            >
+              {isClearingPendingPlans
+                ? 'กำลังเคลียร์สถานะ...'
+                : selectedVisiblePendingPlanIds.length > 0
+                  ? `เคลียร์สถานะที่เลือก (${selectedVisiblePendingPlanIds.length})`
+                  : `เคลียร์สถานะ Pending (${pendingPlanCount})`}
+            </button>
+            <button className="flex h-9 items-center justify-center rounded-md bg-blue-600 px-3 text-sm font-normal text-white hover:bg-blue-700" onClick={openPlanForm} type="button">+ เพิ่มแผนใหม่</button>
+            <button className="flex h-9 items-center justify-center rounded-md bg-emerald-600 px-3 text-sm font-normal text-white hover:bg-emerald-700" onClick={exportPlan} type="button">ส่งออก Excel</button>
+          </div>
+        </div>
       </div>
       {/* 1. Sales Plan Section */}
       <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-semibold text-slate-600">
           📝 ตารางวางแผน — เพิ่มแผนแล้วเริ่มที่ `Pending` ก่อน จากนั้นค่อยกด `Lock %` เองเมื่อพร้อม และคอลัมน์ `PO ขาย` จะแยกต่างหาก
         </div>
+        <Dialog open={Boolean(clearPendingPlansDialog)} onOpenChange={(open) => { if (!open && !isClearingPendingPlans) setClearPendingPlansDialog(null) }}>
+          <DialogContent className="max-w-lg rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 animate-fade-in" fallbackTitle="ยืนยันการเคลียร์สถานะ" hideClose>
+            <DialogHeader className="border-b border-slate-800 px-5 py-4">
+              <DialogTitle className="text-lg font-bold text-slate-100">Confirm เคลียร์สถานะ</DialogTitle>
+              <p className="text-sm text-slate-300">{clearPendingPlansDialog?.message}</p>
+            </DialogHeader>
+            <DialogFooter className="shrink-0">
+              <button className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={isClearingPendingPlans} onClick={() => setClearPendingPlansDialog(null)} type="button">ยกเลิก</button>
+              <button className="h-10 rounded-md bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60" disabled={isClearingPendingPlans} onClick={confirmClearPendingPlans} type="button">{isClearingPendingPlans ? 'กำลังเคลียร์สถานะ...' : 'Confirm'}</button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <Dialog open={isPlanFormOpen} onOpenChange={setIsPlanFormOpen}>
           <DialogContent className="max-w-6xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" fallbackTitle="เพิ่มแผนขาย" hideClose>
             <DialogHeader className="border-b border-slate-800 px-5 py-4">
@@ -1032,55 +1094,57 @@ export function SalesPlanPageClient() {
             <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 text-sm sm:p-5">
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-4 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">รายละเอียดแผนขาย</h4>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-                <SearchCombobox
-                  hideLabel={false}
-                  inputClassName="h-10 text-sm font-medium text-slate-700"
-                  inputId="sales-plan-draft-product"
-                  label="สินค้า *"
-                  openOnFocus={false}
-                  options={productOptions.map((option) => ({
-                    id: option.code,
-                    label: `${option.code} - ${option.name}`,
-                    searchText: `${option.code} ${option.name} ${option.metalGroup}`,
-                  }))}
-                  placeholder="ค้นหารหัสหรือชื่อสินค้า"
-                  value={planDraftForm.productCode}
-                  onChange={handleDraftProductChange}
-                />
-                <SearchCombobox
-                  inputClassName="h-10 text-sm font-medium text-slate-700"
-                  inputId="sales-plan-draft-customer"
-                  label="ลูกค้า *"
-                  options={customerOptions.map((customer) => ({
-                    id: customer.code,
-                    label: `${customer.code} - ${customer.name}`,
-                    searchText: `${customer.code} ${customer.name}`,
-                  }))}
-                  placeholder="ค้นหารหัสหรือชื่อลูกค้า"
-                  value={planDraftForm.customerCode}
-                  onChange={handleDraftCustomerChange}
-                />
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">ช่องทางขาย</span>
-                  <input className="h-10 w-full rounded-md border border-slate-300 bg-slate-100 px-3 text-sm font-medium text-slate-700 outline-none" readOnly value={selectedDraftChannel?.name ?? (selectedDraftCustomer ? 'ไม่พบช่องทางจาก Master Customer' : 'เลือกลูกค้าก่อน')} />
-                </label>
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">จำนวนตู้</span>
-                  <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, containers: event.target.value }))} type="number" value={planDraftForm.containers} />
-                </label>
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">กก./ตู้</span>
-                  <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, kgPerContainer: event.target.value }))} type="number" value={planDraftForm.kgPerContainer} />
-                </label>
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">LME cf (USD/MT)</span>
-                  <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} inputMode="decimal" min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, lmeCf: sanitizeDecimalInput(event.target.value) }))} placeholder="0.00" step="any" type="text" value={planDraftForm.lmeCf} />
-                </label>
-                <label className="text-xs font-bold text-slate-600">
-                  <span className="mb-1 block">% LME</span>
-                  <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, sellPctLme: event.target.value }))} type="number" value={planDraftForm.sellPctLme} />
-                </label>
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+                  <SearchCombobox
+                    hideLabel={false}
+                    inputClassName="h-10 text-sm font-medium text-slate-700"
+                    inputId="sales-plan-draft-product"
+                    label="สินค้า *"
+                    openOnFocus={false}
+                    options={productOptions.map((option) => ({
+                      id: option.code,
+                      label: `${option.code} - ${option.name}`,
+                      searchText: `${option.code} ${option.name} ${option.metalGroup}`,
+                    }))}
+                    placeholder="ค้นหารหัสหรือชื่อสินค้า"
+                    value={planDraftForm.productCode}
+                    onChange={handleDraftProductChange}
+                  />
+                  <SearchCombobox
+                    inputClassName="h-10 text-sm font-medium text-slate-700"
+                    inputId="sales-plan-draft-customer"
+                    label="ลูกค้า *"
+                    options={customerOptions.map((customer) => ({
+                      id: customer.code,
+                      label: `${customer.code} - ${customer.name}`,
+                      searchText: `${customer.code} ${customer.name}`,
+                    }))}
+                    placeholder="ค้นหารหัสหรือชื่อลูกค้า"
+                    value={planDraftForm.customerCode}
+                    onChange={handleDraftCustomerChange}
+                  />
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">ช่องทางขาย</span>
+                    <input className="h-10 w-full rounded-md border border-slate-300 bg-slate-100 px-3 text-sm font-medium text-slate-700 outline-none" readOnly value={selectedDraftChannel?.name ?? (selectedDraftCustomer ? 'ไม่พบช่องทางจาก Master Customer' : 'เลือกลูกค้าก่อน')} />
+                  </label>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">จำนวนตู้</span>
+                    <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, containers: event.target.value }))} type="number" value={planDraftForm.containers} />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">กก./ตู้</span>
+                    <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, kgPerContainer: event.target.value }))} type="number" value={planDraftForm.kgPerContainer} />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">LME cf (USD/MT)</span>
+                    <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} inputMode="decimal" onChange={(event) => setPlanDraftForm((current) => ({ ...current, lmeCf: sanitizeDecimalInput(event.target.value) }))} placeholder="0.00" value={planDraftForm.lmeCf} />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    <span className="mb-1 block">% LME</span>
+                    <input className={`h-10 text-sm ${salesPlanNumberInputClass}`} min="0" onChange={(event) => setPlanDraftForm((current) => ({ ...current, sellPctLme: event.target.value }))} type="number" value={planDraftForm.sellPctLme} />
+                  </label>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -1110,7 +1174,7 @@ export function SalesPlanPageClient() {
         />
         {/* Desktop view */}
         <div className="hidden overflow-x-auto lg:block">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: planResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: planResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {salesPlanColumns.map((column) => (
                 <col key={column.key} style={planResize.getColumnStyle(column.key)} />
@@ -1268,10 +1332,10 @@ export function SalesPlanPageClient() {
           onPageSizeChange={setPendingSalePageSize}
         />
         <div className="hidden overflow-x-auto lg:block">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-100">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-slate-700">รหัส / สินค้า</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">สินค้า</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">หมวด</th>
                 <th className="px-4 py-3 text-right font-semibold text-slate-700">รอขาย (กก.)</th>
                 <th className="px-4 py-3 text-right font-semibold text-slate-700">ต้นทุน Pool<br /><span className="text-xs font-medium text-slate-400">(บาท/กก.)</span></th>
@@ -1354,42 +1418,64 @@ export function SalesPlanPageClient() {
         </div>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <Tabs value={salesPlanInsightTab} onValueChange={(value) => setSalesPlanInsightTab(value as 'analysis' | 'remaining')}>
-            <TabsList aria-label="ตารางวิเคราะห์แผนขาย" className="flex-wrap overflow-x-auto" variant="line">
-              <TabsTrigger value="analysis" variant="line">วิเคราะห์แผนขาย vs สต๊อกว่างขาย</TabsTrigger>
-              <TabsTrigger value="remaining" variant="line">สต๊อกว่างขายคงเหลือ</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap xl:justify-end">
-            <select className="h-10 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={insightFilterGroup} onChange={(event) => setInsightFilterGroup(event.target.value)}>
-              <option value="">ทุกหมวด (ตารางล่าง)</option>
+      <Tabs className="gap-3" value={salesPlanInsightTab} onValueChange={(value) => setSalesPlanInsightTab(value as 'analysis' | 'remaining')}>
+        <div className="overflow-x-auto">
+          <TabsList
+            aria-label="ตารางวิเคราะห์แผนขาย"
+            className="inline-flex w-full max-w-max flex-nowrap gap-2 bg-transparent p-0 shadow-none"
+          >
+            <TabsTrigger
+              className="min-w-fit rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-none"
+              value="analysis"
+            >
+              วิเคราะห์แผนขาย vs สต๊อกว่างขาย
+            </TabsTrigger>
+            <TabsTrigger
+              className="min-w-fit rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-none"
+              value="remaining"
+            >
+              สต๊อกว่างขายคงเหลือ
+            </TabsTrigger>
+          </TabsList>
+        </div>
+      </Tabs>
+
+      <div className="rounded-md bg-white p-3 shadow">
+        <div className="mb-2 text-xs font-medium text-slate-500">ตัวกรองข้อมูลของตารางที่เลือก</div>
+        <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-end">
+          <label className="flex min-w-[200px] flex-col gap-1 text-xs font-medium text-slate-500">
+            <span>หมวด</span>
+            <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" value={insightFilterGroup} onChange={(event) => setInsightFilterGroup(event.target.value)}>
+              <option value="">ทุกหมวด</option>
               {insightFilterGroupOptions.map((group) => <option key={group} value={group}>{group}</option>)}
             </select>
-            <div className="min-w-[240px] flex-1 sm:max-w-sm">
-              <SearchCombobox
-                hideLabel
-                inputClassName="h-10 text-sm font-medium text-slate-700"
-                inputId="sales-plan-insight-filter-product"
-                label="สินค้า"
-                openOnFocus={false}
-                options={filterProductOptions}
-                placeholder="ค้นหาสินค้าในตารางล่าง"
-                value={insightFilterProductCode}
-                onChange={setInsightFilterProductCode}
-              />
-            </div>
-            {insightFilterProductCode ? (
-              <button
-                className="h-10 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                onClick={() => setInsightFilterProductCode('')}
-                type="button"
-              >
-                ล้างสินค้า
-              </button>
-            ) : null}
+          </label>
+          <div className="min-w-[260px] flex-1 lg:max-w-md">
+            <div className="mb-1 text-xs font-medium text-slate-500">สินค้า</div>
+            <SearchCombobox
+              hideLabel
+              inputClassName="h-9 text-sm font-medium text-slate-700"
+              inputId="sales-plan-insight-filter-product"
+              label="สินค้า"
+              openOnFocus={false}
+              options={filterProductOptions}
+              placeholder="ค้นหาสินค้าในตารางล่าง"
+              value={insightFilterProductCode}
+              onChange={setInsightFilterProductCode}
+            />
           </div>
+          {insightFilterGroup || insightFilterProductCode ? (
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 lg:ml-auto"
+              onClick={() => {
+                setInsightFilterGroup('')
+                setInsightFilterProductCode('')
+              }}
+              type="button"
+            >
+              ล้างตัวกรอง
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -1413,7 +1499,7 @@ export function SalesPlanPageClient() {
         />
         {/* Desktop View Table */}
         <div className="hidden overflow-x-auto lg:block">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: analysisResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: analysisResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {salesPlanAnalysisColumns.map((column) => (
                 <col key={column.key} style={analysisResize.getColumnStyle(column.key)} />
@@ -1522,7 +1608,7 @@ export function SalesPlanPageClient() {
         />
         {/* Desktop View Table */}
         <div className="hidden overflow-x-auto lg:block">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: remainingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: remainingResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {salesPlanRemainingColumns.map((column) => (
                 <col key={column.key} style={remainingResize.getColumnStyle(column.key)} />
@@ -1652,7 +1738,9 @@ export function SalesCommissionPageClient() {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
   })
   const [branchId, setBranchId] = useState('')
+  const [salesCardFilter, setSalesCardFilter] = useState<CommissionSalesCardFilter>('all')
   const [selectedSales, setSelectedSales] = useState('')
+  const [drilldownTab, setDrilldownTab] = useState<CommissionDrilldownTab>('categoryAll')
   const [data, setData] = useState<CommissionPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1706,8 +1794,31 @@ export function SalesCommissionPageClient() {
       })
   }, [query])
 
+  function setCommissionQuickRange(range: CommissionQuickRange) {
+    const nextRange = commissionDateRange(range)
+    setFrom(nextRange.from)
+    setTo(nextRange.to)
+  }
+
+  function isCommissionQuickRangeActive(range: CommissionQuickRange) {
+    const nextRange = commissionDateRange(range)
+    return from === nextRange.from && to === nextRange.to
+  }
+
+  function resetCommissionOverviewFilters() {
+    setCommissionQuickRange('month')
+    setBranchId('')
+    setSalesCardFilter('all')
+  }
+
   const sales = (data?.salesRows ?? []).find((row) => text(row.id) === selectedSales)
   const billRows = (data?.billRows ?? []).filter((row) => text(row.salesId) === selectedSales)
+  const visibleSalesRows = useMemo(() => {
+    const rows = data?.salesRows ?? []
+    if (salesCardFilter === 'eligible') return rows.filter((row) => row.commissionEligible)
+    if (salesCardFilter === 'activity') return rows.filter((row) => row.billCount > 0)
+    return rows
+  }, [data?.salesRows, salesCardFilter])
 
   // Table 1: ยอดซื้อรวมตามหมวดสินค้า
   const table1Data = useMemo(() => {
@@ -1810,10 +1921,9 @@ export function SalesCommissionPageClient() {
     return sortedByKey(rows, summarySortKey, summarySortDir, (row, key) => row[key])
   }, [summarySortDir, summarySortKey, summaryTableData])
 
-  // Helper for downloading CSV of Table 4
-  const handleDownloadCsv = () => {
+  const handleDownloadExcel = async () => {
     if (!sales) return
-    const headers = ['วันที่', 'เลขที่บิล', 'Supplier', 'สินค้า', 'น้ำหนัก (กก.)', 'ราคาซื้อ/กก.', 'ราคาหน้าใบ', 'ส่วนต่างกำไร', 'ยอดรวม (บาท)', 'สถานะค่าคอม']
+    const headers = ['วันที่', 'เลขที่บิล', 'ผู้ขาย', 'สินค้า', 'น้ำหนัก (กก.)', 'ราคาซื้อ/กก.', 'ราคาหน้าใบ', 'ส่วนต่างกำไร', 'ยอดรวม (บาท)', 'สถานะค่าคอม']
     const rows = billRows.map((row) => [
       formatDateDisplay(text(row.date)),
       text(row.docNo),
@@ -1826,7 +1936,7 @@ export function SalesCommissionPageClient() {
       money(row.amount),
       row.isCommissionable ? 'ได้คอมมิชชั่น' : 'ไม่ได้คอมมิชชั่น'
     ])
-    downloadCsv(`sales_tracking_${sales.code || sales.id}.csv`, headers, rows)
+    await downloadExcel(`sales_tracking_${sales.code || sales.id}.xlsx`, headers, rows)
   }
 
   function changeTable1Sort(key: CommissionCategoryColumnKey) {
@@ -1893,7 +2003,20 @@ export function SalesCommissionPageClient() {
 
     return (
       <section className="space-y-4 text-[13.5px]">
-        {/* Header Block */}
+        <button
+          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          type="button"
+          onClick={() => {
+            setDrilldownTab('categoryAll')
+            setSelectedSales('')
+            setTable3Page(1)
+            setTable4Page(1)
+            setTable4Search('')
+          }}
+        >
+          ← กลับหน้าหลัก
+        </button>
+
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
           <div>
             <div className="font-bold text-slate-800 text-base flex items-center gap-2">
@@ -1908,30 +2031,18 @@ export function SalesCommissionPageClient() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={handleDownloadCsv}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 shadow-xs outline-none transition-colors h-10 flex items-center justify-center gap-1.5"
+              onClick={handleDownloadExcel}
+              className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 text-sm font-normal text-white hover:bg-emerald-700"
               type="button"
             >
-              📥 ส่งออกรายละเอียด CSV
-            </button>
-            <button
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 shadow-xs outline-none transition-colors h-10 flex items-center justify-center"
-              type="button"
-              onClick={() => {
-                setSelectedSales('')
-                setTable3Page(1)
-                setTable4Page(1)
-                setTable4Search('')
-              }}
-            >
-              ← กลับหน้าหลัก
+              ส่งออก Excel
             </button>
           </div>
         </div>
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <Metric label="จำนวนบิลรับซื้อ" value={`${money(sales.billCount)} บิล`} tone="blue" />
+          <Metric label="จำนวนบิลรับซื้อ" value={`${count(sales.billCount)} บิล`} tone="blue" />
           <Metric label="น้ำหนักรวม" value={`${money(sales.qty)} กก.`} tone="amber" />
           <Metric label="ยอดรับซื้อรวม" value={`${money(sales.purchaseAmt)} บาท`} tone="blue" />
         </div>
@@ -1943,17 +2054,24 @@ export function SalesCommissionPageClient() {
           <Metric label="ยอดซื้อที่ไม่ได้คอม" value={`${money(sales.nonCommissionableAmount)} บาท`} tone="slate" />
         </div>
 
-        {/* Tables Grid */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Table 1 */}
-          <Panel title="📦 Table 1: ยอดซื้อรวมตามหมวดสินค้า">
+        <Tabs value={drilldownTab} onValueChange={(value) => setDrilldownTab(value as CommissionDrilldownTab)}>
+          <TabsList className="w-full flex-nowrap overflow-x-auto" variant="line">
+            <TabsTrigger value="categoryAll" variant="line">ยอดรวมตามหมวด</TabsTrigger>
+            <TabsTrigger value="commissionableCategories" variant="line">ยอดได้คอม</TabsTrigger>
+            <TabsTrigger value="suppliers" variant="line">ผู้ขาย</TabsTrigger>
+            <TabsTrigger value="items" variant="line">รายการสินค้า</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {drilldownTab === 'categoryAll' ? (
+          <Panel title="ยอดรวมตามหมวดสินค้า">
             {table1Resize.hasCustomWidths ? (
               <div className="mb-2 hidden justify-end lg:flex">
                 <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={table1Resize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
               </div>
             ) : null}
-            <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
-              <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table1Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+              <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table1Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
                   {commissionCategoryColumns.map((column) => (
                     <col key={column.key} style={table1Resize.getColumnStyle(column.key)} />
@@ -1997,17 +2115,29 @@ export function SalesCommissionPageClient() {
                 </tbody>
               </table>
             </div>
+            <CommissionMobileRows
+              empty="ไม่มีข้อมูลการซื้อ"
+              rows={sortedTable1Data.map((row) => ({
+                key: row.category,
+                title: row.category,
+                summary: [
+                  { label: 'จำนวน (กก.)', value: money(row.qty) },
+                  { label: 'ยอดซื้อ (บาท)', value: money(row.amount) },
+                ],
+              }))}
+            />
           </Panel>
+        ) : null}
 
-          {/* Table 2 */}
-          <Panel title="📈 Table 2: ยอดซื้อที่ได้รับค่าคอมมิชชั่นตามหมวดสินค้า">
+        {drilldownTab === 'commissionableCategories' ? (
+          <Panel title="ยอดซื้อที่ได้รับค่าคอมมิชชั่นตามหมวดสินค้า">
             {table2Resize.hasCustomWidths ? (
               <div className="mb-2 hidden justify-end lg:flex">
                 <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={table2Resize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
               </div>
             ) : null}
-            <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
-              <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table2Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+              <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table2Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
                   {commissionCategoryColumns.map((column) => (
                     <col key={column.key} style={table2Resize.getColumnStyle(column.key)} />
@@ -2051,18 +2181,29 @@ export function SalesCommissionPageClient() {
                 </tbody>
               </table>
             </div>
+            <CommissionMobileRows
+              empty="ไม่มีข้อมูลรายการที่ได้คอมมิชชั่น"
+              rows={sortedTable2Data.map((row) => ({
+                key: row.category,
+                title: row.category,
+                summary: [
+                  { label: 'จำนวน (กก.)', value: money(row.qty) },
+                  { label: 'ยอดซื้อ (บาท)', value: money(row.amount) },
+                ],
+              }))}
+            />
           </Panel>
-        </div>
+        ) : null}
 
-        {/* Table 3 */}
-        <Panel title="🏭 Table 3: Supplier ในความดูแล">
+        {drilldownTab === 'suppliers' ? (
+          <Panel title="ผู้ขายในความดูแล">
           {table3Resize.hasCustomWidths ? (
             <div className="mb-2 hidden justify-end lg:flex">
               <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={table3Resize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
             </div>
           ) : null}
-          <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm mb-3">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table3Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <div className="mb-3 hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table3Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {commissionSupplierColumns.map((column) => (
                   <col key={column.key} style={table3Resize.getColumnStyle(column.key)} />
@@ -2096,7 +2237,7 @@ export function SalesCommissionPageClient() {
                 ))}
                 {pagedTable3.length === 0 ? (
                   <tr>
-                    <td className="py-8 text-center text-slate-400 font-semibold" colSpan={commissionSupplierColumns.length}>ไม่มีข้อมูล Supplier</td>
+                  <td className="py-8 text-center text-slate-400 font-semibold" colSpan={commissionSupplierColumns.length}>ไม่มีข้อมูลผู้ขาย</td>
                   </tr>
                 ) : (
                   <tr className="bg-slate-50/55 font-bold">
@@ -2112,6 +2253,19 @@ export function SalesCommissionPageClient() {
               </tbody>
             </table>
           </div>
+          <CommissionMobileRows
+            empty="ไม่มีข้อมูลผู้ขาย"
+            rows={pagedTable3.map((row) => ({
+              key: row.supplier,
+              title: row.supplier,
+              details: [{ label: 'จำนวนบิล', value: row.bills }],
+              summary: [
+                { label: 'น้ำหนัก (กก.)', value: money(row.qty) },
+                { label: 'ยอดรับซื้อ (บาท)', value: money(row.amount) },
+                { label: '% ของทั้งหมด', value: row.pct.toFixed(2) + '%' },
+              ],
+            }))}
+          />
           {/* Pagination */}
           {totalTable3Pages > 1 && (
             <div className="flex items-center justify-between pt-2">
@@ -2135,13 +2289,14 @@ export function SalesCommissionPageClient() {
             </div>
           )}
         </Panel>
+        ) : null}
 
-        {/* Table 4 */}
-        <Panel title="📊 Table 4: รายการสินค้าละเอียด">
+        {drilldownTab === 'items' ? (
+          <Panel title="รายการสินค้าละเอียด">
           <div className="mb-3 flex gap-2">
             <input
               className="border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white font-semibold text-slate-700 h-9 w-64 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-all"
-              placeholder="ค้นหาเลขที่บิล, Supplier, สินค้า..."
+              placeholder="ค้นหาเลขที่บิล, ผู้ขาย, สินค้า..."
               value={table4Search}
               onChange={(e) => {
                 setTable4Search(e.target.value)
@@ -2154,8 +2309,8 @@ export function SalesCommissionPageClient() {
               <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={table4Resize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
             </div>
           ) : null}
-          <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm mb-3">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table4Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <div className="mb-3 hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: table4Resize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {commissionBillColumns.map((column) => (
                   <col key={column.key} style={table4Resize.getColumnStyle(column.key)} />
@@ -2211,6 +2366,33 @@ export function SalesCommissionPageClient() {
               </tbody>
             </table>
           </div>
+          <CommissionMobileRows
+            empty="ไม่มีข้อมูลสินค้าละเอียด"
+            rows={pagedTable4.map((row) => {
+              const profitDiff = sales.commissionEligible ? num(row.salesPrice) - num(row.price) : 0
+              return {
+                key: row.id,
+                title: text(row.docNo),
+                badge: row.isCommissionable ? (
+                  <span className="inline-flex rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">ได้คอมมิชชั่น</span>
+                ) : (
+                  <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">ไม่ได้คอม</span>
+                ),
+                details: [
+                  { label: 'วันที่', value: formatDateDisplay(text(row.date)) },
+                  { label: 'ผู้ขาย', value: text(row.supplierName) },
+                  { label: 'สินค้า', value: text(row.productName) },
+                ],
+                summary: [
+                  { label: 'น้ำหนัก (กก.)', value: money(row.qty) },
+                  { label: 'ราคาซื้อ', value: money(row.price) },
+                  { label: 'ราคาหน้าใบ', value: sales.commissionEligible && row.salesPrice > 0 ? money(row.salesPrice) : '-' },
+                  { label: 'ส่วนต่างกำไร', value: sales.commissionEligible && row.salesPrice > 0 ? money(profitDiff) : '-' },
+                  { label: 'ยอดรวม (บาท)', value: money(row.amount) },
+                ],
+              }
+            })}
+          />
           {/* Pagination */}
           {totalTable4Pages > 1 && (
             <div className="flex items-center justify-between pt-2">
@@ -2233,7 +2415,8 @@ export function SalesCommissionPageClient() {
               </div>
             </div>
           )}
-        </Panel>
+          </Panel>
+        ) : null}
       </section>
     )
   }
@@ -2243,7 +2426,7 @@ export function SalesCommissionPageClient() {
     <section className="space-y-4 text-[13.5px]">
       {/* Filters Toolbar */}
       <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4 items-end">
+        <div className="grid items-end gap-3 md:grid-cols-3">
           <Field label="จากวันที่">
             <DatePickerInput className="w-full mt-1" value={from} onChange={setFrom} />
           </Field>
@@ -2257,22 +2440,37 @@ export function SalesCommissionPageClient() {
               onChange={setBranchId}
             />
           </Field>
-          <div className="flex items-center ml-auto w-full xl:w-auto mt-2 md:mt-0 font-bold">
-            {isLoading ? (
-              <span className="text-xs font-bold text-slate-400 animate-pulse flex items-center gap-1.5">
-                ⏳ กำลังโหลดข้อมูล...
-              </span>
+        </div>
+        <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-slate-500">📋 บิลซื้อทั้งหมดในช่วงเวลา:</span>
+            <span className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{count(data?.totals.bills)} บิล</span>
+          </div>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <span className="font-medium text-slate-500">ช่วงเวลา:</span>
+            {commissionQuickRangeOptions.map((option) => (
+              <button
+                aria-pressed={isCommissionQuickRangeActive(option.value)}
+                className={`rounded-md border px-3 py-1 text-xs font-medium transition ${isCommissionQuickRangeActive(option.value) ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                key={option.value}
+                type="button"
+                onClick={() => setCommissionQuickRange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+            {isLoading ? <span className="animate-pulse font-medium text-slate-400">กำลังโหลด...</span> : null}
+            {!isCommissionQuickRangeActive('month') || branchId || salesCardFilter !== 'all' ? (
+              <button className="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={resetCommissionOverviewFilters}>
+                ล้างตัวกรอง
+              </button>
             ) : null}
           </div>
-        </div>
-        <div className="mt-3.5 pt-3 border-t border-slate-100 text-xs flex items-center gap-1.5">
-          <span className="font-semibold text-slate-500">📋 บิลซื้อทั้งหมดในช่วงเวลา:</span>
-          <span className="rounded-xl bg-slate-100 text-slate-700 px-2.5 py-1 text-xs font-bold">{money(data?.totals.bills)} บิล</span>
         </div>
       </div>
 
       {/* 8 Summary Metrics Cards */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Metric label="จำนวนที่ซื้อ" value={`${money(data?.totals.qty)} กก.`} tone="amber" />
         <Metric label="ยอดซื้อ" value={`${money(data?.totals.amount)} บ.`} tone="blue" />
         <Metric label="จำนวนที่ได้คอม" value={`${money(data?.totals.commissionableQty)} กก.`} tone="emerald" />
@@ -2284,44 +2482,72 @@ export function SalesCommissionPageClient() {
       </div>
 
       {/* Grid of Salesperson Cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {(data?.salesRows ?? []).map((row) => (
-          <button
-            key={text(row.id)}
-            className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-slate-400 hover:bg-slate-50/40 outline-none transition-all duration-200 focus:outline-none flex flex-col justify-between"
-            type="button"
-            onClick={() => setSelectedSales(text(row.id))}
-          >
-            <div>
-              <div className="flex items-start justify-between">
-                <div className="font-bold text-slate-800 text-base">{text(row.name)}</div>
-                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-2xs font-bold leading-none ${row.commissionEligible ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-500'}`}>
-                  {row.commissionEligible ? 'ได้ค่าคอม' : 'ไม่ได้คอม'}
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-bold text-slate-900">สรุปยอดตามพนักงานขาย</h2>
+          <div aria-label="ตัวกรองการ์ดพนักงานขาย" className="flex flex-wrap items-center gap-2" role="group">
+            <span className="text-xs font-medium text-slate-500">แสดง:</span>
+            {commissionSalesCardFilterOptions.map((option) => (
+              <button
+                aria-pressed={salesCardFilter === option.value}
+                className={`rounded-md border px-3 py-1 text-xs font-medium transition ${salesCardFilter === option.value ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                key={option.value}
+                type="button"
+                onClick={() => setSalesCardFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {visibleSalesRows.map((row) => (
+            <button
+              key={text(row.id)}
+              className="group flex min-h-[340px] flex-col rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm outline-none transition hover:border-slate-300 hover:bg-slate-50/60 focus:ring-2 focus:ring-blue-100"
+              type="button"
+              onClick={() => {
+                setDrilldownTab('categoryAll')
+                setSelectedSales(text(row.id))
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 pr-2">
+                  <div className="truncate text-xl font-black leading-tight text-slate-950">{text(row.name)}</div>
+                  <div className="mt-1 truncate text-sm font-semibold text-slate-500">
+                    {text(row.code) || '-'} · {text(row.phone) || '-'}
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${row.commissionEligible ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {row.commissionEligible ? 'ได้คอม' : 'ไม่ได้คอม'}
                 </span>
               </div>
-              <div className="text-xs text-slate-500 font-semibold mt-0.5">{text(row.code)} · {text(row.phone) || '-'}</div>
-              <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs">
-                <Mini label="บิล" value={money(row.billCount)} />
-                <Mini label="Supplier" value={money(row.supplierCount)} />
-              </div>
-              <div className="mt-4 space-y-2.5">
-                <Metric label="น้ำหนักรับซื้อ" value={`${money(row.qty)} กก.`} tone="amber" />
-                <Metric label="ยอดรับซื้อรวม" value={`${money(row.purchaseAmt)} บ.`} tone="blue" />
-                <Metric label="น้ำหนักที่ได้คอม" value={`${money(row.commissionableQty)} กก.`} tone="emerald" />
-                <Metric label="ยอดซื้อที่ได้คอม" value={`${money(row.commissionableAmount)} บ.`} tone="emerald" />
-                <Metric label="ค่าคอมเดือนนี้" value={`${money(row.commission)} บ.`} tone={row.commission > 0 ? 'emerald' : 'slate'} />
-              </div>
-            </div>
-            <div className="mt-4 text-right text-xs font-semibold text-blue-600 flex items-center justify-end gap-1 border-t border-slate-50 pt-2.5 w-full">
-              <span>คลิกเพื่อดูรายละเอียด</span>
-              <span>&rarr;</span>
-            </div>
-          </button>
-        ))}
-      </div>
 
-      {/* Sales Summary / สรุปยอดซื้อราย Sales */}
-      <Panel title="สรุปยอดซื้อราย Sales">
+              <div className="mt-4 grid flex-1 grid-cols-2 gap-3">
+                <SalesCardMetric align="center" label="บิล" tone="slate" value={count(row.billCount)} />
+                <SalesCardMetric align="center" label="Supplier" tone="slate" value={count(row.supplierCount)} />
+                <SalesCardMetric label="น้ำหนักรับซื้อ" tone="amber" value={`${money(row.qty)} กก.`} />
+                <SalesCardMetric label="น้ำหนักที่ได้คอม" tone="emerald" value={`${money(row.commissionableQty)} กก.`} />
+                <SalesCardMetric label="ยอดรับซื้อรวม" tone="blue" value={`${money(row.purchaseAmt)} บ.`} />
+                <SalesCardMetric label="ยอดซื้อที่ได้คอม" tone="emerald" value={`${money(row.commissionableAmount)} บ.`} />
+                <SalesCardMetric className="col-span-2" label="ค่าคอมเดือนนี้" tone={row.commission > 0 ? 'amber' : 'slate'} value={`${money(row.commission)} บ.`} />
+              </div>
+
+              <div className="mt-4 border-t border-slate-100 pt-3 text-right text-sm font-bold text-blue-600 transition group-hover:text-blue-700">
+                คลิกเพื่อดูรายละเอียด →
+              </div>
+            </button>
+          ))}
+          {!isLoading && visibleSalesRows.length === 0 ? (
+            <div className="col-span-full rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm font-medium text-slate-500">
+              ไม่พบพนักงานขายตามตัวกรองนี้
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      {/* สรุปยอดซื้อรายพนักงานขาย */}
+      <Panel title="สรุปยอดซื้อรายพนักงานขาย">
         <div className="mb-3.5 flex items-center gap-3">
           <label className="text-xs font-bold text-slate-500">เลือกดูพนักงานขาย:</label>
           <select
@@ -2329,7 +2555,7 @@ export function SalesCommissionPageClient() {
             value={summarySalesFilter}
             onChange={(e) => setSummarySalesFilter(e.target.value)}
           >
-            <option value="ALL">ทุก Sales</option>
+            <option value="ALL">พนักงานขายทั้งหมด</option>
             {(data?.salesRows ?? []).map((sale) => (
               <option key={text(sale.id)} value={text(sale.id)}>{text(sale.name)}</option>
             ))}
@@ -2341,8 +2567,8 @@ export function SalesCommissionPageClient() {
             <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={summaryResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
           </div>
         ) : null}
-        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: summaryResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: summaryResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {commissionSummaryColumns.map((column) => (
                 <col key={column.key} style={summaryResize.getColumnStyle(column.key)} />
@@ -2371,7 +2597,10 @@ export function SalesCommissionPageClient() {
                     <button
                       className="text-blue-600 hover:text-blue-800 hover:underline outline-none text-left font-bold"
                       type="button"
-                      onClick={() => setSelectedSales(row.salesId)}
+                      onClick={() => {
+                        setDrilldownTab('categoryAll')
+                        setSelectedSales(row.salesId)
+                      }}
                     >
                       {row.salesName}
                     </button>
@@ -2387,7 +2616,7 @@ export function SalesCommissionPageClient() {
                 </tr>
               ) : (
                 <tr className="bg-slate-100/50 font-bold text-base">
-                  <td className="p-3 text-slate-800" colSpan={2}>รวมทั้งหมดทุก Sales</td>
+                  <td className="p-3 text-slate-800" colSpan={2}>รวมพนักงานขายทั้งหมด</td>
                   <td className="p-3 text-right font-mono tabular-nums text-slate-800">
                     {money(summaryTableData.reduce((sum, r) => sum + r.totalQty, 0))}
                   </td>
@@ -2399,6 +2628,29 @@ export function SalesCommissionPageClient() {
             </tbody>
           </table>
         </div>
+        <CommissionMobileRows
+          empty="ไม่มีข้อมูล"
+          rows={summaryFlatRows.map((row) => ({
+            key: row.salesId + '-' + row.category,
+            title: (
+              <button
+                className="text-left font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                type="button"
+                onClick={() => {
+                  setDrilldownTab('categoryAll')
+                  setSelectedSales(row.salesId)
+                }}
+              >
+                {row.salesName}
+              </button>
+            ),
+            badge: <span className="text-xs text-slate-500">{row.category}</span>,
+            summary: [
+              { label: 'จำนวน (กก.)', value: money(row.qty) },
+              { label: 'มูลค่ารวม (บาท)', value: money(row.amount) },
+            ],
+          }))}
+        />
       </Panel>
 
       {error ? <ErrorBox text={error} /> : null}
@@ -2487,8 +2739,42 @@ function SimpleTable({ empty = 'ไม่มีข้อมูล', headers, row
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-      <div className="bg-slate-900 p-3 text-sm font-bold text-white">{title}</div>
+      <div className="border-b border-slate-200 bg-white p-3 text-sm font-bold text-slate-800">{title}</div>
       <div className="p-4">{children}</div>
+    </div>
+  )
+}
+
+function CommissionMobileRows({ empty, rows }: { empty: string; rows: CommissionMobileRow[] }) {
+  return (
+    <div className="space-y-3 lg:hidden">
+      {rows.map((row) => (
+        <div key={row.key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2">
+            <div className="min-w-0 font-semibold text-slate-800">{row.title}</div>
+            {row.badge ? <div className="shrink-0">{row.badge}</div> : null}
+          </div>
+          {row.details?.length ? (
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 rounded-md bg-slate-50 p-2 text-xs">
+              {row.details.map((value) => (
+                <div key={value.label}>
+                  <div className="text-slate-500">{value.label}</div>
+                  <div className="mt-0.5 font-semibold text-slate-800">{value.value}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-2 text-right text-xs">
+            {row.summary.map((value) => (
+              <div key={value.label}>
+                <div className="text-slate-500">{value.label}</div>
+                <div className="mt-0.5 font-semibold text-slate-800">{value.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {rows.length === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs font-semibold text-slate-400 shadow-sm">{empty}</div> : null}
     </div>
   )
 }
@@ -2514,25 +2800,51 @@ function LmeEditableCard({ label, manualOnly = false, onChange, readOnly = false
   )
 }
 
-function Metric({ label, tone, value }: { label: string; tone: string; value: string }) {
-  const colors: Record<string, { bg: string; text: string; emoji: string }> = {
-    amber: { bg: 'bg-amber-50', text: 'text-amber-600', emoji: '⏳' },
-    blue: { bg: 'bg-blue-50', text: 'text-blue-600', emoji: '📋' },
-    emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', emoji: '📈' },
-    purple: { bg: 'bg-purple-50', text: 'text-purple-600', emoji: '📦' },
-    red: { bg: 'bg-red-50', text: 'text-red-600', emoji: '⚠️' },
-    slate: { bg: 'bg-slate-100', text: 'text-slate-600', emoji: '🏷️' }
+type CommissionMetricTone = 'amber' | 'blue' | 'emerald' | 'purple' | 'red' | 'slate'
+
+const commissionMetricIcons: Record<CommissionMetricTone, ReactNode> = {
+  amber: '⏳',
+  blue: '📋',
+  emerald: '📈',
+  purple: '📦',
+  red: '⚠️',
+  slate: '🏷️',
+}
+
+function Metric({ label, tone, value }: { label: string; tone: CommissionMetricTone; value: string }) {
+  return <KpiCard icon={commissionMetricIcons[tone]} label={label} tone={tone} value={value} />
+}
+
+function SalesCardMetric({
+  align = 'left',
+  className = '',
+  label,
+  tone,
+  value,
+}: {
+  align?: 'center' | 'left'
+  className?: string
+  label: string
+  tone: 'amber' | 'blue' | 'emerald' | 'slate'
+  value: string
+}) {
+  const labelColors = {
+    amber: 'text-orange-600',
+    blue: 'text-blue-600',
+    emerald: 'text-emerald-600',
+    slate: 'text-slate-400',
   }
-  const style = colors[tone] ?? colors.slate
+  const valueColors = {
+    amber: 'text-orange-600',
+    blue: 'text-blue-600',
+    emerald: 'text-emerald-600',
+    slate: 'text-slate-900',
+  }
+
   return (
-    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3 w-full">
-      <div className={`w-10 h-10 rounded-full ${style.bg} ${style.text} flex items-center justify-center text-lg shrink-0`}>
-        {style.emoji}
-      </div>
-      <div>
-        <div className="text-xs text-slate-500 font-semibold mb-0.5">{label}</div>
-        <div className="text-lg font-bold text-slate-800 leading-tight">{value}</div>
-      </div>
+    <div className={`min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-xs ${align === 'center' ? 'text-center' : 'text-left'} ${className}`}>
+      <div className={`truncate text-sm font-bold ${labelColors[tone]}`}>{label}</div>
+      <div className={`mt-1 break-words font-mono text-[15px] font-black leading-tight tabular-nums ${valueColors[tone]}`}>{value}</div>
     </div>
   )
 }
@@ -2550,15 +2862,6 @@ function BigCard({ label, tone, value }: { label: string; tone: string; value: s
         <div className="text-xs text-slate-500 font-semibold mb-1">{label}</div>
         <div className="break-words font-mono text-2xl font-bold text-slate-800">{value}</div>
       </div>
-    </div>
-  )
-}
-
-function Mini({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-xs">
-      <div className="text-xs text-slate-400 font-semibold">{label}</div>
-      <div className="text-xs font-bold text-slate-800">{value}</div>
     </div>
   )
 }
