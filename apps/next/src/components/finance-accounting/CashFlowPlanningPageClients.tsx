@@ -437,11 +437,10 @@ export function CashFlowForecastCalendarPageClient() {
 
       {displayData ? (
         <>
-          <KpiCardGrid className="lg:grid-cols-4 xl:grid-cols-4">
+          <KpiCardGrid className="lg:grid-cols-3 xl:grid-cols-3">
             <SharedKpiCard className={analysisKpiClassName} icon={<Wallet aria-hidden="true" className="size-5" />} label="เงินสดเริ่มต้น" note={`ณ ${shortThaiDate(displayStartDate)}`} tone="blue" value={money(displayData.summary.startCash)} />
             <SharedKpiCard className={analysisKpiClassName} icon={<ArrowDownLeft aria-hidden="true" className="size-5" />} label="Expected In" note="เงินรับที่ถึงกำหนดในช่วง forecast" tone="cyan" value={`+${money(displayData.summary.totalIn)}`} />
             <SharedKpiCard className={analysisKpiClassName} icon={<ArrowUpRight aria-hidden="true" className="size-5" />} label="Expected Out" note="เงินจ่ายที่ถึงกำหนดในช่วง forecast" tone="orange" value={`-${money(displayData.summary.totalOut)}`} />
-            <SharedKpiCard className={analysisKpiClassName} icon={<Activity aria-hidden="true" className="size-5" />} label="เงินสดสิ้นสุด" note={`สิ้นสุด ${horizon} วัน`} tone={displayData.summary.endCash >= 0 ? 'emerald' : 'red'} value={money(displayData.summary.endCash)} />
           </KpiCardGrid>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -460,16 +459,12 @@ export function CashFlowForecastCalendarPageClient() {
             </AnalysisPanel>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4">
             <AnalysisPanel
-              className="lg:col-span-2"
               subtitle="กดเลือกวันที่บนปฏิทินเพื่อดูรายการรับและจ่ายที่ทำให้ยอดวันนั้นเปลี่ยน"
               title="ปฏิทิน cash flow รายวัน"
             >
               <CalendarGrid days={displayData.dailyProjection} isLoading={false} onSelect={setModal} />
-            </AnalysisPanel>
-            <AnalysisPanel subtitle="ดูความเสี่ยงยอดติดลบและสัดส่วนเงินเข้าออกจากยอดตั้งต้น" title="สัญญาณสภาพคล่อง">
-              <ForecastRiskPanel horizon={horizon} startDate={displayStartDate} summary={displayData.summary} />
             </AnalysisPanel>
           </div>
 
@@ -1028,8 +1023,6 @@ function ProjectionSvg({ days }: { days: ProjectionDay[] }) {
         <line className="stroke-slate-100" strokeDasharray="3 5" x1={xStart} x2={xEnd} y1={bottom} y2={bottom} />
         {minimum <= 0 && maximum >= 0 ? <line className="stroke-slate-300" strokeDasharray="5 5" x1={xStart - 8} x2={xEnd + 8} y1={zeroY} y2={zeroY} /> : null}
         {minimum <= 0 && maximum >= 0 ? <text className="fill-slate-500" fontSize="10" textAnchor="end" x={xStart - 12} y={zeroY + 3}>0</text> : null}
-        <text className="fill-slate-400" fontSize="10" textAnchor="end" x={xStart - 12} y={top + 3}>{money(maximum)}</text>
-        <text className="fill-slate-400" fontSize="10" textAnchor="end" x={xStart - 12} y={bottom + 3}>{money(minimum)}</text>
         <polygon fill="url(#forecastProjectionArea)" points={areaPoints} />
         <polyline className="stroke-cyan-600" fill="none" points={pointString} strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
         {points.map((point, index) => {
@@ -1071,33 +1064,6 @@ function ProjectionSvg({ days }: { days: ProjectionDay[] }) {
   )
 }
 
-function ForecastRiskPanel({ horizon, startDate, summary }: { horizon: number; startDate: string; summary: ForecastPayload['summary'] }) {
-  const netChange = summary.endCash - summary.startCash
-  const changePercent = summary.startCash !== 0 ? netChange / summary.startCash * 100 : 0
-  const risk = summary.negCount > 0 ? 'danger' : netChange < 0 ? 'warn' : 'ok'
-  const riskText = risk === 'danger' ? 'มีวันเงินสดติดลบในช่วง forecast' : risk === 'warn' ? 'เงินสดลดลง แต่ยังไม่ติดลบ' : 'เงินสดยังอยู่ในโซนปลอดภัย'
-  const riskClass = risk === 'danger' ? 'bg-rose-50 text-rose-700' : risk === 'warn' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
-  const gapToLowest = summary.startCash - summary.lowestBal
-
-  return (
-    <div className="space-y-4">
-      <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${riskClass}`}>
-        {risk === 'danger' ? <AlertTriangle aria-hidden="true" className="size-3.5" /> : risk === 'warn' ? <Gauge aria-hidden="true" className="size-3.5" /> : <CheckCircle2 aria-hidden="true" className="size-3.5" />}
-        {riskText}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-        <ForecastMiniStat label="การเปลี่ยนแปลงสุทธิ" tone={netChange >= 0 ? 'emerald' : 'red'} value={`${netChange >= 0 ? '+' : ''}${money(netChange)}`} />
-        <ForecastMiniStat label="คิดเป็น" tone={netChange >= 0 ? 'blue' : 'red'} value={`${changePercent >= 0 ? '+' : ''}${changePercent.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`} />
-        <ForecastMiniStat label="ลดลงจากจุดเริ่มต้นมากสุด" tone={gapToLowest > 0 ? 'amber' : 'slate'} value={money(gapToLowest)} />
-        <ForecastMiniStat label="จำนวนวันที่ติดลบ" tone={summary.negCount > 0 ? 'red' : 'emerald'} value={`${summary.negCount.toLocaleString('th-TH')} วัน`} />
-      </div>
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
-        ช่วง forecast นี้ครอบคลุม {horizon.toLocaleString('th-TH')} วันนับจาก {shortThaiDate(startDate)} โดยตัวเลขรับและจ่ายจะอ้างอิงรายการที่ถึงกำหนดในแต่ละวัน
-      </div>
-    </div>
-  )
-}
-
 function ForecastMiniStat({ label, tone, value }: { label: string; tone: 'amber' | 'blue' | 'emerald' | 'red' | 'slate'; value: string }) {
   const toneClass = tone === 'blue'
     ? 'text-blue-700 bg-blue-50 border-blue-100'
@@ -1129,7 +1095,7 @@ function ForecastChartNote({ children, label, tone, value }: { children: ReactNo
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
       <div className="text-[11px] font-semibold text-slate-500">{label}</div>
-      <div className={`mt-1 break-words font-mono text-sm font-bold tabular-nums ${textClass}`}>{value}</div>
+      <div className={`mt-1 break-words font-mono text-lg font-bold tabular-nums sm:text-[1.75rem] ${textClass}`}>{value}</div>
       <div className="mt-1 text-[11px] text-slate-400">{children}</div>
     </div>
   )
