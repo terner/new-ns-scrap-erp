@@ -182,6 +182,12 @@ export function WorkingCapitalPageClient() {
   const s = data?.summary
   const maxDays = Math.max(s?.arDays ?? 0, s?.invDays ?? 0, s?.apDays ?? 0, 1)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const ccc = s?.ccc ?? 0
+  const cccTone = ccc < 60 ? 'emerald' : ccc < 90 ? 'amber' : 'red'
+  const cccLabel = ccc < 60 ? 'หมุนเงินได้ดี' : ccc < 90 ? 'พอใช้' : 'เงินจมค่อนข้างนาน'
+  const annualizedTurnover = s?.annualizedTurnover ?? 0
+  const turnoverLabel = annualizedTurnover >= 12 ? 'สต็อกหมุนดี' : annualizedTurnover >= 6 ? 'พอใช้' : 'สต็อกหมุนช้า'
+  const selectedBranchName = branchId ? data?.branches.find((branch) => branch.id === branchId)?.name ?? 'เลือกสาขา' : 'ทุกสาขา'
 
   return (
     <section className="space-y-4">
@@ -267,45 +273,71 @@ export function WorkingCapitalPageClient() {
           </div>
         </MobileFilterSheet>
       ) : null}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-4">
-          <div className="min-w-0 flex-1">
-            <div className={`text-xs font-semibold ${(s?.ccc ?? 0) < 60 ? 'text-emerald-600' : (s?.ccc ?? 0) < 90 ? 'text-amber-600' : 'text-red-600'} truncate`}>
-              {(s?.ccc ?? 0) < 60 ? 'วงจรเงินสด (ดี)' : (s?.ccc ?? 0) < 90 ? 'วงจรเงินสด (พอใช้)' : 'วงจรเงินสด (เสี่ยง)'}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.9fr)]">
+        <div className={`rounded-md border bg-white p-5 shadow-sm ${cccTone === 'emerald' ? 'border-emerald-200' : cccTone === 'amber' ? 'border-amber-200' : 'border-red-200'}`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className={`text-xs font-bold uppercase ${cccTone === 'emerald' ? 'text-emerald-700' : cccTone === 'amber' ? 'text-amber-700' : 'text-red-700'}`}>ภาพรวมรอบเงินสด</div>
+              <div className="mt-1 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">{ccc.toFixed(1)} <span className="text-base font-semibold text-slate-500">วัน</span></div>
+              <div className="mt-2 text-sm font-semibold text-slate-700">{cccLabel}</div>
+              <div className="mt-1 text-xs text-slate-500">สูตร: วันเก็บเงินลูกค้า + วันคงเหลือสต็อก - วันจ่ายเจ้าหนี้</div>
             </div>
-            <div className="mt-0.5 text-2xl font-extrabold text-slate-900 tracking-tight">{(s?.ccc ?? 0).toFixed(1)} <span className="text-xs font-medium text-slate-500">วัน</span></div>
-            <div className="mt-3 text-xs text-slate-400 pt-2 border-t border-slate-100">
-              AR ({(s?.arDays ?? 0).toFixed(0)}) + Inv ({(s?.invDays ?? 0).toFixed(0)}) - AP ({(s?.apDays ?? 0).toFixed(0)})
+            <div className={`rounded-md px-3 py-2 text-xs ${cccTone === 'emerald' ? 'border border-emerald-200 bg-emerald-50 text-emerald-800' : cccTone === 'amber' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-red-200 bg-red-50 text-red-800'}`}>
+              <div className="font-bold">ตัวกรองปัจจุบัน</div>
+              <div className="mt-0.5">{periodDays} วันล่าสุด</div>
+              <div>{selectedBranchName}</div>
             </div>
           </div>
+          <div className="mt-5 grid grid-cols-1 gap-2 border-t border-slate-100 pt-4 sm:grid-cols-3">
+            <Mini label="เก็บเงินลูกค้า" value={`${(s?.arDays ?? 0).toFixed(1)} วัน`} />
+            <Mini label="สต็อกคงเหลือ" value={`${(s?.invDays ?? 0).toFixed(1)} วัน`} />
+            <Mini label="จ่ายเจ้าหนี้" value={`${(s?.apDays ?? 0).toFixed(1)} วัน`} />
+          </div>
         </div>
-        <Panel className="md:col-span-2" title="รอบเงินสด (CCC) — แสดงเงินจมแต่ละขั้น">
+        <Panel title="เงินจมอยู่ตรงไหนบ้าง">
           <BreakdownBar label="วันเก็บเงินลูกค้า" tone="blue" value={s?.arDays ?? 0} max={maxDays} amount={s?.ar ?? 0} />
           <BreakdownBar label="วันคงเหลือสต็อก" tone="amber" value={s?.invDays ?? 0} max={maxDays} amount={s?.inv ?? 0} />
           <BreakdownBar label="วันจ่ายเจ้าหนี้" tone="emerald" value={s?.apDays ?? 0} max={maxDays} amount={s?.ap ?? 0} />
+          <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            ยิ่งแถบของลูกหนี้หรือสต็อกยาวขึ้น เงินจะยิ่งกลับมาเป็นเงินสดช้า ส่วนเจ้าหนี้ช่วยยืดเวลาการจ่ายเงินออกไป
+          </div>
+        </Panel>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Panel title="สภาพคล่องระยะสั้น">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Mini label="สินทรัพย์หมุนเวียน" value={money(s?.currentAssets)} />
+            <Mini label="หนี้สินหมุนเวียน" value={money(s?.currentLiab)} />
+            <Mini label="เงินสด + ธนาคาร" value={money(s?.cash)} />
+            <Mini label="หนี้เงินกู้ 12 เดือน" value={money(s?.currentLoan)} />
+          </div>
+        </Panel>
+        <Panel title="ภาพรวมการหมุนสต็อก">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Mini label="รอบหมุนในช่วงที่เลือก" value={`${(s?.stockTurnover ?? 0).toFixed(2)}x`} />
+            <Mini label="เทียบเป็นต่อปี" value={`${annualizedTurnover.toFixed(1)}x/ปี`} />
+            <Mini label="มูลค่าสต็อก" value={money(s?.inv)} />
+            <Mini label="ต้นทุนขาย" value={money(s?.cogs)} />
+          </div>
         </Panel>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Gauge title="อัตราส่วนทุนหมุนเวียน" value={s?.currentRatio ?? 0} kind="current" footer="(สินทรัพย์หมุนเวียน ÷ หนี้สินหมุนเวียน)" />
         <Gauge title="อัตราส่วนสภาพคล่องเร็ว" value={s?.quickRatio ?? 0} kind="quick" footer="((เงินสด + AR) ÷ หนี้สินหมุนเวียน)" />
-        <Panel title="รอบหมุนสต็อก">
-          <div className="py-4 text-center"><div className="text-5xl font-bold text-purple-700">{(s?.stockTurnover ?? 0).toFixed(2)}<span className="text-xl">x</span></div><div className="mt-1 text-sm text-slate-500">ใน {periodDays} วัน</div><div className="mt-2 text-xs text-slate-400">= <b className="text-purple-600">{(s?.annualizedTurnover ?? 0).toFixed(1)}x</b> ต่อปี</div><div className={`mt-1 text-xs ${(s?.annualizedTurnover ?? 0) >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>{(s?.annualizedTurnover ?? 0) >= 12 ? 'สต็อกหมุนดี' : (s?.annualizedTurnover ?? 0) >= 6 ? 'พอใช้' : 'สต็อกหมุนช้า'}</div></div>
+        <Panel title="ธุรกิจหมุนเงินดีขึ้นหรือแย่ลง?">
+          <div className="py-4 text-center">
+            <div className="text-5xl font-bold text-purple-700">{(s?.stockTurnover ?? 0).toFixed(2)}<span className="text-xl">x</span></div>
+            <div className="mt-1 text-sm text-slate-500">หมุนได้ในช่วง {periodDays} วัน</div>
+            <div className="mt-2 text-xs text-slate-400">= <b className="text-purple-600">{annualizedTurnover.toFixed(1)}x</b> ต่อปี</div>
+            <div className={`mt-1 text-xs ${annualizedTurnover >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>{turnoverLabel}</div>
+          </div>
         </Panel>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
-        <Kpi label="รอบเงินสด (CCC)" value={`${(s?.ccc ?? 0).toFixed(1)} วัน`} tone={(s?.ccc ?? 0) < 60 ? 'emerald' : (s?.ccc ?? 0) < 90 ? 'amber' : 'red'} />
-        <Kpi label="วันเก็บเงินลูกค้า" value={(s?.arDays ?? 0).toFixed(1)} tone="blue" />
-        <Kpi label="วันจ่ายเจ้าหนี้" value={(s?.apDays ?? 0).toFixed(1)} tone="emerald" />
-        <Kpi label="วันคงเหลือสต็อก" value={(s?.invDays ?? 0).toFixed(1)} tone="amber" />
-        <Kpi label="รอบหมุนสต็อก" value={`${(s?.stockTurnover ?? 0).toFixed(2)}x`} tone="slate" />
-        <Kpi label="อัตราส่วนทุนหมุนเวียน" value={(s?.currentRatio ?? 0).toFixed(2)} tone={(s?.currentRatio ?? 0) >= 1 ? 'emerald' : 'red'} />
-        <Kpi label="อัตราส่วนสภาพคล่องเร็ว" value={(s?.quickRatio ?? 0).toFixed(2)} tone={(s?.quickRatio ?? 0) >= 0.5 ? 'emerald' : 'red'} />
-      </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Insight tone="amber" title="เงินจมในสต็อกกี่วัน" value={`${(s?.invDays ?? 0).toFixed(0)} วัน`} body={`มูลค่าสต็อก ${money(s?.inv)} ÷ COGS เฉลี่ย/วัน ${money((s?.cogs ?? 0) / periodDays)}`} />
-        <Insight tone="blue" title="ลูกหนี้เก็บเงินกี่วัน" value={`${(s?.arDays ?? 0).toFixed(0)} วัน`} body={`AR ${money(s?.ar)} ÷ ยอดขายเฉลี่ย/วัน ${money((s?.revenue ?? 0) / periodDays)}`} />
-        <Insight tone="emerald" title="เจ้าหนี้จ่ายเงินกี่วัน" value={`${(s?.apDays ?? 0).toFixed(0)} วัน`} body={`AP ${money(s?.ap)} ÷ ยอดซื้อเฉลี่ย/วัน ${money((s?.purchases ?? 0) / periodDays)}`} />
-        <Insight tone="purple" title="ซื้อของแล้วขายออกเร็วไหม?" value={`${(s?.annualizedTurnover ?? 0).toFixed(1)}x/ปี`} body="อัตราหมุนเวียนสต็อก (ต่อปี): COGS / มูลค่าสต็อกเฉลี่ย" />
+        <Insight tone="amber" title="เงินจมในสต็อกกี่วัน" value={`${(s?.invDays ?? 0).toFixed(0)} วัน`} body={`เอามูลค่าสต็อก ${money(s?.inv)} เทียบกับต้นทุนขายเฉลี่ยต่อวัน ${money((s?.cogs ?? 0) / periodDays)}`} />
+        <Insight tone="blue" title="ลูกหนี้เก็บเงินกี่วัน" value={`${(s?.arDays ?? 0).toFixed(0)} วัน`} body={`เอายอดลูกหนี้ ${money(s?.ar)} เทียบกับยอดขายเฉลี่ยต่อวัน ${money((s?.revenue ?? 0) / periodDays)}`} />
+        <Insight tone="emerald" title="เจ้าหนี้จ่ายเงินกี่วัน" value={`${(s?.apDays ?? 0).toFixed(0)} วัน`} body={`เอายอดเจ้าหนี้ ${money(s?.ap)} เทียบกับยอดซื้อเฉลี่ยต่อวัน ${money((s?.purchases ?? 0) / periodDays)}`} />
+        <Insight tone="purple" title="ธุรกิจหมุนเงินดีขึ้นหรือแย่ลง?" value={`${annualizedTurnover.toFixed(1)}x/ปี`} body="ใช้ Stock Turnover แบบ annualized เพื่อดูว่าซื้อของแล้วขายออกได้กี่รอบต่อปี" />
       </div>
       <DetailTable isLoading={isLoading} rows={data?.calculationRows ?? []} />
     </section>
