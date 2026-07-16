@@ -33,10 +33,12 @@ type WorkingPayload = {
     currentRatio: number
     inv: number
     invDays: number
+    prevCcc: number
     purchases: number
     quickRatio: number
     revenue: number
     stockTurnover: number
+    trend: 'better' | 'same' | 'worse'
   }
 }
 type StockProduct = { ageDays: number; code: string; daysSinceSale: number; id: string; marginPotential: number; metalGroup: string; name: string; qty: number; status: string; stdPrice: number; value: number; wac: number }
@@ -324,7 +326,7 @@ export function WorkingCapitalPageClient() {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Gauge title="อัตราส่วนทุนหมุนเวียน" value={s?.currentRatio ?? 0} kind="current" footer="(สินทรัพย์หมุนเวียน ÷ หนี้สินหมุนเวียน)" />
         <Gauge title="อัตราส่วนสภาพคล่องเร็ว" value={s?.quickRatio ?? 0} kind="quick" footer="((เงินสด + AR) ÷ หนี้สินหมุนเวียน)" />
-        <Panel title="ธุรกิจหมุนเงินดีขึ้นหรือแย่ลง?">
+        <Panel title="ซื้อของแล้วขายออกเร็วไหม?">
           <div className="py-4 text-center">
             <div className="text-5xl font-bold text-purple-700">{(s?.stockTurnover ?? 0).toFixed(2)}<span className="text-xl">x</span></div>
             <div className="mt-1 text-sm text-slate-500">หมุนได้ในช่วง {periodDays} วัน</div>
@@ -333,12 +335,13 @@ export function WorkingCapitalPageClient() {
           </div>
         </Panel>
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Insight tone="amber" title="เงินจมในสต็อกกี่วัน" value={`${(s?.invDays ?? 0).toFixed(0)} วัน`} body={`เอามูลค่าสต็อก ${money(s?.inv)} เทียบกับต้นทุนขายเฉลี่ยต่อวัน ${money((s?.cogs ?? 0) / periodDays)}`} />
         <Insight tone="blue" title="ลูกหนี้เก็บเงินกี่วัน" value={`${(s?.arDays ?? 0).toFixed(0)} วัน`} body={`เอายอดลูกหนี้ ${money(s?.ar)} เทียบกับยอดขายเฉลี่ยต่อวัน ${money((s?.revenue ?? 0) / periodDays)}`} />
         <Insight tone="emerald" title="เจ้าหนี้จ่ายเงินกี่วัน" value={`${(s?.apDays ?? 0).toFixed(0)} วัน`} body={`เอายอดเจ้าหนี้ ${money(s?.ap)} เทียบกับยอดซื้อเฉลี่ยต่อวัน ${money((s?.purchases ?? 0) / periodDays)}`} />
-        <Insight tone="purple" title="ธุรกิจหมุนเงินดีขึ้นหรือแย่ลง?" value={`${annualizedTurnover.toFixed(1)}x/ปี`} body="ใช้ Stock Turnover แบบ annualized เพื่อดูว่าซื้อของแล้วขายออกได้กี่รอบต่อปี" />
+        <Insight tone="purple" title="ซื้อของแล้วขายออกเร็วไหม?" value={`${annualizedTurnover.toFixed(1)}x/ปี`} body="ใช้ Stock Turnover แบบ annualized เพื่อดูว่าซื้อของแล้วขายออกได้กี่รอบต่อปี" />
       </div>
+      <TrendInsight currentCcc={ccc} prevCcc={s?.prevCcc ?? 0} trend={s?.trend ?? 'same'} />
       <DetailTable isLoading={isLoading} rows={data?.calculationRows ?? []} />
     </section>
   )
@@ -742,6 +745,45 @@ function Insight({ body, title, tone, value }: { body: string; title: string; to
       <h3 className="mb-1 text-xs font-bold text-slate-800">{title}</h3>
       <div className="mb-1 text-xl font-bold tracking-tight">{value}</div>
       <div className="text-xs text-slate-500">{body}</div>
+    </div>
+  )
+}
+
+function TrendInsight({ currentCcc, prevCcc, trend }: { currentCcc: number; prevCcc: number; trend: 'better' | 'same' | 'worse' }) {
+  const toneClass = trend === 'better'
+    ? 'border-emerald-200 bg-emerald-50/50'
+    : trend === 'worse'
+      ? 'border-rose-200 bg-rose-50/60'
+      : 'border-slate-200 bg-slate-50/50'
+  const textClass = trend === 'better' ? 'text-emerald-700' : trend === 'worse' ? 'text-red-700' : 'text-slate-600'
+  const message = trend === 'better'
+    ? 'CCC ลดลง — ธุรกิจหมุนเงินดีขึ้น'
+    : trend === 'worse'
+      ? 'CCC เพิ่ม — เงินจมนานขึ้น'
+      : 'CCC คงที่'
+  const delta = currentCcc - prevCcc
+
+  return (
+    <div className={`rounded-md border p-5 shadow-sm ${toneClass}`}>
+      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-sm font-bold text-slate-800">ธุรกิจหมุนเงินดีขึ้นหรือแย่ลง?</div>
+          <div className={`mt-1 text-sm font-semibold ${textClass}`}>{trend === 'better' ? '✓ ' : trend === 'worse' ? '⚠ ' : ''}{message}</div>
+        </div>
+        <div className={`text-sm font-bold ${textClass}`}>
+          {delta > 0 ? '+' : ''}{delta.toFixed(1)} วัน
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-md bg-white/70 p-3">
+          <div className="text-xs text-slate-500">CCC ปัจจุบัน</div>
+          <div className="mt-1 text-2xl font-bold text-slate-900">{currentCcc.toFixed(1)} วัน</div>
+        </div>
+        <div className="rounded-md bg-white/70 p-3">
+          <div className="text-xs text-slate-500">CCC ช่วงก่อน</div>
+          <div className="mt-1 text-2xl font-bold text-slate-500">{prevCcc.toFixed(1)} วัน</div>
+        </div>
+      </div>
     </div>
   )
 }

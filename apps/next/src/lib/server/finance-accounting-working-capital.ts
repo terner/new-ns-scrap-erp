@@ -177,6 +177,8 @@ async function workingInputs(filter: PeriodDaysFilter) {
 
 export async function buildWorkingCapital(filter: PeriodDaysFilter) {
   const [sales, purchases, salesAsOf, purchasesAsOf, schedules, stock, cash, branches] = await workingInputs(filter)
+  const prevTo = addDays(filter.asOf, -filter.periodDays)
+  const prevFrom = addDays(prevTo, -filter.periodDays + 1)
   const revenue = sales.reduce((sum, bill) => sum + (toNumber(bill.subtotal) || toNumber(bill.total_amount) - toNumber(bill.vat_amount)), 0)
   const cogs = sales.reduce((sum, bill) => sum + (toNumber(bill.cogs_amount) || toNumber(bill.total_cost)), 0)
   const purchaseTotal = purchases.reduce((sum, bill) => sum + (toNumber(bill.subtotal) || toNumber(bill.total_amount) - toNumber(bill.vat_amount)), 0)
@@ -196,6 +198,19 @@ export async function buildWorkingCapital(filter: PeriodDaysFilter) {
   const quickRatio = currentLiab > 0 ? (cash + ar) / currentLiab : 0
   const stockTurnover = stock.totalValue > 0 ? cogs / stock.totalValue : 0
   const annualizedTurnover = stockTurnover * (365 / Math.max(1, filter.periodDays))
+  const previousSales = salesAsOf.filter((bill) => bill.date >= prevFrom && bill.date <= endOfDay(prevTo))
+  const previousPurchases = purchasesAsOf.filter((bill) => bill.date >= prevFrom && bill.date <= endOfDay(prevTo))
+  const previousRevenue = previousSales.reduce((sum, bill) => sum + (toNumber(bill.subtotal) || toNumber(bill.total_amount) - toNumber(bill.vat_amount)), 0)
+  const previousCogs = previousSales.reduce((sum, bill) => sum + (toNumber(bill.cogs_amount) || toNumber(bill.total_cost)), 0)
+  const previousPurchaseTotal = previousPurchases.reduce((sum, bill) => sum + (toNumber(bill.subtotal) || toNumber(bill.total_amount) - toNumber(bill.vat_amount)), 0)
+  const previousDailyRevenue = previousRevenue / Math.max(1, filter.periodDays)
+  const previousDailyCogs = previousCogs / Math.max(1, filter.periodDays)
+  const previousDailyPurchases = previousPurchaseTotal / Math.max(1, filter.periodDays)
+  const previousArDays = previousDailyRevenue > 0 ? ar / previousDailyRevenue : 0
+  const previousInvDays = previousDailyCogs > 0 ? stock.totalValue / previousDailyCogs : 0
+  const previousApDays = previousDailyPurchases > 0 ? ap / previousDailyPurchases : apDays
+  const prevCcc = previousArDays + previousInvDays - previousApDays
+  const trend: 'better' | 'same' | 'worse' = ccc < prevCcc ? 'better' : ccc > prevCcc ? 'worse' : 'same'
 
   return {
     branches,
@@ -213,7 +228,7 @@ export async function buildWorkingCapital(filter: PeriodDaysFilter) {
     ],
     filters: { asOf: dateOnly(filter.asOf), branchId: filter.branchId ?? 'ALL', from: dateOnly(addDays(filter.asOf, -filter.periodDays + 1)), periodDays: filter.periodDays },
     sourceState: sourceState(),
-    summary: { annualizedTurnover, ap, apDays, ar, arDays, cash, ccc, cogs, currentAssets, currentLiab, currentLoan, currentRatio, inv: stock.totalValue, invDays, purchases: purchaseTotal, quickRatio, revenue, stockTurnover },
+    summary: { annualizedTurnover, ap, apDays, ar, arDays, cash, ccc, cogs, currentAssets, currentLiab, currentLoan, currentRatio, inv: stock.totalValue, invDays, prevCcc, purchases: purchaseTotal, quickRatio, revenue, stockTurnover, trend },
   }
 }
 
