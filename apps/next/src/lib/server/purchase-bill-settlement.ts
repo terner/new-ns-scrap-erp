@@ -1,4 +1,5 @@
 import type { Prisma } from '../../../generated/prisma/client'
+import { calculatePurchaseBillPostAdvanceTotals } from '@/lib/purchase-advance'
 import {
   appendSupplierAdvanceStatusLog,
   supplierAdvanceStatusActionForStatus,
@@ -38,19 +39,14 @@ function purchaseBillAmountAfterAdvance(
   const discountTotal = toNumber(bill.discount_total) || toNumber(bill.discount)
   const afterDiscount = Math.max(0, roundMoney(subtotal - discountTotal))
   const vatRatePercent = clampVatRate(toNumber(bill.vat_rate_percent))
-  const hasVat = Boolean(bill.has_vat) && bill.vat_type !== 'NONE' && vatRatePercent > 0
-  const taxableBaseBeforeAdvance = hasVat && bill.vat_type === 'INCLUDE'
-    ? roundMoney(afterDiscount * 100 / (100 + vatRatePercent))
-    : afterDiscount
-  const taxableBaseAmount = Math.max(0, roundMoney(taxableBaseBeforeAdvance - advanceBaseAllocatedAmount))
-  const vatAmount = hasVat ? roundMoney(taxableBaseAmount * vatRatePercent / 100) : 0
-  const totalAmount = hasVat ? roundMoney(taxableBaseAmount + vatAmount) : taxableBaseAmount
-
-  return {
-    taxableBaseAmount,
-    totalAmount,
-    vatAmount,
-  }
+  return calculatePurchaseBillPostAdvanceTotals({
+    advanceBaseAllocatedAmount,
+    discountAmount: 0,
+    hasVat: Boolean(bill.has_vat),
+    subtotalAmount: afterDiscount,
+    vatRatePercent,
+    vatType: bill.vat_type,
+  })
 }
 
 export async function calculatePurchaseBillSettlement(tx: PurchaseBillSettlementTx, billId: bigint) {

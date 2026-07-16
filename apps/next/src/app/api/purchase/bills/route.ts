@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { XLSX } from '@/lib/server/xlsx'
 import { parseInternalBigIntId, requireBusinessCode, stringifyBusinessValue } from '@/lib/business-code'
 import { purchaseBillCancelSchema, purchaseBillFormSchema, type PurchaseBillFormValues } from '@/lib/purchase-bill'
-import { calculateSupplierAdvanceAllocation, calculateSupplierAdvancePaidBaseCapacity } from '@/lib/purchase-advance'
+import { calculatePurchaseBillPostAdvanceTotals, calculateSupplierAdvanceAllocation, calculateSupplierAdvancePaidBaseCapacity } from '@/lib/purchase-advance'
 import {
   PURCHASE_BILL_CANCELLED_STATUSES,
   PURCHASE_BILL_SUPPLIER_SWAP_CANCELLED_STATUS,
@@ -394,17 +394,22 @@ function billJson(row: PurchaseBillRow, paymentDocNos: string[] = []) {
 
 function calculateTotals(values: PurchaseBillFormValues, vatRatePercent: number) {
   const subtotal = values.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - item.discount), 0)
-  const afterDiscount = Math.max(0, subtotal - values.discountTotal)
-  const rate = Math.max(0, Math.min(100, vatRatePercent))
-  const vatAmount = !values.hasVat || values.vatType === 'NONE'
-    ? 0
-    : values.vatType === 'INCLUDE'
-      ? afterDiscount * rate / (100 + rate)
-      : afterDiscount * (rate / 100)
-  const totalAmount = values.hasVat && values.vatType === 'EXCLUDE' ? afterDiscount + vatAmount : afterDiscount
-  const taxableBaseAmount = values.hasVat && values.vatType === 'INCLUDE' ? Math.max(0, afterDiscount - vatAmount) : afterDiscount
+  const totals = calculatePurchaseBillPostAdvanceTotals({
+    advanceBaseAllocatedAmount: 0,
+    discountAmount: values.discountTotal,
+    hasVat: values.hasVat,
+    subtotalAmount: subtotal,
+    vatRatePercent,
+    vatType: values.vatType,
+  })
 
-  return { afterDiscount, subtotal, taxableBaseAmount, totalAmount, vatAmount }
+  return {
+    afterDiscount: totals.afterDiscountAmount,
+    subtotal,
+    taxableBaseAmount: totals.taxableBaseAmount,
+    totalAmount: totals.totalAmount,
+    vatAmount: totals.vatAmount,
+  }
 }
 
 function roundMoney(value: number) {

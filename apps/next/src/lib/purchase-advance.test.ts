@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  calculatePurchaseBillPostAdvanceTotals,
   calculateSupplierAdvanceAllocation,
   calculateSupplierAdvancePaidBaseCapacity,
 } from './purchase-advance'
@@ -63,6 +64,42 @@ describe('supplier advance base-credit calculations', () => {
       allocatedTotalAmount: 107,
       allocatedVatAmount: 7,
       remainingBaseAmount: 900,
+    })
+  })
+
+  it('recalculates remaining purchase bill VAT from the taxable base left after ADV', () => {
+    expect(calculatePurchaseBillPostAdvanceTotals({
+      advanceBaseAllocatedAmount: 4209.5,
+      discountAmount: 0,
+      hasVat: true,
+      subtotalAmount: 5000,
+      vatRatePercent: 7,
+      vatType: 'EXCLUDE',
+    })).toEqual({
+      advanceBaseAppliedAmount: 4209.5,
+      afterDiscountAmount: 5000,
+      taxableBaseAmount: 790.5,
+      totalAmount: 845.84,
+      vatAmount: 55.34,
+      vatBeforeAdvance: 350,
+    })
+  })
+
+  it('applies discount before ADV and recalculates VAT from the remaining base', () => {
+    expect(calculatePurchaseBillPostAdvanceTotals({
+      advanceBaseAllocatedAmount: 1000,
+      discountAmount: 100,
+      hasVat: true,
+      subtotalAmount: 2000,
+      vatRatePercent: 7,
+      vatType: 'EXCLUDE',
+    })).toEqual({
+      advanceBaseAppliedAmount: 1000,
+      afterDiscountAmount: 1900,
+      taxableBaseAmount: 900,
+      totalAmount: 963,
+      vatAmount: 63,
+      vatBeforeAdvance: 133,
     })
   })
 })

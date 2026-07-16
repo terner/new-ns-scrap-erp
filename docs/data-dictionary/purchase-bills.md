@@ -104,6 +104,8 @@ Current source of truth:
 
 1. สร้างบิลซื้อที่ `/api/purchase/bills`
    - ถ้ามี ADV/มัดจำ ระบบใช้เฉพาะยอดฐานก่อน VAT ของ ADV ไปหักยอดฐานก่อน VAT ของ PB ก่อน แล้วค่อยคำนวณ VAT ของ PB จากฐานที่เหลือ
+   - ลำดับคำนวณ canonical ของ PB คือ `ยอดรวมรายการ -> หักส่วนลดท้ายบิล -> ได้ฐานก่อน VAT หลังส่วนลด -> หักเครดิต ADV ก่อน VAT -> ได้ยอดที่ต้องจ่ายก่อน VAT -> คำนวณ VAT ใหม่จากฐานที่เหลือ -> ได้ยอดสุทธิรวม VAT ที่ต้องจ่าย`
+   - ตัวอย่าง: ยอดรวมรายการ `2,000` บาท, ส่วนลด `100` บาท, เครดิต ADV ก่อน VAT `1,000` บาท, VAT `7%` จะได้ `2,000 - 100 = 1,900`, `1,900 - 1,000 = 900`, VAT `63`, ยอดสุทธิที่ต้องจ่าย `963`
    - VAT ของ ADV ไม่ถูกนำมาหัก PB โดยตรง; `supplier_advance_allocations.allocated_amount` / `allocated_subtotal_amount` คือยอดฐาน ADV ที่ใช้กับ PB
    - `paid_amount` รวมเฉพาะยอด PMT ที่ไม่ cancelled และไม่รวม ADV allocation
    - `payable_balance = total_amount - paid_amount` โดย `total_amount` เป็นยอด PB หลังหักฐาน ADV และคำนวณ VAT ใหม่แล้ว
@@ -240,6 +242,7 @@ Current source of truth:
 - Section `รายการสินค้า` ต้องแสดง/รับค่า `ราคาหน้าใบ` ต่อรายการ และ API ต้อง validate ว่าไม่ติดลบ เพราะ Sale Tracking ใช้ค่านี้คำนวณ commission
 - Section `รายการสินค้า` ต้องไม่มีช่องส่วนลดรายสินค้าใน target flow; ส่วนลดมีเฉพาะ `ส่วนลดท้ายใบ` ที่หัวบิล
 - API target ต้องบันทึกส่วนลดท้ายใบแยกจาก line cost และห้ามนำไปลด `purchase_bill_items.amount`, stock ledger cost, WAC, หรือ Cost Pool
+- ฟอร์มสร้าง/แก้ไข, modal รายละเอียด, และเอกสารพิมพ์ของบิลซื้อ ต้องแสดง breakdown ยอดในลำดับเดียวกันเสมอ: `ยอดรวมรายการ -> หักส่วนลด -> หัก ADV/มัดจำก่อน VAT -> ยอดที่ต้องจ่ายก่อน VAT -> VAT -> ยอดสุทธิรวม VAT ที่ต้องจ่าย`
 - Section `รายการสินค้า` ใน current compatibility UI ยังใช้ searchable product combobox จนกว่าจะเปลี่ยนเป็น receipt-line driven สำหรับ Stock
 - Row-level PO dropdown:
   - `Spot Buy` หมายถึงไม่เลือก PO (`poBuyId = null`)

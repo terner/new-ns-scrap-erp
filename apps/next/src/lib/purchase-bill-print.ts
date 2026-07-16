@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { readJsonResponse } from '@/lib/api-client'
 import { companyProfileForPrint, companyProfileResponseSchema, type CompanyProfilePrintValues } from '@/lib/company-profile'
+import { calculatePurchaseBillPostAdvanceTotals } from '@/lib/purchase-advance'
 import type { PurchaseBillDetail } from '@/lib/server/purchase-bill-detail'
 
 const companyProfilePayloadSchema = z.object({
@@ -98,10 +99,17 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
   const totalSummaryText = totals.map((item) => `${money(item.qty)} ${item.unit}`).join(' / ') || '-'
   const grossSummaryText = totals.map((item) => `${money(item.grossWeight)} ${item.unit}`).join(' / ') || '-'
   const deductSummaryText = totals.map((item) => `${money(item.deductWeight)} ${item.unit}`).join(' / ') || '-'
-  const afterDiscount = Math.max(0, bill.subtotal - bill.discount)
-  const advanceAppliedAmount = bill.advanceAllocatedSubtotalAmount + bill.advanceAllocatedVatAmount
-  const advanceVatBreakdownHtml = bill.advancePaymentDocNo
-    ? `<div class="total-row advance-sub"><div>หักเงินมัดจำ (${escapeHtml(bill.advancePaymentDocNo)})</div><div class="num">${money(advanceAppliedAmount)}</div></div>`
+  const postAdvanceTotals = calculatePurchaseBillPostAdvanceTotals({
+    advanceBaseAllocatedAmount: bill.advanceAllocatedSubtotalAmount || bill.advanceConsumedAmount,
+    discountAmount: bill.discount,
+    hasVat: bill.hasVat,
+    subtotalAmount: bill.subtotal,
+    vatRatePercent: bill.vatRatePercent,
+    vatType: bill.vatType,
+  })
+  const vatLabel = `VAT ${bill.vatRatePercent || 7}%`
+  const advanceBreakdownHtml = bill.advancePaymentDocNo
+    ? `<div class="total-row advance-sub"><div>หัก ADV/มัดจำก่อน VAT (${escapeHtml(bill.advancePaymentDocNo)})</div><div class="num">${money(bill.advanceAllocatedSubtotalAmount || bill.advanceConsumedAmount)}</div></div>`
     : ''
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)} ${escapeHtml(bill.docNo)}</title>
@@ -309,12 +317,12 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
           </div>
         </div>
         <div class="totals">
-          <div class="total-row"><div>ยอดเงินรวม</div><div class="num">${money(bill.subtotal)}</div></div>
+          <div class="total-row"><div>ยอดรวมรายการ</div><div class="num">${money(bill.subtotal)}</div></div>
           <div class="total-row"><div>หักส่วนลด</div><div class="num">${money(bill.discount)}</div></div>
-          <div class="total-row"><div>ยอดหลังหักส่วนลด</div><div class="num">${money(afterDiscount)}</div></div>
-          <div class="total-row"><div>VAT หลังหักเงินมัดจำ</div><div class="num">${money(bill.vatAmount)}</div></div>
-          <div class="total-row final"><div>ยอดรวมทั้งสิ้น</div><div class="num">${money(bill.totalAmount)}</div></div>
-          ${advanceVatBreakdownHtml}
+          ${advanceBreakdownHtml}
+          <div class="total-row"><div>${bill.hasVat ? 'ยอดที่ต้องจ่ายก่อน VAT' : 'ยอดที่ต้องจ่าย'}</div><div class="num">${money(postAdvanceTotals.taxableBaseAmount)}</div></div>
+          ${bill.hasVat ? `<div class="total-row"><div>${escapeHtml(vatLabel)}</div><div class="num">${money(postAdvanceTotals.vatAmount)}</div></div>` : ''}
+          <div class="total-row final"><div>${bill.hasVat ? 'ยอดสุทธิรวม VAT ที่ต้องจ่าย' : 'ยอดสุทธิที่ต้องจ่าย'}</div><div class="num">${money(postAdvanceTotals.totalAmount)}</div></div>
           <div class="total-row advance"><div>ชำระแล้ว</div><div class="num">${money(bill.paidAmount)}</div></div>
           <div class="total-row"><div>ค้างชำระ</div><div class="num strong">${money(bill.payableBalance)}</div></div>
         </div>

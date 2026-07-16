@@ -52,6 +52,7 @@ export type PurchaseBillDetail = {
   date: string
   discount: number
   docNo: string
+  hasVat: boolean
   licensePlate: string
   note: string
   paidAmount: number
@@ -85,6 +86,8 @@ export type PurchaseBillDetail = {
   vatInvoiceDate: string
   vatInvoiceNo: string
   vatInvoiceReceived: boolean
+  vatRatePercent: number
+  vatType: string
   warehouseName: string
   refNo: string
   salesName: string
@@ -605,6 +608,7 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
     date: bill.date ? toDateOnly(bill.date) : '-',
     discount: toNumber(bill.discount_total ?? bill.discount),
     docNo: bill.doc_no,
+    hasVat: Boolean(bill.has_vat),
     licensePlate: bill.license_plate ?? receiptVehicleNo,
     note: bill.note ?? bill.notes ?? '',
     paidAmount: toNumber(bill.paid_amount),
@@ -625,6 +629,8 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
     vatInvoiceDate: bill.vat_invoice_date ? toDateOnly(bill.vat_invoice_date) : '-',
     vatInvoiceNo: bill.vat_invoice_no ?? '-',
     vatInvoiceReceived: Boolean(bill.vat_invoice_received),
+    vatRatePercent: toNumber(bill.vat_rate_percent) ?? 7,
+    vatType: bill.vat_type ?? 'NONE',
     warehouseName: bill.warehouses?.name ?? '-',
     refNo: bill.ref_no ?? '-',
     salesName: bill.supplier_sales_rep_snapshot ?? '-',

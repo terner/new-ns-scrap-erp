@@ -126,6 +126,47 @@ export function calculateSupplierAdvanceAllocation(params: {
   }
 }
 
+export function calculatePurchaseBillPostAdvanceTotals(params: {
+  advanceBaseAllocatedAmount: number
+  discountAmount?: number
+  hasVat: boolean
+  subtotalAmount: number
+  vatRatePercent: number
+  vatType?: 'NONE' | 'EXCLUDE' | 'INCLUDE' | string | null
+}) {
+  const subtotalAmount = Math.max(0, roundSupplierAdvanceMoney(params.subtotalAmount))
+  const discountAmount = Math.max(0, roundSupplierAdvanceMoney(params.discountAmount ?? 0))
+  const advanceBaseAllocatedAmount = Math.max(0, roundSupplierAdvanceMoney(params.advanceBaseAllocatedAmount))
+  const vatRatePercent = Math.max(0, Math.min(100, Number(params.vatRatePercent) || 0))
+  const vatType = params.vatType ?? (params.hasVat ? 'EXCLUDE' : 'NONE')
+  const afterDiscountAmount = Math.max(0, roundSupplierAdvanceMoney(subtotalAmount - discountAmount))
+  const hasVat = Boolean(params.hasVat) && vatType !== 'NONE' && vatRatePercent > 0
+  const vatBeforeAdvance = hasVat
+    ? vatType === 'INCLUDE'
+      ? roundSupplierAdvanceMoney(afterDiscountAmount * vatRatePercent / (100 + vatRatePercent))
+      : roundSupplierAdvanceMoney(afterDiscountAmount * vatRatePercent / 100)
+    : 0
+  const taxableBaseBeforeAdvance = hasVat && vatType === 'INCLUDE'
+    ? Math.max(0, roundSupplierAdvanceMoney(afterDiscountAmount - vatBeforeAdvance))
+    : afterDiscountAmount
+  const taxableBaseAmount = Math.max(0, roundSupplierAdvanceMoney(taxableBaseBeforeAdvance - advanceBaseAllocatedAmount))
+  const vatAmount = hasVat
+    ? roundSupplierAdvanceMoney(taxableBaseAmount * vatRatePercent / 100)
+    : 0
+  const totalAmount = hasVat
+    ? roundSupplierAdvanceMoney(taxableBaseAmount + vatAmount)
+    : taxableBaseAmount
+
+  return {
+    advanceBaseAppliedAmount: Math.min(advanceBaseAllocatedAmount, taxableBaseBeforeAdvance),
+    afterDiscountAmount,
+    taxableBaseAmount,
+    totalAmount,
+    vatAmount,
+    vatBeforeAdvance,
+  }
+}
+
 export const supplierAdvancePaymentStatusValues = [
   'pending_approval',
   'partially_approved',

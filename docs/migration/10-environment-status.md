@@ -63,10 +63,13 @@ Status update on 2026-07-15:
 - Latest SIT production redeploy `dpl_CAnQTGKviTNEdM4gHp9e9WdSHGi5` completed with `READY` and `ns-erp-sit.vercel.app` points to it. Browser smoke verification returned Supabase token `200`, `/api/auth/login-complete` `200`, and redirected to `/`.
 
 Status update on 2026-07-16:
+- Applied `20260716190000_add_customer_advance_vat_breakdown.sql` to dev-target `fhglqymcdmrgbsbadnwr`. Existing CADV rows: 2; invalid targets before migration: 0; post-migration valid tax breakdowns: 2/2; VAT constraints present: 3/3. Existing rows are explicitly `NONE`; new VAT-inclusive CADV records snapshot the master VAT rate by document date.
 - Applied the CADV create/branch migrations and the Supplier ADV base-credit normalization migration directly to SIT with transactional error stopping.
+- Applied `20260716190000_add_customer_advance_vat_breakdown.sql` to SIT `vbjlkxbytccklhqvxjuu` and recorded migration history. Postflight confirms all 4 VAT-breakdown columns, all 3 VAT arithmetic/type constraints, and 0 invalid CADV rows; SIT currently has no CADV business rows to backfill.
 - SIT now has the CADV tables with required document branch support and validated ADV arithmetic constraints. `ADV012607-0004` reconciles to gross cash 10,700, allocated base 4,900, and remaining base 5,100.
 - Repaired the SIT Storage layer after the database refresh left product/WTI storage keys without buckets or binary objects. Public 10 MB buckets `product-images` and `weight-ticket-pdfs` now use the documented MIME contracts and match the current UAT source object counts at 124 and 407. A real product thumbnail returned HTTP 200, and a service-role upload/public-read/delete health check passed for `weight-ticket-pdfs`.
 - Supabase CLI still reports pre-existing migration-history drift, so do not run a blanket `supabase db push` until remote-only migration versions are reconciled with the repository.
+- Verification on 2026-07-16 confirmed SIT still has migration-history row `20260716190000` plus the expected `public.customer_advances` VAT columns (`vat_type`, `vat_rate_percent`, `subtotal_amount`, `vat_amount`) and related tax-breakdown constraints. Current SIT `customer_advances` row count is `0`.
 
 ### Staging / UAT
 
@@ -95,6 +98,11 @@ Status update on 2026-07-14:
 - UAT Supabase Storage was synced from dev target for the business buckets `product-images` and `weight-ticket-pdfs`; post-sync object counts match dev exactly at `124` and `402`.
 - Post-refresh verification on 2026-07-14 confirmed core business table counts match dev for users, customers, suppliers, products, WTI/WTO, PO Sell, PB/SB, petty advance, and stock ledger. Remaining row-count drift was limited to runtime log/audit tables (`app_activity_logs`, `app_audit_logs`, `app_auth_events`) created by the verification traffic itself.
 - Direct Supabase password sign-in on the active UAT project `ekeomeumqjvbhgwyaqwe` still succeeds for `watcharathat@gmail.com` after the full code/schema/data/storage refresh.
+
+Status update on 2026-07-16:
+- Active UAT `ekeomeumqjvbhgwyaqwe` did not yet contain the CADV schema, so migrations `20260715133000_create_customer_advances.sql`, `20260715143000_add_branch_to_customer_advances.sql`, and `20260716190000_add_customer_advance_vat_breakdown.sql` were applied in dependency order and recorded in `supabase_migrations.schema_migrations`.
+- Postflight confirms 4 CADV tables, 6 database-backed CADV statuses, required document `branch_id`, all 4 VAT-breakdown columns, all 3 VAT arithmetic/type constraints, and 0 invalid CADV rows. UAT had no CADV business rows to backfill.
+- Verification on 2026-07-16 confirmed active UAT `ekeomeumqjvbhgwyaqwe` already contains migration-history rows `20260715133000`, `20260715143000`, and `20260716190000`, and the CADV tables `customer_advance_statuses`, `customer_advances`, `customer_advance_items`, and `customer_advance_status_logs` exist with the VAT-breakdown columns/constraints in place. Current UAT `customer_advances` row count is `0`.
 
 Status update on 2026-07-11:
 - The active customer UAT deployment is `https://ns-erp-uat.vercel.app` and its Vercel Production environment now points Supabase URL, anon/publishable key, service-role/secret key, and PostgreSQL pooler connection to project ref `ekeomeumqjvbhgwyaqwe`.

@@ -25,6 +25,7 @@ import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { firstErrorKeyFromZodIssues, focusFieldError, issueMapFromZodIssues } from '@/lib/form-errors'
 import { formatDateDisplay, formatDecimalDisplay, formatDecimalDraft, sanitizeDecimalInput } from '@/lib/format'
 import { purchaseBillCancelSchema, purchaseBillFormSchema, type PurchaseBillCancelValues, type PurchaseBillFormValues } from '@/lib/purchase-bill'
+import { calculatePurchaseBillPostAdvanceTotals } from '@/lib/purchase-advance'
 import { calculateSupplierAdvanceAllocation } from '@/lib/purchase-advance'
 import { openPurchaseBillPrint, openPurchaseBillPrintWindow } from '@/lib/purchase-bill-print'
 import { salesBillCancelSchema, salesBillFormSchema, type SalesBillCancelValues, type SalesBillFormValues } from '@/lib/sales'
@@ -142,6 +143,7 @@ type PurchaseBillDetail = {
   date: string
   discount: number
   docNo: string
+  hasVat: boolean
   licensePlate: string
   note: string
   paidAmount: number
@@ -175,6 +177,8 @@ type PurchaseBillDetail = {
   vatInvoiceDate: string
   vatInvoiceNo: string
   vatInvoiceReceived: boolean
+  vatRatePercent: number
+  vatType: string
   warehouseName: string
   refNo: string
   salesName: string
@@ -1004,10 +1008,15 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const formVatRatePercent = editingBill?.vatRatePercent ?? vatRatePercent
   const formSubtotal = form.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price), 0)
   const formTotalWeight = form.items.reduce((sum, item) => sum + item.qty, 0)
-  const formAfterDiscount = Math.max(0, formSubtotal - form.discountTotal)
-  const formVat = !form.hasVat || form.vatType === 'NONE' ? 0 : form.vatType === 'INCLUDE' ? formAfterDiscount * formVatRatePercent / (100 + formVatRatePercent) : formAfterDiscount * (formVatRatePercent / 100)
-  const formTotal = form.hasVat && form.vatType === 'EXCLUDE' ? formAfterDiscount + formVat : formAfterDiscount
-  const formTaxableBase = form.hasVat && form.vatType === 'INCLUDE' ? Math.max(0, formAfterDiscount - formVat) : formAfterDiscount
+  const formPreAdvanceTotals = calculatePurchaseBillPostAdvanceTotals({
+    advanceBaseAllocatedAmount: 0,
+    discountAmount: form.discountTotal,
+    hasVat: form.hasVat,
+    subtotalAmount: formSubtotal,
+    vatRatePercent: formVatRatePercent,
+    vatType: form.vatType,
+  })
+  const formTaxableBase = formPreAdvanceTotals.taxableBaseAmount
   const selectedAdvancePayment = form.advancePaymentId
     ? activeAdvancePayments.find((option) => option.id === form.advancePaymentId)
       ?? null
@@ -1021,15 +1030,23 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const formAdvanceAllocation = calculateSupplierAdvanceAllocation({
     availableBaseAmount: availableAdvanceAmount,
     billSubtotalAmount: formTaxableBase,
-    billTotalAmount: formTotal,
-    billVatAmount: formVat,
+    billTotalAmount: formPreAdvanceTotals.totalAmount,
+    billVatAmount: formPreAdvanceTotals.vatAmount,
   })
   const formAdvanceConsumed = formAdvanceAllocation.allocatedSubtotalAmount
-  const formTaxableBaseAfterAdvance = Math.max(0, formTaxableBase - formAdvanceConsumed)
-  const formAdvanceVatRelief = formAdvanceAllocation.allocatedVatAmount
-  const formAdvanceApplied = formAdvanceAllocation.allocatedTotalAmount
   const formAdvanceRemainingAfterApply = formAdvanceAllocation.remainingBaseAmount
-  const formNetPayable = Math.max(0, formTotal - formAdvanceApplied)
+  const formPostAdvanceTotals = calculatePurchaseBillPostAdvanceTotals({
+    advanceBaseAllocatedAmount: formAdvanceConsumed,
+    discountAmount: form.discountTotal,
+    hasVat: form.hasVat,
+    subtotalAmount: formSubtotal,
+    vatRatePercent: formVatRatePercent,
+    vatType: form.vatType,
+  })
+  const formTaxableBaseAfterAdvance = formPostAdvanceTotals.taxableBaseAmount
+  const formVatAfterAdvance = formPostAdvanceTotals.vatAmount
+  const formTotalAfterAdvance = formPostAdvanceTotals.totalAmount
+  const formNetPayable = formTotalAfterAdvance
   const salesSubtotal = salesForm.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - (salesForm.transactionMode === 'TRADING' ? 0 : item.discount)), 0)
   const salesAfterDiscount = Math.max(0, salesSubtotal - salesForm.discountTotal)
   const salesVat = !salesForm.hasVat || salesForm.vatType === 'NONE' ? 0 : salesForm.vatType === 'INCLUDE' ? salesAfterDiscount * formVatRatePercent / (100 + formVatRatePercent) : salesAfterDiscount * (formVatRatePercent / 100)
@@ -3733,10 +3750,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                   <div className="rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
                     <SummaryLine label="ยอดรวมรายการ" value={formatMoney(formSubtotal)} />
                     {form.discountTotal > 0 ? <SummaryLine label="หักส่วนลด" tone="red" value={`-${formatMoney(form.discountTotal)}`} /> : null}
-                    {formAdvanceApplied > 0 ? <SummaryLine label="หัก ADV/มัดจำ" tone="red" value={`-${formatMoney(formAdvanceApplied)}`} /> : null}
-                    {form.hasVat ? <SummaryLine label="ยอดสุทธิก่อน VAT" value={formatMoney(formTaxableBaseAfterAdvance)} /> : null}
-                    {form.hasVat ? <SummaryLine label={`ยอด ${vatLabel}`} value={formatMoney(formVat)} /> : null}
-                    <SummaryLine label="ยอดสุทธิรวม VAT" value={formatMoney(formTotal)} />
+                    {formAdvanceConsumed > 0 ? <SummaryLine label="หัก ADV/มัดจำก่อน VAT" tone="red" value={`-${formatMoney(formAdvanceConsumed)}`} /> : null}
+                    <SummaryLine label={form.hasVat ? 'ยอดที่ต้องจ่ายก่อน VAT' : 'ยอดที่ต้องจ่าย'} value={formatMoney(formTaxableBaseAfterAdvance)} />
+                    {form.hasVat ? <SummaryLine label={vatLabel} value={formatMoney(formVatAfterAdvance)} /> : null}
+                    <SummaryLine label={form.hasVat ? 'ยอดสุทธิรวม VAT ที่ต้องจ่าย' : 'ยอดสุทธิที่ต้องจ่าย'} value={formatMoney(formTotalAfterAdvance)} />
                     <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-lg font-bold"><span>ยอดสุทธิที่ต้องจ่าย</span><span className="tabular-nums text-slate-900">{formatMoney(formNetPayable)}</span></div>
                     <div className="mt-3 flex justify-between rounded-md border border-slate-200 bg-white p-2 text-sm font-bold text-slate-800"><span>น้ำหนักรวมที่ซื้อ</span><span className="tabular-nums">{formatMoney(formTotalWeight)} กก.</span></div>
                   </div>
@@ -4463,6 +4480,27 @@ function PurchaseBillDetailModal({
 }) {
   const detailTitle = detail?.docNo ?? docNo
   const detailPartyName = detail ? `${detail.supplierCode ? `[${detail.supplierCode}] ` : ''}${detail.supplierName}` : '-'
+  const detailPreAdvanceTotals = detail
+    ? calculatePurchaseBillPostAdvanceTotals({
+        advanceBaseAllocatedAmount: 0,
+        discountAmount: detail.discount,
+        hasVat: detail.hasVat,
+        subtotalAmount: detail.subtotal,
+        vatRatePercent: detail.vatRatePercent,
+        vatType: detail.vatType,
+      })
+    : null
+  const detailPostAdvanceTotals = detail
+    ? calculatePurchaseBillPostAdvanceTotals({
+        advanceBaseAllocatedAmount: detail.advanceAllocatedSubtotalAmount || detail.advanceConsumedAmount,
+        discountAmount: detail.discount,
+        hasVat: detail.hasVat,
+        subtotalAmount: detail.subtotal,
+        vatRatePercent: detail.vatRatePercent,
+        vatType: detail.vatType,
+      })
+    : null
+  const detailVatLabel = detail ? `VAT ${detail.vatRatePercent || 7}%` : 'VAT'
   return (
     <Dialog open onOpenChange={(open) => {
       if (!open) onClose()
@@ -4527,8 +4565,28 @@ function PurchaseBillDetailModal({
                 <DetailItem label="ยอดคงเหลือค้างจ่าย" value={`${formatMoney(detail.payableBalance)} บาท`} />
                 {detail.advancePaymentDocNo ? (
                   <>
-                    <DetailItem className="col-span-2 sm:col-span-4" label="หักเงินล่วงหน้า / มัดจำ" value={`${detail.advancePaymentDocNo}${detail.advancePaymentInvoiceNo ? ` · INV ${detail.advancePaymentInvoiceNo}` : ''} (ผลหักรวม ${formatMoney(detail.advanceAllocatedAmount)} บาท)`} />
-                    <DetailItem className="col-span-2 sm:col-span-4" label="ยอดหัก ADV ก่อน VAT" value={`ฐาน ${formatMoney(detail.advanceAllocatedSubtotalAmount)} บาท / ลด VAT ${formatMoney(detail.advanceAllocatedVatAmount)} บาท / ใช้ ADV จริง ${formatMoney(detail.advanceConsumedAmount)} บาท`} />
+                    <DetailItem className="col-span-2 sm:col-span-4" label="เอกสารเงินล่วงหน้า / มัดจำ" value={`${detail.advancePaymentDocNo}${detail.advancePaymentInvoiceNo ? ` · INV ${detail.advancePaymentInvoiceNo}` : ''}`} />
+                  </>
+                ) : null}
+                {detailPreAdvanceTotals ? (
+                  <>
+                    <DetailItem label="ยอดรวมรายการ" value={`${formatMoney(detail.subtotal)} บาท`} />
+                    <DetailItem label="หักส่วนลด" value={`${formatMoney(detail.discount)} บาท`} />
+                    {detail.advancePaymentDocNo ? (
+                      <DetailItem label="หัก ADV/มัดจำก่อน VAT" value={`${formatMoney(detail.advanceAllocatedSubtotalAmount || detail.advanceConsumedAmount)} บาท`} />
+                    ) : null}
+                    <DetailItem
+                      label={detail.hasVat ? 'ยอดที่ต้องจ่ายก่อน VAT' : 'ยอดที่ต้องจ่าย'}
+                      value={`${formatMoney(detailPostAdvanceTotals?.taxableBaseAmount ?? detailPreAdvanceTotals.taxableBaseAmount)} บาท`}
+                    />
+                    {detail.hasVat ? (
+                      <DetailItem label={detailVatLabel} value={`${formatMoney(detailPostAdvanceTotals?.vatAmount ?? detailPreAdvanceTotals.vatAmount)} บาท`} />
+                    ) : null}
+                    <DetailItem
+                      className="col-span-2 sm:col-span-4"
+                      label={detail.hasVat ? 'ยอดสุทธิรวม VAT ที่ต้องจ่าย' : 'ยอดสุทธิที่ต้องจ่าย'}
+                      value={`${formatMoney(detailPostAdvanceTotals?.totalAmount ?? detail.totalAmount)} บาท`}
+                    />
                   </>
                 ) : null}
               </div>
