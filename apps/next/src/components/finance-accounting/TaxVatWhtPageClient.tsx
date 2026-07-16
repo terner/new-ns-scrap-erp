@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { RotateCcw } from 'lucide-react'
-import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
+import { Activity, Building2, FileWarning, HandCoins, ReceiptText, RotateCcw, SlidersHorizontal } from 'lucide-react'
+import { KpiCard as SharedKpiCard, KpiCardGrid } from '@/components/ui/KpiCard'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -41,28 +42,42 @@ type TaxPayload = {
 
 const MONTHS = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
 const YEARS = [2024, 2025, 2026, 2027, 2028]
+const taxKpiClassName = 'items-start sm:items-center [&_.truncate]:overflow-visible [&_.truncate]:text-clip [&_.truncate]:whitespace-normal [&>div:first-child]:hidden sm:[&>div:first-child]:flex'
 
-type DetailTab = 'vat-output' | 'vat-input' | 'wht-calendar'
+type DetailTab = 'vat-output' | 'vat-input' | 'wht-charged' | 'wht-withheld' | 'tax-calendar'
 
 export function TaxVatWhtPageClient() {
   const now = new Date()
   const [month, setMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'))
   const [year, setYear] = useState(String(now.getFullYear()))
   const [branchId, setBranchId] = useState('')
+  const [mobileMonth, setMobileMonth] = useState(month)
+  const [mobileYear, setMobileYear] = useState(year)
+  const [mobileBranchId, setMobileBranchId] = useState(branchId)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [detailTab, setDetailTab] = useState<DetailTab>('vat-output')
   const url = useMemo(() => `/api/finance-accounting/tax-vat-wht?month=${month}&year=${year}${branchId ? `&branchId=${branchId}` : ''}`, [branchId, month, year])
   const { data, error, isLoading } = useApi<TaxPayload>(url)
   const maxCalendar = Math.max(...(data?.taxCalendar ?? []).flatMap((row) => [row.vOut, row.vIn, Math.abs(row.vatPayable)]), 1)
+  const selectedBranch = (data?.branches ?? []).find((branch) => branch.id === branchId)?.name ?? 'ทุกสาขา'
+  const periodLabel = thaiPeriodLabel(year, month)
   const detailTabs = [
     { count: data?.vatOutput.items.length ?? 0, label: 'VAT ขาย', value: 'vat-output' },
     { count: data?.vatInput.items.length ?? 0, label: 'VAT ซื้อ', value: 'vat-input' },
-    { count: data?.taxCalendar.length ?? 0, label: 'ปฏิทินภาษี', value: 'wht-calendar' },
+    { count: data?.whtCharged.items.length ?? 0, label: 'WHT เราหักไว้', value: 'wht-charged' },
+    { count: data?.whtWithheld.items.length ?? 0, label: 'WHT ลูกค้าหักจากเรา', value: 'wht-withheld' },
+    { count: data?.taxCalendar.length ?? 0, label: 'ปฏิทินภาษี', value: 'tax-calendar' },
   ] satisfies Array<{ count: number; label: string; value: DetailTab }>
 
+  function openMobileFilters() {
+    setMobileMonth(month)
+    setMobileYear(year)
+    setMobileBranchId(branchId)
+    setShowMobileFilters(true)
+  }
+
   return (
-    <section className="space-y-4">
-      <BaselineNotice sourceState={data?.sourceState} />
+    <section aria-busy={isLoading} className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
@@ -86,132 +101,165 @@ export function TaxVatWhtPageClient() {
           <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs text-slate-500">ช่วง {data?.filters.periodStart ?? `${year}-${month}-01`} ถึง {data?.filters.periodEnd ?? '-'}</span>
+          <span className="text-xs text-slate-500">{periodLabel} · {selectedBranch}</span>
+          <span className="text-xs text-slate-400">ช่วง {data?.filters.periodStart ?? `${year}-${month}-01`} ถึง {data?.filters.periodEnd ?? '-'}</span>
         </div>
       </div>
 
-      {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
-        <div className="flex gap-2 items-center">
-          <div className="flex-1 grid grid-cols-2 gap-2">
-            <select 
-              aria-label="Month select"
-              className="w-full h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-400 transition cursor-pointer"
-              value={month} 
-              onChange={(event) => setMonth(event.target.value)}
-            >
-              {MONTHS.map((item) => <option key={item} value={item}>เดือน {item}</option>)}
-            </select>
-            <select 
-              aria-label="Year select"
-              className="w-full h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-400 transition cursor-pointer"
-              value={year} 
-              onChange={(event) => setYear(event.target.value)}
-            >
-              {YEARS.map((item) => <option key={item} value={String(item)}>ปี {item}</option>)}
-            </select>
+      {/* Mobile compact filter strip */}
+      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-slate-500">งวดภาษี</div>
+            <div className="truncate text-sm font-bold text-slate-800">{periodLabel}</div>
+            <div className="truncate text-xs text-slate-500">{selectedBranch}</div>
           </div>
           <button
             type="button"
-            className="h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-normal text-slate-700 hover:bg-slate-50 transition outline-none"
-            onClick={() => setShowMobileFilters(true)}
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-500/40"
+            onClick={openMobileFilters}
           >
+            <SlidersHorizontal aria-hidden="true" className="size-3.5" />
             ตัวกรอง {branchId ? '(มี)' : ''}
           </button>
         </div>
       </div>
 
-      {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/55 lg:hidden">
-          <div className="flex max-h-[calc(100dvh_-_env(safe-area-inset-top)_-_0.75rem)] w-full flex-col overflow-hidden rounded-t-md bg-slate-900 shadow-2xl">
-            <div className="flex items-center rounded-t-md bg-slate-900 px-4 py-4 text-white">
-              <h4 className="text-sm font-bold text-white">ตัวกรองเพิ่มเติม</h4>
-            </div>
-
-            <div className="flex-1 space-y-4 overflow-y-auto bg-white p-4">
-              <div>
-                <label className="mb-1 block font-semibold text-slate-600 text-xs">สาขา</label>
-                <select
-                  aria-label="Branch select"
-                  className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-slate-400"
-                  value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                >
-                  <option value="">ทุกสาขา</option>
-                  {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                </select>
-              </div>
-
-              <div className="pt-2 text-xs text-slate-500 border-t border-slate-100">
-                ช่วงเวลา: <span className="font-semibold">{data?.filters.periodStart ?? `${year}-${month}-01`} ถึง {data?.filters.periodEnd ?? '-'}</span>
-              </div>
-
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 border-t border-slate-100 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)_+_1rem)]">
+        <MobileFilterSheet
+          title="ตัวกรองเพิ่มเติม"
+          onClose={() => setShowMobileFilters(false)}
+          footer={
+            <>
               <button
                 type="button"
                 onClick={() => {
-                  setBranchId('')
+                  setMobileMonth(String(now.getMonth() + 1).padStart(2, '0'))
+                  setMobileYear(String(now.getFullYear()))
+                  setMobileBranchId('')
                 }}
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-normal text-slate-700 hover:bg-slate-50"
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
-                onClick={() => setShowMobileFilters(false)}
-                className="h-11 rounded-md bg-blue-600 text-sm font-normal text-white hover:bg-blue-700"
+                onClick={() => {
+                  setMonth(mobileMonth)
+                  setYear(mobileYear)
+                  setBranchId(mobileBranchId)
+                  setShowMobileFilters(false)
+                }}
+                className="h-10 rounded-md bg-blue-600 text-sm font-normal text-white transition hover:bg-blue-700"
               >
-                ตกลง
+                ใช้ตัวกรอง
               </button>
+            </>
+          }
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">เดือน</label>
+              <select
+                aria-label="เลือกเดือน"
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-slate-400"
+                value={mobileMonth}
+                onChange={(event) => setMobileMonth(event.target.value)}
+              >
+                {MONTHS.map((item) => <option key={item} value={item}>เดือน {item}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">ปี</label>
+              <select
+                aria-label="เลือกปี"
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-slate-400"
+                value={mobileYear}
+                onChange={(event) => setMobileYear(event.target.value)}
+              >
+                {YEARS.map((item) => <option key={item} value={String(item)}>ปี {item}</option>)}
+              </select>
             </div>
           </div>
-        </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="สาขา"
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-slate-400"
+              value={mobileBranchId}
+              onChange={(event) => setMobileBranchId(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </div>
+        </MobileFilterSheet>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-3">
-          <SharedKpiCard
-            label={`VAT สุทธิ งวด ${year}-${month}`}
-            note={`บาท · ${(data?.summary.vatPayable ?? 0) >= 0 ? 'ต้องนำส่ง' : 'ภาษีซื้อรอใช้เครดิต'}`}
-            tone={(data?.summary.vatPayable ?? 0) >= 0 ? 'rose' : 'emerald'}
-            value={money(data?.summary.vatPayable)}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <MiniHero label="VAT ขาย" tone="emerald" value={money(data?.summary.vatOut)} />
-            <MiniHero label="VAT ซื้อ" tone="blue" value={money(data?.summary.vatIn)} />
+      <BaselineNotice sourceState={data?.sourceState} />
+
+      {isLoading && !data && !error ? <TaxLoadingState /> : null}
+
+      {data ? (
+        <>
+          <KpiCardGrid className="lg:grid-cols-4 xl:grid-cols-5">
+            <SharedKpiCard className={taxKpiClassName} icon={<ReceiptText aria-hidden="true" className="size-5" />} label="VAT สุทธิ" note={`${periodLabel} · ${(data.summary.vatPayable ?? 0) >= 0 ? 'ต้องนำส่ง' : 'ภาษีซื้อรอใช้เครดิต'}`} tone={(data.summary.vatPayable ?? 0) >= 0 ? 'rose' : 'emerald'} value={money(data.summary.vatPayable)} />
+            <SharedKpiCard className={taxKpiClassName} icon={<Activity aria-hidden="true" className="size-5" />} label="VAT ขาย" note="ภาษีขายของงวดที่เลือก" tone="emerald" value={money(data.summary.vatOut)} />
+            <SharedKpiCard className={taxKpiClassName} icon={<HandCoins aria-hidden="true" className="size-5" />} label="VAT ซื้อ" note="ภาษีซื้อที่บันทึกในงวด" tone="blue" value={money(data.summary.vatIn)} />
+            <SharedKpiCard className={taxKpiClassName} icon={<Building2 aria-hidden="true" className="size-5" />} label="WHT เราหักไว้" note="ยอดที่ต้องนำส่ง ภ.ง.ด." tone="amber" value={money(data.summary.whtChargedNet)} />
+            <SharedKpiCard className={taxKpiClassName} icon={<FileWarning aria-hidden="true" className="size-5" />} label="เอกสารภาษีไม่ครบ" note="ใช้ตาม transaction field ปัจจุบัน" tone="red" value={`${data.summary.missingCount.toLocaleString('th-TH')} รายการ`} />
+          </KpiCardGrid>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <Panel
+              className="lg:col-span-2"
+              subtitle="สรุปความสัมพันธ์ของ VAT ขาย, VAT ซื้อ และยอดสุทธิที่ต้องนำส่งหรือรอใช้เครดิต"
+              title="ภาพรวม VAT ของงวด"
+            >
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">งวดที่เลือก</div>
+                      <div className="mt-1 text-lg font-bold text-slate-800">{periodLabel}</div>
+                      <div className="mt-1 text-xs text-slate-500">{selectedBranch}</div>
+                    </div>
+                    <div className={`rounded-full px-3 py-1 text-xs font-bold ${(data.summary.vatPayable ?? 0) >= 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {(data.summary.vatPayable ?? 0) >= 0 ? 'VAT ต้องนำส่ง' : 'มี VAT ซื้อเกิน'}
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <MiniHero label="VAT ขาย" tone="emerald" value={money(data.summary.vatOut)} />
+                    <MiniHero label="VAT ซื้อ" tone="blue" value={money(data.summary.vatIn)} />
+                    <MiniHero label="VAT สุทธิ" tone={(data.summary.vatPayable ?? 0) >= 0 ? 'rose' : 'emerald'} value={money(data.summary.vatPayable)} />
+                  </div>
+                  <div className="mt-4 border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-500">
+                    ช่วงข้อมูล {data.filters.periodStart} ถึง {data.filters.periodEnd}
+                  </div>
+                </div>
+                <Donut output={data.summary.vatOut ?? 0} input={data.summary.vatIn ?? 0} net={data.summary.vatPayable ?? 0} />
+              </div>
+            </Panel>
+
+            <Panel subtitle="ติดตามยอดภาษีหัก ณ ที่จ่ายและความครบถ้วนของเอกสารที่เกี่ยวข้อง" title="สถานะ WHT และเอกสาร">
+              <div className="space-y-3">
+                <WhtBox label="เราหักไว้ (ต้องนำส่ง ภงด.)" tone="amber" value={money(data.summary.whtChargedNet)} />
+                <WhtBox label="ลูกค้าหักจากเรา (เครดิตได้)" tone="purple" value={money(data.summary.whtWithheldNet)} />
+                <WhtBox label="เอกสารภาษีไม่ครบ" tone="red" value={`${data.summary.missingCount.toLocaleString('th-TH')} รายการ`} />
+              </div>
+            </Panel>
           </div>
-        </div>
 
-        <Panel title="สรุป VAT ขายและซื้อ">
-          <Donut output={data?.summary.vatOut ?? 0} input={data?.summary.vatIn ?? 0} net={data?.summary.vatPayable ?? 0} />
-        </Panel>
-
-        <Panel title="สถานะภาษีหัก ณ ที่จ่าย">
-          <div className="space-y-3">
-            <WhtBox label="เราหักไว้ (ต้องนำส่ง ภงด.)" tone="amber" value={money(data?.summary.whtChargedNet)} />
-            <WhtBox label="ลูกค้าหักจากเรา (เครดิตได้)" tone="purple" value={money(data?.summary.whtWithheldNet)} />
-            <WhtBox label="เอกสารภาษีไม่ครบ" tone="red" value={`${data?.summary.missingCount ?? 0} รายการ`} />
-          </div>
-        </Panel>
-      </div>
-
-      <Panel title="แนวโน้ม VAT 6 เดือน (ขาย/ซื้อ/สุทธิ)">
-        <div className="grid grid-cols-6 gap-3 overflow-x-auto pb-1">
-          {(data?.taxCalendar ?? []).map((row) => <CalendarBars key={row.periodLabel} max={maxCalendar} row={row} />)}
-        </div>
-      </Panel>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="VAT ขาย" value={money(data?.summary.vatOut)} tone="emerald" />
-        <StatCard label="VAT ซื้อ" value={money(data?.summary.vatIn)} tone="blue" />
-        <StatCard label="VAT สุทธิ" value={money(data?.summary.vatPayable)} tone="red" sub="ต้องนำส่ง / เสนอเครดิต" />
-        <StatCard label="WHT เราหักไว้" value={money(data?.summary.whtChargedNet)} tone="amber" sub="ต้องนำส่งภาษี" />
-        <StatCard label="WHT ถูกหักจากเรา" value={money(data?.summary.whtWithheldNet)} tone="purple" sub="ใช้เป็นเครดิตภาษี" />
-        <StatCard label="เอกสารภาษีไม่ครบ" value={String(data?.summary.missingCount ?? 0)} tone="red" />
-      </div>
+          <Panel
+            subtitle="ดูแนวโน้ม VAT ขาย, VAT ซื้อ และ VAT สุทธิย้อนหลัง 6 เดือน เพื่อจับทิศทางการนำส่ง"
+            title="แนวโน้ม VAT 6 เดือน"
+          >
+            <div className="grid grid-cols-3 gap-3 overflow-x-auto pb-1 md:grid-cols-6">
+              {data.taxCalendar.map((row) => <CalendarBars key={row.periodLabel} max={maxCalendar} row={row} />)}
+            </div>
+          </Panel>
+        </>
+      ) : null}
 
       <Tabs className="gap-4" value={detailTab} onValueChange={(value) => setDetailTab(value as DetailTab)}>
         <TabsList className="w-full flex-nowrap overflow-x-auto" variant="line">
@@ -238,11 +286,15 @@ export function TaxVatWhtPageClient() {
           <TaxTable hasDoc isLoading={isLoading} rows={data?.vatInput.items ?? []} title={`VAT ซื้อ — ${year}-${month}`} tone="blue" valueKey="vat" tableKey="finance.tax.vat-input.v5" />
         </TabsContent>
 
-        <TabsContent value="wht-calendar" className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <TaxTable isLoading={isLoading} rows={data?.whtCharged.items ?? []} title="WHT เราหักไว้ (ต้องนำส่ง ภ.ง.ด. 3/53)" tone="amber" valueKey="wht" tableKey="tax-wht-charged" />
-            <TaxTable isLoading={isLoading} rows={data?.whtWithheld.items ?? []} title="WHT ลูกค้าหักจากเรา (ใช้เครดิต)" tone="purple" valueKey="wht" tableKey="tax-wht-withheld" />
-          </div>
+        <TabsContent value="wht-charged">
+          <TaxTable isLoading={isLoading} rows={data?.whtCharged.items ?? []} title={`WHT เราหักไว้ — ${year}-${month}`} tone="amber" valueKey="wht" tableKey="finance.tax.wht-charged.v1" />
+        </TabsContent>
+
+        <TabsContent value="wht-withheld">
+          <TaxTable isLoading={isLoading} rows={data?.whtWithheld.items ?? []} title={`WHT ลูกค้าหักจากเรา — ${year}-${month}`} tone="purple" valueKey="wht" tableKey="finance.tax.wht-withheld.v1" />
+        </TabsContent>
+
+        <TabsContent value="tax-calendar" className="space-y-4">
           <CalendarTable rows={data?.taxCalendar ?? []} />
         </TabsContent>
       </Tabs>
@@ -269,6 +321,11 @@ function money(value?: number) {
   return amount < 0 ? `(${formatMoney(Math.abs(amount))})` : formatMoney(amount)
 }
 
+function thaiPeriodLabel(year: string, month: string) {
+  const date = new Date(Number(year), Number(month) - 1, 1)
+  return new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(date)
+}
+
 function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 text-sm text-amber-900">
@@ -277,10 +334,6 @@ function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
       {sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}
     </div>
   )
-}
-
-function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">{children}</div>
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
@@ -296,21 +349,24 @@ function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; on
   )
 }
 
-function Panel({ children, title }: { children: ReactNode; title: string }) {
+function Panel({ children, className = '', subtitle, title }: { children: ReactNode; className?: string; subtitle?: string; title: string }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-      <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</div>
+    <section className={`rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm sm:p-5 ${className}`}>
+      <div className="mb-4">
+        <h2 className="text-sm font-bold text-slate-800 sm:text-base">{title}</h2>
+        {subtitle ? <p className="mt-1 text-xs leading-relaxed text-slate-500">{subtitle}</p> : null}
+      </div>
       {children}
-    </div>
+    </section>
   )
 }
 
-function MiniHero({ label, tone, value }: { label: string; tone: 'blue' | 'emerald'; value: string }) {
-  const color = tone === 'emerald' ? 'text-emerald-600' : 'text-blue-600'
+function MiniHero({ label, tone, value }: { label: string; tone: 'blue' | 'emerald' | 'rose'; value: string }) {
+  const color = tone === 'emerald' ? 'text-emerald-600' : tone === 'rose' ? 'text-rose-600' : 'text-blue-600'
   return (
-    <div>
-      <div className="text-xs text-slate-400 font-medium uppercase">{label}</div>
-      <div className={`text-base font-bold ${color}`}>{value}</div>
+    <div className="rounded-xl border border-white/80 bg-white p-3 shadow-sm">
+      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
+      <div className={`mt-2 text-lg font-bold ${color}`}>{value}</div>
     </div>
   )
 }
@@ -319,14 +375,20 @@ function Donut({ input, net, output }: { input: number; net: number; output: num
   const total = Math.max(1, input + output)
   const outputDash = output / total * 439.8
   return (
-    <svg viewBox="0 0 200 200" className="h-44 w-full">
-      <g transform="rotate(-90 100 100)">
-        <circle cx="100" cy="100" fill="none" r="70" stroke="#10b981" strokeDasharray={`${outputDash} 439.8`} strokeWidth="30" />
-        <circle cx="100" cy="100" fill="none" r="70" stroke="#3b82f6" strokeDasharray={`${input / total * 439.8} 439.8`} strokeDashoffset={-outputDash} strokeWidth="30" />
-      </g>
-      <text fill="#64748b" fontSize="12" textAnchor="middle" x="100" y="98">VAT Net</text>
-      <text fill={net >= 0 ? '#dc2626' : '#059669'} fontSize="13" fontWeight="bold" textAnchor="middle" x="100" y="115">{money(net)}</text>
-    </svg>
+    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+      <svg viewBox="0 0 200 200" className="h-44 w-full">
+        <g transform="rotate(-90 100 100)">
+          <circle cx="100" cy="100" fill="none" r="70" stroke="#10b981" strokeDasharray={`${outputDash} 439.8`} strokeWidth="30" />
+          <circle cx="100" cy="100" fill="none" r="70" stroke="#3b82f6" strokeDasharray={`${input / total * 439.8} 439.8`} strokeDashoffset={-outputDash} strokeWidth="30" />
+        </g>
+        <text fill="#64748b" fontSize="12" textAnchor="middle" x="100" y="98">VAT Net</text>
+        <text fill={net >= 0 ? '#dc2626' : '#059669'} fontSize="13" fontWeight="bold" textAnchor="middle" x="100" y="115">{money(net)}</text>
+      </svg>
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500">
+        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500" />VAT ขาย</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-500" />VAT ซื้อ</span>
+      </div>
+    </div>
   )
 }
 
@@ -358,8 +420,23 @@ function CalendarBars({ max, row }: { max: number; row: TaxPayload['taxCalendar'
   )
 }
 
-function StatCard({ label, sub, tone, value }: { label: string; sub?: string; tone: 'amber' | 'blue' | 'emerald' | 'purple' | 'red'; value: string }) {
-  return <SharedKpiCard label={label} note={sub} tone={tone} value={value} />
+function TaxLoadingState() {
+  return (
+    <div aria-label="กำลังโหลดข้อมูล Tax VAT WHT" className="space-y-4" role="status">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5">
+        {Array.from({ length: 5 }, (_, index) => <div className="h-24 animate-pulse rounded-xl border border-slate-200 bg-white shadow-sm" key={index} />)}
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2" />
+        <div className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white shadow-sm" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2" />
+        <div className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white shadow-sm" />
+      </div>
+      <span className="sr-only">กำลังโหลดข้อมูล</span>
+    </div>
+  )
 }
 
 function TaxTable({ hasDoc = false, isLoading, rows, title, tone, valueKey, tableKey }: { hasDoc?: boolean; isLoading: boolean; rows: TaxItem[]; title: string; tone: 'amber' | 'blue' | 'emerald' | 'purple'; valueKey: 'vat' | 'wht'; tableKey: string }) {
