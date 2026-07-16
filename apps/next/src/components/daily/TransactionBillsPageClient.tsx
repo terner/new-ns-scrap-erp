@@ -25,6 +25,7 @@ import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { firstErrorKeyFromZodIssues, focusFieldError, issueMapFromZodIssues } from '@/lib/form-errors'
 import { formatDateDisplay, formatDecimalDisplay, formatDecimalDraft, sanitizeDecimalInput } from '@/lib/format'
 import { purchaseBillCancelSchema, purchaseBillFormSchema, type PurchaseBillCancelValues, type PurchaseBillFormValues } from '@/lib/purchase-bill'
+import { calculateSupplierAdvanceAllocation } from '@/lib/purchase-advance'
 import { openPurchaseBillPrint, openPurchaseBillPrintWindow } from '@/lib/purchase-bill-print'
 import { salesBillCancelSchema, salesBillFormSchema, type SalesBillCancelValues, type SalesBillFormValues } from '@/lib/sales'
 import { openSalesBillPrint, openSalesBillPrintWindow } from '@/lib/sales-bill-print'
@@ -1017,22 +1018,17 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const availableAdvanceAmount = selectedAdvancePayment
     ? Math.max(0, (selectedAdvancePayment.remainingAmount ?? 0) + editingAdvanceCarry)
     : 0
-  const selectedAdvanceSubtotal = selectedAdvancePayment?.subtotalAmount ?? selectedAdvancePayment?.amount ?? 0
-  const selectedAdvanceVat = selectedAdvancePayment?.vatAmount ?? 0
-  const selectedAdvanceBaseCapacity = selectedAdvancePayment?.vatType && selectedAdvancePayment.vatType !== 'NONE'
-    ? availableAdvanceAmount * (selectedAdvanceSubtotal / Math.max(selectedAdvanceSubtotal + selectedAdvanceVat, 0.000001))
-    : availableAdvanceAmount
-  const formAdvanceConsumed = Math.min(formTaxableBase, selectedAdvanceBaseCapacity)
+  const formAdvanceAllocation = calculateSupplierAdvanceAllocation({
+    availableBaseAmount: availableAdvanceAmount,
+    billSubtotalAmount: formTaxableBase,
+    billTotalAmount: formTotal,
+    billVatAmount: formVat,
+  })
+  const formAdvanceConsumed = formAdvanceAllocation.allocatedSubtotalAmount
   const formTaxableBaseAfterAdvance = Math.max(0, formTaxableBase - formAdvanceConsumed)
-  const formAdvanceVatRelief = formTaxableBase > 0 ? formAdvanceConsumed * (formVat / formTaxableBase) : 0
-  const formAdvanceApplied = Math.min(formTotal, formAdvanceConsumed + formAdvanceVatRelief)
-  const formAdvanceGrossConsumed = selectedAdvancePayment?.vatType && selectedAdvancePayment.vatType !== 'NONE'
-    ? Math.min(
-      availableAdvanceAmount,
-      formAdvanceConsumed * ((selectedAdvanceSubtotal + selectedAdvanceVat) / Math.max(selectedAdvanceSubtotal, 0.000001)),
-    )
-    : formAdvanceConsumed
-  const formAdvanceRemainingAfterApply = Math.max(0, availableAdvanceAmount - formAdvanceGrossConsumed)
+  const formAdvanceVatRelief = formAdvanceAllocation.allocatedVatAmount
+  const formAdvanceApplied = formAdvanceAllocation.allocatedTotalAmount
+  const formAdvanceRemainingAfterApply = formAdvanceAllocation.remainingBaseAmount
   const formNetPayable = Math.max(0, formTotal - formAdvanceApplied)
   const salesSubtotal = salesForm.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - (salesForm.transactionMode === 'TRADING' ? 0 : item.discount)), 0)
   const salesAfterDiscount = Math.max(0, salesSubtotal - salesForm.discountTotal)

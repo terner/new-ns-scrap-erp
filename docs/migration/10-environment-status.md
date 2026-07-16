@@ -62,6 +62,11 @@ Status update on 2026-07-15:
 - The deployed Prisma/pg runtime uses the Supabase pooler with `sslmode=require&uselibpqcompat=true`; this avoids the `SELF_SIGNED_CERT_IN_CHAIN` failure seen in `POST /api/auth/login-complete`.
 - Latest SIT production redeploy `dpl_CAnQTGKviTNEdM4gHp9e9WdSHGi5` completed with `READY` and `ns-erp-sit.vercel.app` points to it. Browser smoke verification returned Supabase token `200`, `/api/auth/login-complete` `200`, and redirected to `/`.
 
+Status update on 2026-07-16:
+- Applied the CADV create/branch migrations and the Supplier ADV base-credit normalization migration directly to SIT with transactional error stopping.
+- SIT now has the CADV tables with required document branch support and validated ADV arithmetic constraints. `ADV012607-0004` reconciles to gross cash 10,700, allocated base 4,900, and remaining base 5,100.
+- Supabase CLI still reports pre-existing migration-history drift, so do not run a blanket `supabase db push` until remote-only migration versions are reconciled with the repository.
+
 ### Staging / UAT
 
 - Active project ref: `ekeomeumqjvbhgwyaqwe`

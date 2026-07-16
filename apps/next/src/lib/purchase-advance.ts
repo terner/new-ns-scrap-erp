@@ -59,27 +59,71 @@ export function calculateSupplierAdvanceTaxBreakdown(params: {
   const rate = Math.max(0, Math.min(100, Number(params.vatRatePercent ?? 7) || 0))
   if (params.vatType === 'NONE' || rate <= 0 || amount <= 0) {
     return {
-      subtotalAmount: roundMoney(amount),
-      totalAmount: roundMoney(amount),
+      subtotalAmount: roundSupplierAdvanceMoney(amount),
+      totalAmount: roundSupplierAdvanceMoney(amount),
       vatAmount: 0,
       vatRatePercent: rate,
       vatType: 'NONE' as const,
     }
   }
 
-  const subtotalAmount = roundMoney(amount)
-  const vatAmount = roundMoney(subtotalAmount * rate / 100)
+  const subtotalAmount = roundSupplierAdvanceMoney(amount)
+  const vatAmount = roundSupplierAdvanceMoney(subtotalAmount * rate / 100)
   return {
     subtotalAmount,
-    totalAmount: roundMoney(subtotalAmount + vatAmount),
+    totalAmount: roundSupplierAdvanceMoney(subtotalAmount + vatAmount),
     vatAmount,
     vatRatePercent: rate,
     vatType: 'INCLUDE' as const,
   }
 }
 
-function roundMoney(value: number) {
+export function roundSupplierAdvanceMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+export function calculateSupplierAdvancePaidBaseCapacity(params: {
+  settledGrossAmount: number
+  subtotalAmount: number
+  totalAmount: number
+}) {
+  const settledGrossAmount = Math.max(0, params.settledGrossAmount)
+  const subtotalAmount = Math.max(0, params.subtotalAmount)
+  const totalAmount = Math.max(0, params.totalAmount)
+  if (subtotalAmount <= 0 || settledGrossAmount <= 0) return 0
+  if (totalAmount <= 0) throw new Error('ยอดรวม ADV ต้องมากกว่า 0')
+
+  return roundSupplierAdvanceMoney(Math.min(
+    subtotalAmount,
+    settledGrossAmount * subtotalAmount / totalAmount,
+  ))
+}
+
+export function calculateSupplierAdvanceAllocation(params: {
+  availableBaseAmount: number
+  billSubtotalAmount: number
+  billTotalAmount: number
+  billVatAmount: number
+}) {
+  const availableBaseAmount = Math.max(0, params.availableBaseAmount)
+  const billSubtotalAmount = Math.max(0, params.billSubtotalAmount)
+  const billTotalAmount = Math.max(0, params.billTotalAmount)
+  const billVatAmount = Math.max(0, params.billVatAmount)
+  const allocatedSubtotalAmount = roundSupplierAdvanceMoney(Math.min(availableBaseAmount, billSubtotalAmount))
+  const billVatRatio = billSubtotalAmount > 0 ? billVatAmount / billSubtotalAmount : 0
+  const allocatedVatAmount = roundSupplierAdvanceMoney(allocatedSubtotalAmount * billVatRatio)
+  const allocatedTotalAmount = roundSupplierAdvanceMoney(Math.min(
+    billTotalAmount,
+    allocatedSubtotalAmount + allocatedVatAmount,
+  ))
+
+  return {
+    allocatedAmount: allocatedSubtotalAmount,
+    allocatedSubtotalAmount,
+    allocatedTotalAmount,
+    allocatedVatAmount,
+    remainingBaseAmount: roundSupplierAdvanceMoney(Math.max(0, availableBaseAmount - allocatedSubtotalAmount)),
+  }
 }
 
 export const supplierAdvancePaymentStatusValues = [

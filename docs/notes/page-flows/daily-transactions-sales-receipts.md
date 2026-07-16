@@ -22,7 +22,7 @@ route: /sales/receipts
 
 ## Canonical References
 
-[[Sales Flow]], [[Payment Flow]]
+[[Sales Flow]], [[Payment Flow]], [[Customer Advance Receipt Flow]]
 
 ## Flow Baseline
 
@@ -51,9 +51,10 @@ RCP รับเงินจาก SB/customer advance และเขียน 
 
 ## Page Responsibilities
 
-- แสดงคิวบิลขายค้างรับและประวัติรับเงิน
+- แสดงคิวบิลขายค้างรับ, CADV ที่รอรับเงินจริง และประวัติรับเงิน
 - สร้าง `RCP` เพื่อรับเงินจาก Customer
 - รองรับรับหลาย SB ใน RCP เดียวตาม customer/payment account rule
+- รองรับออก RCP จาก CADV ที่สร้างจาก Packing List โดยเลือกได้เฉพาะ CADV ของลูกค้าคนเดียวกัน
 - เขียน bank statement เงินเข้าและ recalc AR/SB paid status
 - รองรับส่วนลด ค่าธรรมเนียม WHT/ภาษีหัก ณ ที่จ่าย ตาม target
 
@@ -63,6 +64,16 @@ RCP รับเงินจาก SB/customer advance และเขียน 
 - ไม่ตัด stock
 - ไม่แก้ยอดบิลขายเดิมนอกจาก payment status/paid amount
 - ไม่ใช้ payment supplier PMT แทน receipt
+
+## Customer Advance Integration (Target)
+
+CADV เป็น source request ก่อนเงินเข้า ไม่ใช่ RCP. เมื่อผู้ใช้เลือก CADV ใน Receipt modal ระบบต้องดึง customer, Invoice/Contract, รายการสินค้า และยอดที่ยังต้องรับมาแสดงเป็น reference read-only. ผู้ใช้กรอกวันที่รับเงินจริง, วิธีรับเงิน, บัญชีรับเงิน และยอดรับใน RCP ตามปกติ.
+
+- RCP commit สร้าง `customer_receipt_advance_allocations` และ `bank_statement` เงินเข้าใน transaction เดียว
+- CADV เปลี่ยนเป็น `partially_received` หรือ `received` ตามยอดรับจริง
+- cancel/reissue RCP ต้อง reverse allocation และ bank statement ก่อนคำนวณ CADV ใหม่
+- CADV ที่ยังไม่ `received` ห้ามเลือกไปหัก Sales Bill
+- `customer_receipt_allocations` ของ SB และ `customer_receipt_advance_allocations` ของ CADV เป็นคนละ relationship; ห้ามใช้ foreign key/null semantics ปนกัน
 
 ## Lifecycle / Operation Flow
 

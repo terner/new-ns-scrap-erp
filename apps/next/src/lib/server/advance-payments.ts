@@ -295,7 +295,6 @@ export async function summarizeAdvancePaymentApprovalStatus(
     totalSettledAmount += settledAmount
     if (Math.max(0, toNumber(approval.approved_amount) - settledAmount) > EPSILON) {
       allActiveApprovalsSettled = false
-      break
     }
   }
 

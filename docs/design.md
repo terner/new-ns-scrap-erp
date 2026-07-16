@@ -68,7 +68,14 @@
 
 ## Searchable Dropdown
 
+- คำเรียกกลางของ dropdown ที่ระบบ render panel เองและคุม design เองได้คือ `custom dropdown`
+- `custom dropdown` เป็น family กลางของระบบ และแตกเป็น 2 แบบ:
+  - `branch dropdown` = custom dropdown แบบไม่ searchable อ้างอิง baseline จาก field `สาขา` ใน `/purchase/bills`
+  - `searchable combobox` = custom dropdown แบบพิมพ์ค้นหาได้
+- ห้ามเรียก `branch dropdown` ว่า searchable ถ้า field นั้นพิมพ์ค้นหาไม่ได้จริง
+- field ที่เป็น master/list selector ใน form, modal, filter, และ document flow ต้องใช้ `custom dropdown` กลางของระบบเท่านั้น ห้ามใช้ native browser panel ถ้าหน้านั้นต้องคุมสี, option state, dark mode, spacing, หรือ selected row ให้ตรงกันทั้งระบบ
 - Dropdown ที่เลือกข้อมูลจาก master/list และมีโอกาสค้นหาชื่อหรือรหัส ต้องใช้ `SearchCombobox` กลาง ไม่สร้าง panel หรือ listbox รายหน้า
+- Dropdown ที่ไม่ต้องค้นหาแต่ต้องคุม panel design ให้ใช้ custom dropdown แบบเดียวกับ `สาขา` ใน `/purchase/bills` ไม่ใช้ native `<select>`
 - Field และ panel ต้องเป็นชุดเดียวกัน: field สูงตาม form control (`h-9` ใน filter), panel เปิดชิดใต้ field, มุม `rounded-md`, และแถวรายการ compact (`px-3 py-2`).
 - รายการที่เลือกหรืออยู่ใน keyboard focus ใช้ background เดียวกัน; dark mode ใช้ `--ns-dropdown-selected` บน `--ns-dropdown-surface` เพื่อให้ selected state ชัดโดยไม่ใช้สีสด.
 - Native HTML `select` ควบคุม panel ของ browser ไม่ได้ จึงใช้ได้เฉพาะตัวเลือกสั้นและไม่ต้องค้นหา; filter/master-data dropdown ใหม่ต้องใช้ shared searchable dropdown.
