@@ -8,6 +8,7 @@ const CANCELLED_STATUSES = ['cancelled', 'void', 'ยกเลิก']
 
 export type PeriodFilter = {
   branchId?: string
+  costBasis?: 'COMPARE' | 'DEAL' | 'WAC'
   from: Date
   to: Date
   transactionMode?: 'ALL' | 'STOCK' | 'TRADING'
@@ -183,25 +184,152 @@ async function loadPlInputs(filter: PeriodFilter) {
       take: 10000,
       where: { date: dateWhere },
     }),
+    prisma.historical_monthly.findMany({
+      orderBy: [{ year: 'asc' }, { month: 'asc' }, { id: 'asc' }],
+      take: 2000,
+    }),
     listBranches(),
   ])
 }
 
+function billRevenueAmount(bill: SalesBillRow) {
+  return toNumber(bill.subtotal) || toNumber(bill.total_amount) - toNumber(bill.vat_amount)
+}
+
+function billWacCostAmount(bill: SalesBillRow) {
+  return toNumber(bill.cogs_amount) || toNumber(bill.total_cost)
+}
+
+function ratioPart(total: number, ratio: number) {
+  if (!(total > 0) || !(ratio > 0)) return 0
+  return total * Math.min(1, Math.max(0, ratio))
+}
+
+function groupHistoricalBaseline(rows: Prisma.historical_monthlyGetPayload<Record<string, never>>[]) {
+  const baselineRows = rows.filter((row) => (row.year ?? 0) === 2026 && (row.month ?? 0) >= 1 && (row.month ?? 0) <= 4)
+  if (!baselineRows.length) return { hasData: false as const }
+
+  const sumMetric = (metricType: string, categoryId?: string) => baselineRows
+    .filter((row) => row.metric_type === metricType && (categoryId ? row.category_id === categoryId : true))
+    .reduce((sum, row) => sum + toNumber(row.amount), 0)
+
+  const revenue = sumMetric('pnl', 'revenue')
+  const cogs = sumMetric('pnl', 'cogs')
+  const opexMetric = sumMetric('pnl', 'opex')
+  const expenseFallback = baselineRows
+    .filter((row) => row.metric_type === 'expense')
+    .reduce((sum, row) => sum + toNumber(row.amount), 0)
+  const opex = opexMetric || expenseFallback
+  const interest = sumMetric('pnl', 'interest')
+  const otherIncome = sumMetric('pnl', 'other_inc')
+  const tax = sumMetric('pnl', 'tax')
+  const netProfit = revenue - cogs - opex - interest + otherIncome - tax
+  const hasData = revenue + cogs + opex + interest + otherIncome + tax > 0
+
+  return {
+    cogs,
+    hasData,
+    interest,
+    netProfit,
+    opex,
+    otherIncome,
+    revenue,
+    tax,
+  }
+}
+
 export async function buildPlStatement(filter: PeriodFilter) {
-  const [salesBillsRaw, expensesRaw, depreciationsRaw, loanPayments, fxRows, branches] = await loadPlInputs(filter)
+  const [salesBillsRaw, expensesRaw, depreciationsRaw, loanPayments, fxRows, historicalMonthly, branches] = await loadPlInputs(filter)
   const salesBills = salesBillsRaw as SalesBillRow[]
   const expenses = expensesRaw as ExpenseRow[]
   const depreciations = depreciationsRaw as Array<Prisma.depreciationsGetPayload<{ include: { assets: { select: { branch_id: true; code: true; name: true } } } }>>
+  const costBasis = filter.costBasis ?? 'WAC'
+  const billIdMap = new Map<string, SalesBillRow>()
+  const billDocNoMap = new Map<string, SalesBillRow>()
+  salesBills.forEach((bill) => {
+    billIdMap.set(String(bill.id), bill)
+    billDocNoMap.set(bill.doc_no, bill)
+  })
+
+  const activeAllocationFacts = await prisma.trading_allocation_facts.findMany({
+    orderBy: [{ date: 'asc' }, { id: 'asc' }],
+    take: 20000,
+    where: {
+      status: 'active',
+      OR: [
+        { sales_bill_id: { in: salesBills.map((bill) => bill.id) } },
+        { sales_doc_no: { in: salesBills.map((bill) => bill.doc_no) } },
+      ],
+    },
+  })
+  const coveredDealIds = new Set<bigint>()
+  const factByBill = new Map<string, { cost: number; qty: number }>()
+  activeAllocationFacts.forEach((fact) => {
+    const bill = (fact.sales_bill_id ? billIdMap.get(String(fact.sales_bill_id)) : undefined) ?? (fact.sales_doc_no ? billDocNoMap.get(fact.sales_doc_no) : undefined)
+    if (!bill) return
+    const key = String(bill.id)
+    const current = factByBill.get(key) ?? { cost: 0, qty: 0 }
+    current.cost += toNumber(fact.matched_cogs)
+    current.qty += toNumber(fact.qty)
+    factByBill.set(key, current)
+    if (fact.trading_deal_id) coveredDealIds.add(fact.trading_deal_id)
+  })
+  const fallbackDeals = await prisma.trading_deals.findMany({
+    orderBy: [{ date: 'asc' }, { id: 'asc' }],
+    take: 20000,
+    where: {
+      NOT: { status: { in: CANCELLED_STATUSES } },
+      OR: [
+        { sales_bill_id: { in: salesBills.map((bill) => bill.id) } },
+        { sales_bill_no: { in: salesBills.map((bill) => bill.doc_no) } },
+      ],
+    },
+  })
+  fallbackDeals.forEach((deal) => {
+    if (coveredDealIds.has(deal.id)) return
+    const bill = (deal.sales_bill_id ? billIdMap.get(String(deal.sales_bill_id)) : undefined) ?? (deal.sales_bill_no ? billDocNoMap.get(deal.sales_bill_no) : undefined)
+    if (!bill) return
+    const key = String(bill.id)
+    const current = factByBill.get(key) ?? { cost: 0, qty: 0 }
+    current.cost += toNumber(deal.matched_purchase_amount)
+    current.qty += toNumber(deal.matched_qty)
+    factByBill.set(key, current)
+  })
+
+  const billCostMap = new Map<string, { deal: number; mappedRatio: number; replaced: boolean; wac: number }>()
+  salesBills.forEach((bill) => {
+    const wac = billWacCostAmount(bill)
+    const items = Array.isArray(bill.items) ? bill.items : []
+    const totalQty = items.reduce<number>((sum, item) => {
+      if (!item || typeof item !== 'object') return sum
+      const raw = item as Record<string, unknown>
+      return sum + toNumber(raw.qty as number | null | undefined) + toNumber(raw.netWeight as number | null | undefined) + toNumber(raw.net_weight as number | null | undefined)
+    }, 0)
+    const matched = factByBill.get(String(bill.id)) ?? { cost: 0, qty: 0 }
+    const mappedRatio = totalQty > 0 ? Math.min(1, matched.qty / totalQty) : 0
+    const dealCost = matched.cost > 0
+      ? matched.cost + Math.max(0, wac - ratioPart(wac, mappedRatio))
+      : wac
+    billCostMap.set(String(bill.id), {
+      deal: dealCost,
+      mappedRatio,
+      replaced: matched.cost > 0 && Math.abs(dealCost - wac) > 0.01,
+      wac,
+    })
+  })
+
   const salesDetails = salesBills.map((bill: SalesBillRow) => ({
-    amount: toNumber(bill.subtotal) || toNumber(bill.total_amount) - toNumber(bill.vat_amount),
+    amount: billRevenueAmount(bill),
     date: dateOnly(bill.date),
     description: bill.customers?.name ?? bill.branches?.name ?? '-',
     refNo: bill.doc_no,
   }))
   const cogsDetails = salesBills.map((bill: SalesBillRow) => ({
-    amount: toNumber(bill.cogs_amount) || toNumber(bill.total_cost),
+    amount: costBasis === 'DEAL'
+      ? billCostMap.get(String(bill.id))?.deal ?? billWacCostAmount(bill)
+      : billWacCostAmount(bill),
     date: dateOnly(bill.date),
-    description: `${bill.transaction_mode ?? 'STOCK'} · ${bill.customers?.name ?? '-'}`,
+    description: `${bill.transaction_mode ?? 'STOCK'} · ${bill.customers?.name ?? '-'}${costBasis === 'DEAL' && (billCostMap.get(String(bill.id))?.replaced ?? false) ? ' · Deal Cost' : ''}`,
     refNo: bill.doc_no,
   })).filter((row) => row.amount > 0)
   const expenseDetails = expenses.map((expense: ExpenseRow) => ({
@@ -230,7 +358,9 @@ export async function buildPlStatement(filter: PeriodFilter) {
   }))
 
   const revenue = sumDetails(salesDetails)
-  const cogs = sumDetails(cogsDetails)
+  const cogsWac = salesBills.reduce((sum, bill) => sum + billWacCostAmount(bill), 0)
+  const cogsDeal = salesBills.reduce((sum, bill) => sum + (billCostMap.get(String(bill.id))?.deal ?? billWacCostAmount(bill)), 0)
+  const cogs = costBasis === 'DEAL' ? cogsDeal : cogsWac
   const expensesTotal = sumDetails(expenseDetails)
   const depreciation = sumDetails(depreciationDetails)
   const interest = sumDetails(interestDetails)
@@ -239,20 +369,33 @@ export async function buildPlStatement(filter: PeriodFilter) {
   const operatingExpenses = expensesTotal + depreciation
   const operatingProfit = grossProfit - operatingExpenses
   const netProfitBeforeTax = operatingProfit - interest + fxNet
-  const stockRevenue = salesBills.filter((bill) => bill.transaction_mode !== 'TRADING').reduce((sum, bill) => sum + (toNumber(bill.subtotal) || toNumber(bill.total_amount) - toNumber(bill.vat_amount)), 0)
-  const tradingRevenue = salesBills.filter((bill) => bill.transaction_mode === 'TRADING').reduce((sum, bill) => sum + (toNumber(bill.subtotal) || toNumber(bill.total_amount) - toNumber(bill.vat_amount)), 0)
+  const stockBills = salesBills.filter((bill) => bill.transaction_mode !== 'TRADING')
+  const tradingBills = salesBills.filter((bill) => bill.transaction_mode === 'TRADING')
+  const stockRevenue = stockBills.reduce((sum, bill) => sum + billRevenueAmount(bill), 0)
+  const tradingRevenue = tradingBills.reduce((sum, bill) => sum + billRevenueAmount(bill), 0)
+  const stockCogsWac = stockBills.reduce((sum, bill) => sum + billWacCostAmount(bill), 0)
+  const stockCogsDeal = stockBills.reduce((sum, bill) => sum + (billCostMap.get(String(bill.id))?.deal ?? billWacCostAmount(bill)), 0)
+  const tradingCogsWac = tradingBills.reduce((sum, bill) => sum + billWacCostAmount(bill), 0)
+  const tradingCogsDeal = tradingBills.reduce((sum, bill) => sum + (billCostMap.get(String(bill.id))?.deal ?? billWacCostAmount(bill)), 0)
+  const grossProfitWac = revenue - cogsWac
+  const grossProfitDeal = revenue - cogsDeal
+  const netProfitBeforeTaxWac = grossProfitWac - operatingExpenses - interest + fxNet
+  const netProfitBeforeTaxDeal = grossProfitDeal - operatingExpenses - interest + fxNet
+  const dualReplacedCount = Array.from(billCostMap.values()).filter((row) => row.replaced).length
+  const historicalBaseline = groupHistoricalBaseline(historicalMonthly)
 
   return {
     branches,
     filters: {
       branchId: filter.branchId ?? 'ALL',
+      costBasis,
       from: dateOnly(filter.from),
       to: dateOnly(filter.to),
       transactionMode: filter.transactionMode ?? 'ALL',
     },
     sections: [
       moneyLine('revenue', 'Revenue / รายได้จาก Sales Bills', revenue, salesDetails, 'good'),
-      moneyLine('cogs', 'COGS (WAC) / ต้นทุนขาย', -cogs, cogsDetails, 'bad'),
+      moneyLine('cogs', costBasis === 'DEAL' ? 'COGS (Deal Cost) / ต้นทุนขายตามดีล' : 'COGS (WAC) / ต้นทุนขาย', -cogs, cogsDetails, 'bad'),
       moneyLine('grossProfit', 'Gross Profit / กำไรขั้นต้น', grossProfit, undefined, 'total'),
       moneyLine('opex', 'Operating Expenses / ค่าใช้จ่ายดำเนินงาน', -expensesTotal, expenseDetails, 'bad'),
       moneyLine('opex', 'Depreciation Expense / ค่าเสื่อมราคา', -depreciation, depreciationDetails, 'bad', 1),
@@ -262,22 +405,39 @@ export async function buildPlStatement(filter: PeriodFilter) {
       moneyLine('finance', 'Realized FX Gain/(Loss)', fxNet, fxDetails, fxNet >= 0 ? 'good' : 'bad'),
       moneyLine('net', 'Net Profit Before Tax / กำไรก่อนภาษี', netProfitBeforeTax, undefined, 'total'),
     ],
-    sourceState: sourceState(['Revenue ใช้ subtotal ก่อน VAT เมื่อมีข้อมูล ไม่รวมการปิดงวดภาษี', 'Interest ใช้ loan payments cash-basis ในช่วงวันที่']),
+    sourceState: sourceState([
+      'Revenue ใช้ subtotal ก่อน VAT เมื่อมีข้อมูล ไม่รวมการปิดงวดภาษี',
+      'Interest ใช้ loan payments cash-basis ในช่วงวันที่',
+      ...(costBasis === 'DEAL' || costBasis === 'COMPARE'
+        ? ['Deal Cost ใช้ matched cost จาก trading_allocation_facts/trading_deals สำหรับส่วนที่ allocate แล้ว และให้ unmatched portion คงอยู่บน WAC เดิม']
+        : []),
+    ]),
     split: {
-      stock: { cogs: salesBills.filter((bill) => bill.transaction_mode !== 'TRADING').reduce((sum, bill) => sum + (toNumber(bill.cogs_amount) || toNumber(bill.total_cost)), 0), revenue: stockRevenue },
-      trading: { cogs: salesBills.filter((bill) => bill.transaction_mode === 'TRADING').reduce((sum, bill) => sum + (toNumber(bill.cogs_amount) || toNumber(bill.total_cost)), 0), revenue: tradingRevenue },
+      stock: { cogs: costBasis === 'DEAL' ? stockCogsDeal : stockCogsWac, dealCogs: stockCogsDeal, revenue: stockRevenue, wacCogs: stockCogsWac },
+      trading: { cogs: costBasis === 'DEAL' ? tradingCogsDeal : tradingCogsWac, dealCogs: tradingCogsDeal, revenue: tradingRevenue, wacCogs: tradingCogsWac },
     },
     summary: {
       cogs,
+      cogsDeal,
+      cogsDiff: cogsDeal - cogsWac,
+      cogsWac,
       depreciation,
+      dualReplacedCount,
       expenses: expensesTotal,
       fxNet,
       grossProfit,
+      grossProfitDeal,
+      grossProfitDiff: grossProfitDeal - grossProfitWac,
+      grossProfitWac,
       interest,
       netProfitBeforeTax,
+      netProfitBeforeTaxDeal,
+      netProfitBeforeTaxDiff: netProfitBeforeTaxDeal - netProfitBeforeTaxWac,
+      netProfitBeforeTaxWac,
       operatingProfit,
       revenue,
     },
+    historicalBaseline,
   }
 }
 
