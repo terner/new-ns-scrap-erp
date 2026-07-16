@@ -21,7 +21,7 @@ route: /purchase/advance-payments
 
 ## Canonical References
 
-[[Supplier Advance Payment Flow]], [[Payment Flow]], [[Purchase Flow]]
+[[Supplier Advance Payment Flow]], [[Payment Flow]], [[Purchase Flow]], [[Customer Advance Receipt Flow]]
 
 ## Flow Baseline
 
@@ -39,6 +39,20 @@ ADV เป็น source document ของเงินล่วงหน้า S
 แม้สอง tab อยู่หน้าเดียวกันเพื่อให้ผู้ใช้ค้นพบง่าย แต่ห้าม share business API, status, validation หรือ table เพราะ ADV เป็นเงินออก Supplier ขณะที่ CADV เป็นคำขอรับเงินจาก Customer. ดู canonical contract ที่ [[Customer Advance Receipt Flow]].
 
 หน้า list เป็น working surface หลักของทั้งสอง tab. การสร้าง/แก้ไข `ADV` และการสร้าง `CADV` ต้องเปิดเป็น modal จากหน้ารายการ เพื่อไม่ให้ผู้ใช้เสีย context ของ filter, pagination, และรายการเอกสารที่กำลังตรวจอยู่. Modal เป็นเพียง editing surface ชั่วคราว; หลังบันทึกสำเร็จต้องปิด modal, reload list, และคง filter เดิม.
+
+## CADV Tab Contract
+
+| Area | Contract |
+|---|---|
+| List source | `GET /api/sales/customer-advances` |
+| Create source | `POST /api/sales/customer-advances` |
+| Header fields | สาขา, วันที่เอกสาร, ลูกค้า, invoice no, contract no, VAT, ยอดฐาน/ยอดรวม, currency, remark |
+| Line fields | product, quantity, gross weight, net weight |
+| Status source | `customer_advance_statuses` |
+| Balance source | `customer_advances.received_amount`, `available_amount`, `allocated_amount` |
+| Not owned here | RCP cash receipt, bank statement, Sales Bill allocation |
+
+Data dictionary ของ CADV อยู่ใน [[Customer Advance Receipt Flow]] เพื่อไม่ให้หน้า ADV/CADV รวมนี้กลายเป็น source of truth ซ้ำ.
 
 ## Target ADV Types
 

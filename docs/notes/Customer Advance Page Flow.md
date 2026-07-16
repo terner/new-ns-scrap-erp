@@ -12,12 +12,12 @@ tags:
   - page-flow
 status: retired
 created: 2026-06-11
-updated: 2026-07-15
+updated: 2026-07-16
 ---
 
 # Customer Advance Page Flow / Flow หน้ารับล่วงหน้าจาก Customer
 
-> Retired as an active page. หน้า `/finance/customer-advance` ถูกลบออกจาก active app เพราะซ้ำกับ flow รับเงินลูกค้า. ตั้งแต่ 2026-07-15 canonical target คือ [[Customer Advance Receipt Flow]]: สร้าง `CADV` จาก Packing List ก่อน, ใช้ `/sales/receipts` ออก `RCP` เมื่อรับเงินจริง, แล้วจึงใช้ CADV ที่รับเงินครบไปหัก Sales Bill. เอกสารนี้เก็บ baseline เก่าที่อ่าน `bank_statement.ref_type = CADV` เท่านั้น ไม่ใช่ target implementation ใหม่.
+> Retired as an active page. หน้า `/finance/customer-advance` ถูกลบออกจาก active app เพราะซ้ำกับ flow รับเงินลูกค้า. ตั้งแต่ 2026-07-15 canonical target คือ [[Customer Advance Receipt Flow]]: สร้าง `CADV` จาก Packing List ก่อน, ใช้ `/sales/receipts` ออก `RCP` เมื่อรับเงินจริง, แล้วจึงใช้ CADV ที่รับเงินครบไปหัก Sales Bill. เอกสารนี้เก็บ baseline เก่าที่อ่าน `bank_statement.ref_type = CADV` เท่านั้น ไม่ใช่ target implementation ใหม่. Dedicated `customer_advances` และ SB allocation facts มีแล้ว; data dictionary ปัจจุบันอยู่ใน [[Customer Advance Receipt Flow]].
 
 ## Scope
 
@@ -35,8 +35,8 @@ updated: 2026-07-15
 |---|---|---|
 | Advance row | `bank_statement` with `ref_type = CADV` | `customer_advances` |
 | Customer | `bank_statement.ref_id` maps to `customers.code` | FK/business code in `customer_advances` |
-| Used amount | currently 0 / interim snapshot outside this page | `customer_advance_allocations` |
-| Remaining amount | amount - used | derived from allocation facts |
+| Used amount | baseline page ยังไม่ production-complete | `sales_bill_customer_advance_allocations.allocated_subtotal_amount` plus future RCP allocation facts |
+| Remaining amount | baseline page ยังไม่ production-complete | `customer_advances.available_amount` เป็น base credit คงเหลือ |
 | Account | `bank_statement.account_id` | cash/bank receipt fact |
 
 ## Page Meaning
@@ -140,10 +140,10 @@ Response ควรรวม:
 ## Current Implementation / Gap
 
 - มี read/export baseline จาก `bank_statement.ref_type = CADV`
-- API ระบุ `schemaState.allocationSource = missing_table`
-- `usedAmount` ยังเป็น 0 เพราะ dedicated allocation table ยังไม่มี
-- ต้องออกแบบ `customer_advances` และ `customer_advance_allocations`
-- ต้องเชื่อมกับ `/sales/bills` deposit allocation และ `/sales/receipts`
+- Retired API baseline may still report legacy schema state from the old bank-statement read model
+- `usedAmount` ในหน้า retired baseline ยังไม่ใช่ target production source; target SB usage ต้องอ่านจาก `sales_bill_customer_advance_allocations`
+- `customer_advances` และ `sales_bill_customer_advance_allocations` มีแล้วใน target runtime; หน้า retired นี้ยังไม่ใช่ surface หลักสำหรับข้อมูลใหม่
+- ต้องเชื่อม `/sales/receipts` -> CADV receipt allocation เพื่อ populate `received_amount`/`available_amount` จากเงินจริง
 - ต้องเพิ่ม created-date display ใน list/detail/export
 
 ## Related Notes

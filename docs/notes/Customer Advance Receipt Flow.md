@@ -86,6 +86,19 @@ flowchart LR
 | `allocated` | ใช้หักบิลครบ | ใช้ยอดครบแล้ว | อ่านประวัติเท่านั้น |
 | `cancelled` | ยกเลิก | ยกเลิกก่อนหรือหลัง reverse ความสัมพันธ์ครบ | ห้ามเลือกต่อ |
 
+## Page Surface Matrix
+
+| Page / Route | Current role | CADV behavior | Source of truth |
+|---|---|---|---|
+| `/purchase/advance-payments` tab `รับเงินล่วงหน้า` | CADV source-document working page | แสดง list/filter และสร้าง CADV จาก Packing List/Invoice ภายนอกผ่าน modal; ไม่รับเงินจริงและไม่เขียน bank statement | `customer_advances`, `customer_advance_items`, `customer_advance_statuses` |
+| `/sales/receipts` | Receipt/RCP working page | Target ถัดไป: เลือก CADV ที่ยังต้องรับเงิน, ออก RCP, เขียน cash/bank fact, และเพิ่มยอดรับจริงให้ CADV | `customer_receipts`, future `customer_receipt_advance_allocations`, `bank_statement`, `customer_advances` |
+| `/sales/bills` | Sales Bill working page | เลือก CADV ที่ `received/partially_allocated` และมี `available_amount > 0`; หักฐานก่อน VAT แล้วคำนวณ VAT ใหม่จากฐานที่เหลือ | `sales_bills`, `sales_bill_customer_advance_allocations`, `customer_advances` |
+| `/sales/bills/[docNo]` detail/print | Sales Bill read model | แสดง CADV ที่ใช้กับบิลจาก allocation facts และแสดงยอดที่ใช้เป็น total amount ของ allocation | `sales_bill_customer_advance_allocations` |
+| `/finance/ar` | AR aging/drilldown | ใช้ `sales_bills.receivable_balance` เป็น source หลัก และแสดง CADV allocation เป็น drilldown/audit fact | `sales_bills`, `sales_bill_customer_advance_allocations` |
+| `/finance/customer-advance` | Retired legacy page | ไม่ใช่หน้า active สำหรับสร้าง/จัดการ CADV แล้ว; เก็บเป็น historical reference ของ read model เก่า | legacy `bank_statement.ref_type = CADV`; target อ่าน dedicated CADV tables |
+
+ผู้ใช้ทำงานกับ CADV ผ่าน tab `รับเงินล่วงหน้า` ใน `/purchase/advance-payments` เพราะเป็น source document ก่อนเงินเข้า. การรับเงินจริงต้องอยู่ใน `/sales/receipts`; การใช้หักบิลต้องอยู่ใน `/sales/bills`; การดูยอดลูกหนี้ต้องอยู่ใน `/finance/ar`.
+
 ## API Design
 
 ### Customer Advance source document
@@ -147,6 +160,115 @@ Sales Bill เลือกได้เฉพาะ CADV ที่ `received/part
 | `customer_advance_status_logs` | append-only lifecycle/audit |
 
 `bank_statement` เป็น cash fact ของ `RCP` ไม่ใช่ header/source of truth ของ CADV. ไฟล์แนบอยู่ใน Storage/attachment table ภายหลัง ไม่อยู่ใน text/base64 field ของ CADV.
+
+## Data Dictionary
+
+### `customer_advance_statuses`
+
+| Column | Meaning | Rule |
+|---|---|---|
+| `id` | internal status id | ใช้เป็น FK เท่านั้น |
+| `code` | machine status code | unique; ใช้ใน runtime เช่น `pending_receipt`, `received`, `allocated` |
+| `name` | ชื่อที่แสดง | Thai display label |
+| `sort_order` | ลำดับแสดงผล | unique |
+| `is_initial` | สถานะเริ่มต้น | `pending_receipt` ต้องเป็น initial |
+| `active` | ใช้งานอยู่หรือไม่ | inactive status ไม่ควรถูกเลือกใน write path ใหม่ |
+
+### `customer_advances`
+
+| Column | Meaning | Rule |
+|---|---|---|
+| `id` | internal CADV id | ใช้เป็น FK ใน item/status log |
+| `doc_no` | เลขเอกสาร CADV | unique; format `CADV{branch}{YYMM}-####` |
+| `document_date` | วันที่เอกสารลูกค้า/Packing List | ไม่ใช่วันที่รับเงินจริง |
+| `branch_id` | สาขาเจ้าของเอกสาร | required FK; ใช้กรองลูกค้าและเลขรัน |
+| `customer_id` | ลูกค้าเจ้าของ CADV | required FK; ต้องผูกกับสาขาใน `customer_branches` |
+| `customer_code_snapshot` | customer code ตอนสร้าง | ใช้แสดง/ตรวจ trace หาก master เปลี่ยน |
+| `customer_name_snapshot` | customer name ตอนสร้าง | ใช้แสดง/พิมพ์เอกสาร |
+| `invoice_no` | เลข invoice ภายนอก | optional reference; ไม่ unique |
+| `contract_no` | เลข contract ภายนอก | optional reference; ไม่ unique |
+| `currency_code` | สกุลเงิน | FK ไป `currencies.code`; phase ปัจจุบันทำงานหลักเป็น THB |
+| `vat_type` | VAT mode | `NONE` หรือ `INCLUDE`; `INCLUDE` หมายถึงผู้ใช้กรอกยอดก่อน VAT |
+| `vat_rate_percent` | VAT rate snapshot | มาจาก VAT master ตาม `document_date`; ห้าม hardcode ใน client |
+| `subtotal_amount` | ยอดฐานก่อน VAT | เป็นเครดิตฐานสูงสุดที่ใช้หัก SB หลังรับเงินครบตามสัดส่วน |
+| `vat_amount` | VAT ของ CADV | `0` เมื่อ `vat_type = NONE` |
+| `target_amount` | ยอดเงินสดรวมที่ต้องรับ | `subtotal_amount + vat_amount`; RCP ต้องรับยอด gross นี้ |
+| `received_amount` | ยอดเงินสด gross ที่รับจริงแล้ว | เพิ่มจาก RCP -> CADV allocation; ไม่เพิ่มตอนสร้าง CADV |
+| `available_amount` | เครดิตฐานก่อน VAT ที่ยังใช้หัก SB ได้ | คำนวณจากเงินรับ gross แปลงกลับเป็นฐาน แล้วหัก allocation active |
+| `allocated_amount` | เครดิตฐานก่อน VAT ที่ใช้กับ SB แล้ว | ต้องเป็น base amount ไม่ใช่ gross |
+| `status_id` | สถานะปัจจุบัน | FK ไป `customer_advance_statuses` |
+| `remark` | หมายเหตุ | ข้อความประกอบเอกสาร |
+| `created_at`, `created_by` | audit create | required |
+| `updated_at`, `updated_by`, `version` | audit/update guard | update ใน write transaction |
+| `cancelled_at`, `cancelled_by`, `cancel_reason` | cancellation snapshot | set เมื่อยกเลิก; ห้ามเลือกไปใช้ต่อ |
+
+Balance invariant:
+
+| Formula | Meaning |
+|---|---|
+| `target_amount = subtotal_amount + vat_amount` | ยอดเงินสดที่ต้องรับรวม VAT |
+| `available_amount = paid_base_capacity - allocated_amount` | เครดิตฐานคงเหลือสำหรับหัก SB |
+| `paid_base_capacity = min(subtotal_amount, received_amount * subtotal_amount / target_amount)` | แปลงเงินสด gross ที่รับจริงเป็นฐานก่อน VAT |
+
+### `customer_advance_items`
+
+| Column | Meaning | Rule |
+|---|---|---|
+| `id` | internal line id | ใช้ภายใน |
+| `customer_advance_id` | CADV header | FK ไป `customer_advances.id` |
+| `line_no` | ลำดับรายการ | unique ต่อ CADV |
+| `product_id` | สินค้า | required FK |
+| `product_code_snapshot` | product code ตอนสร้าง | ใช้ trace/print |
+| `product_name_snapshot` | product name ตอนสร้าง | ใช้ trace/print |
+| `quantity` | จำนวน | > 0 |
+| `gross_weight` | น้ำหนักรวม | numeric(18,2), kg |
+| `net_weight` | น้ำหนักสุทธิ | numeric(18,2), kg; ต้องไม่มากกว่า gross |
+| `created_at`, `created_by`, `updated_at`, `updated_by` | audit | เขียนพร้อม header transaction |
+
+### `customer_advance_status_logs`
+
+| Column | Meaning | Rule |
+|---|---|---|
+| `event_key` | idempotent event key | unique |
+| `customer_advance_id`, `customer_advance_doc_no` | เอกสารที่เปลี่ยนสถานะ | ใช้ทั้ง FK และ outward trace |
+| `from_status_id`, `to_status_id` | สถานะก่อน/หลัง | `from_status_id` เป็น null ได้ตอนสร้าง |
+| `action` | เหตุการณ์ | เช่น create, status_received, status_allocated, cancel |
+| `target_amount_snapshot` | gross target ตอน log | snapshot เพื่อ audit |
+| `received_amount_snapshot` | gross received ตอน log | snapshot เพื่อ audit |
+| `available_amount_snapshot` | base available ตอน log | snapshot เพื่อ audit |
+| `allocated_amount_snapshot` | base allocated ตอน log | snapshot เพื่อ audit |
+| `note`, `meta` | รายละเอียดเสริม | เก็บ context เช่น source route/reason |
+| `created_at`, `created_by` | audit | append-only |
+
+### `sales_bill_customer_advance_allocations`
+
+| Column | Meaning | Rule |
+|---|---|---|
+| `sales_bill_id` | Sales Bill ที่ใช้ CADV | FK ไป `sales_bills` |
+| `customer_advance_doc_no` | CADV ที่ถูกใช้ | outward link ไป `customer_advances.doc_no` |
+| `customer_id`, `customer_code_snapshot`, `customer_name_snapshot` | ลูกค้า snapshot | ต้องเป็นลูกค้าเดียวกับ SB/CADV |
+| `allocated_amount` | base credit ที่ใช้ | ต้องเท่ากับ `allocated_subtotal_amount` |
+| `allocated_subtotal_amount` | ฐานก่อน VAT ที่หักจาก SB | ใช้ลด taxable base หลังส่วนลด |
+| `allocated_vat_amount` | VAT ของ SB ที่ลดลงเพราะฐานถูกหัก | ใช้ audit/report; ไม่ใช่ VAT cash receipt |
+| `allocated_total_amount` | ยอดรวมที่ SB ลดลง | `allocated_subtotal_amount + allocated_vat_amount` |
+| `outstanding_before` | CADV base available ก่อน allocate | snapshot |
+| `outstanding_after` | CADV base available หลัง allocate | snapshot |
+| `status` | allocation status | `active` ใช้ลดยอด; cancel/edit SB ต้อง set non-active/release |
+| `meta` | context เพิ่มเติม | เช่น `source`, `totalAppliedAmount` |
+| `created_at`, `created_by`, `updated_at`, `updated_by`, `version` | audit/version | update ใน transaction เดียวกับ SB |
+
+### Future `customer_receipt_advance_allocations`
+
+| Field | Target meaning |
+|---|---|
+| `customer_receipt_id` / `customer_receipt_doc_no` | RCP ที่รับเงินจริง |
+| `customer_advance_id` / `customer_advance_doc_no` | CADV ที่ถูกเติมยอดรับ |
+| `received_gross_amount` | เงินสด gross ที่รับเข้า CADV |
+| `received_base_amount` | ฐานก่อน VAT ที่คำนวณจาก gross ตามสัดส่วน CADV |
+| `status` | active/reversed |
+| `created_at`, `created_by`, `reversed_at`, `reversed_by` | audit |
+
+ตารางนี้ยังเป็น target ถัดไป. ปัจจุบัน `/sales/receipts` ยังไม่ populate `received_amount`/`available_amount` ให้ CADV อัตโนมัติ.
 
 ## VAT And Balance Contract
 
