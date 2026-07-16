@@ -18,7 +18,7 @@ export function ForgotPasswordPageClient() {
     setError(null)
     setMessage(null)
 
-    const parsed = forgotPasswordSchema.safeParse({ identifier })
+    const parsed = forgotPasswordSchema.safeParse({ email: identifier })
 
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง')
@@ -33,7 +33,7 @@ export function ForgotPasswordPageClient() {
     setIsLoading(true)
     const response = await fetch('/api/auth/forgot-password', {
       body: JSON.stringify({
-        identifier: parsed.data.identifier,
+        email: parsed.data.email,
         redirectTo: `${window.location.origin}/reset-password`,
       }),
       cache: 'no-store',
@@ -53,7 +53,7 @@ export function ForgotPasswordPageClient() {
 
   return (
     <section className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-md rounded-md bg-white p-8 shadow-xl">
+      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
           <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-indigo-700 text-2xl font-bold text-white">
             NS
@@ -69,14 +69,14 @@ export function ForgotPasswordPageClient() {
 
         <form className="space-y-4" onSubmit={submit}>
           <label className="block text-sm font-medium text-slate-700">
-            Email / Username
+            Email
             <input
-              autoComplete="username"
+              autoComplete="email"
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
               disabled={isLoading}
               onChange={(event) => setIdentifier(event.target.value)}
-              placeholder="name@example.com หรือ username"
-              type="text"
+              placeholder="name@example.com"
+              type="email"
               value={identifier}
             />
           </label>

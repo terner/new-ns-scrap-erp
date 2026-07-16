@@ -7,7 +7,9 @@ import { openPoSellPrint, openPoSellPrintWindow, type PoSellPrintDocument } from
 import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input as UiInput } from '@/components/ui/Input'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select as UiSelect } from '@/components/ui/Select'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
@@ -87,6 +89,10 @@ type PoSellRow = {
   vatAmount: number
   vatType: string
   subtotal: number
+}
+
+function canShortClosePoSell(row: PoSellRow) {
+  return (row.documentStatus === 'open' || row.documentStatus === 'partial') && row.remainingQty > 0
 }
 
 type StatusFilterOption = {
@@ -190,6 +196,9 @@ export function PoSellPageClient() {
   const [documentStatus, setDocumentStatus] = useState('all')
   const [toDate, setToDate] = useState('')
   const [printingPoDocNo, setPrintingPoDocNo] = useState<string | null>(null)
+  const [shortCloseNote, setShortCloseNote] = useState('')
+  const [shortCloseNoteError, setShortCloseNoteError] = useState('')
+  const [shortClosingRow, setShortClosingRow] = useState<PoSellRow | null>(null)
 
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -474,6 +483,17 @@ export function PoSellPageClient() {
     setError(null)
   }
 
+  function openShortCloseDialog(row: PoSellRow) {
+    if (!canShortClosePoSell(row)) {
+      setError('รายการนี้ยังไม่สามารถปิดส่งไม่ครบได้')
+      return
+    }
+    setShortClosingRow(row)
+    setShortCloseNote('')
+    setShortCloseNoteError('')
+    setError(null)
+  }
+
   function updateForm<K extends keyof PoSellFormValues>(key: K, value: PoSellFormValues[K]) {
     setForm((current) => {
       const next = { ...current, [key]: value }
@@ -573,6 +593,33 @@ export function PoSellPageClient() {
     }
   }
 
+  async function submitShortClose() {
+    if (!shortClosingRow) return
+    const note = shortCloseNote.trim()
+    if (!note) {
+      setShortCloseNoteError('กรอกเหตุผลการปิดส่งไม่ครบ')
+      return
+    }
+
+    setIsSaving(true)
+    setError(null)
+    setShortCloseNoteError('')
+    try {
+      await dailyFetchJson<{ docNo: string }>('/api/sales/po-sell', {
+        body: JSON.stringify({ action: 'shortClose', docNo: shortClosingRow.docNo, note }),
+        method: 'PATCH',
+      })
+      setSearch(shortClosingRow.docNo)
+      setShortClosingRow(null)
+      setShortCloseNote('')
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ปิดส่งไม่ครบไม่สำเร็จ')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const listControls = (
     <>
       <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
@@ -587,17 +634,7 @@ export function PoSellPageClient() {
             คืนค่าเดิมตาราง
           </UiButton>
         ) : null}
-        <select
-          aria-label="จำนวนรายการต่อหน้า"
-          className="h-8 text-xs rounded-md border border-slate-300 px-2 bg-white text-slate-800"
-          value={pageSize}
-          onChange={(event) => setPageSize(Number(event.target.value))}
-        >
-          <option value={10}>10 / หน้า</option>
-          <option value={25}>25 / หน้า</option>
-          <option value={50}>50 / หน้า</option>
-          <option value={100}>100 / หน้า</option>
-        </select>
+        <PageSizeDropdown value={pageSize} onChange={setPageSize} />
         <UiButton disabled={currentPage <= 1} size="xs" variant="outline" type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</UiButton>
         <span className="px-1">หน้า {currentPage} / {totalPages}</span>
         <UiButton disabled={currentPage >= totalPages} size="xs" variant="outline" type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</UiButton>
@@ -627,7 +664,7 @@ export function PoSellPageClient() {
       </div>
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden lg:block mb-4 space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="mb-4 hidden space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:block">
         <div className="flex flex-wrap items-center gap-2">
           <input autoComplete="off" className="min-w-[260px] flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหาเลข PO / ชื่อ Customer / ชื่อสินค้า / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <label className="text-sm text-slate-500">วันที่สร้างรายการ:</label>
@@ -635,8 +672,6 @@ export function PoSellPageClient() {
           <span className="text-slate-400">→</span>
           <DatePickerInput ariaLabel="ถึงวันที่" className="w-[130px]" title="ถึงวันที่" value={toDate} onChange={setToDate} />
           {hasFilters ? <button className="rounded-md bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={resetFilters}>✕ ล้าง</button> : null}
-          <a className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700" href={exportHref}>ส่งออก Excel</a>
-          <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={openCreateForm}>+ PO Sell ใหม่</button>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-slate-500">สถานะเอกสาร:</span>
@@ -644,6 +679,10 @@ export function PoSellPageClient() {
           {(data?.filters.statuses ?? []).map((item) => (
             <MatchButton key={item.value} active={documentStatus === item.value} label={item.label} tone={documentStatusTone(item.value)} onClick={() => setDocumentStatus(item.value)} />
           ))}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <a className="inline-flex h-9 items-center rounded-md bg-emerald-600 px-4 text-sm text-white hover:bg-emerald-700" href={exportHref}>ส่งออก Excel</a>
+            <button className="inline-flex h-9 items-center rounded-md bg-blue-600 px-4 text-sm text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={openCreateForm}>+ PO Sell ใหม่</button>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-slate-500">สถานะ Match:</span>
@@ -655,7 +694,7 @@ export function PoSellPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 space-y-2 rounded-md bg-white p-3 shadow lg:hidden">
+      <div className="mb-4 space-y-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
         <div className="flex gap-2 items-center">
           <input autoComplete="off" className="min-w-[200px] flex-1 rounded-md border px-3 py-2 text-sm h-9" placeholder="ค้นหาเลข PO / Customer / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <button
@@ -733,13 +772,13 @@ export function PoSellPageClient() {
       {/* Mobile Card List (Hidden on Desktop) */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : null}
 
         {!isLoading && pageRows.map((row) => (
           <div
             key={row.id}
-            className="rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
             onClick={() => setSelectedRow(row)}
           >
             <div className="flex justify-between items-start mb-2">
@@ -778,7 +817,7 @@ export function PoSellPageClient() {
         ))}
 
         {!isLoading && totalRows === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+          <div className="rounded-xl bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
             ยังไม่มี PO Sell
           </div>
         ) : null}
@@ -791,12 +830,9 @@ export function PoSellPageClient() {
         </div>
         <Table className="min-w-full divide-y divide-slate-200" style={{ tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}>
         <colgroup>
-          {poSellColumns.map((column, index) => {
-            if (index === poSellColumns.length - 1) {
-              return <col key={column.key} style={{ minWidth: column.minWidth }} />
-            }
-            return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
-          })}
+          {poSellColumns.map((column) => (
+            <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+          ))}
         </colgroup>
         <TableHeader>
           <tr>
@@ -874,6 +910,20 @@ export function PoSellPageClient() {
                     <Printer className="size-3" />
                     {printingPoDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
                   </button>
+                  {canShortClosePoSell(row) ? (
+                    <button
+                      className="rounded-md border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:cursor-wait disabled:opacity-50"
+                      disabled={isSaving}
+                      title={`ปิดส่งไม่ครบ ${row.docNo}`}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openShortCloseDialog(row)
+                      }}
+                    >
+                      ปิดส่งไม่ครบ
+                    </button>
+                  ) : null}
                   {row.canCancel ? (
                     <button
                       className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
@@ -913,6 +963,10 @@ export function PoSellPageClient() {
           isPrinting={printingPoDocNo === selectedRow.docNo}
           row={selectedRow}
           onClose={() => setSelectedRow(null)}
+          onShortClose={(rowToShortClose) => {
+            setSelectedRow(null)
+            openShortCloseDialog(rowToShortClose)
+          }}
           onPrint={(rowToPrint) => void printPoSell(rowToPrint)}
         />
       ) : null}
@@ -966,6 +1020,25 @@ export function PoSellPageClient() {
           onSubmit={submitCancel}
         />
       ) : null}
+      {shortClosingRow ? (
+        <PoSellShortCloseModal
+          error={shortCloseNoteError}
+          isSaving={isSaving}
+          note={shortCloseNote}
+          row={shortClosingRow}
+          onChangeNote={(value) => {
+            setShortCloseNote(value)
+            setShortCloseNoteError('')
+          }}
+          onClose={() => {
+            if (isSaving) return
+            setShortClosingRow(null)
+            setShortCloseNote('')
+            setShortCloseNoteError('')
+          }}
+          onSubmit={submitShortClose}
+        />
+      ) : null}
     </section>
   )
 }
@@ -981,23 +1054,24 @@ function formatTimestampDisplay(value: string | null | undefined) {
   return date.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function documentStatusTone(value: string): 'amber' | 'dark' | 'emerald' | 'red' | 'slate' {
+function documentStatusTone(value: string): 'amber' | 'dark' | 'emerald' | 'red' | 'rose' | 'slate' {
   if (value === 'cancelled') return 'slate'
   if (value === 'closed') return 'emerald'
+  if (value === 'short_closed') return 'rose'
   if (value === 'partial') return 'amber'
   return 'dark'
 }
 
-function documentStatusPillTone(value: string): 'cancelled' | 'closed' | 'match' | 'open' | 'partial' | 'status' {
+function documentStatusPillTone(value: string): 'cancelled' | 'closed' | 'match' | 'open' | 'partial' | 'shortClosed' | 'status' {
   if (value === 'cancelled') return 'cancelled'
   if (value === 'closed') return 'closed'
+  if (value === 'short_closed') return 'shortClosed'
   if (value === 'partial') return 'partial'
   return 'open'
 }
 
 function Metric({
   emoji,
-  iconBg = 'bg-slate-100',
   label,
   subLabel,
   value,
@@ -1010,34 +1084,24 @@ function Metric({
   value: string
   className?: string
 }) {
-  return (
-    <div className={`bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 ${className}`}>
-      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${iconBg} flex items-center justify-center text-xl shrink-0`}>
-        {emoji}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold text-slate-500">{label}</div>
-        <div className="font-bold text-slate-900 mt-0.5">{value}</div>
-        {subLabel ? <div className="text-xs text-slate-400 mt-1 truncate">{subLabel}</div> : null}
-      </div>
-    </div>
-  )
+  return <SharedKpiCard className={className} icon={emoji} label={label} note={subLabel} tone="slate" value={value} />
 }
 
-function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolean; label: string; onClick: () => void; tone?: 'amber' | 'dark' | 'emerald' | 'red' | 'slate' }) {
+function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolean; label: string; onClick: () => void; tone?: 'amber' | 'dark' | 'emerald' | 'red' | 'rose' | 'slate' }) {
   void tone
   const activeClass = 'border-slate-700 bg-slate-700 text-white'
   const idleClass = 'border-slate-300 bg-white hover:bg-slate-50'
   return <button className={`rounded-md border px-3.5 py-1.5 text-sm font-medium ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
 }
 
-function StatusPill({ label, tone = 'status' }: { label: string; tone?: 'cancelled' | 'closed' | 'match' | 'open' | 'partial' | 'status' }) {
+function StatusPill({ label, tone = 'status' }: { label: string; tone?: 'cancelled' | 'closed' | 'match' | 'open' | 'partial' | 'shortClosed' | 'status' }) {
   const color = {
     cancelled: 'text-slate-500',
     closed: 'text-emerald-700',
     match: 'text-cyan-700',
     open: 'text-amber-700',
     partial: 'text-cyan-700',
+    shortClosed: 'text-rose-700',
     status: 'text-slate-700',
   }[tone]
   if (tone === 'match') return <span className={`text-xs font-semibold ${color}`}>{label || '-'}</span>
@@ -1237,7 +1301,7 @@ function PoSellFormModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-5 text-sm space-y-4">
-          <div className="rounded-md border border-slate-200 bg-white p-4 shadow">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow">
             <div className="mb-3 text-sm font-bold text-slate-800">ข้อมูลเอกสาร</div>
             <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
               <div className="col-span-1">
@@ -1276,7 +1340,7 @@ function PoSellFormModal({
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-white p-4 shadow">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow">
             <div className="mb-2 flex items-center justify-between gap-3">
               <label className="font-medium text-slate-800">📋 รายการสินค้า ({form.items.length})</label>
               <UiButton className="h-9 rounded-md bg-emerald-600 font-normal hover:bg-emerald-700 text-white transition-colors outline-none focus:ring-0" size="xs" type="button" variant="default" onClick={onAddItem}>+ เพิ่มรายการ</UiButton>
@@ -1328,7 +1392,7 @@ function PoSellFormModal({
  
            <div className="grid gap-3 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
               <div className="flex flex-col gap-3">
-                <label className={`flex items-center gap-3 rounded-md border p-3 cursor-pointer select-none transition-colors ${form.hasVat ? 'border-amber-500 bg-amber-50/50' : 'border-slate-300 bg-white'}`}>
+                <label className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer select-none transition-colors ${form.hasVat ? 'border-amber-500 bg-amber-50/50' : 'border-slate-300 bg-white'}`}>
                   <input
                     checked={form.hasVat}
                     className="h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-0 outline-none"
@@ -1337,7 +1401,7 @@ function PoSellFormModal({
                   />
                   <span className="font-bold text-slate-700">มี VAT</span>
                 </label>
-                <div className="rounded-md border border-slate-200 bg-white p-4 shadow flex-1 flex flex-col">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow flex-1 flex flex-col">
                   <label className="mb-1 block text-xs font-medium text-slate-600">หมายเหตุ</label>
                   <textarea className="min-h-16 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-none focus:border-slate-400 focus:ring-0 outline-none transition-colors flex-1" rows={2} value={form.note ?? ''} onChange={(event) => onUpdate('note', event.target.value || null)} />
                   {fieldError('note')}
@@ -1406,15 +1470,66 @@ function PoSellCancelModal({
   )
 }
 
+function PoSellShortCloseModal({
+  error,
+  isSaving,
+  note,
+  onChangeNote,
+  onClose,
+  onSubmit,
+  row,
+}: {
+  error: string
+  isSaving: boolean
+  note: string
+  onChangeNote: (value: string) => void
+  onClose: () => void
+  onSubmit: () => void
+  row: PoSellRow
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => {
+      if (!open && !isSaving) onClose()
+    }}>
+      <DialogContent aria-labelledby="po-sell-short-close-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md border-0 bg-slate-900 shadow-2xl !p-0 overflow-hidden outline-none focus:outline-none" hideClose>
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-md flex flex-row items-center shrink-0">
+          <div>
+            <DialogTitle id="po-sell-short-close-title" className="text-white">ปิดส่งไม่ครบ {row.docNo}</DialogTitle>
+            <DialogDescription className="text-slate-300">{row.customerName} · คงเหลือ {formatMoney(row.remainingQty)} กก.</DialogDescription>
+          </div>
+        </DialogHeader>
+        <div className="space-y-2 bg-slate-50 p-5 text-sm">
+          <label className="block text-xs font-medium text-slate-600" htmlFor="po-sell-short-close-note">เหตุผลการปิดส่งไม่ครบ *</label>
+          <textarea
+            id="po-sell-short-close-note"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-400 focus:ring-0 outline-none transition-colors"
+            maxLength={500}
+            rows={3}
+            value={note}
+            onChange={(event) => onChangeNote(event.target.value)}
+          />
+          {error ? <div className="text-xs text-red-600">{error}</div> : null}
+        </div>
+        <DialogFooter className="px-5 py-4 border-t border-slate-100 bg-white flex justify-end gap-2 shrink-0 md:rounded-b-md">
+          <UiButton className="font-normal transition-colors outline-none focus:ring-0" disabled={isSaving} type="button" variant="outline" onClick={onClose}>ปิด</UiButton>
+          <UiButton className="rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium transition-colors outline-none focus:ring-0 px-5" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'ยืนยันปิดส่งไม่ครบ'}</UiButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function PoSellDetailModal({
   onClose,
   row,
   isPrinting,
+  onShortClose,
   onPrint,
 }: {
   onClose: () => void
   row: PoSellRow
   isPrinting: boolean
+  onShortClose: (row: PoSellRow) => void
   onPrint: (row: PoSellRow) => void
 }) {
   return (
@@ -1429,6 +1544,16 @@ function PoSellDetailModal({
             <DialogDescription className="truncate text-slate-300">{row.customerName}</DialogDescription>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {canShortClosePoSell(row) ? (
+              <UiButton
+                className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white"
+                type="button"
+                variant="outline"
+                onClick={() => onShortClose(row)}
+              >
+                ปิดส่งไม่ครบ
+              </UiButton>
+            ) : null}
             <UiButton
               className="h-9 gap-2 border-emerald-600 bg-emerald-600 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white"
               disabled={isPrinting}
@@ -1446,7 +1571,7 @@ function PoSellDetailModal({
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4 text-sm">
           {/* ข้อมูลเอกสาร */}
-          <div className="rounded-md border border-slate-200 bg-white p-5 shadow">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow">
             <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">ข้อมูลเอกสาร</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-5">
               <DetailItem label="วันที่สร้างรายการ" value={formatDateDisplay(row.createdAt)} />
@@ -1458,7 +1583,7 @@ function PoSellDetailModal({
           </div>
 
           {/* สถานะรายการ */}
-          <div className="rounded-md border border-slate-200 bg-white p-5 shadow">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow">
             <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">สถานะรายการ</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-5">
               <div>
@@ -1473,7 +1598,7 @@ function PoSellDetailModal({
           </div>
 
           {/* จำนวนและรายได้ */}
-          <div className="rounded-md border border-slate-200 bg-white p-5 shadow">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow">
             <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">จำนวนและรายได้</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-5">
               <DetailItem label="จำนวนจองรวม" value={`${formatMoney(row.qty)} กก.`} />
@@ -1498,7 +1623,7 @@ function PoSellDetailModal({
           </div>
 
           {/* รายการสินค้า */}
-          <div className="rounded-md border border-slate-200 bg-white p-5 shadow">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow">
             <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">รายการสินค้า</h4>
             <div className="text-sm font-semibold text-slate-900 mt-1">{row.productName || '-'}</div>
           </div>

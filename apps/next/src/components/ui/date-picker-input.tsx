@@ -34,7 +34,7 @@ export function DatePickerInput({
   className,
   disabled = false,
   id,
-  placeholder = '24/05/2026',
+  placeholder = 'วว/ดด/ปปปป',
   readOnly = false,
   required = false,
   showClearButton = true,
@@ -127,7 +127,7 @@ export function DatePickerInput({
               <span className="sr-only">Select date</span>
             </InputGroupButton>
           </PopoverTrigger>
-          <PopoverContent align="end" alignOffset={-8} className="w-auto overflow-hidden p-0" sideOffset={10}>
+          <PopoverContent align="end" alignOffset={-8} className="w-[20rem] max-w-[calc(100vw_-_1rem)] overflow-hidden p-0" sideOffset={10}>
             <Calendar
               mode="single"
               month={month}

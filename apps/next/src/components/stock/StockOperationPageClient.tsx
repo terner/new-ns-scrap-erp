@@ -1,18 +1,20 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import type { SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
-import { isCostPoolEligibleMetalGroup, stockAdjustReasonOptions, statusConvertFormSchema, stockConvertFormSchema, stockAdjustFormSchema } from '@/lib/stock'
+import { isCostPoolEligibleMetalGroup, stockAdjustReasonLabel, stockAdjustReasonOptions, statusConvertFormSchema, stockConvertFormSchema, stockAdjustFormSchema } from '@/lib/stock'
 import type { StatusConvertFormValues, StockAdjustFormValues, StockConvertFormValues, StockCostPoolOption, StockOption } from '@/lib/stock'
 import { z } from 'zod'
 import { ApiError } from '@/lib/api-client'
@@ -47,6 +49,48 @@ type StatusConvertSortKey =
   | 'value'
 
 const OPERATION_PAGE_SIZES = [10, 20, 50, 100]
+
+const CONVERT_SOURCE_TYPE_LABELS: Record<string, string> = {
+  Manual: 'กำหนดเอง',
+  'Auto (FIFO)': 'อัตโนมัติ FIFO',
+  'Auto (LIFO)': 'อัตโนมัติ LIFO',
+  'Auto (HIGHEST_COST)': 'อัตโนมัติ ต้นทุนสูงสุด',
+  'Auto (LOWEST_COST)': 'อัตโนมัติ ต้นทุนต่ำสุด',
+  Legacy: 'ข้อมูลเดิม',
+}
+
+const CONVERT_COST_STATUS_LABELS: Record<string, string> = {
+  allocated: '✓ จัดสรรครบ',
+  pending_cost: '⏳ รอต้นทุน',
+  partial: '📋 จัดสรรบางส่วน',
+}
+
+const CONVERT_STATUS_LABELS: Record<string, string> = {
+  posted: 'ลงรายการแล้ว',
+  reversed: 'ย้อนกลับแล้ว',
+}
+
+const CONVERT_TARGET_COST_POLICY_LABELS: Record<string, string> = {
+  SOURCE_MATCHED: 'ตามต้นทุนแหล่งเดิม',
+  CUSTOM_UNIT_COST: 'กำหนดเอง',
+}
+
+const CONVERT_ALLOCATION_STATUS_LABELS: Record<string, string> = {
+  active: 'ใช้งานอยู่',
+  reversed: 'ย้อนกลับแล้ว',
+}
+
+const CONVERT_POOL_STATUS_LABELS: Record<string, string> = {
+  Available: 'พร้อมใช้',
+  'Partially Used': 'ใช้บางส่วน',
+  'Fully Used': 'ใช้ครบแล้ว',
+  Released: 'คืนแล้ว',
+  Cancelled: 'ยกเลิก',
+}
+
+function displayConvertLabel(labels: Record<string, string>, value: string) {
+  return labels[value] ?? (value || '-')
+}
 
 type StockAdjustSnapshot = {
   adjustType: 'NONE' | 'LOSS' | 'GAIN'
@@ -108,7 +152,7 @@ const config = {
   convert: {
     accent: 'from-cyan-700 to-teal-700',
     api: '/api/stock/convert',
-    title: 'Grade Adjustment / ปรับเกรดสินค้า',
+    title: 'ปรับเกรดสินค้า / Grade Adjustment',
   },
   'status-convert': {
     accent: 'from-purple-700 to-pink-700',
@@ -118,67 +162,67 @@ const config = {
 } satisfies Record<Mode, { accent: string; api: string; title: string }>
 
 const statusConvertColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'date', defaultWidth: 100 },
-  { key: 'refNo', defaultWidth: 120 },
-  { key: 'productDisplay', defaultWidth: 180 },
-  { key: 'locationDisplay', defaultWidth: 150 },
-  { key: 'qty', defaultWidth: 100 },
-  { key: 'unitCost', defaultWidth: 110 },
-  { key: 'value', defaultWidth: 110 },
-  { key: 'statusFlow', defaultWidth: 120 },
-  { key: 'note', defaultWidth: 120 },
-  { key: 'status', defaultWidth: 90 },
-  { key: 'createdBy', defaultWidth: 110 },
-  { key: 'createdAt', defaultWidth: 120 },
-  { key: 'action', defaultWidth: 90 },
+  { key: 'date', defaultWidth: 130, minWidth: 110 },
+  { key: 'refNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'productDisplay', defaultWidth: 220, minWidth: 180 },
+  { key: 'locationDisplay', defaultWidth: 180, minWidth: 140 },
+  { key: 'qty', defaultWidth: 120, minWidth: 90 },
+  { key: 'unitCost', defaultWidth: 150, minWidth: 110 },
+  { key: 'value', defaultWidth: 130, minWidth: 100 },
+  { key: 'statusFlow', defaultWidth: 140, minWidth: 110 },
+  { key: 'note', defaultWidth: 140, minWidth: 110 },
+  { key: 'status', defaultWidth: 100, minWidth: 80 },
+  { key: 'createdBy', defaultWidth: 120, minWidth: 90 },
+  { key: 'createdAt', defaultWidth: 160, minWidth: 130 },
+  { key: 'action', defaultWidth: 100, minWidth: 80 },
 ]
 
 const convertColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'sourceType', defaultWidth: 110 },
-  { key: 'refNo', defaultWidth: 120 },
-  { key: 'date', defaultWidth: 100 },
-  { key: 'branchWarehouse', defaultWidth: 150 },
-  { key: 'sourceProduct', defaultWidth: 150 },
-  { key: 'sourceQty', defaultWidth: 100 },
-  { key: 'unitCost', defaultWidth: 90 },
-  { key: 'targetProduct', defaultWidth: 150 },
-  { key: 'targetQty', defaultWidth: 100 },
-  { key: 'targetUnitCost', defaultWidth: 90 },
-  { key: 'lossQty', defaultWidth: 90 },
-  { key: 'costStatus', defaultWidth: 100 },
-  { key: 'status', defaultWidth: 80 },
-  { key: 'action', defaultWidth: 150 },
+  { key: 'sourceType', defaultWidth: 160, minWidth: 140 },
+  { key: 'refNo', defaultWidth: 170, minWidth: 145 },
+  { key: 'date', defaultWidth: 130, minWidth: 110 },
+  { key: 'branchWarehouse', defaultWidth: 160, minWidth: 130 },
+  { key: 'sourceProduct', defaultWidth: 220, minWidth: 180 },
+  { key: 'sourceQty', defaultWidth: 120, minWidth: 90 },
+  { key: 'unitCost', defaultWidth: 155, minWidth: 140 },
+  { key: 'targetProduct', defaultWidth: 220, minWidth: 180 },
+  { key: 'targetQty', defaultWidth: 120, minWidth: 90 },
+  { key: 'targetUnitCost', defaultWidth: 155, minWidth: 140 },
+  { key: 'lossQty', defaultWidth: 130, minWidth: 120 },
+  { key: 'costStatus', defaultWidth: 175, minWidth: 160 },
+  { key: 'status', defaultWidth: 155, minWidth: 145 },
+  { key: 'action', defaultWidth: 200, minWidth: 190 },
 ]
 
 const adjustColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'docNo', defaultWidth: 120 },
-  { key: 'date', defaultWidth: 100 },
-  { key: 'branchWarehouse', defaultWidth: 150 },
-  { key: 'productName', defaultWidth: 180 },
-  { key: 'outputCategory', defaultWidth: 110 },
-  { key: 'systemQty', defaultWidth: 100 },
-  { key: 'onHoldQty', defaultWidth: 90 },
-  { key: 'readyQty', defaultWidth: 90 },
-  { key: 'countedQty', defaultWidth: 90 },
-  { key: 'diffQty', defaultWidth: 90 },
-  { key: 'adjustType', defaultWidth: 100 },
-  { key: 'unitPricePerKg', defaultWidth: 90 },
-  { key: 'totalValue', defaultWidth: 120 },
-  { key: 'reason', defaultWidth: 120 },
-  { key: 'createdAt', defaultWidth: 120 },
-  { key: 'updatedBy', defaultWidth: 110 },
-  { key: 'action', defaultWidth: 70 },
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 130, minWidth: 110 },
+  { key: 'branchWarehouse', defaultWidth: 160, minWidth: 130 },
+  { key: 'productName', defaultWidth: 220, minWidth: 180 },
+  { key: 'outputCategory', defaultWidth: 120, minWidth: 90 },
+  { key: 'systemQty', defaultWidth: 120, minWidth: 90 },
+  { key: 'onHoldQty', defaultWidth: 100, minWidth: 80 },
+  { key: 'readyQty', defaultWidth: 100, minWidth: 80 },
+  { key: 'countedQty', defaultWidth: 100, minWidth: 80 },
+  { key: 'diffQty', defaultWidth: 100, minWidth: 80 },
+  { key: 'adjustType', defaultWidth: 110, minWidth: 90 },
+  { key: 'unitPricePerKg', defaultWidth: 110, minWidth: 80 },
+  { key: 'totalValue', defaultWidth: 140, minWidth: 110 },
+  { key: 'reason', defaultWidth: 140, minWidth: 110 },
+  { key: 'createdAt', defaultWidth: 160, minWidth: 130 },
+  { key: 'updatedBy', defaultWidth: 120, minWidth: 90 },
+  { key: 'action', defaultWidth: 90, minWidth: 70 },
 ]
 
 const detailColumns: Array<ResizableColumnDefinition<string>> = [
-  { key: 'line', defaultWidth: 80 },
-  { key: 'sourcePool', defaultWidth: 150 },
-  { key: 'sourceProduct', defaultWidth: 180 },
-  { key: 'targetPool', defaultWidth: 150 },
-  { key: 'targetProduct', defaultWidth: 180 },
-  { key: 'qty', defaultWidth: 100 },
-  { key: 'unitCost', defaultWidth: 90 },
-  { key: 'cost', defaultWidth: 100 },
+  { key: 'line', defaultWidth: 70, minWidth: 60 },
+  { key: 'sourcePool', defaultWidth: 145, minWidth: 130 },
+  { key: 'sourceProduct', defaultWidth: 175, minWidth: 150 },
+  { key: 'targetPool', defaultWidth: 145, minWidth: 130 },
+  { key: 'targetProduct', defaultWidth: 175, minWidth: 150 },
+  { key: 'qty', defaultWidth: 90, minWidth: 80 },
+  { key: 'unitCost', defaultWidth: 85, minWidth: 80 },
+  { key: 'cost', defaultWidth: 100, minWidth: 90 },
   { key: 'status', defaultWidth: 90 },
 ]
 
@@ -195,6 +239,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [costStatusFilter, setCostStatusFilter] = useState('')
+  const [documentStatusFilter, setDocumentStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [sourceTypeFilter, setSourceTypeFilter] = useState('')
   const [toDateFilter, setToDateFilter] = useState('')
@@ -247,6 +292,11 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
   const [statusConvertSortKey, setStatusConvertSortKey] = useState<StatusConvertSortKey>('date')
   const [convertDetail, setConvertDetail] = useState<StockConvertDetail | null>(null)
   const [adjustDetail, setAdjustDetail] = useState<Record<string, string | number | boolean | null> | null>(null)
+
+  const statusConvertResize = useResizableColumns('stock.operation.status-convert.v7', statusConvertColumns)
+  const convertResize = useResizableColumns('stock.operation.convert.v7', convertColumns)
+  const adjustResize = useResizableColumns('stock.operation.adjust.v5', adjustColumns)
+  const columnResize = mode === 'status-convert' ? statusConvertResize : mode === 'convert' ? convertResize : adjustResize
   const [isConvertDetailLoading, setIsConvertDetailLoading] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -275,6 +325,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       .filter((row) => !query || Object.values(row).join(' ').toLowerCase().includes(query))
       .filter((row) => mode !== 'convert' || !sourceTypeFilter || row.sourceType === sourceTypeFilter)
       .filter((row) => mode !== 'convert' || !costStatusFilter || row.costStatus === costStatusFilter)
+      .filter((row) => mode !== 'convert' || !documentStatusFilter || row.status === documentStatusFilter)
       // Stock Adjust Filters (NSERP-66)
       .filter((row) => mode !== 'adjust' || !adjustBranchFilter || row.branchId === adjustBranchFilter)
       .filter((row) => mode !== 'adjust' || !adjustTypeFilter || row.adjustType === adjustTypeFilter)
@@ -303,6 +354,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
     adjustTypeFilter,
     costStatusFilter,
     data.rows,
+    documentStatusFilter,
     fromDateFilter,
     mode,
     search,
@@ -344,6 +396,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
     statusFlowFilter,
     sourceTypeFilter,
     costStatusFilter,
+    documentStatusFilter,
   ])
 
   const statusConvertSortedRows = useMemo(() => {
@@ -401,7 +454,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
   }, [adjustPage, adjustPageSize, convertPage, convertPageSize, mode, operationSortedRows, statusConvertPage, statusConvertPageSize, statusConvertSortedRows])
 
   const hasFilters = useMemo(() => {
-    if (mode === 'convert') return Boolean(search.trim() || sourceTypeFilter || costStatusFilter)
+    if (mode === 'convert') return Boolean(search.trim() || sourceTypeFilter || costStatusFilter || documentStatusFilter)
     if (mode === 'adjust') return Boolean(search.trim() || adjustBranchFilter || adjustTypeFilter || fromDateFilter || toDateFilter || adjustProductFilter || adjustCategoryFilter || adjustWarehouseFilter || adjustReasonFilter)
     if (mode === 'status-convert') return Boolean(search.trim() || statusProductFilter || statusCategoryFilter || statusWarehouseFilter || statusFromDateFilter || statusToDateFilter || statusFlowFilter)
     return Boolean(search.trim())
@@ -410,6 +463,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
     search,
     sourceTypeFilter,
     costStatusFilter,
+    documentStatusFilter,
     adjustBranchFilter,
     adjustTypeFilter,
     fromDateFilter,
@@ -430,6 +484,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
     setSearch('')
     setSourceTypeFilter('')
     setCostStatusFilter('')
+    setDocumentStatusFilter('')
     setAdjustBranchFilter('')
     setAdjustTypeFilter('')
     setFromDateFilter('')
@@ -540,7 +595,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       window.alert('นับจริงต้องเป็นตัวเลขและไม่ติดลบ')
       return
     }
-    const reasonText = window.prompt(`เลือกเหตุผลโดยใส่หมายเลข:\n${stockAdjustReasonOptions.map((reason, index) => `${index + 1}. ${reason}`).join('\n')}`, '1')
+    const reasonText = window.prompt(`เลือกเหตุผลโดยใส่หมายเลข:\n${stockAdjustReasonOptions.map((reason, index) => `${index + 1}. ${stockAdjustReasonLabel(reason)}`).join('\n')}`, '1')
     if (reasonText === null) return
     const reasonIndex = Number(reasonText) - 1
     const reason = stockAdjustReasonOptions[reasonIndex]
@@ -577,8 +632,8 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
 
   function exportConvertDetail(refNo: string) {
     const link = document.createElement('a')
-    link.href = `${meta.api}?detail=${encodeURIComponent(refNo)}&format=csv`
-    link.download = `stock-convert-${refNo}-allocation.csv`
+    link.href = `${meta.api}?detail=${encodeURIComponent(refNo)}&format=xlsx`
+    link.download = `stock-convert-${refNo}-allocation.xlsx`
     document.body.appendChild(link)
     link.click()
     link.remove()
@@ -588,32 +643,20 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       <SummaryCards mode={mode} rows={rows} />
-      {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden lg:block mb-4 space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:block">
         <div className="flex flex-wrap items-center gap-2">
           <input
             className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
-            placeholder={mode === 'convert' ? 'ค้นหา doc/source/target/ref...' : mode === 'adjust' ? 'ค้นหา doc/สินค้า/เหตุผล...' : 'ค้นหาเลขที่/วันที่/สินค้า/เหตุผล...'}
+            placeholder={mode === 'convert' ? 'ค้นหาเลขที่/สินค้าออก/สินค้าเข้า/อ้างอิง...' : mode === 'adjust' ? 'ค้นหา doc/สินค้า/เหตุผล...' : 'ค้นหาเลขที่/วันที่/สินค้า/เหตุผล...'}
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
           {mode === 'convert' ? (
             <>
-              <select className="h-9 rounded-md border border-slate-300 bg-amber-50 px-3 text-sm font-medium text-slate-800" value={sourceTypeFilter} onChange={(event) => setSourceTypeFilter(event.target.value)}>
-                <option value="">ทุก Source Type</option>
-                <option value="Manual">📝 Manual</option>
-                <option value="Auto (FIFO)">Auto FIFO</option>
-                <option value="Auto (LIFO)">Auto LIFO</option>
-                <option value="Auto (HIGHEST_COST)">Auto Highest Cost</option>
-                <option value="Auto (LOWEST_COST)">Auto Lowest Cost</option>
-                <option value="Legacy">Legacy</option>
-              </select>
-              <select className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800" value={costStatusFilter} onChange={(event) => setCostStatusFilter(event.target.value)}>
-                <option value="">ทุก Cost Status</option>
-                <option value="allocated">✓ Allocated</option>
-                <option value="pending_cost">⏳ Pending Cost</option>
-                <option value="partial">📋 Partial</option>
+              <select className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800" value={sourceTypeFilter} onChange={(event) => setSourceTypeFilter(event.target.value)}>
+                <option value="">ทุกวิธีจัดสรร</option>
+                {Object.entries(CONVERT_SOURCE_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </>
           ) : mode === 'adjust' ? (
@@ -643,11 +686,10 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
               </select>
               <select className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none" value={adjustReasonFilter} onChange={(event) => setAdjustReasonFilter(event.target.value)}>
                 <option value="">ทุกเหตุผล</option>
-                {reasonOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                {reasonOptions.map(r => <option key={r} value={r}>{stockAdjustReasonLabel(r)}</option>)}
               </select>
               <DatePickerInput className="w-[130px] h-9" title="จากวันที่" value={fromDateFilter} onChange={setFromDateFilter} />
               <DatePickerInput className="w-[130px] h-9" title="ถึงวันที่" value={toDateFilter} onChange={setToDateFilter} />
-              <button className="h-9 rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-500 opacity-60 flex items-center justify-center border border-slate-200" disabled title="รอ export contract สำหรับ stock adjustment" type="button">📥 CSV</button>
             </>
           ) : mode === 'status-convert' ? (
             <>
@@ -681,32 +723,52 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
             </button>
           ) : null}
 
-          <a className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors ml-auto" href={`${pathname}?new=1`}>
-            {mode === 'adjust' ? '+ ปรับสต๊อกใหม่' : mode === 'convert' ? '+ ปรับเกรดใหม่' : '+ ปรับสถานะใหม่'}
-          </a>
         </div>
-        {mode === 'adjust' ? (
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-            <span className="text-xs text-slate-500">ประเภท:</span>
-            <SegmentedButton active={!adjustTypeFilter} label="ทั้งหมด" onClick={() => setAdjustTypeFilter('')} />
-            <SegmentedButton active={adjustTypeFilter === 'LOSS'} label="นับขาด" onClick={() => setAdjustTypeFilter('LOSS')} />
-            <SegmentedButton active={adjustTypeFilter === 'GAIN'} label="นับเกิน" onClick={() => setAdjustTypeFilter('GAIN')} />
+        <div className="mt-2 grid w-full grid-cols-1 gap-2 border-t border-slate-100 pt-2 xl:grid-cols-[minmax(0,1fr)_auto]">
+          {mode === 'convert' ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">สถานะต้นทุน:</span>
+                <SegmentedButton active={!costStatusFilter} label="ทุกสถานะ" onClick={() => setCostStatusFilter('')} />
+                {Object.entries(CONVERT_COST_STATUS_LABELS).map(([value, label]) => (
+                  <SegmentedButton active={costStatusFilter === value} key={value} label={label} onClick={() => setCostStatusFilter(value)} />
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">สถานะเอกสาร:</span>
+                <SegmentedButton active={!documentStatusFilter} label="ทุกสถานะ" onClick={() => setDocumentStatusFilter('')} />
+                {Object.entries(CONVERT_STATUS_LABELS).map(([value, label]) => (
+                  <SegmentedButton active={documentStatusFilter === value} key={value} label={label} onClick={() => setDocumentStatusFilter(value)} />
+                ))}
+              </div>
+            </div>
+          ) : mode === 'adjust' ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">ประเภท:</span>
+                <SegmentedButton active={!adjustTypeFilter} label="ทั้งหมด" onClick={() => setAdjustTypeFilter('')} />
+                <SegmentedButton active={adjustTypeFilter === 'LOSS'} label="นับขาด" onClick={() => setAdjustTypeFilter('LOSS')} />
+                <SegmentedButton active={adjustTypeFilter === 'GAIN'} label="นับเกิน" onClick={() => setAdjustTypeFilter('GAIN')} />
+            </div>
+          ) : mode === 'status-convert' ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-slate-500">เส้นทางสถานะ:</span>
+                <SegmentedButton active={!statusFlowFilter} label="ทั้งหมด" onClick={() => setStatusFlowFilter('')} />
+                <SegmentedButton active={statusFlowFilter === 'RM-FG'} label="RM → FG" onClick={() => setStatusFlowFilter('RM-FG')} />
+                <SegmentedButton active={statusFlowFilter === 'FG-RM'} label="FG → RM" onClick={() => setStatusFlowFilter('FG-RM')} />
+                <SegmentedButton active={statusFlowFilter === 'RM-WIP'} label="RM → WIP" onClick={() => setStatusFlowFilter('RM-WIP')} />
+                <SegmentedButton active={statusFlowFilter === 'WIP-FG'} label="WIP → FG" onClick={() => setStatusFlowFilter('WIP-FG')} />
+            </div>
+          ) : null}
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <a className="inline-flex h-9 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-normal text-white transition-colors hover:bg-blue-700" href={`${pathname}?new=1`}>
+              {mode === 'convert' ? '+ ปรับเกรดใหม่' : mode === 'adjust' ? '+ ปรับสต๊อกใหม่' : '+ ปรับสถานะใหม่'}
+            </a>
           </div>
-        ) : null}
-        {mode === 'status-convert' ? (
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-            <span className="text-xs text-slate-500 font-medium">เส้นทางสถานะ:</span>
-            <SegmentedButton active={!statusFlowFilter} label="ทั้งหมด" onClick={() => setStatusFlowFilter('')} />
-            <SegmentedButton active={statusFlowFilter === 'RM-FG'} label="RM → FG" onClick={() => setStatusFlowFilter('RM-FG')} />
-            <SegmentedButton active={statusFlowFilter === 'FG-RM'} label="FG → RM" onClick={() => setStatusFlowFilter('FG-RM')} />
-            <SegmentedButton active={statusFlowFilter === 'RM-WIP'} label="RM → WIP" onClick={() => setStatusFlowFilter('RM-WIP')} />
-            <SegmentedButton active={statusFlowFilter === 'WIP-FG'} label="WIP → FG" onClick={() => setStatusFlowFilter('WIP-FG')} />
-          </div>
-        ) : null}
+        </div>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 space-y-2 rounded-md bg-white p-3 shadow lg:hidden">
+      <div className="space-y-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
         <div className="flex gap-2 items-center">
           <input
             className="min-w-[150px] flex-1 rounded-md border border-slate-300 px-3 h-9 text-sm"
@@ -774,26 +836,30 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
               {mode === 'convert' ? (
                 <>
                   <label className="block">
-                    <span className="mb-1 block text-xs font-semibold text-slate-600">Source Type</span>
+                    <span className="mb-1 block text-xs font-semibold text-slate-600">วิธีจัดสรร</span>
                     <select className="h-10 w-full rounded-md border border-slate-300 px-3 bg-white text-slate-800" value={sourceTypeFilter} onChange={(event) => setSourceTypeFilter(event.target.value)}>
-                      <option value="">ทุก Source Type</option>
-                      <option value="Manual">📝 Manual</option>
-                      <option value="Auto (FIFO)">Auto FIFO</option>
-                      <option value="Auto (LIFO)">Auto LIFO</option>
-                      <option value="Auto (HIGHEST_COST)">Auto Highest Cost</option>
-                      <option value="Auto (LOWEST_COST)">Auto Lowest Cost</option>
-                      <option value="Legacy">Legacy</option>
+                      <option value="">ทุกวิธีจัดสรร</option>
+                      {Object.entries(CONVERT_SOURCE_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
                   </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-semibold text-slate-600">Cost Status</span>
-                    <select className="h-10 w-full rounded-md border border-slate-300 px-3 bg-white text-slate-800" value={costStatusFilter} onChange={(event) => setCostStatusFilter(event.target.value)}>
-                      <option value="">ทุก Cost Status</option>
-                      <option value="allocated">✓ Allocated</option>
-                      <option value="pending_cost">⏳ Pending Cost</option>
-                      <option value="partial">📋 Partial</option>
-                    </select>
-                  </label>
+                  <div className="space-y-2">
+                    <span className="block text-xs text-slate-500">สถานะต้นทุน:</span>
+                    <div className="flex flex-wrap gap-2">
+                      <SegmentedButton active={!costStatusFilter} label="ทุกสถานะ" onClick={() => setCostStatusFilter('')} />
+                      {Object.entries(CONVERT_COST_STATUS_LABELS).map(([value, label]) => (
+                        <SegmentedButton active={costStatusFilter === value} key={value} label={label} onClick={() => setCostStatusFilter(value)} />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <span className="block text-xs text-slate-500">สถานะเอกสาร:</span>
+                    <div className="flex flex-wrap gap-2">
+                      <SegmentedButton active={!documentStatusFilter} label="ทุกสถานะ" onClick={() => setDocumentStatusFilter('')} />
+                      {Object.entries(CONVERT_STATUS_LABELS).map(([value, label]) => (
+                        <SegmentedButton active={documentStatusFilter === value} key={value} label={label} onClick={() => setDocumentStatusFilter(value)} />
+                      ))}
+                    </div>
+                  </div>
                 </>
               ) : mode === 'adjust' ? (
                 <>
@@ -829,7 +895,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
                     <span className="mb-1 block text-xs font-semibold text-slate-600">เหตุผล</span>
                     <select className="h-10 w-full rounded-md border border-slate-300 px-3 bg-white text-slate-800 outline-none" value={adjustReasonFilter} onChange={(event) => setAdjustReasonFilter(event.target.value)}>
                       <option value="">ทุกเหตุผล</option>
-                      {reasonOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                      {reasonOptions.map(r => <option key={r} value={r}>{stockAdjustReasonLabel(r)}</option>)}
                     </select>
                   </label>
                   <div>
@@ -880,29 +946,28 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       {/* FAB for Mobile Creation */}
       <a
         aria-label="สร้างรายการใหม่"
-        className="h-14 w-14 rounded-full bg-slate-900 text-white shadow-lg fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 lg:hidden flex items-center justify-center hover:bg-slate-800"
+        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 lg:hidden"
         href={`${pathname}?new=1`}
       >
         <Plus className="h-6 w-6" />
       </a>
       {mode === 'status-convert' ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 text-sm text-slate-600">
           <span>พบทั้งหมด {rows.length} รายการ</span>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <select
-              className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
-              value={String(statusConvertPageSize)}
-              onChange={(event) => {
-                setStatusConvertPageSize(Number(event.target.value))
-                setStatusConvertPage(1)
-              }}
-            >
-              {OPERATION_PAGE_SIZES.map((pageSize) => (
-                <option key={pageSize} value={pageSize}>
-                  {pageSize} / หน้า
-                </option>
-              ))}
-            </select>
+            {columnResize.hasCustomWidths ? (
+              <button
+                className="hidden lg:inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={columnResize.resetColumnWidths}
+              >
+                คืนค่าเดิมตาราง
+              </button>
+            ) : null}
+            <PageSizeDropdown options={OPERATION_PAGE_SIZES} value={statusConvertPageSize} onChange={(size) => {
+              setStatusConvertPageSize(size)
+              setStatusConvertPage(1)
+            }} />
             <button
               className="h-9 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={statusConvertPage <= 1}
@@ -924,26 +989,25 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
         </div>
       ) : null}
       {mode === 'adjust' ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-normal text-slate-600">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 text-sm text-slate-600">
           <span>
             พบทั้งหมด {rows.length} รายการ
             {rows.length > 0 ? `  แสดง ${(adjustPage - 1) * adjustPageSize + 1}-${Math.min(adjustPage * adjustPageSize, rows.length)}` : ''}
           </span>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <select
-              className="h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-normal text-slate-700"
-              value={String(adjustPageSize)}
-              onChange={(event) => {
-                setAdjustPageSize(Number(event.target.value))
-                setAdjustPage(1)
-              }}
-            >
-              {OPERATION_PAGE_SIZES.map((pageSize) => (
-                <option key={pageSize} value={pageSize}>
-                  {pageSize} / หน้า
-                </option>
-              ))}
-            </select>
+            {columnResize.hasCustomWidths ? (
+              <button
+                className="hidden lg:inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={columnResize.resetColumnWidths}
+              >
+                คืนค่าเดิมตาราง
+              </button>
+            ) : null}
+            <PageSizeDropdown options={OPERATION_PAGE_SIZES} value={adjustPageSize} onChange={(size) => {
+              setAdjustPageSize(size)
+              setAdjustPage(1)
+            }} />
             <button
               className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={adjustPage <= 1}
@@ -965,26 +1029,25 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
         </div>
       ) : null}
       {mode === 'convert' ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-normal text-slate-600">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 text-sm text-slate-600">
           <span>
             พบทั้งหมด {rows.length} รายการ
             {rows.length > 0 ? `  แสดง ${(convertPage - 1) * convertPageSize + 1}-${Math.min(convertPage * convertPageSize, rows.length)}` : ''}
           </span>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <select
-              className="h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-normal text-slate-700"
-              value={String(convertPageSize)}
-              onChange={(event) => {
-                setConvertPageSize(Number(event.target.value))
-                setConvertPage(1)
-              }}
-            >
-              {OPERATION_PAGE_SIZES.map((pageSize) => (
-                <option key={pageSize} value={pageSize}>
-                  {pageSize} / หน้า
-                </option>
-              ))}
-            </select>
+            {columnResize.hasCustomWidths ? (
+              <button
+                className="hidden lg:inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={columnResize.resetColumnWidths}
+              >
+                คืนค่าเดิมตาราง
+              </button>
+            ) : null}
+            <PageSizeDropdown options={OPERATION_PAGE_SIZES} value={convertPageSize} onChange={(size) => {
+              setConvertPageSize(size)
+              setConvertPage(1)
+            }} />
             <button
               className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={convertPage <= 1}
@@ -1051,6 +1114,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
         </DialogContent>
       </Dialog>
       <OperationTable
+        columnResize={columnResize}
         isLoading={isLoading}
         mode={mode}
         rows={visibleRows}
@@ -1098,11 +1162,11 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
     const reversed = rows.filter((row) => row.status === 'reversed').length
     return (
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-5 text-sm">
-        <Metric emoji="✅" iconBg="bg-emerald-100 text-emerald-700" label="Posted" value={String(posted)} valueClassName="text-emerald-700" />
-        <Metric emoji="⏳" iconBg="bg-amber-100 text-amber-700" label="Pending Cost" value={String(pendingCost)} valueClassName="text-amber-700" />
-        <Metric emoji="📝" iconBg="bg-blue-100 text-blue-700" label="Manual" value={String(manualCount)} valueClassName="text-blue-700" />
-        <Metric emoji="🏭" iconBg="bg-purple-100 text-purple-700" label="Auto Cost Pool" value={String(autoCount)} valueClassName="text-purple-700" />
-        <Metric emoji="🔄" iconBg="bg-slate-100 text-slate-500" label="Reversed" value={String(reversed)} valueClassName="text-slate-500" className="col-span-2 md:col-span-1" />
+        <Metric emoji="✅" iconBg="bg-emerald-100 text-emerald-700" label="ลงรายการแล้ว" value={String(posted)} valueClassName="text-emerald-700" />
+        <Metric emoji="⏳" iconBg="bg-amber-100 text-amber-700" label="รอต้นทุน" value={String(pendingCost)} valueClassName="text-amber-700" />
+        <Metric emoji="📝" iconBg="bg-blue-100 text-blue-700" label="กำหนดเอง" value={String(manualCount)} valueClassName="text-blue-700" />
+        <Metric emoji="🏭" iconBg="bg-purple-100 text-purple-700" label="Cost Pool อัตโนมัติ" value={String(autoCount)} valueClassName="text-purple-700" />
+        <Metric emoji="🔄" iconBg="bg-slate-100 text-slate-500" label="ย้อนกลับแล้ว" value={String(reversed)} valueClassName="text-slate-500" className="col-span-2 md:col-span-1" />
       </div>
     )
   }
@@ -1126,6 +1190,7 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
 }
 
 function OperationTable({
+  columnResize,
   isLoading,
   mode,
   onAdjustCorrect,
@@ -1138,6 +1203,7 @@ function OperationTable({
   sortDirection,
   sortKey,
 }: {
+  columnResize: ReturnType<typeof useResizableColumns<string>>
   isLoading: boolean
   mode: Mode
   onAdjustCorrect?: (row: Record<string, string | number | boolean | null>) => void
@@ -1150,17 +1216,22 @@ function OperationTable({
   sortDirection?: SortDirection
   sortKey?: string
 }) {
-  const statusConvertResize = useResizableColumns('stock.operation.status-convert.v5', statusConvertColumns)
-  const convertResize = useResizableColumns('stock.operation.convert.v5', convertColumns)
-  const adjustResize = useResizableColumns('stock.operation.adjust.v5', adjustColumns)
-  const columnResize = mode === 'status-convert' ? statusConvertResize : mode === 'convert' ? convertResize : adjustResize
-
   const columns = columnsFor(mode)
+  const desktopTableScrollRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (isLoading) return
+    const frameId = window.requestAnimationFrame(() => {
+      if (desktopTableScrollRef.current) desktopTableScrollRef.current.scrollLeft = 0
+    })
+    return () => window.cancelAnimationFrame(frameId)
+  }, [isLoading, mode, rows])
+
   return (
     <>
       {/* Mobile Card List (Hidden on Desktop) */}
       <div className="block space-y-3 lg:hidden">
-        {isLoading ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
+        {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
         {!isLoading && rows.map((row, index) => {
           const id = String(row.id ?? index)
           const date = String(row.date ?? '')
@@ -1176,7 +1247,7 @@ function OperationTable({
             return (
               <div
                 key={id}
-                className="cursor-pointer rounded-md border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50"
+                className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50"
                 role="button"
                 tabIndex={0}
                 onClick={() => onAdjustDetail?.(row)}
@@ -1195,7 +1266,7 @@ function OperationTable({
                 <div className="my-3 space-y-1 text-xs text-slate-600">
                   <div><span className="font-semibold">สินค้า:</span> {formatCell(row.productName)}</div>
                   <div><span className="font-semibold">สาขา/คลัง:</span> {formatCell(row.branchWarehouse)}</div>
-                  {row.reason ? <div><span className="font-semibold">เหตุผล:</span> {String(row.reason)}</div> : null}
+                  {row.reason ? <div><span className="font-semibold">เหตุผล:</span> {stockAdjustReasonLabel(String(row.reason))}</div> : null}
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
                   <div>
@@ -1235,38 +1306,38 @@ function OperationTable({
           if (mode === 'convert') {
             const status = String(row.status ?? '')
             const costStatus = String(row.costStatus ?? '')
-            const costStatusLabel = costStatus === 'allocated' ? '✓ Allocated' : costStatus === 'pending_cost' ? '⏳ Pending Cost' : costStatus === 'partial' ? '📋 Partial' : '-'
+            const costStatusLabel = displayConvertLabel(CONVERT_COST_STATUS_LABELS, costStatus)
             const costStatusColor = costStatus === 'allocated' ? 'bg-emerald-100 text-emerald-700' : costStatus === 'pending_cost' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
             const statusColor = status === 'posted' ? 'bg-emerald-100 text-emerald-700' : status === 'reversed' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-700'
             const sourceType = String(row.sourceType ?? 'Manual')
             const sourceTypeColor = sourceType.startsWith('Auto') ? 'bg-purple-100 text-purple-700' : sourceType === 'Legacy' ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'
 
             return (
-              <div key={id} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50">
+              <div key={id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50">
                 <div className="mb-2 flex items-start justify-between">
                   <span className="font-bold text-slate-800">{refNo}</span>
                   <div className="flex gap-1.5">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sourceTypeColor}`}>{sourceType}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusColor}`}>{status || 'posted'}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sourceTypeColor}`}>{displayConvertLabel(CONVERT_SOURCE_TYPE_LABELS, sourceType)}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusColor}`}>{displayConvertLabel(CONVERT_STATUS_LABELS, status || 'posted')}</span>
                   </div>
                 </div>
                 <div className="text-xs text-slate-500">{formatDateDisplay(date)}</div>
                 <div className="my-3 space-y-1 text-xs text-slate-600">
-                  <div><span className="font-semibold text-red-600">Source (ออก):</span> {formatCell(row.sourceProduct)}</div>
-                  <div><span className="font-semibold text-emerald-700">Target (เข้า):</span> {formatCell(row.targetProduct)}</div>
+                  <div><span className="font-semibold text-red-600">สินค้าออก:</span> {formatCell(row.sourceProduct)}</div>
+                  <div><span className="font-semibold text-emerald-700">สินค้าเข้า:</span> {formatCell(row.targetProduct)}</div>
                   <div><span className="font-semibold">สาขา / คลัง:</span> {formatCell(row.branchWarehouse)}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
                   <div>
-                    <div className="text-slate-400">Source Qty</div>
+                    <div className="text-slate-400">จำนวนออก</div>
                     <div className="font-semibold text-red-700">{formatMoney(Number(row.sourceQty ?? 0))} กก. (@{formatMoney(Number(row.unitCost ?? 0))})</div>
                   </div>
                   <div>
-                    <div className="text-slate-400">Target Qty</div>
+                    <div className="text-slate-400">จำนวนเข้า</div>
                     <div className="font-semibold text-emerald-700">{formatMoney(Number(row.targetQty ?? 0))} กก. (@{formatMoney(Number(row.targetUnitCost ?? 0))})</div>
                   </div>
                   <div>
-                    <div className="text-slate-400">Loss / Cost Status</div>
+                    <div className="text-slate-400">สูญเสีย / สถานะต้นทุน</div>
                     <div className="font-semibold text-slate-800">
                       {formatMoney(Number(row.lossQty ?? 0))} กก. / <span className={`inline-flex rounded-full px-1.5 py-0.5 text-xs font-semibold ${costStatusColor}`}>{costStatusLabel}</span>
                     </div>
@@ -1298,7 +1369,7 @@ function OperationTable({
             const status = String(row.status ?? 'posted')
 
             return (
-              <div key={id} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50">
+              <div key={id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50">
                 <div className="mb-2 flex items-start justify-between">
                   <span className="font-bold text-slate-800">{refNo}</span>
                   <StatusText status={status} />
@@ -1345,25 +1416,18 @@ function OperationTable({
 
           return null
         })}
-        {!isLoading && !rows.length ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-400 shadow">{emptyTextFor(mode)}</div> : null}
+        {!isLoading && !rows.length ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-400 shadow">{emptyTextFor(mode)}</div> : null}
       </div>
 
       {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden overflow-x-auto rounded-md bg-white shadow lg:block overflow-hidden">
-        <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
-          {columnResize.hasCustomWidths ? (
-            <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
-              คืนค่าเดิมตาราง
-            </button>
-          ) : null}
-        </div>
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+      <div key={`${mode}-${isLoading ? 'loading' : 'ready'}`} ref={desktopTableScrollRef} className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        <table className="ns-table w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {columns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
             ))}
           </colgroup>
-          <thead className="border-b border-slate-100 bg-slate-100 text-slate-700">
+          <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
             <tr>
               {columns.map((column) => (
                 <ResizableTableHead
@@ -1379,21 +1443,21 @@ function OperationTable({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
+          <tbody className="divide-y divide-slate-200">
+            {isLoading ? <tr><td className="px-3 py-10 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && rows.map((row, index) => (
-              <tr key={String(row.id ?? index)} className={`hover:bg-slate-50 ${mode === 'adjust' ? 'cursor-pointer' : ''}`} onClick={mode === 'adjust' ? () => onAdjustDetail?.(row) : undefined}>
+              <tr key={String(row.id ?? index)} className={`hover:bg-slate-50 transition-colors ${mode === 'adjust' ? 'cursor-pointer' : ''}`} onClick={mode === 'adjust' ? () => onAdjustDetail?.(row) : undefined}>
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`p-2 align-top text-xs font-semibold text-slate-700 ${column.key === 'action' || column.key === 'status' || column.key === 'costStatus' ? 'overflow-visible whitespace-nowrap' : 'overflow-hidden truncate'} ${column.cellClassName ?? ''}`}
+                    className={`px-3 py-3 align-top text-slate-700 ${column.key === 'action' || column.key === 'status' || column.key === 'costStatus' ? 'overflow-visible whitespace-nowrap' : 'overflow-hidden truncate'} ${column.cellClassName ?? ''}`}
                   >
                     {formatOperationCell(mode, row, column.key, onConvertReverse, onConvertDetail, onStatusConvertReverse, onAdjustCorrect)}
                   </td>
                 ))}
               </tr>
             ))}
-            {!isLoading && !rows.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
+            {!isLoading && !rows.length ? <tr><td className="px-3 py-10 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -1424,7 +1488,7 @@ function StatusText({ status }: { status: string }) {
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${isReversed ? 'text-slate-500' : 'text-emerald-700'}`}>
       <span className={`size-1.5 rounded-full ${isReversed ? 'bg-slate-400' : 'bg-emerald-500'}`} />
-      {status || 'posted'}
+      {displayConvertLabel(CONVERT_STATUS_LABELS, status || 'posted')}
     </span>
   )
 }
@@ -1446,20 +1510,20 @@ function columnsFor(mode: Mode): OperationColumn[] {
     { key: 'action', label: 'จัดการ', cellClassName: 'text-center', headerClassName: 'text-center' },
   ]
   if (mode === 'convert') return [
-    { key: 'sourceType', label: 'Source Type', sortable: true },
-    { key: 'refNo', label: 'เลขที่ / Ref', sortable: true },
-    { key: 'date', label: 'วันที่เอกสาร', sortable: true },
-    { key: 'branchWarehouse', label: 'สาขา / คลัง', sortable: true },
-    { key: 'sourceProduct', label: 'Source (ออก)', sortable: true },
-    { key: 'sourceQty', label: 'Qty', cellClassName: 'text-right font-mono text-red-700', headerClassName: 'text-right', sortable: true },
-    { key: 'unitCost', label: '฿/กก.', cellClassName: 'text-right font-mono', headerClassName: 'text-right', sortable: true },
-    { key: 'targetProduct', label: 'Target (เข้า)', sortable: true },
-    { key: 'targetQty', label: 'Qty', cellClassName: 'text-right font-mono text-emerald-700', headerClassName: 'text-right', sortable: true },
-    { key: 'targetUnitCost', label: '฿/กก.', cellClassName: 'text-right font-mono', headerClassName: 'text-right', sortable: true },
-    { key: 'lossQty', label: 'Loss', cellClassName: 'text-right font-mono', sortable: true },
-    { key: 'costStatus', label: 'Cost Status', cellClassName: 'text-center', headerClassName: 'text-center', sortable: true },
-    { key: 'status', label: 'สถานะ', cellClassName: 'text-center', headerClassName: 'text-center', sortable: true },
-    { key: 'action', label: '', cellClassName: 'text-center', headerClassName: 'text-center' },
+    { key: 'sourceType', label: 'วิธีจัดสรร', cellClassName: 'text-left', headerClassName: 'text-left', sortable: true },
+    { key: 'refNo', label: 'เลขที่ / อ้างอิง', cellClassName: 'whitespace-nowrap text-right', headerClassName: 'text-right', sortable: true },
+    { key: 'date', label: 'วันที่เอกสาร', cellClassName: 'whitespace-nowrap text-right', headerClassName: 'text-right', sortable: true },
+    { key: 'branchWarehouse', label: 'สาขา / คลัง', cellClassName: 'whitespace-nowrap text-right', headerClassName: 'text-right', sortable: true },
+    { key: 'sourceProduct', label: 'สินค้าออก', cellClassName: 'text-right', headerClassName: 'text-right', sortable: true },
+    { key: 'sourceQty', label: 'จำนวนออก', cellClassName: 'whitespace-nowrap text-right font-mono tabular-nums text-red-700', headerClassName: 'text-right', sortable: true },
+    { key: 'unitCost', label: 'ต้นทุน/กก. ออก', cellClassName: 'whitespace-nowrap text-right font-mono tabular-nums', headerClassName: 'text-right', sortable: true },
+    { key: 'targetProduct', label: 'สินค้าเข้า', cellClassName: 'text-right', headerClassName: 'text-right', sortable: true },
+    { key: 'targetQty', label: 'จำนวนเข้า', cellClassName: 'whitespace-nowrap text-right font-mono tabular-nums text-emerald-700', headerClassName: 'text-right', sortable: true },
+    { key: 'targetUnitCost', label: 'ต้นทุน/กก. เข้า', cellClassName: 'whitespace-nowrap text-right font-mono tabular-nums', headerClassName: 'text-right', sortable: true },
+    { key: 'lossQty', label: 'สูญเสีย', cellClassName: 'whitespace-nowrap text-right font-mono tabular-nums', headerClassName: 'text-right', sortable: true },
+    { key: 'costStatus', label: 'สถานะต้นทุน', cellClassName: 'text-right', headerClassName: 'text-right', sortable: true },
+    { key: 'status', label: 'สถานะ', cellClassName: 'text-right', headerClassName: 'text-right', sortable: true },
+    { key: 'action', label: 'จัดการ', cellClassName: 'text-right', headerClassName: 'text-right' },
   ]
   if (mode === 'adjust') return [
     { key: 'docNo', label: 'เลขที่เอกสาร', sortable: true },
@@ -1585,7 +1649,7 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
       const status = String(row.status ?? '')
       const refNo = String(row.refNo ?? row.id ?? '')
       return (
-        <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
           <button
             className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             disabled={!onConvertDetail}
@@ -1607,19 +1671,19 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
     }
     if (key === 'costStatus') {
       const value = String(row[key] ?? '')
-      const label = value === 'allocated' ? '✓ Allocated' : value === 'pending_cost' ? '⏳ Pending Cost' : value === 'partial' ? '📋 Partial' : '-'
+      const label = displayConvertLabel(CONVERT_COST_STATUS_LABELS, value)
       const color = value === 'allocated' ? 'bg-emerald-100 text-emerald-700' : value === 'pending_cost' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
-      return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{label}</span>
+      return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{label}</span>
     }
     if (key === 'status') {
       const value = String(row[key] ?? '')
       const color = value === 'posted' ? 'bg-emerald-100 text-emerald-700' : value === 'reversed' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-700'
-      return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{value || '-'}</span>
+      return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{displayConvertLabel(CONVERT_STATUS_LABELS, value)}</span>
     }
     if (key === 'sourceType') {
       const value = String(row[key] ?? 'Manual')
       const color = value.startsWith('Auto') ? 'bg-purple-100 text-purple-700' : value === 'Legacy' ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'
-      return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{value}</span>
+      return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{displayConvertLabel(CONVERT_SOURCE_TYPE_LABELS, value)}</span>
     }
   }
   if (mode === 'adjust') {
@@ -1641,6 +1705,7 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
     if (key === 'outputCategory') {
       return formatCell(row[key])
     }
+    if (key === 'reason') return stockAdjustReasonLabel(String(row[key] ?? ''))
     if (key === 'diffQty') {
       const value = Number(row[key] ?? 0)
       return <span className={value < 0 ? 'font-mono text-red-600' : value > 0 ? 'font-mono text-emerald-700' : 'font-mono text-slate-500'}>{formatMoney(value)}</span>
@@ -1703,17 +1768,17 @@ function AdjustDetailModal({
         </div>
         <div className="overflow-y-auto bg-slate-50 p-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric cardClassName="rounded-md border border-slate-200 bg-white p-3 shadow-sm" label="ยอดในระบบ" value={`${formatMoney(Number(detail.systemQty ?? 0))} กก.`} />
-            <Metric cardClassName="rounded-md border border-slate-200 bg-white p-3 shadow-sm" label="นับจริง" value={`${formatMoney(Number(detail.countedQty ?? 0))} กก.`} />
-            <Metric cardClassName="rounded-md border border-slate-200 bg-white p-3 shadow-sm" label="ส่วนต่าง" value={`${formatMoney(diffQty)} กก.`} valueClassName={diffQty < 0 ? 'text-red-600' : diffQty > 0 ? 'text-emerald-700' : 'text-slate-900'} />
-            <Metric cardClassName="rounded-md border border-slate-200 bg-white p-3 shadow-sm" label="มูลค่ารวม (บาท)" value={formatMoney(totalValue)} valueClassName={totalValue < 0 ? 'text-red-600' : totalValue > 0 ? 'text-emerald-700' : 'text-slate-900'} />
-            <Metric cardClassName="rounded-md border border-slate-200 bg-white p-3 shadow-sm" label="จองไว้" value={`${formatMoney(Number(detail.onHoldQty ?? 0))} กก.`} valueClassName="text-amber-700" />
-            <Metric cardClassName="rounded-md border border-slate-200 bg-white p-3 shadow-sm" label="พร้อมใช้" value={`${formatMoney(Number(detail.readyQty ?? 0))} กก.`} valueClassName="text-emerald-700" />
-            <Metric cardClassName="rounded-md border border-slate-200 bg-white p-3 shadow-sm" label="ราคา/กก." value={formatMoney(Number(detail.unitPricePerKg ?? 0))} />
-            <Metric cardClassName="rounded-md border border-slate-200 bg-white p-3 shadow-sm" label="ประเภทคลัง" value={formatCell(detail.outputCategory)} />
+            <Metric cardClassName="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" label="ยอดในระบบ" value={`${formatMoney(Number(detail.systemQty ?? 0))} กก.`} />
+            <Metric cardClassName="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" label="นับจริง" value={`${formatMoney(Number(detail.countedQty ?? 0))} กก.`} />
+            <Metric cardClassName="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" label="ส่วนต่าง" value={`${formatMoney(diffQty)} กก.`} valueClassName={diffQty < 0 ? 'text-red-600' : diffQty > 0 ? 'text-emerald-700' : 'text-slate-900'} />
+            <Metric cardClassName="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" label="มูลค่ารวม (บาท)" value={formatMoney(totalValue)} valueClassName={totalValue < 0 ? 'text-red-600' : totalValue > 0 ? 'text-emerald-700' : 'text-slate-900'} />
+            <Metric cardClassName="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" label="จองไว้" value={`${formatMoney(Number(detail.onHoldQty ?? 0))} กก.`} valueClassName="text-amber-700" />
+            <Metric cardClassName="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" label="พร้อมใช้" value={`${formatMoney(Number(detail.readyQty ?? 0))} กก.`} valueClassName="text-emerald-700" />
+            <Metric cardClassName="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" label="ราคา/กก." value={formatMoney(Number(detail.unitPricePerKg ?? 0))} />
+            <Metric cardClassName="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" label="ประเภทคลัง" value={formatCell(detail.outputCategory)} />
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <h4 className="mb-3 text-sm font-bold text-slate-800">สินค้าและคลัง</h4>
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <DetailField label="สินค้า" value={`${formatCell(detail.productCode)} ${formatCell(detail.productName)}`} />
@@ -1722,10 +1787,10 @@ function AdjustDetailModal({
                 <DetailField label="คลัง" value={formatCell(detail.warehouseName)} />
               </div>
             </div>
-            <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <h4 className="mb-3 text-sm font-bold text-slate-800">เหตุผลและ audit</h4>
               <div className="grid gap-3 text-sm sm:grid-cols-2">
-                <DetailField label="เหตุผล" value={formatCell(detail.reason)} />
+                <DetailField label="เหตุผล" value={stockAdjustReasonLabel(String(detail.reason ?? ''))} />
                 <DetailField label="หมายเหตุ" value={formatCell(detail.remark)} />
                 <DetailField label="สร้างโดย" value={formatCell(detail.createdBy)} />
                 <DetailField label="วันที่สร้างรายการ" value={formatDateTime(detail.createdAt)} />
@@ -1752,103 +1817,168 @@ function DetailField({ label, value }: { label: string; value: string }) {
 }
 
 function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: StockConvertDetail; isLoading: boolean; onClose: () => void; onExport: () => void }) {
-  const columnResize = useResizableColumns('stock.operation.detail-modal.v5', detailColumns)
+  const columnResize = useResizableColumns('stock.operation.detail-modal.v6', detailColumns)
   const totalQty = detail.lines.reduce((sum, line) => sum + line.qty, 0)
   const totalCost = detail.lines.reduce((sum, line) => sum + line.totalCost, 0)
+  const hasNotes = Boolean(detail.reason || detail.notes || detail.targetCostReason)
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-10">
-      <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-md border-0 bg-slate-900 shadow-2xl outline-none">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
-          <div className="min-w-0">
-            <h3 className="font-bold text-white text-base">Cost Allocation Detail · {detail.refNo}</h3>
-            <div className="mt-1 text-xs text-slate-400">{detail.date} · {detail.branchWarehouse || '-'} · {detail.status}</div>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent
+        hideClose
+        aria-labelledby="stock-convert-detail-title"
+        className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-slate-900 !p-0 outline-none sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[90vh] sm:w-[calc(100%-2rem)] sm:max-w-6xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-md"
+      >
+        <DialogHeader className="shrink-0 rounded-none bg-slate-900 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] text-white sm:p-4 sm:rounded-t-md">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div className="min-w-0">
+              <DialogTitle id="stock-convert-detail-title" className="truncate text-base text-white sm:text-lg">
+                รายละเอียดการจัดสรรต้นทุน · {detail.refNo}
+              </DialogTitle>
+              <DialogDescription className="truncate text-slate-300">
+                {detail.date} · {detail.branchWarehouse || '-'} · {displayConvertLabel(CONVERT_STATUS_LABELS, detail.status)}
+              </DialogDescription>
+            </div>
+            <div className="flex shrink-0 justify-end gap-2">
+              <button className="h-10 rounded-md border border-emerald-600 bg-emerald-600 px-3 text-sm font-normal text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 disabled:opacity-50 sm:h-9 sm:px-4" disabled={isLoading} type="button" onClick={onExport}>ส่งออก Excel</button>
+              <button className="h-10 rounded-md border border-rose-600 bg-rose-600 px-3 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700 sm:h-9 sm:px-4" type="button" onClick={onClose}>ปิด</button>
+            </div>
           </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
-            <button className="h-9 rounded-md border border-emerald-600 bg-emerald-600 px-4 text-sm font-normal text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 disabled:opacity-50" disabled={isLoading} type="button" onClick={onExport}>ส่งออก CSV</button>
-            <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700" type="button" onClick={onClose}>ปิด</button>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50">
+          <div className="grid grid-cols-2 gap-2.5 border-b border-slate-100 p-4 sm:gap-4 lg:grid-cols-4">
+            <Metric label="น้ำหนักออก" value={`${formatMoney(detail.sourceQty)} กก.`} />
+            <Metric label="น้ำหนักเข้า" value={`${formatMoney(detail.targetQty)} กก.`} />
+            <Metric label="น้ำหนักสูญเสีย" value={`${formatMoney(detail.lossQty)} กก.`} />
+            <Metric label="น้ำหนักที่จัดสรร" value={`${formatMoney(totalQty)} กก.`} />
+            <Metric label="ต้นทุนที่จัดสรร" value={`${formatMoney(totalCost)} บาท`} />
+            <Metric label="นโยบายต้นทุน" value={displayConvertLabel(CONVERT_TARGET_COST_POLICY_LABELS, detail.targetCostPolicy)} />
+            <Metric label="ต้นทุนปลายทาง" value={`${formatMoney(detail.targetUnitCost)} บาท/กก.`} />
+            <Metric label="ส่วนต่างต้นทุน" value={`${formatMoney(detail.targetCostVariance)} บาท`} />
           </div>
-        </div>
-        <div className="overflow-y-auto bg-slate-50">
-          <div className="grid grid-cols-2 gap-3 border-b border-slate-100 p-4 md:grid-cols-4 lg:grid-cols-5">
-            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Source Qty" value={`${formatMoney(detail.sourceQty)} กก.`} />
-            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Target Qty" value={`${formatMoney(detail.targetQty)} กก.`} />
-            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Loss" value={`${formatMoney(detail.lossQty)} กก.`} />
-            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Allocated Qty" value={`${formatMoney(totalQty)} กก.`} />
-            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Allocated Cost" value={formatMoney(totalCost)} />
-            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Target Policy" value={detail.targetCostPolicy} />
-            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Target ฿/กก." value={formatMoney(detail.targetUnitCost)} />
-            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Variance" value={formatMoney(detail.targetCostVariance)} />
-          </div>
-          <div className="p-4">
-            <div className="overflow-auto rounded-md bg-white shadow overflow-hidden">
-              <div className="p-2 bg-slate-50 border-b border-slate-100 flex justify-end">
-                {columnResize.hasCustomWidths ? (
+
+          <div className="space-y-3 p-4">
+            <h4 className="text-sm font-bold text-slate-800">รายการจัดสรรต้นทุน</h4>
+
+            <div className="space-y-3 md:hidden">
+              {detail.lines.map((line) => (
+                <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" key={`${line.lineNo}-${line.sourcePoolId ?? 'source'}-mobile`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="font-semibold text-slate-800">รายการ {line.lineNo}</div>
+                    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${line.allocationStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                      {displayConvertLabel(CONVERT_ALLOCATION_STATUS_LABELS, line.allocationStatus)}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                    <div>
+                      <div className="text-xs text-slate-500">Cost Pool ต้นทาง</div>
+                      <div className="mt-0.5 font-semibold text-slate-800">{line.sourceRefNo ?? line.sourceType ?? '-'}</div>
+                      <div className="text-xs text-slate-400">Pool {line.sourcePoolId ?? '-'}{line.sourceLotNo ? ` · ล็อต ${line.sourceLotNo}` : ''}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500">Cost Pool ปลายทาง</div>
+                      <div className="mt-0.5 font-semibold text-slate-800">Pool {line.targetPoolId ?? '-'}</div>
+                      <div className="text-xs text-slate-400">{displayConvertLabel(CONVERT_POOL_STATUS_LABELS, line.targetPoolStatus ?? '')}{line.targetLotNo ? ` · ล็อต ${line.targetLotNo}` : ''}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500">สินค้าต้นทาง</div>
+                      <div className="mt-0.5 font-medium text-slate-700">{line.sourceProduct}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500">สินค้าปลายทาง</div>
+                      <div className="mt-0.5 font-medium text-slate-700">{line.targetProduct}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500">จำนวน</div>
+                      <div className="mt-0.5 font-mono font-semibold text-slate-800">{formatMoney(line.qty)} กก.</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500">ต้นทุน</div>
+                      <div className="mt-0.5 font-mono font-semibold text-slate-800">{formatMoney(line.unitCost)} บาท/กก.</div>
+                      <div className="text-xs text-slate-500">รวม {formatMoney(line.totalCost)} บาท</div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+              {!detail.lines.length ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400 shadow-sm">ไม่พบรายการจัดสรรสำหรับเอกสารนี้</div> : null}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm md:block">
+              {columnResize.hasCustomWidths ? (
+                <div className="flex justify-end border-b border-slate-100 bg-slate-50 p-2">
                   <button className="text-xs text-blue-600 hover:underline" type="button" onClick={columnResize.resetColumnWidths}>
                     คืนค่าเดิมตาราง
                   </button>
-                ) : null}
-              </div>
-              <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+                </div>
+              ) : null}
+              <table className="ns-table w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
                   {detailColumns.map((col) => (
                     <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
                   ))}
                 </colgroup>
-                <thead className="border-b border-slate-100 bg-slate-100 text-slate-700">
+                <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
                   <tr>
-                    <ResizableTableHead label="Line" resizeProps={columnResize.getResizeHandleProps('line', 'Line')} />
-                    <ResizableTableHead label="Source Pool" resizeProps={columnResize.getResizeHandleProps('sourcePool', 'Source Pool')} />
-                    <ResizableTableHead label="Source Product" resizeProps={columnResize.getResizeHandleProps('sourceProduct', 'Source Product')} />
-                    <ResizableTableHead label="Target Pool" resizeProps={columnResize.getResizeHandleProps('targetPool', 'Target Pool')} />
-                    <ResizableTableHead label="Target Product" resizeProps={columnResize.getResizeHandleProps('targetProduct', 'Target Product')} />
-                    <ResizableTableHead align="right" label="Qty" resizeProps={columnResize.getResizeHandleProps('qty', 'Qty')} />
-                    <ResizableTableHead align="right" label="฿/กก." resizeProps={columnResize.getResizeHandleProps('unitCost', '฿/กก.')} />
-                    <ResizableTableHead align="right" label="Cost" resizeProps={columnResize.getResizeHandleProps('cost', 'Cost')} />
-                    <ResizableTableHead align="center" label="Status" resizeProps={columnResize.getResizeHandleProps('status', 'Status')} />
+                    <ResizableTableHead label="ลำดับ" resizeProps={columnResize.getResizeHandleProps('line', 'ลำดับ')} />
+                    <ResizableTableHead label="Cost Pool ต้นทาง" resizeProps={columnResize.getResizeHandleProps('sourcePool', 'Cost Pool ต้นทาง')} />
+                    <ResizableTableHead label="สินค้าต้นทาง" resizeProps={columnResize.getResizeHandleProps('sourceProduct', 'สินค้าต้นทาง')} />
+                    <ResizableTableHead label="Cost Pool ปลายทาง" resizeProps={columnResize.getResizeHandleProps('targetPool', 'Cost Pool ปลายทาง')} />
+                    <ResizableTableHead label="สินค้าปลายทาง" resizeProps={columnResize.getResizeHandleProps('targetProduct', 'สินค้าปลายทาง')} />
+                    <ResizableTableHead align="right" label="จำนวน" resizeProps={columnResize.getResizeHandleProps('qty', 'จำนวน')} />
+                    <ResizableTableHead align="right" label="ต้นทุน/กก." resizeProps={columnResize.getResizeHandleProps('unitCost', 'ต้นทุน/กก.')} />
+                    <ResizableTableHead align="right" label="ต้นทุนรวม" resizeProps={columnResize.getResizeHandleProps('cost', 'ต้นทุนรวม')} />
+                    <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-200">
                   {detail.lines.map((line) => (
-                    <tr key={`${line.lineNo}-${line.sourcePoolId ?? 'source'}`} className="hover:bg-slate-50">
-                      <td className="p-2 align-top font-mono text-xs font-semibold text-slate-700 overflow-hidden truncate">{line.lineNo}</td>
-                      <td className="p-2 align-top text-xs font-semibold text-slate-700 overflow-hidden truncate">
+                    <tr key={`${line.lineNo}-${line.sourcePoolId ?? 'source'}`} className="transition-colors hover:bg-slate-50">
+                      <td className="overflow-hidden truncate px-3 py-3 align-top font-mono text-slate-700">{line.lineNo}</td>
+                      <td className="overflow-hidden truncate px-3 py-3 align-top text-slate-700">
                         <div>{line.sourceRefNo ?? line.sourceType ?? '-'}</div>
-                        <div className="text-xs text-slate-500">Pool {line.sourcePoolId ?? '-'}{line.sourceLotNo ? ` · Lot ${line.sourceLotNo}` : ''}</div>
+                        <div className="mt-0.5 text-xs text-slate-400">Pool {line.sourcePoolId ?? '-'}{line.sourceLotNo ? ` · ล็อต ${line.sourceLotNo}` : ''}</div>
                       </td>
-                      <td className="p-2 align-top text-xs font-semibold text-slate-700 overflow-hidden truncate">{line.sourceProduct}</td>
-                      <td className="p-2 align-top text-xs font-semibold text-slate-700 overflow-hidden truncate">
+                      <td className="overflow-hidden truncate px-3 py-3 align-top text-slate-700">{line.sourceProduct}</td>
+                      <td className="overflow-hidden truncate px-3 py-3 align-top text-slate-700">
                         <div>Pool {line.targetPoolId ?? '-'}</div>
-                        <div className="text-xs text-slate-500">{line.targetPoolStatus ?? '-'}{line.targetLotNo ? ` · Lot ${line.targetLotNo}` : ''}</div>
+                        <div className="mt-0.5 text-xs text-slate-400">{displayConvertLabel(CONVERT_POOL_STATUS_LABELS, line.targetPoolStatus ?? '')}{line.targetLotNo ? ` · ล็อต ${line.targetLotNo}` : ''}</div>
                       </td>
-                      <td className="p-2 align-top text-xs font-semibold text-slate-700 overflow-hidden truncate">{line.targetProduct}</td>
-                      <td className="p-2 align-top text-right font-mono text-xs font-semibold text-slate-700 overflow-hidden truncate">{formatMoney(line.qty)}</td>
-                      <td className="p-2 align-top text-right font-mono text-xs font-semibold text-slate-700 overflow-hidden truncate">{formatMoney(line.unitCost)}</td>
-                      <td className="p-2 align-top text-right font-mono text-xs font-semibold text-slate-700 overflow-hidden truncate">{formatMoney(line.totalCost)}</td>
-                      <td className="p-2 align-top text-center overflow-hidden truncate">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${line.allocationStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{line.allocationStatus}</span>
+                      <td className="overflow-hidden truncate px-3 py-3 align-top text-slate-700">{line.targetProduct}</td>
+                      <td className="overflow-hidden truncate px-3 py-3 text-right align-top font-mono text-slate-700">{formatMoney(line.qty)}</td>
+                      <td className="overflow-hidden truncate px-3 py-3 text-right align-top font-mono text-slate-700">{formatMoney(line.unitCost)}</td>
+                      <td className="overflow-hidden truncate px-3 py-3 text-right align-top font-mono text-slate-700">{formatMoney(line.totalCost)}</td>
+                      <td className="overflow-hidden truncate px-3 py-3 text-center align-top">
+                        <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${line.allocationStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                          {displayConvertLabel(CONVERT_ALLOCATION_STATUS_LABELS, line.allocationStatus)}
+                        </span>
                       </td>
                     </tr>
                   ))}
-                  {!detail.lines.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่พบ allocation lines สำหรับเอกสารนี้</td></tr> : null}
+                  {!detail.lines.length ? <tr><td className="px-3 py-10 text-center text-slate-400" colSpan={9}>ไม่พบรายการจัดสรรสำหรับเอกสารนี้</td></tr> : null}
                 </tbody>
               </table>
             </div>
-            <div className="mt-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 shadow-sm">
-              เหตุผล: {detail.reason || '-'} · หมายเหตุ: {detail.notes || '-'} · เหตุผล override: {detail.targetCostReason || '-'}
-            </div>
+
+            {hasNotes ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h4 className="border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">เหตุผลและหมายเหตุ</h4>
+                <div className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                  {detail.reason ? <div><div className="text-xs text-slate-500">เหตุผลการปรับเกรด</div><div className="mt-0.5 break-words text-slate-700">{detail.reason}</div></div> : null}
+                  {detail.notes ? <div><div className="text-xs text-slate-500">หมายเหตุ</div><div className="mt-0.5 break-words text-slate-700">{detail.notes}</div></div> : null}
+                  {detail.targetCostReason ? <div><div className="text-xs text-slate-500">เหตุผลการกำหนดต้นทุนเอง</div><div className="mt-0.5 break-words text-slate-700">{detail.targetCostReason}</div></div> : null}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 function Metric({
-  cardClassName,
   emoji,
-  iconBg = 'bg-slate-100',
   label,
-  labelClassName = 'text-slate-500',
   value,
   valueClassName = 'text-slate-900',
   className = '',
@@ -1862,21 +1992,8 @@ function Metric({
   valueClassName?: string
   className?: string
 }) {
-  if (cardClassName) {
-    return <div className={cardClassName}><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 font-mono text-lg sm:text-2xl font-bold ${valueClassName}`}>{value}</div></div>
-  }
-
-  return (
-    <div className={`bg-white p-3 sm:p-4 border border-slate-200 rounded-md shadow-sm flex items-center gap-2.5 sm:gap-3 ${className}`}>
-      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-md ${iconBg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
-        {emoji ?? '•'}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className={`text-xs font-semibold ${labelClassName} truncate`}>{label}</div>
-        <div className={`font-mono text-lg sm:text-2xl font-bold ${valueClassName} mt-0.5`}>{value}</div>
-      </div>
-    </div>
-  )
+  const tone = valueClassName.includes('emerald') ? 'emerald' : valueClassName.includes('amber') ? 'amber' : valueClassName.includes('red') ? 'red' : valueClassName.includes('blue') ? 'blue' : 'slate'
+  return <SharedKpiCard className={className} icon={emoji} label={label} tone={tone} value={value} />
 }
 
 function Field(props: { disabled?: boolean; label: string; onChange: (value: string) => void; type?: string; value: string }) {
@@ -2011,7 +2128,7 @@ function StatusConvertForm(props: { isSaving: boolean; error?: string | null; on
   }, [props.reference.products])
 
   return <FormShell isSaving={props.isSaving} error={props.error} onCancel={props.onCancel} onSubmit={() => props.onSubmit(values)}>
-    <div className="md:col-span-2 grid gap-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:grid-cols-2">
+    <div className="md:col-span-2 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:grid-cols-2">
       <div className="w-full">
         <SearchCombobox
           inputId="status-convert-product-search"
@@ -2121,7 +2238,7 @@ function CostPoolPreview({
   const totalQty = previewRows.reduce((sum, line) => sum + line.qty, 0)
   const totalValue = previewRows.reduce((sum, line) => sum + line.qty * line.entry.unitCost, 0)
   return (
-    <div className="rounded-md border border-red-100 bg-white p-3">
+    <div className="rounded-xl border border-red-100 bg-white p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs font-semibold text-red-700">Cost Pool Lots</div>
         <div className="text-xs text-slate-500">
@@ -2131,7 +2248,7 @@ function CostPoolPreview({
       {shortageQty > 0 ? <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">Cost Pool ไม่พอ ขาด {formatMoney(shortageQty)} กก.</div> : null}
       {method === 'MANUAL' ? (
         <div className="max-h-48 overflow-y-auto rounded-md border border-slate-100">
-          <table className="w-full text-xs">
+          <table className="ns-table w-full text-xs">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="p-2 text-left">Source</th>
@@ -2143,13 +2260,13 @@ function CostPoolPreview({
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.id} className="border-t border-slate-100">
-                  <td className="p-2">
+                  <td className="p-3">
                     <div className="font-semibold text-slate-700">{entry.sourceRefNo ?? entry.sourceType}</div>
                     <div className="text-slate-500">{entry.date}{entry.lotNo ? ` · Lot ${entry.lotNo}` : ''}</div>
                   </td>
-                  <td className="p-2 text-right font-mono">{formatMoney(entry.availableQty)}</td>
-                  <td className="p-2 text-right font-mono">{formatMoney(entry.unitCost)}</td>
-                  <td className="p-2 text-right">
+                  <td className="p-3 text-right font-mono">{formatMoney(entry.availableQty)}</td>
+                  <td className="p-3 text-right font-mono">{formatMoney(entry.unitCost)}</td>
+                  <td className="p-3 text-right">
                     <input
                       className="h-9 w-24 rounded-md border border-slate-300 px-2 text-right font-mono"
                       min="0"
@@ -2167,7 +2284,7 @@ function CostPoolPreview({
         </div>
       ) : (
         <div className="max-h-44 overflow-y-auto rounded-md border border-slate-100">
-          <table className="w-full text-xs">
+          <table className="ns-table w-full text-xs">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="p-2 text-left">Source</th>
@@ -2179,13 +2296,13 @@ function CostPoolPreview({
             <tbody>
               {previewRows.map((line) => (
                 <tr key={line.entry.id} className="border-t border-slate-100">
-                  <td className="p-2">
+                  <td className="p-3">
                     <div className="font-semibold text-slate-700">{line.entry.sourceRefNo ?? line.entry.sourceType}</div>
                     <div className="text-slate-500">{line.entry.date}{line.entry.lotNo ? ` · Lot ${line.entry.lotNo}` : ''}</div>
                   </td>
-                  <td className="p-2 text-right font-mono">{formatMoney(line.qty)}</td>
-                  <td className="p-2 text-right font-mono">{formatMoney(line.entry.unitCost)}</td>
-                  <td className="p-2 text-right font-mono">{formatMoney(line.qty * line.entry.unitCost)}</td>
+                  <td className="p-3 text-right font-mono">{formatMoney(line.qty)}</td>
+                  <td className="p-3 text-right font-mono">{formatMoney(line.entry.unitCost)}</td>
+                  <td className="p-3 text-right font-mono">{formatMoney(line.qty * line.entry.unitCost)}</td>
                 </tr>
               ))}
               {!previewRows.length ? <tr><td className="p-3 text-center text-slate-400" colSpan={4}>เลือกสินค้า/สาขา/คลังและน้ำหนักเพื่อ preview Cost Pool</td></tr> : null}
@@ -2217,6 +2334,9 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
     targetUnitCostReason: null,
     warehouseId: '',
   })
+  const [productStock, setProductStock] = useState<ProductStockPayload | null>(null)
+  const [productStockError, setProductStockError] = useState<string | null>(null)
+  const [isStockPreviewLoading, setIsStockPreviewLoading] = useState(false)
   const sourceProduct = props.reference.products.find((item) => item.id === values.sourceProductId)
   const lossQty = Math.max(0, Number(values.sourceQty) - Number(values.targetQty))
   const yieldPct = Number(values.sourceQty) > 0 ? (Number(values.targetQty) / Number(values.sourceQty)) * 100 : 0
@@ -2263,8 +2383,44 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
       }))
   }, [props.reference.products])
 
+  useEffect(() => {
+    const productCode = props.reference.products.find((product) => product.id === values.sourceProductId)?.code
+    const branchCode = props.reference.branches.find((branch) => branch.id === values.branchId)?.code
+
+    if (!branchCode || !productCode) {
+      setProductStock(null)
+      setProductStockError(null)
+      setIsStockPreviewLoading(false)
+      return
+    }
+
+    let cancelled = false
+    async function loadProductStock() {
+      setIsStockPreviewLoading(true)
+      setProductStockError(null)
+      try {
+        const params = new URLSearchParams({
+          branchCode: branchCode ?? '',
+          productCode: productCode ?? '',
+          warehouseCode: '',
+        })
+        const payload = await dailyFetchJson<ProductStockPayload>(`/api/production/orders/product-stock?${params.toString()}`)
+        if (!cancelled) setProductStock(payload)
+      } catch (caught) {
+        if (cancelled) return
+        setProductStock(null)
+        setProductStockError(caught instanceof Error ? caught.message : 'โหลดสต๊อกสินค้าไม่ได้')
+      } finally {
+        if (!cancelled) setIsStockPreviewLoading(false)
+      }
+    }
+
+    void loadProductStock()
+    return () => { cancelled = true }
+  }, [props.reference.branches, props.reference.products, values.branchId, values.sourceProductId])
+
   return <FormShell isSaving={props.isSaving} error={props.error} onCancel={props.onCancel} onSubmit={() => props.onSubmit(values)}>
-    <div className="md:col-span-2 rounded-md border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2 animate-fade-in">
+    <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2 animate-fade-in">
       <BaseDateDoc values={values} setValues={setValues} />
       <BranchWarehouseFields branchId={values.branchId} reference={props.reference} setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '' })} setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId })} warehouseId={values.warehouseId} />
     </div>
@@ -2310,6 +2466,16 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
             </div>
           </>
         ) : null}
+        <div className="md:col-span-2">
+          <ProductStockPreview
+            destinationWarehouseName=""
+            error={productStockError}
+            heading="ข้อมูล Stock ปัจจุบันของสินค้าที่จะปรับเกรดสินค้า"
+            isLoading={isStockPreviewLoading}
+            isReady={Boolean(values.branchId && values.sourceProductId)}
+            stock={productStock}
+          />
+        </div>
       </div>
     </div>
     <div className="rounded-md border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm md:col-span-2">
@@ -2333,7 +2499,7 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
             onChange={(event) => setValues({ ...values, targetCostPolicy: event.target.value as StockConvertFormValues['targetCostPolicy'], targetUnitCost: null, targetUnitCostReason: null })}
           >
             <option value="SOURCE_MATCHED">Source matched cost (default)</option>
-            <option value="CUSTOM_UNIT_COST">Custom unit cost (admin/owner)</option>
+            <option value="CUSTOM_UNIT_COST">กำหนดต้นทุนต่อหน่วยเอง</option>
           </select>
         </label>
         {values.targetCostPolicy === 'CUSTOM_UNIT_COST' ? (
@@ -2344,7 +2510,7 @@ function ConvertForm(props: { isSaving: boolean; error?: string | null; onCancel
         ) : null}
       </div>
     </div>
-    <div className="rounded-md border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
       <div className="mb-3 text-sm font-bold text-slate-700">Loss / Yield / Cost Flow</div>
       <div className="grid gap-4 md:grid-cols-3">
         <ReadOnlyBox label="Loss" value={`${formatMoney(lossQty)} กก.`} />
@@ -2419,7 +2585,7 @@ function AdjustForm(props: { isSaving: boolean; error?: string | null; onCancel:
   const diffQty = snapshot?.diffQty ?? 0
 
   return <FormShell isSaving={props.isSaving} error={props.error} onCancel={props.onCancel} onSubmit={() => props.onSubmit(values)}>
-    <div className="md:col-span-2 grid gap-3 rounded-md bg-white p-4 shadow md:grid-cols-2">
+    <div className="grid gap-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm md:col-span-2 md:grid-cols-2">
       <div className="md:col-span-2 border-b border-slate-100 pb-2">
         <h4 className="text-sm font-bold text-slate-800">ข้อมูลการนับจริง</h4>
       </div>
@@ -2459,7 +2625,7 @@ function AdjustForm(props: { isSaving: boolean; error?: string | null; onCancel:
         <label className="block text-xs font-semibold text-slate-600">
           เหตุผล <span className="text-red-600">*</span>
           <select className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800 outline-none focus:border-slate-900" value={values.reason} onChange={(event) => setValues({ ...values, reason: event.target.value as StockAdjustFormValues['reason'] })}>
-            {reasonOptions.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+            {reasonOptions.map((reason) => <option key={reason} value={reason}>{stockAdjustReasonLabel(reason)}</option>)}
           </select>
         </label>
       </div>
@@ -2517,12 +2683,14 @@ interface ProductStockPayload {
 function ProductStockPreview({
   destinationWarehouseName,
   error,
+  heading = 'ข้อมูล Stock ปัจจุบันของสินค้า',
   isLoading,
   isReady,
   stock,
 }: {
   destinationWarehouseName: string
   error: string | null
+  heading?: string
   isLoading: boolean
   isReady: boolean
   stock: ProductStockPayload | null
@@ -2535,12 +2703,12 @@ function ProductStockPreview({
   return (
     <div className="rounded-md border border-indigo-100 bg-indigo-50/50 p-4 space-y-2 text-left">
       <h5 className="font-bold text-indigo-800 text-xs flex items-center gap-1.5">
-        📦 ข้อมูล Stock ปัจจุบันของสินค้าที่จะปรับสถานะสินค้า: <span className="font-normal text-slate-600">{stock.productName} ({stock.productCode})</span>
+        📦 {heading}: <span className="font-normal text-slate-600">{stock.productName} ({stock.productCode})</span>
       </h5>
       
       {/* Desktop Table View */}
       <div className="hidden md:block overflow-x-auto rounded-md bg-white border border-indigo-100">
-        <table className="w-full text-xs">
+        <table className="ns-table w-full text-xs">
           <thead className="bg-indigo-50 text-indigo-700">
             <tr>
               <th className="p-2 text-left">สาขา / คลัง</th>
@@ -2553,11 +2721,11 @@ function ProductStockPreview({
           <tbody className="divide-y divide-indigo-50/50">
             {stock.rows.map((row, index) => (
               <tr key={index} className="hover:bg-indigo-50/10">
-                <td className="p-2 font-medium text-slate-700">{stock.branchCode} / {row.warehouseCode || destinationWarehouseName}</td>
-                <td className="p-2 text-center"><span className="rounded bg-slate-100 px-1 py-0.5 text-xs font-bold text-slate-600">{row.status}</span></td>
-                <td className="p-2 text-right font-bold text-slate-900 tabular-nums">{formatMoney(row.qty)}</td>
-                <td className="p-2 text-right text-slate-500 tabular-nums">{formatMoney(row.avgCost)}</td>
-                <td className="p-2 text-right font-bold text-indigo-700 tabular-nums">{formatMoney(row.value)}</td>
+                <td className="p-3 font-medium text-slate-700">{stock.branchCode} / {row.warehouseCode || destinationWarehouseName}</td>
+                <td className="p-3 text-center"><span className="rounded bg-slate-100 px-1 py-0.5 text-xs font-bold text-slate-600">{row.status}</span></td>
+                <td className="p-3 text-right font-bold text-slate-900 tabular-nums">{formatMoney(row.qty)}</td>
+                <td className="p-3 text-right text-slate-500 tabular-nums">{formatMoney(row.avgCost)}</td>
+                <td className="p-3 text-right font-bold text-indigo-700 tabular-nums">{formatMoney(row.value)}</td>
               </tr>
             ))}
             {stock.rows.length === 0 ? (

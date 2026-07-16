@@ -12,7 +12,7 @@ import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-ref
 import { appendWtoPendingOutEventsFromHolds, getWeightTicketPendingOutEvents } from '@/lib/server/weight-ticket-pending-out-events'
 import { buildWeightTicketEditChanges } from '@/lib/server/weight-ticket-write/edit-audit'
 import { assertWeightTicketImpurityRules, assertWeightTicketPartyForType, WeightTicketWriteValidationError } from '@/lib/server/weight-ticket-write/type-guards'
-import { applyWeightTicketEditSideEffects, resolveWeightTicketWarehousesForWrite, validateWeightTicketStockForWrite, weightTicketPartySnapshot } from '@/lib/server/weight-ticket-write/handlers'
+import { applyWeightTicketCreateSideEffects, applyWeightTicketEditSideEffects, resolveWeightTicketWarehousesForWrite, validateWeightTicketStockForWrite, weightTicketPartySnapshot } from '@/lib/server/weight-ticket-write/handlers'
 import { buildWtoEditTimelineNote, prepareWtoEditPendingOutPlan } from '@/lib/server/weight-ticket-write/wto'
 import {
   releaseActiveWtoPendingOut,
@@ -25,7 +25,6 @@ import {
   buildWeightTicketLineRows,
   buildWeightTicketProductSummaryRows,
   canMutateWeightTicket,
-  defaultTicketStatus,
   getWeightTicketTimeline,
   getWeightTicketDownstreamAllocations,
   getWeightTicketUsageTimeline,
@@ -33,6 +32,7 @@ import {
   mapWeightTicketRow,
   mutableTicketErrorMessage,
   nextWeightTicketDocNo,
+  requireWeightTicketBranchDocumentCode,
   type WeightTicketRow,
   weightTicketAuditSnapshot,
 } from '@/lib/server/weight-tickets'
@@ -133,7 +133,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await getCurrentAuthContext()
-    requirePermission(auth, 'daily.weight_tickets.view')
+    requirePermission(auth, 'daily.weight_tickets.update')
 
     const { id } = await context.params
     const values = weightTicketFormSchema.parse(await request.json())
@@ -237,9 +237,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const actor = currentActor(auth)
     const documentDate = toDateOnly(existing.document_date)
-    const nextStatus = existing.status === 'billed' || existing.status === 'delivered'
-      ? existing.status
-      : defaultTicketStatus(values.type)
+    const nextStatus = existing.status
     const totals = calculateTicketTotals(values.lines.map((line) => ({
       containerDeductionWeight: String(line.containerDeductionWeight),
       deductionMode: line.deductionMode,
@@ -252,7 +250,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     })))
 
     const updated = await prisma.$transaction(async (tx) => {
-      const branchCode = String(branch.code ?? '').replace(/\D/g, '').slice(-2).padStart(2, '0')
+      const branchCode = requireWeightTicketBranchDocumentCode(branch.code)
       const mustRenumber = existing.branch_id !== branch.id
       const docNo = mustRenumber
         ? await (async () => {
@@ -274,6 +272,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           doc_no: docNo,
           doc_type: values.type,
           gross_weight: totals.grossWeight,
+          godown_name: values.godownName,
           image_count: values.vehicleImageNames.length,
           net_weight: totals.netWeight,
           party_name: partySnapshot.partyName,
@@ -326,18 +325,22 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       })
       await tx.weight_ticket_product_summaries.deleteMany({ where: { weight_ticket_id: existing.id } })
       await tx.weight_ticket_lines.deleteMany({ where: { weight_ticket_id: existing.id } })
-      await validateWeightTicketStockForWrite(tx, { branchId: branch.id, lineRows, type: values.type })
+      if (existing.status === 'delivered') {
+        await validateWeightTicketStockForWrite(tx, { branchId: branch.id, lineRows, type: values.type })
+      }
       const createdLines = await Promise.all(lineRows.map((data) => tx.weight_ticket_lines.create({ data })))
-      const createdPendingOutHoldIds = await applyWeightTicketEditSideEffects(tx, {
-        actor,
-        branchId: branch.id,
-        createdLines,
-        documentNo: docNo,
-        preservedCostSnapshots,
-        shouldSnapshotCost: existing.status === 'delivered',
-        type: values.type,
-        weightTicketId: existing.id,
-      })
+      const createdPendingOutHoldIds = existing.status === 'delivered'
+        ? await applyWeightTicketEditSideEffects(tx, {
+          actor,
+          branchId: branch.id,
+          createdLines,
+          documentNo: docNo,
+          preservedCostSnapshots,
+          shouldSnapshotCost: true,
+          type: values.type,
+          weightTicketId: existing.id,
+        })
+        : []
       const imageCount = values.vehicleImageNames.length + createdLines.reduce((sum, line) => sum + (line.image_count ?? 0), 0)
       const { summaryRows } = buildWeightTicketProductSummaryRows(existing.id, createdLines)
       const createdSummaries = await Promise.all(summaryRows.map(({ lineIds, ...data }) => tx.weight_ticket_product_summaries.create({ data })))
@@ -354,12 +357,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       if (bridgeRows.length) {
         await tx.weight_ticket_product_summary_lines.createMany({ data: bridgeRows })
       }
-      const warehouseName = values.warehouseName || null
-
       await tx.weight_tickets.update({
-        data: { 
+        data: {
           image_count: imageCount,
-          warehouse_name: warehouseName,
         },
         where: { id: existing.id },
       })
@@ -430,30 +430,6 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       targetType: 'weight_ticket',
     })
 
-    // Trigger auto-send to LINE if enabled for this document type on edit
-    const autoSendKey = mapped.type === 'WTI' ? 'LINE_AUTO_SEND_WTI' : 'LINE_AUTO_SEND_WTO'
-    const autoSendConfig = await prisma.system_settings.findUnique({
-      where: { key: autoSendKey },
-    })
-    if (autoSendConfig?.value === 'true') {
-      try {
-        // Auto-send: enqueue แล้ว execute ทันที (ไม่รอ worker) ตามแนวทาง A
-        const enqueueResult = await enqueueNotificationJob(mapped.documentNo, {
-          requestedBy: actor,
-          force: false,
-        })
-        for (const job of enqueueResult.jobs) {
-          try {
-            await executeNotificationJob(job.id, { force: false })
-          } catch (err) {
-            console.error('[weight-ticket-auto-send] failed to execute job on update:', job.id, err)
-          }
-        }
-      } catch (err) {
-        console.error('[weight-ticket-auto-send] failed to enqueue LINE notification on update:', err)
-      }
-    }
-
     const [timeline, pendingOutEvents] = await Promise.all([
       getWeightTicketTimeline(prisma, updated.id),
       getWeightTicketPendingOutEvents(prisma, updated.id),
@@ -491,24 +467,41 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const actor = currentActor(auth)
     const confirmParsed = weightTicketConfirmSchema.safeParse(rawValues)
     if (confirmParsed.success) {
-      if (existing.doc_type !== 'WTO') {
-        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยืนยันต้นทุนได้เฉพาะใบส่งของ WTO' }, { status: 400 })
-      }
+      requirePermission(auth, 'daily.weight_tickets.confirm')
       if (existing.status !== 'draft') {
-        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยืนยันได้เฉพาะใบส่งของสถานะร่าง' }, { status: 400 })
+        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยืนยันได้เฉพาะเอกสารสถานะแบบร่าง' }, { status: 400 })
       }
 
       const confirmedAt = new Date()
+      const nextStatus = existing.doc_type === 'WTO' ? 'delivered' : 'received'
       const updated = await prisma.$transaction(async (tx) => {
-        const confirmedHoldIds = await snapshotActiveWtoPendingOutCosts(tx, {
-          actor,
-          branchId: existing.branch_id,
-          source: 'WTO_CONFIRM',
-          weightTicketId: existing.id,
-        })
+        let confirmedHoldIds: bigint[] = []
+        if (existing.doc_type === 'WTO') {
+          await validateWeightTicketStockForWrite(tx, {
+            branchId: existing.branch_id,
+            lineRows: existing.weight_ticket_lines,
+            type: 'WTO',
+          })
+          const createdHoldIds = await applyWeightTicketCreateSideEffects(tx, {
+            actor,
+            branchId: existing.branch_id,
+            createdLines: existing.weight_ticket_lines,
+            documentNo: existing.doc_no,
+            type: 'WTO',
+            weightTicketId: existing.id,
+          })
+          confirmedHoldIds = createdHoldIds.length
+            ? await snapshotActiveWtoPendingOutCosts(tx, {
+              actor,
+              branchId: existing.branch_id,
+              source: 'WTO_CONFIRM',
+              weightTicketId: existing.id,
+            })
+            : []
+        }
         await tx.weight_tickets.update({
           data: {
-            status: 'delivered',
+            status: nextStatus,
             updated_at: confirmedAt,
             updated_by: actor,
           },
@@ -520,19 +513,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           createdAt: confirmedAt,
           fromStatus: existing.status,
           meta: {
-            reason: 'wto_confirm_cost_snapshot',
+            reason: existing.doc_type === 'WTO' ? 'wto_confirm_cost_snapshot' : 'wti_confirm_receipt',
           },
-          toStatus: 'delivered',
+          toStatus: nextStatus,
           weightTicketId: existing.id,
         })
-        await appendWtoPendingOutEventsFromHolds(tx, {
-          actor,
-          eventTypeForHold: () => 'confirm_snapshot',
-          holdIds: confirmedHoldIds,
-          occurredAt: confirmedAt,
-          statusLogEventKey,
-          weightTicketId: existing.id,
-        })
+        if (existing.doc_type === 'WTO') {
+          await appendWtoPendingOutEventsFromHolds(tx, {
+            actor,
+            eventTypeForHold: () => 'confirm_snapshot',
+            holdIds: confirmedHoldIds,
+            occurredAt: confirmedAt,
+            statusLogEventKey,
+            weightTicketId: existing.id,
+          })
+        }
         return tx.weight_tickets.findUniqueOrThrow({
           include: ticketInclude,
           where: { id: existing.id },
@@ -560,6 +555,25 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         targetLabel: updated.doc_no,
         targetType: 'weight_ticket',
       })
+      const autoSendKey = mapped.type === 'WTI' ? 'LINE_AUTO_SEND_WTI' : 'LINE_AUTO_SEND_WTO'
+      const autoSendConfig = await prisma.system_settings.findUnique({ where: { key: autoSendKey } })
+      if (autoSendConfig?.value === 'true') {
+        try {
+          const enqueueResult = await enqueueNotificationJob(mapped.documentNo, {
+            requestedBy: actor,
+            force: false,
+          })
+          for (const job of enqueueResult.jobs) {
+            try {
+              await executeNotificationJob(job.id, { force: false })
+            } catch (caught) {
+              console.error('[weight-ticket-auto-send] failed to execute confirmed job:', job.id, caught)
+            }
+          }
+        } catch (caught) {
+          console.error('[weight-ticket-auto-send] failed to enqueue confirmed document:', caught)
+        }
+      }
       const [timeline, pendingOutEvents] = await Promise.all([
         getWeightTicketTimeline(prisma, updated.id),
         getWeightTicketPendingOutEvents(prisma, updated.id),
@@ -571,6 +585,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       })
     }
 
+    requirePermission(auth, 'daily.weight_tickets.cancel')
     const values = weightTicketCancelSchema.parse(rawValues)
     const cancelledAt = new Date()
     const updated = await prisma.$transaction(async (tx) => {

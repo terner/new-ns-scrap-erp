@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { canAccessPath, navigationItems, navigationSections, sidebarNavigationPath, type NavigationSectionKey } from '@/lib/navigation'
 
 type AppNavigationProps = {
+  authContext: { permissions: string[] } | null
   compact?: boolean
   onNavigate?: () => void
 }
@@ -22,7 +23,7 @@ function isNavigationPathActive(pathname: string, href: string) {
   return normalizedPath === normalizedHref || normalizedPath.startsWith(`${normalizedHref}/`)
 }
 
-export function AppNavigation({ compact = false, onNavigate }: AppNavigationProps) {
+export function AppNavigation({ authContext, compact = false, onNavigate }: AppNavigationProps) {
   const pathname = usePathname()
   const activePathname = sidebarNavigationPath(pathname)
   const navRef = useRef<HTMLElement | null>(null)
@@ -30,39 +31,8 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
   const manualSectionSelectionRef = useRef(false)
   const suppressScrollSaveRef = useRef(false)
   const lastActivePathnameRef = useRef(activePathname)
-  const [authContext, setAuthContext] = useState<{ isAdmin: boolean; permissions: string[] } | null>(null)
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null)
   const [expandedSection, setExpandedSection] = useState<NavigationSectionKey | null>(null)
-
-  useEffect(() => {
-    let mounted = true
-
-    async function loadAuthContext() {
-      try {
-        const response = await fetch('/api/auth/me', { cache: 'no-store' })
-        const payload = await response.json().catch(() => null)
-
-        if (mounted && response.ok) {
-          setAuthContext({
-            isAdmin: payload?.isAdmin === true,
-            permissions: Array.isArray(payload?.permissions) ? payload.permissions : [],
-          })
-        } else if (mounted) {
-          setAuthContext({ isAdmin: false, permissions: [] })
-        }
-      } catch {
-        if (mounted) {
-          setAuthContext({ isAdmin: false, permissions: [] })
-        }
-      }
-    }
-
-    void loadAuthContext()
-
-    return () => {
-      mounted = false
-    }
-  }, [])
 
   const visibleItems = useMemo(() => {
     if (!authContext) return []
@@ -73,6 +43,7 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
       }))
       .filter((item) => canAccessPath(item.href, authContext) || Boolean(item.children?.length))
   }, [authContext])
+
   useEffect(() => {
     if (lastActivePathnameRef.current !== activePathname) {
       lastActivePathnameRef.current = activePathname
@@ -89,9 +60,7 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
     if (!activeItem) return
 
     setExpandedSection(activeItem.section)
-    if (activeItem.children?.some((child) => isNavigationPathActive(activePathname, child.href))) {
-      setExpandedMenu(activeItem.href)
-    }
+    setExpandedMenu(activeItem.children?.some((child) => isNavigationPathActive(activePathname, child.href)) ? activeItem.href : null)
   }, [activePathname, visibleItems])
 
   useEffect(() => {
@@ -172,10 +141,12 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
         const items = visibleItems.filter((item) => item.section === section.key)
         if (!items.length) return null
         const sectionExpanded = expandedSection === section.key
+        const sectionPanelId = `sidebar-section-${section.key}`
 
         return (
           <div key={section.key}>
             <button
+              aria-controls={sectionPanelId}
               aria-expanded={sectionExpanded}
               className={`flex w-full items-center justify-between px-4 pb-1 pt-4 text-left text-xs uppercase tracking-wider text-slate-500 transition hover:text-slate-300 ${compact ? 'lg:justify-center lg:px-2' : ''}`}
               title={compact ? section.label : undefined}
@@ -186,19 +157,22 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
               <span className={compact ? 'text-xs lg:hidden' : 'text-xs'}>{sectionExpanded ? '▾' : '▸'}</span>
               {compact ? <span className="hidden size-1.5 rounded-full bg-slate-500 lg:block" /> : null}
             </button>
-            {sectionExpanded ? items.map((item) => {
+            {sectionExpanded ? <div id={sectionPanelId}>{items.map((item) => {
               const childActive = item.children?.some((child) => isNavigationPathActive(activePathname, child.href)) ?? false
               const active = isNavigationPathActive(activePathname, item.href) || childActive
               const expanded = expandedMenu === item.href
+              const childPanelId = `sidebar-menu-${item.href.replace(/[^a-z0-9]+/gi, '-')}`
+              const itemControlClass = `flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left transition hover:bg-slate-800/60 ${active ? 'text-white' : 'text-slate-300'} ${compact ? 'lg:justify-center lg:px-2' : ''}`
 
               return (
                 <div key={item.href}>
-                  <div className={`flex border-l-4 transition hover:bg-slate-800 ${active ? 'border-blue-500 bg-slate-800 text-white' : 'border-transparent text-slate-300'}`}>
+                  <div className="flex">
                     {item.children?.length ? (
                       <button
+                        aria-controls={childPanelId}
                         aria-current={active ? 'page' : undefined}
                         aria-expanded={expanded}
-                        className={`flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left ${active ? 'text-white' : 'text-slate-300'} ${compact ? 'lg:justify-center lg:px-2' : ''}`}
+                        className={itemControlClass}
                         data-active-nav={active ? 'true' : undefined}
                         title={compact ? item.label : undefined}
                         type="button"
@@ -207,13 +181,13 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
                           toggleMenu(item.href)
                         }}
                       >
-                        <span className="w-5 text-center">{item.icon}</span>
+                        <span className="w-5 text-center leading-none">{item.icon}</span>
                         <span className={compact ? 'truncate lg:hidden' : 'truncate'}>{item.label}</span>
                       </button>
                     ) : (
                       <Link
                         aria-current={active ? 'page' : undefined}
-                        className={`flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left ${active ? 'text-white' : 'text-slate-300'} ${compact ? 'lg:justify-center lg:px-2' : ''}`}
+                        className={itemControlClass}
                         data-active-nav={active ? 'true' : undefined}
                         href={item.href}
                         title={compact ? item.label : undefined}
@@ -222,12 +196,13 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
                           onNavigate?.()
                         }}
                       >
-                        <span className="w-5 text-center">{item.icon}</span>
+                        <span className="w-5 text-center leading-none">{item.icon}</span>
                         <span className={compact ? 'truncate lg:hidden' : 'truncate'}>{item.label}</span>
                       </Link>
                     )}
                     {item.children?.length ? (
                       <button
+                        aria-controls={childPanelId}
                         aria-expanded={expanded}
                         aria-label={`${expanded ? 'ยุบ' : 'ขยาย'}เมนู ${item.label}`}
                         className={`px-3 text-xs text-slate-400 hover:text-white ${compact ? 'lg:hidden' : ''}`}
@@ -239,7 +214,7 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
                     ) : null}
                   </div>
                   {item.children?.length && expanded ? (
-                    <div className="bg-slate-950/30 py-1">
+                    <div id={childPanelId} className="bg-slate-950/30 py-1">
                       {item.children.map((child) => {
                         const childIsActive = isNavigationPathActive(activePathname, child.href)
 
@@ -247,9 +222,9 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
                           <Link
                             key={child.href}
                             aria-current={childIsActive ? 'page' : undefined}
-                            className={`flex items-center gap-3 border-l-4 py-2 pl-11 pr-4 text-left transition hover:bg-slate-800 ${compact ? 'lg:justify-center lg:px-2' : ''} ${
-                              childIsActive ? 'border-blue-400 bg-slate-800 text-white' : 'border-transparent text-slate-400'
-                            }`}
+                            className={`flex items-center gap-3 py-2 pl-11 pr-4 text-left transition hover:bg-slate-800/60 ${
+                              childIsActive ? 'text-white' : 'text-slate-400'
+                            } ${compact ? 'lg:justify-center lg:px-2' : ''}`}
                             data-active-nav={childIsActive ? 'true' : undefined}
                             href={child.href}
                             title={compact ? child.label : undefined}
@@ -258,7 +233,7 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
                               onNavigate?.()
                             }}
                           >
-                            <span className="w-5 text-center">{child.icon}</span>
+                            <span className="w-5 text-center leading-none">{child.icon}</span>
                             <span className={compact ? 'truncate lg:hidden' : 'truncate'}>{child.label}</span>
                           </Link>
                         )
@@ -267,7 +242,7 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
                   ) : null}
                 </div>
               )
-            }) : null}
+            })}</div> : null}
           </div>
         )
       })}

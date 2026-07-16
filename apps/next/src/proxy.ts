@@ -19,10 +19,6 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
 }
 
-function metadataRole(user: { app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }) {
-  return String(user.app_metadata?.role ?? user.user_metadata?.role ?? '').toLowerCase()
-}
-
 function isPasswordChangeAllowedPath(pathname: string) {
   return pathname === '/admin/change-password' || pathname === '/api/auth/me' || pathname === '/api/auth/password-changed'
 }
@@ -60,21 +56,35 @@ export async function proxy(request: NextRequest) {
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser()
+
+  if (authError) {
+    return pathname.startsWith('/api/') ? jsonError('ตรวจสอบ session ไม่สำเร็จ', 401) : loginRedirect(request)
+  }
 
   if (!user) {
     return pathname.startsWith('/api/') ? jsonError('กรุณาเข้าสู่ระบบ', 401) : loginRedirect(request)
   }
 
-  const { data: currentAppUser } = await supabase
-    .from('app_users')
-    .select('id, must_change_password')
-    .eq('auth_user_id', user.id)
-    .eq('active', true)
-    .maybeSingle<{ id: number; must_change_password: boolean }>()
-  const { data: currentAppUserId } = currentAppUser?.id == null
-    ? await supabase.rpc('current_app_user_id')
-    : { data: currentAppUser.id }
+  const { data: appUserAccessRows, error: appUserError } = await supabase.rpc('current_app_user_access_context')
+
+  if (appUserError) {
+    return pathname.startsWith('/api/')
+      ? jsonError('ตรวจสอบบัญชีผู้ใช้งานไม่สำเร็จ', 500)
+      : new NextResponse('ตรวจสอบบัญชีผู้ใช้งานไม่สำเร็จ', { status: 500 })
+  }
+
+  if (!Array.isArray(appUserAccessRows)) {
+    return pathname.startsWith('/api/')
+      ? jsonError('รูปแบบข้อมูลบัญชีผู้ใช้งานไม่ถูกต้อง', 500)
+      : new NextResponse('รูปแบบข้อมูลบัญชีผู้ใช้งานไม่ถูกต้อง', { status: 500 })
+  }
+
+  const currentAppUser = appUserAccessRows[0] as {
+    app_user_id: number
+    must_change_password: boolean
+  } | undefined
 
   if (currentAppUser?.must_change_password === true && !isPasswordChangeAllowedPath(pathname)) {
     if (pathname.startsWith('/api/')) {
@@ -87,41 +97,29 @@ export async function proxy(request: NextRequest) {
   }
 
   const requiredPermission = permissionForPath(pathname)
-  const { data: isAppAdmin, error: appAdminError } = await supabase.rpc('is_app_admin')
-
-  if (!appAdminError && isAppAdmin === true) {
-    return response
-  }
 
   if (requiredPermission) {
     const { data: hasPermission, error: permissionError } = await supabase.rpc('has_app_permission', {
       _permission_code: requiredPermission,
     })
 
-    if (!permissionError && hasPermission === true) {
+    if (permissionError) {
+      return pathname.startsWith('/api/')
+        ? jsonError('ตรวจสอบสิทธิ์ไม่สำเร็จ', 500)
+        : new NextResponse('ตรวจสอบสิทธิ์ไม่สำเร็จ', { status: 500 })
+    }
+
+    if (hasPermission === true) {
       return response
     }
   } else {
-    if (currentAppUser?.id != null || currentAppUserId != null) {
+    if (currentAppUser?.app_user_id != null) {
       return response
     }
   }
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('role, active')
-    .eq('user_id', user.id)
-    .maybeSingle<{ role: string; active: boolean | null }>()
-
-  const role = String(profile?.role ?? metadataRole(user)).toLowerCase()
-  const isActive = profile?.active !== false
-
-  if ((role !== 'admin' && role !== 'owner') || !isActive) {
-    const message = requiredPermission ? 'ไม่มีสิทธิ์ใช้งานส่วนนี้' : 'ต้องใช้บัญชีที่เปิดใช้งาน'
-    return pathname.startsWith('/api/') ? jsonError(message, 403) : NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  return response
+  const message = requiredPermission ? 'ไม่มีสิทธิ์ใช้งานส่วนนี้' : 'ต้องใช้บัญชีที่เปิดใช้งาน'
+  return pathname.startsWith('/api/') ? jsonError(message, 403) : NextResponse.redirect(new URL('/login', request.url))
 }
 
 export const config = {

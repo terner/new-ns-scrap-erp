@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, ClipboardList, Package2, Printer, RotateCcw,
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import {
   WeightTicketProductBreakdownTable,
   WeightTicketTimelinePendingOutChanges,
@@ -16,7 +17,7 @@ import {
 import { WeightTicketStockReturnDialog, type StockReturnPayload } from '@/components/daily/WeightTicketStockReturnDialog'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
-import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, notifyWeightTicketLine, type WeightTicketRecord, type WeightTicketStatus, type WeightTicketType, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
+import { cancelWeightTicket, confirmWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, notifyWeightTicketLine, type WeightTicketRecord, type WeightTicketStatus, type WeightTicketType, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
 import { getErrorMessage } from '@/lib/api-client'
 import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
 
@@ -33,10 +34,10 @@ function formatDateTime(value?: string | null) {
   })
 }
 
-function timelineLabel(eventKey: string, action: string) {
+function timelineLabel(eventKey: string, action: string, type: WeightTicketType) {
   if (action === 'created') return 'สร้างเอกสาร'
   if (action === 'edited') return 'แก้ไขเอกสาร'
-  if (action === 'confirmed') return 'ยืนยันใบส่งของ'
+  if (action === 'confirmed') return type === 'WTI' ? 'ยืนยันรับของ' : 'ยืนยันส่งของ'
   if (action === 'cancelled') return 'ยกเลิกเอกสาร'
   if (action === 'status_synced') return 'ปรับสถานะปัจจุบัน'
   if (action === 'usage_status_changed') return 'เปลี่ยนสถานะจากการใช้งาน'
@@ -105,6 +106,7 @@ export function WeightTicketDetailModal({
   const [cancelNote, setCancelNote] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
   const [previewImage, setPreviewImage] = useState<{ fileName: string; url: string } | null>(null)
   const [isPrinting, setIsPrinting] = useState(false)
   const [lineGallery, setLineGallery] = useState<{
@@ -196,6 +198,20 @@ export function WeightTicketDetailModal({
     }
   }
 
+  async function handleConfirmTicket() {
+    if (!ticket) return
+    setIsConfirming(true)
+    try {
+      const updated = await confirmWeightTicket(ticket.id)
+      setTicket(updated)
+      setSuccessModalMessage(ticket.type === 'WTI' ? 'ยืนยันรับของเรียบร้อยแล้ว' : 'ยืนยันส่งของเรียบร้อยแล้ว')
+    } catch (caught) {
+      window.alert(getErrorMessage(caught, 'ยืนยันใบรับ-ส่งของไม่ได้'))
+    } finally {
+      setIsConfirming(false)
+    }
+  }
+
   async function handlePrintReceipt() {
     if (!ticket) return
     setIsPrinting(true)
@@ -265,6 +281,15 @@ export function WeightTicketDetailModal({
             <div className="flex max-w-[min(58vw,15rem)] justify-end gap-2 overflow-x-auto pb-0.5 sm:max-w-none sm:flex-wrap sm:overflow-visible sm:pb-0">
               {ticket ? (
                 <>
+                  {ticket.status === 'draft' ? (
+                    <div className="flex items-center gap-3">
+                      {ticket.type === 'WTO' ? <span className="text-xs text-slate-300">ยังไม่จอง stock</span> : null}
+                      <Button disabled={isConfirming} type="button" className="h-10 shrink-0 bg-emerald-600 text-white hover:bg-emerald-700 sm:h-9" onClick={() => void handleConfirmTicket()}>
+                        <CheckCircle2 className="size-4" />
+                        <span>{isConfirming ? 'กำลังยืนยัน...' : ticket.type === 'WTI' ? 'ยืนยันรับของ' : 'ยืนยันส่งของ'}</span>
+                      </Button>
+                    </div>
+                  ) : null}
                 {canReturnStock ? (
                   <Button aria-label="รับของคืน" type="button" variant="outline" className="h-10 w-10 shrink-0 gap-0 px-0 font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" onClick={() => setShowStockReturnDialog(true)}>
                     <RotateCcw className="size-4" />
@@ -292,10 +317,10 @@ export function WeightTicketDetailModal({
                     </Button>
                   )
                 ) : null}
-                <Button aria-label="แชร์" className="h-10 w-10 shrink-0 gap-0 px-0 font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" type="button" variant="outline" onClick={() => setShowShareDialog(true)}>
+                {ticket.status !== 'draft' ? <Button aria-label="แชร์" className="h-10 w-10 shrink-0 gap-0 px-0 font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" type="button" variant="outline" onClick={() => setShowShareDialog(true)}>
                   <Share2 className="size-4" />
                   <span className="sr-only sm:not-sr-only">แชร์</span>
-                </Button>
+                </Button> : null}
                 <Button aria-label={isPrinting ? 'กำลังเตรียมพิมพ์' : 'พิมพ์'} className="h-10 w-10 shrink-0 gap-0 border-emerald-600 bg-emerald-600 px-0 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
                   <Printer className="size-4" />
                   <span className="sr-only sm:not-sr-only">{isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}</span>
@@ -386,7 +411,7 @@ export function WeightTicketDetailModal({
                   <div className="grid grid-cols-2 gap-4">
                     <DetailItem label={ticket.type === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} value={ticket.partyName} />
                     <DetailItem label="ทะเบียนรถ" value={ticket.vehicleNo} />
-                    <DetailItem label="โกดัง" value={ticket.warehouseName || '-'} />
+                    <DetailItem label="โกดัง" value={ticket.godownName || '-'} />
                   </div>
                   <div>
                     <div className="mb-2 text-sm font-semibold text-slate-500">รูปภาพรถส่งของ</div>
@@ -455,7 +480,7 @@ export function WeightTicketDetailModal({
                   <SectionTitle title="ประวัติการใช้งานใบรับของ" />
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="hidden lg:table min-w-full divide-y divide-slate-100 text-sm">
+                  <table className="ns-table hidden lg:table min-w-full divide-y divide-slate-100 text-sm">
                     <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500">
                       <tr>
                         <th className="px-3 py-3 text-left">เวลา</th>
@@ -581,7 +606,7 @@ export function WeightTicketDetailModal({
                       <div className="relative border-l border-slate-200 pb-4 pl-4 last:pb-0">
                         <span className={`absolute -left-1.5 top-1 h-3 w-3 rounded-full border-2 border-white ${timelineDotClass(event.action, isLatest)}`} />
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="text-base font-bold text-slate-800">{timelineLabel(event.eventKey, event.action)}</div>
+                          <div className="text-base font-bold text-slate-800">{timelineLabel(event.eventKey, event.action, ticket.type)}</div>
                           {toStatus ? (
                             <span className={cn('inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded', weightTicketStatusBadgeClass(ticket.type, toStatus as WeightTicketStatus))}>
                               <span className="size-1.5 rounded-full bg-current" />
@@ -594,7 +619,7 @@ export function WeightTicketDetailModal({
                             เปลี่ยนสถานะจาก {timelineStatusLabel(ticket.type, fromStatus)}
                           </div>
                         ) : null}
-                        <div className="mt-2 grid gap-1.5 rounded-md bg-white px-3 py-2.5 text-sm text-slate-600 shadow-sm border border-slate-100">
+                        <div className="mt-2 grid gap-1.5 rounded-xl bg-white px-3 py-2.5 text-sm text-slate-600 shadow-sm border border-slate-100">
                           {targetDocNo || productName || allocatedNetWeight != null ? (
                             <div className="flex flex-wrap gap-x-4 gap-y-1">
                               {targetDocNo ? (
@@ -853,12 +878,7 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 function MetricCard({ className, icon, label, value }: { className?: string; icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className={cn("rounded-md border border-slate-200 bg-white px-3 py-3 shadow-sm sm:px-4 sm:py-4", className)}>
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-slate-500 sm:text-sm">{icon}{label}</div>
-      <div className="mt-2 text-base font-bold tabular-nums text-slate-950 sm:text-lg">{value}</div>
-    </div>
-  )
+  return <SharedKpiCard className={className} icon={icon} label={label} tone="slate" value={value} />
 }
 
 function DetailItem({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {

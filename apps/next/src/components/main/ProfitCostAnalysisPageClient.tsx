@@ -1,10 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Sarabun } from 'next/font/google'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
+import { KpiCard as SharedKpiCard, type KpiCardTone } from '@/components/ui/KpiCard'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { formatDateDisplay } from '@/lib/format'
 
@@ -58,6 +63,23 @@ type Tab = 'alerts' | 'channels' | 'customers' | 'products' | 'suppliers' | 'tre
 type SortDirection = 'asc' | 'desc'
 type ProductColumnKey = 'avgBuy' | 'avgSell' | 'buyAmount' | 'buyQty' | 'code' | 'cogs' | 'gp' | 'gpPct' | 'metalGroup' | 'name' | 'profitPerKg' | 'revenue' | 'sellQty' | 'stockQty' | 'stockValue'
 
+const productPageSizeOptions = [10, 25, 50, 100] as const
+const profitKpiCardClass = 'profit-kpi-card shadow-none'
+const profitTableFont = Sarabun({
+  subsets: ['latin', 'thai'],
+  variable: '--font-profit-table',
+  weight: ['400', '500'],
+})
+
+const reportTabs: { key: Tab; label: string }[] = [
+  { key: 'products', label: 'สินค้า' },
+  { key: 'suppliers', label: 'ผู้ขาย' },
+  { key: 'customers', label: 'ลูกค้า' },
+  { key: 'channels', label: 'ช่องทาง' },
+  { key: 'trend', label: 'แนวโน้ม' },
+  { key: 'alerts', label: 'แจ้งเตือน' },
+]
+
 const productColumns: Array<ResizableColumnDefinition<ProductColumnKey> & { align?: 'center' | 'left' | 'right'; label: string }> = [
   { key: 'code', label: 'รหัสสินค้า', defaultWidth: 120, minWidth: 100 },
   { key: 'name', label: 'สินค้า', defaultWidth: 220, minWidth: 160 },
@@ -72,8 +94,8 @@ const productColumns: Array<ResizableColumnDefinition<ProductColumnKey> & { alig
   { key: 'gp', label: 'GP', defaultWidth: 120, minWidth: 105, align: 'right' },
   { key: 'gpPct', label: 'GP%', defaultWidth: 90, minWidth: 80, align: 'right' },
   { key: 'profitPerKg', label: 'กำไร/กก.', defaultWidth: 115, minWidth: 100, align: 'right' },
-  { key: 'stockQty', label: 'Stock', defaultWidth: 115, minWidth: 100, align: 'right' },
-  { key: 'stockValue', label: 'Stock Value', defaultWidth: 130, minWidth: 115, align: 'right' },
+  { key: 'stockQty', label: 'สต๊อก', defaultWidth: 115, minWidth: 100, align: 'right' },
+  { key: 'stockValue', label: 'มูลค่าสต๊อก', defaultWidth: 130, minWidth: 115, align: 'right' },
 ]
 
 function today() {
@@ -95,12 +117,13 @@ export function ProfitCostAnalysisPageClient() {
   const [salesChannelId, setSalesChannelId] = useState('')
   const [supplierId, setSupplierId] = useState('')
   const [customerId, setCustomerId] = useState('')
-  const [selectedMetalGroups, setSelectedMetalGroups] = useState<string[]>([])
+  const [selectedMetalGroup, setSelectedMetalGroup] = useState('')
   const [activeTab, setActiveTab] = useState<Tab>('products')
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null)
   const [data, setData] = useState<ProfitCostPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ from, to })
@@ -109,9 +132,9 @@ export function ProfitCostAnalysisPageClient() {
     if (salesChannelId) params.set('salesChannelId', salesChannelId)
     if (supplierId) params.set('supplierId', supplierId)
     if (customerId) params.set('customerId', customerId)
-    selectedMetalGroups.forEach((group) => params.append('metalGroup', group))
+    if (selectedMetalGroup) params.set('metalGroup', selectedMetalGroup)
     return params.toString()
-  }, [branchId, customerId, from, purchaseChannelId, salesChannelId, selectedMetalGroups, supplierId, to])
+  }, [branchId, customerId, from, purchaseChannelId, salesChannelId, selectedMetalGroup, supplierId, to])
 
   useEffect(() => {
     const requestId = latestLoadRequestRef.current + 1
@@ -122,9 +145,6 @@ export function ProfitCostAnalysisPageClient() {
       .then((payload) => {
         if (latestLoadRequestRef.current !== requestId) return
         setData(payload)
-        if (selectedMetalGroups.length === 0 && payload.filters.selectedMetalGroups.length > 0) {
-          setSelectedMetalGroups(payload.filters.selectedMetalGroups)
-        }
       })
       .catch((caught) => {
         if (latestLoadRequestRef.current !== requestId) return
@@ -134,7 +154,7 @@ export function ProfitCostAnalysisPageClient() {
         if (latestLoadRequestRef.current !== requestId) return
         setIsLoading(false)
       })
-  }, [query, selectedMetalGroups.length])
+  }, [query])
 
   const supplierSearchOptions = useMemo<SearchComboboxOption[]>(() => {
     return (data?.filters.suppliers ?? []).map((supplier) => ({
@@ -152,153 +172,238 @@ export function ProfitCostAnalysisPageClient() {
 
   const summary = data?.summary ?? {}
   const metalGroups = data?.filters.metalGroups ?? []
+  const metalGroupSearchOptions = useMemo<SearchComboboxOption[]>(() => (data?.filters.metalGroups ?? []).map((group) => ({ id: group, label: group })), [data?.filters.metalGroups])
+  const hasActiveFilters = from !== monthStart()
+    || to !== today()
+    || Boolean(branchId || purchaseChannelId || salesChannelId || supplierId || customerId)
+    || Boolean(selectedMetalGroup)
 
-  function toggleMetalGroup(group: string) {
-    setSelectedMetalGroups((current) => current.includes(group) ? current.filter((value) => value !== group) : [...current, group])
+  function clearFilters() {
+    setFrom(monthStart())
+    setTo(today())
+    setBranchId('')
+    setPurchaseChannelId('')
+    setSalesChannelId('')
+    setSupplierId('')
+    setCustomerId('')
+    setSelectedMetalGroup('')
   }
 
   return (
     <section className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
-        <Metric label="ซื้อรวม" tone="blue" value={money(summary.purchaseAmount)} sub={`${money(summary.purchaseQty)} กก.`} />
-        <Metric label="ขายรวม" tone="emerald" value={money(summary.revenue)} sub={`${money(summary.salesQty)} กก.`} />
-        <Metric label="COGS" tone="orange" value={money(summary.cogs)} sub="ต้นทุนขาย" />
-        <Metric label="GP" tone={(summary.gp ?? 0) >= 0 ? 'purple' : 'red'} value={money(summary.gp)} sub={`${pct(summary.gpPct)}%`} />
-        <Metric label="Stock Qty" tone="amber" value={money(summary.stockQty)} sub="คงเหลือ กก." />
-        <Metric label="Stock Value" tone="slate" value={money(summary.stockValue)} sub="มูลค่าสต๊อก" />
-        <Metric label="ซื้อเฉลี่ย/กก." tone="cyan" value={money(summary.avgBuy)} sub="Avg buy" />
-        <Metric label="ขายเฉลี่ย/กก." tone="emerald" value={money(summary.avgSell)} sub="Avg sell" />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-12">
+        <PairMetric
+          className={`${profitKpiCardClass} col-span-2 xl:col-span-4`}
+          label="ซื้อ / ขายรวม"
+          left={{ label: 'ซื้อ', note: `${money(summary.purchaseQty)} กก.`, value: money(summary.purchaseAmount) }}
+          right={{ label: 'ขาย', note: `${money(summary.salesQty)} กก.`, value: money(summary.revenue) }}
+          tone="slate"
+        />
+        <Metric className={`${profitKpiCardClass} xl:col-span-2`} label="COGS" tone="slate" value={money(summary.cogs)} sub="ต้นทุนขาย" />
+        <Metric className={`${profitKpiCardClass} xl:col-span-2`} label="GP" tone={(summary.gp ?? 0) >= 0 ? 'emerald' : 'red'} value={money(summary.gp)} sub={`${pct(summary.gpPct)}%`} />
+        <Metric className={`${profitKpiCardClass} xl:col-span-2`} label="สต๊อกคงเหลือ" tone="slate" value={money(summary.stockQty)} sub="กก." />
+        <Metric className={`${profitKpiCardClass} xl:col-span-2`} label="มูลค่าสต๊อก" tone="slate" value={money(summary.stockValue)} sub="รวมตามตัวกรอง" />
+        <PairMetric
+          className={`${profitKpiCardClass} col-span-2 xl:col-span-4`}
+          label="ราคาเฉลี่ย/กก."
+          left={{ label: 'ซื้อ', value: money(summary.avgBuy) }}
+          right={{ label: 'ขาย', value: money(summary.avgSell) }}
+          tone="slate"
+        />
+        <PairMetric
+          className={`${profitKpiCardClass} col-span-2 xl:col-span-8`}
+          label="ยอดคงเหลือเจ้าหนี้ / ลูกหนี้"
+          left={{ label: 'เจ้าหนี้คงเหลือ', note: `AP · ผู้ขายที่ซื้อ ${summary.supplierCount ?? 0} ราย`, value: money(summary.ap) }}
+          right={{ label: 'ลูกหนี้คงเหลือ', note: `AR · ลูกค้าที่ขาย ${summary.customerCount ?? 0} ราย`, value: money(summary.ar) }}
+          tone="slate"
+        />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="เจ้าหนี้คงเหลือ" tone="red" value={money(summary.ap)} sub="AP" />
-        <Metric label="ลูกหนี้คงเหลือ" tone="cyan" value={money(summary.ar)} sub="AR" />
-        <Metric label="Supplier ที่ซื้อ" tone="blue" value={String(summary.supplierCount ?? 0)} sub="ราย" />
-        <Metric label="Customer ที่ขาย" tone="purple" value={String(summary.customerCount ?? 0)} sub="ราย" />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel title="Revenue / GP">
-          <div className="grid gap-3 md:grid-cols-2">
-            <BigNumber label="Revenue" value={money(summary.revenue)} />
-            <BigNumber label="Gross Profit" value={money(summary.gp)} />
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <SmallStat label="ซื้อเฉลี่ย" value={money(summary.avgBuy)} />
-            <SmallStat label="ขายเฉลี่ย" value={money(summary.avgSell)} />
-            <SmallStat label="จำนวนสินค้า" value={String(summary.productCount ?? 0)} />
-          </div>
-        </Panel>
-        <Panel title="Top 10 Product ยอดขาย">
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Panel title="สินค้าขายสูงสุด 10 อันดับ">
           <BarRows rows={(data?.top.byRevenue ?? []).map((row) => ({ label: row.name, value: row.revenue }))} />
         </Panel>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <Panel title="รายได้ vs ต้นทุน vs กำไร">
-          <BarRows rows={[{ label: 'รายได้', value: summary.revenue ?? 0 }, { label: 'COGS', value: summary.cogs ?? 0 }, { label: 'GP', value: summary.gp ?? 0 }]} />
-        </Panel>
-        <Panel title="Top 10 Product GP">
+        <Panel title="สินค้า GP สูงสุด 10 อันดับ">
           <BarRows rows={(data?.top.byGp ?? []).map((row) => ({ label: row.name, value: row.gp }))} />
         </Panel>
+        <Panel title="มูลค่าสต๊อกสูงสุด 10 อันดับ">
+          <BarRows rows={(data?.top.byStockValue ?? []).map((row) => ({ label: row.name, value: row.stockValue }))} />
+        </Panel>
       </div>
 
-      <div className="flex flex-wrap rounded-md bg-white px-2 shadow-sm">
-        {[
-          ['products', 'Product'],
-          ['suppliers', 'Supplier'],
-          ['customers', 'Customer'],
-          ['channels', 'Channel'],
-          ['trend', 'Trend'],
-          ['alerts', 'Alerts'],
-        ].map(([key, label]) => (
+      <Tabs className="gap-2" value={activeTab} onValueChange={(value) => setActiveTab(value as Tab)}>
+        <TabsList className="w-full overflow-x-auto" variant="line">
+          {reportTabs.map((tab) => (
+            <TabsTrigger key={tab.key} value={tab.key} variant="line">
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-semibold text-slate-500">ช่วงวันที่</div>
+            <div className="truncate text-sm font-semibold text-slate-900">{from || 'ไม่จำกัด'} → {to || 'ไม่จำกัด'}</div>
+          </div>
           <button
-            key={key}
-            className={`border-b-2 px-4 py-2 text-sm font-semibold transition-colors outline-none focus:outline-none ${
-              activeTab === key
-                ? 'border-slate-900 text-slate-900'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200"
             type="button"
-            onClick={() => setActiveTab(key as Tab)}
+            onClick={() => setShowMobileFilters(true)}
           >
-            {label}
+            ตัวกรอง{hasActiveFilters ? ' (มี)' : ''}
           </button>
-        ))}
+        </div>
       </div>
 
-      <div className="rounded-md bg-white p-4 shadow border border-slate-100">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
-          <Field label="จากวันที่"><DatePickerInput className="w-full" value={from} onChange={setFrom} /></Field>
-          <Field label="ถึงวันที่"><DatePickerInput className="w-full" value={to} onChange={setTo} /></Field>
-          <Field label="สาขา"><Select options={data?.filters.branches ?? []} value={branchId} onChange={setBranchId} /></Field>
-          <Field label="ช่องทางซื้อ"><Select options={data?.filters.purchaseChannels ?? []} value={purchaseChannelId} onChange={setPurchaseChannelId} /></Field>
-          <Field label="ช่องทางขาย"><Select options={data?.filters.salesChannels ?? []} value={salesChannelId} onChange={setSalesChannelId} /></Field>
-          <Field label="Supplier">
-            <div className="mt-1">
+      <div className="hidden rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:block">
+        <div className="space-y-3">
+          <div className="grid items-end gap-2 md:grid-cols-2 xl:grid-cols-[minmax(300px,1.2fr)_minmax(140px,0.75fr)_minmax(160px,0.85fr)_minmax(160px,0.85fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
+            <Field label="วันที่">
+              <div className="grid grid-cols-[minmax(135px,1fr)_auto_minmax(135px,1fr)] items-center gap-2">
+                <DatePickerInput className="h-9 w-full" value={from} onChange={setFrom} />
+                <span className="text-xs text-slate-400">→</span>
+                <DatePickerInput className="h-9 w-full" value={to} onChange={setTo} />
+              </div>
+            </Field>
+            <Field label="สาขา"><Select inputId="profit-branch-select" label="สาขา" options={data?.filters.branches ?? []} value={branchId} onChange={setBranchId} /></Field>
+            <Field label="ช่องทางซื้อ"><Select inputId="profit-purchase-channel-select" label="ช่องทางซื้อ" options={data?.filters.purchaseChannels ?? []} value={purchaseChannelId} onChange={setPurchaseChannelId} /></Field>
+            <Field label="ช่องทางขาย"><Select inputId="profit-sales-channel-select" label="ช่องทางขาย" options={data?.filters.salesChannels ?? []} value={salesChannelId} onChange={setSalesChannelId} /></Field>
+            <Field label="ผู้ขาย">
+              <div>
+                <SearchCombobox
+                  inputId="profit-supplier-select"
+                  label="ผู้ขาย"
+                  hideLabel
+                  inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
+                  placeholder="ทุกผู้ขาย"
+                  options={supplierSearchOptions}
+                  value={supplierId}
+                  onChange={setSupplierId}
+                />
+              </div>
+            </Field>
+            <Field label="ลูกค้า">
+              <div>
+                <SearchCombobox
+                  inputId="profit-customer-select"
+                  label="ลูกค้า"
+                  hideLabel
+                  inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
+                  placeholder="ทุกลูกค้า"
+                  options={customerSearchOptions}
+                  value={customerId}
+                  onChange={setCustomerId}
+                />
+              </div>
+            </Field>
+          </div>
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="w-full sm:w-72">
               <SearchCombobox
-                inputId="profit-supplier-select"
-                label="Supplier"
                 hideLabel
-                placeholder="ทั้งหมด"
+                inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
+                inputId="profit-metal-group-select"
+                label="หมวดสินค้า"
+                options={metalGroupSearchOptions}
+                placeholder="ทุกหมวดสินค้า"
+                value={selectedMetalGroup}
+                onChange={setSelectedMetalGroup}
+              />
+            </div>
+            {hasActiveFilters ? (
+              <button className="ml-auto h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200" type="button" onClick={clearFilters}>ล้างตัวกรอง</button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {showMobileFilters ? (
+        <MobileFilterSheet
+          title="ตัวกรองกำไรและต้นทุน"
+          onClose={() => setShowMobileFilters(false)}
+          footer={(
+            <>
+              <button className="h-10 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700" type="button" onClick={clearFilters}>ล้าง</button>
+              <button className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white" type="button" onClick={() => setShowMobileFilters(false)}>ปิด</button>
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            <Field label="วันที่">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                <DatePickerInput className="h-9 w-full" value={from} onChange={setFrom} />
+                <span className="text-xs text-slate-400">→</span>
+                <DatePickerInput className="h-9 w-full" value={to} onChange={setTo} />
+              </div>
+            </Field>
+            <Field label="สาขา"><Select inputId="profit-branch-select-mobile" label="สาขา" options={data?.filters.branches ?? []} value={branchId} onChange={setBranchId} /></Field>
+            <Field label="ช่องทางซื้อ"><Select inputId="profit-purchase-channel-select-mobile" label="ช่องทางซื้อ" options={data?.filters.purchaseChannels ?? []} value={purchaseChannelId} onChange={setPurchaseChannelId} /></Field>
+            <Field label="ช่องทางขาย"><Select inputId="profit-sales-channel-select-mobile" label="ช่องทางขาย" options={data?.filters.salesChannels ?? []} value={salesChannelId} onChange={setSalesChannelId} /></Field>
+            <Field label="ผู้ขาย">
+              <SearchCombobox
+                inputId="profit-supplier-select-mobile"
+                label="ผู้ขาย"
+                hideLabel
+                inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
+                placeholder="ทุกผู้ขาย"
                 options={supplierSearchOptions}
                 value={supplierId}
                 onChange={setSupplierId}
               />
-            </div>
-          </Field>
-          <Field label="Customer">
-            <div className="mt-1">
+            </Field>
+            <Field label="ลูกค้า">
               <SearchCombobox
-                inputId="profit-customer-select"
-                label="Customer"
+                inputId="profit-customer-select-mobile"
+                label="ลูกค้า"
                 hideLabel
-                placeholder="ทั้งหมด"
+                inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
+                placeholder="ทุกลูกค้า"
                 options={customerSearchOptions}
                 value={customerId}
                 onChange={setCustomerId}
               />
-            </div>
-          </Field>
-        </div>
-        <div className="mt-4 border-t border-slate-100 pt-3">
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-700">
-            <span>หมวดสินค้า ({selectedMetalGroups.length ? selectedMetalGroups.length : 'ทุกหมวด'})</span>
-            <button className={`${chipClass} bg-slate-900 text-white outline-none`} type="button" onClick={() => setSelectedMetalGroups(metalGroups)}>เลือกทั้งหมด</button>
-            <button className={`${chipClass} bg-slate-100 text-slate-700 outline-none`} type="button" onClick={() => setSelectedMetalGroups([])}>ไม่เลือก</button>
+            </Field>
+            <Field label="หมวดสินค้า">
+              <SearchCombobox
+                hideLabel
+                inputClassName="h-9 border-slate-300 bg-white font-medium text-slate-900 placeholder:text-slate-500"
+                inputId="profit-metal-group-select-mobile"
+                label="หมวดสินค้า"
+                options={metalGroupSearchOptions}
+                placeholder="ทุกหมวดสินค้า"
+                value={selectedMetalGroup}
+                onChange={setSelectedMetalGroup}
+              />
+            </Field>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {metalGroups.map((group) => <button key={group} className={`${chipClass} ${selectedMetalGroups.includes(group) ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700'} outline-none`} type="button" onClick={() => toggleMetalGroup(group)}>{group}</button>)}
-            {metalGroups.length === 0 ? <span className="text-sm text-slate-400">ไม่มีหมวดสินค้า</span> : null}
-          </div>
-        </div>
-        <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
-          <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white opacity-70 outline-none" disabled type="button">ส่งออก CSV</button>
-        </div>
-      </div>
+        </MobileFilterSheet>
+      ) : null}
 
-      <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-        <div className="p-3">
-          {activeTab === 'products' ? <ProductTable rows={data?.rows.products ?? []} onSelect={setSelectedProduct} /> : null}
-          {activeTab === 'suppliers' ? <SimpleTable tableKey="suppliers" rows={(data?.rows.suppliers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.paid), money(row.payable), String(row.billCount)])} headers={['Supplier', 'กก.', 'ซื้อ', 'จ่ายแล้ว', 'ค้างจ่าย', 'บิล']} /> : null}
-          {activeTab === 'customers' ? <SimpleTable tableKey="customers" rows={(data?.rows.customers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.gp), `${pct(row.gpPct)}%`, money(row.receivable)])} headers={['Customer', 'กก.', 'ขาย', 'GP', 'GP %', 'ค้างรับ']} /> : null}
-          {activeTab === 'channels' ? <SimpleTable tableKey="channels" rows={(data?.rows.channels ?? []).map((row) => [row.group, row.name, money(row.qty), money(row.amount), money(row.gp), String(row.billCount)])} headers={['Group', 'Channel', 'กก.', 'ยอด', 'GP', 'บิล']} /> : null}
-          {activeTab === 'trend' ? <SimpleTable tableKey="trend" rows={(data?.rows.trend ?? []).map((row) => [formatDateDisplay(row.date), money(row.buyAmount), money(row.revenue), money(row.cogs), money(row.gp), money(row.sellQty)])} headers={['Date', 'ซื้อ', 'ขาย', 'COGS', 'GP', 'ขาย กก.']} /> : null}
-          {activeTab === 'alerts' ? <SimpleTable tableKey="alerts" rows={(data?.alerts ?? []).map((row) => [row.severity, row.type, row.label, money(row.amount)])} headers={['Severity', 'Type', 'รายการ', 'ค่า']} /> : null}
-        </div>
+      <div>
+        {activeTab === 'products' ? <ProductTable rows={data?.rows.products ?? []} onSelect={setSelectedProduct} /> : null}
+        {activeTab === 'suppliers' ? <SimpleTable tableKey="suppliers" rows={(data?.rows.suppliers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.paid), money(row.payable), String(row.billCount)])} headers={['ผู้ขาย', 'กก.', 'ซื้อ', 'จ่ายแล้ว', 'ค้างจ่าย', 'บิล']} /> : null}
+        {activeTab === 'customers' ? <SimpleTable tableKey="customers" rows={(data?.rows.customers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.gp), `${pct(row.gpPct)}%`, money(row.receivable)])} headers={['ลูกค้า', 'กก.', 'ขาย', 'GP', 'GP %', 'ค้างรับ']} /> : null}
+        {activeTab === 'channels' ? <SimpleTable tableKey="channels" rows={(data?.rows.channels ?? []).map((row) => [row.group, row.name, money(row.qty), money(row.amount), money(row.gp), String(row.billCount)])} headers={['กลุ่ม', 'ช่องทาง', 'กก.', 'ยอด', 'GP', 'บิล']} /> : null}
+        {activeTab === 'trend' ? <SimpleTable tableKey="trend" rows={(data?.rows.trend ?? []).map((row) => [formatDateDisplay(row.date), money(row.buyAmount), money(row.revenue), money(row.cogs), money(row.gp), money(row.sellQty)])} headers={['วันที่', 'ซื้อ', 'ขาย', 'COGS', 'GP', 'ขาย กก.']} /> : null}
+        {activeTab === 'alerts' ? <SimpleTable tableKey="alerts" rows={(data?.alerts ?? []).map((row) => [row.severity, row.type, row.label, money(row.amount)])} headers={['ระดับ', 'ประเภท', 'รายการ', 'ค่า']} /> : null}
       </div>
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      {isLoading ? <div className="rounded-md bg-white p-4 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
+      {isLoading ? <div className="rounded-xl bg-white p-4 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
       {selectedProduct ? <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} /> : null}
     </section>
   )
 }
 
-const controlClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-100'
-const chipClass = 'rounded-full px-3 py-1.5 text-xs font-bold shadow-sm'
+function Select({ inputId, label, onChange, options, value }: { inputId: string; label: string; onChange: (value: string) => void; options: Option[]; value: string }) {
+  const searchOptions = useMemo<SearchComboboxOption[]>(() => options.map((option) => ({
+    id: option.id,
+    label: option.code ? `${option.code} - ${option.name}` : option.name,
+  })), [options])
 
-function Select({ onChange, options, value }: { onChange: (value: string) => void; options: Option[]; value: string }) {
-  return <select className={controlClass} value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทั้งหมด</option>{options.map((option) => <option key={option.id} value={option.id}>{option.code ? `${option.code} - ${option.name}` : option.name}</option>)}</select>
+  return <SearchCombobox hideLabel inputClassName="h-9 border-slate-300 bg-white font-semibold text-slate-800 placeholder:text-slate-500" inputId={inputId} label={label} options={searchOptions} placeholder="ทั้งหมด" value={value} onChange={onChange} />
 }
 
 function Field({ children, label }: { children: ReactNode; label: string }) {
@@ -340,44 +445,38 @@ function formatProductCell(row: ProductRow, key: ProductColumnKey) {
   return money(row[key] as number)
 }
 
-function toneClass(tone: string) {
-  const map: Record<string, string> = {
-    amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    blue: 'bg-blue-50 text-blue-700 border-blue-100',
-    cyan: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    orange: 'bg-orange-50 text-orange-700 border-orange-100',
-    purple: 'bg-purple-50 text-purple-700 border-purple-100',
-    red: 'bg-red-50 text-red-700 border-red-100',
-    slate: 'bg-slate-50 text-slate-700 border-slate-100',
-  }
-  return map[tone] ?? map.slate
+function Metric({ className, label, sub, tone, value }: { className?: string; label: string; sub: string; tone: KpiCardTone; value: string }) {
+  return <SharedKpiCard className={className} label={label} note={sub} tone={tone} value={value} />
 }
 
-function Metric({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
+function PairMetric({ className, label, left, right, tone }: {
+  className?: string
+  label: string
+  left: { label: string; note?: string; value: string }
+  right: { label: string; note?: string; value: string }
+  tone: KpiCardTone
+}) {
   return (
-    <div className="bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className="mt-1 font-mono text-lg font-bold text-slate-900 truncate">{value}</div>
-      <div className="text-xs text-slate-400 mt-0.5">{sub}</div>
-    </div>
+    <SharedKpiCard
+      className={className}
+      label={label}
+      tone={tone}
+      value={(
+        <div className="grid grid-cols-2 gap-3">
+          <PairMetricValue {...left} />
+          <PairMetricValue {...right} />
+        </div>
+      )}
+    />
   )
 }
 
-function BigNumber({ label, value }: { label: string; value: string }) {
+function PairMetricValue({ label, note, value }: { label: string; note?: string; value: string }) {
   return (
-    <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-xl shadow-sm">
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className="mt-1.5 font-mono text-2xl font-bold text-slate-900">{value}</div>
-    </div>
-  )
-}
-
-function SmallStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/30 p-3">
-      <div className="text-xs text-slate-500 font-semibold">{label}</div>
-      <div className="font-mono text-base font-bold text-slate-800 mt-0.5">{value}</div>
+    <div className="min-w-0">
+      <span className="block font-sans text-xs font-medium text-slate-500">{label}</span>
+      <span className="block truncate">{value}</span>
+      {note ? <span className="block font-sans text-xs font-medium text-slate-500">{note}</span> : null}
     </div>
   )
 }
@@ -385,32 +484,48 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
-      <div className="border-b border-slate-100 bg-slate-50/50 p-3 font-bold text-slate-700 text-sm">{title}</div>
+      <div className="profit-top-list-header border-b border-slate-100 p-3 font-bold text-slate-700 text-sm">{title}</div>
       <div className="p-4">{children}</div>
     </div>
   )
 }
 
 function BarRows({ rows }: { rows: { label: string; value: number }[] }) {
+  const [expanded, setExpanded] = useState(false)
   const max = Math.max(1, ...rows.map((row) => Math.abs(row.value)))
+  const visibleRows = rows.slice(0, expanded ? 10 : 5)
   return (
-    <div className="space-y-2">
-      {rows.map((row) => (
+    <div>
+      <div className="space-y-2">
+      {visibleRows.map((row) => (
         <div key={row.label}>
           <div className="mb-1 flex justify-between gap-3 text-xs text-slate-600">
             <span className="truncate">{row.label}</span>
             <b className="text-slate-800 font-mono">{money(row.value)}</b>
           </div>
           <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div className="h-full rounded-full bg-purple-500" style={{ width: `${Math.min(100, Math.abs(row.value) / max * 100)}%` }} />
+            <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(100, Math.abs(row.value) / max * 100)}%` }} />
           </div>
         </div>
       ))}
+      </div>
+      {rows.length > 5 ? (
+        <button
+          aria-expanded={expanded}
+          className="mt-3 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? 'ย่อเหลือ 5 อันดับ' : 'ดู 10 อันดับ'}
+        </button>
+      ) : null}
     </div>
   )
 }
 
 function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void; rows: ProductRow[] }) {
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<(typeof productPageSizeOptions)[number]>(25)
   const [sortKey, setSortKey] = useState<ProductColumnKey | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const columnResize = useResizableColumns('main.profit-cost-analysis.products.v1', productColumns)
@@ -422,19 +537,51 @@ function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void;
       return sortDirection === 'asc' ? result : -result
     })
   }, [rows, sortDirection, sortKey])
+  const totalRows = sortedRows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize), [pageSize, safePage, sortedRows])
+
+  useEffect(() => {
+    setPage(1)
+  }, [rows])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   function changeSort(key: ProductColumnKey) {
     if (sortKey === key) {
       setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      setPage(1)
       return
     }
 
     setSortKey(key)
     setSortDirection('asc')
+    setPage(1)
   }
 
   return (
     <>
+      {totalRows > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+          <span>แสดง {(safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, totalRows)} จาก {totalRows} รายการ</span>
+          <div className="flex items-center gap-2">
+            <PageSizeDropdown
+              options={[...productPageSizeOptions]}
+              value={pageSize}
+              onChange={(value) => {
+                setPageSize(value as (typeof productPageSizeOptions)[number])
+                setPage(1)
+              }}
+            />
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={safePage <= 1} type="button" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</button>
+            <span className="px-1 text-sm">หน้า {safePage} / {totalPages}</span>
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={safePage >= totalPages} type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</button>
+          </div>
+        </div>
+      ) : null}
       {/* Desktop view */}
       {columnResize.hasCustomWidths ? (
         <div className="mb-2 hidden justify-end lg:flex">
@@ -442,7 +589,7 @@ function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void;
         </div>
       ) : null}
       <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className={`${profitTableFont.variable} profit-analysis-table ns-table min-w-full divide-y divide-slate-200 text-sm`} style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {productColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -455,6 +602,7 @@ function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void;
                   key={column.key}
                   activeSortKey={sortKey ?? undefined}
                   align={column.align}
+                  className="!font-medium"
                   direction={sortDirection}
                   label={column.label}
                   sortKey={column.key}
@@ -465,35 +613,35 @@ function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void;
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {sortedRows.map((row) => <tr key={row.id} className="cursor-pointer transition-colors hover:bg-slate-50" onClick={() => onSelect(row)}>
+            {pagedRows.map((row) => <tr key={row.id} className="cursor-pointer transition-colors hover:bg-slate-50" onClick={() => onSelect(row)}>
               {productColumns.map((column) => (
-                <td key={column.key} className={`px-3 py-3 ${column.align === 'right' ? 'text-right font-mono tabular-nums' : 'text-left'} ${column.key === 'gp' ? row.gp >= 0 ? 'font-bold text-emerald-700' : 'font-bold text-red-700' : column.key === 'stockValue' ? 'font-bold text-slate-800' : column.key === 'name' ? 'font-semibold text-slate-800' : 'text-slate-700'}`}>
+                <td key={column.key} className={`px-3 py-3 ${column.align === 'right' ? 'text-right font-mono tabular-nums' : 'text-left'} ${column.key === 'gp' ? row.gp >= 0 ? 'font-medium text-emerald-700' : 'font-medium text-red-700' : column.key === 'stockValue' ? 'font-medium text-slate-800' : column.key === 'name' ? 'font-medium text-slate-800' : 'text-slate-700'}`}>
                   <div className={column.align === 'right' ? 'whitespace-nowrap' : 'truncate'} title={String(formatProductCell(row, column.key))}>{formatProductCell(row, column.key)}</div>
                 </td>
               ))}
             </tr>)}
-            {sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={productColumns.length}>ไม่มีข้อมูล</td></tr> : null}
+            {totalRows === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={productColumns.length}>ไม่มีข้อมูล</td></tr> : null}
           </tbody>
         </table>
       </div>
 
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[600px] overflow-y-auto">
-        {sortedRows.map((row) => (
-          <div key={row.id} className="p-3 bg-white rounded-lg border border-slate-100 mb-2 shadow-sm flex flex-col gap-1.5 text-xs cursor-pointer" onClick={() => onSelect(row)}>
+        {pagedRows.map((row) => (
+          <div key={row.id} className="p-3 bg-white rounded-xl border border-slate-100 mb-2 shadow-sm flex flex-col gap-1.5 text-xs cursor-pointer" onClick={() => onSelect(row)}>
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800">{row.name}</span>
               <span className="font-mono text-xs text-slate-400">{row.code || '-'}</span>
             </div>
             <div className="text-xs text-slate-500 font-medium">หมวด: {row.metalGroup || '-'}</div>
             <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
-              <div className="bg-blue-50/50 p-2 rounded-lg text-blue-900">
+              <div className="bg-blue-50/50 p-2 rounded-xl text-blue-900">
                 <div className="font-semibold text-xs uppercase text-blue-700">📥 ซื้อ</div>
                 <div className="font-mono mt-0.5">{money(row.buyQty)} กก.</div>
                 <div className="font-bold font-mono mt-0.5">{money(row.buyAmount)} ฿</div>
                 <div className="text-xs opacity-75 font-mono mt-0.5">เฉลี่ย {money(row.avgBuy)} ฿/กก.</div>
               </div>
-              <div className="bg-emerald-50/50 p-2 rounded-lg text-emerald-900">
+              <div className="bg-emerald-50/50 p-2 rounded-xl text-emerald-900">
                 <div className="font-semibold text-xs uppercase text-emerald-700">📤 ขาย</div>
                 <div className="font-mono mt-0.5">{money(row.sellQty)} กก.</div>
                 <div className="font-bold font-mono mt-0.5">{money(row.revenue)} ฿</div>
@@ -501,12 +649,12 @@ function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void;
               </div>
             </div>
             <div className="flex justify-between items-center mt-1 pt-1.5 border-t border-slate-50 text-xs">
-              <span className="text-slate-500 font-medium">Stock: {money(row.stockQty)} กก. ({money(row.stockValue)} ฿)</span>
+              <span className="text-slate-500 font-medium">สต๊อก: {money(row.stockQty)} กก. ({money(row.stockValue)} ฿)</span>
               <span className={`font-bold ${row.gp >= 0 ? 'text-purple-700' : 'text-red-600'}`}>GP: {money(row.gp)} ({pct(row.gpPct)}%)</span>
             </div>
           </div>
         ))}
-        {sortedRows.length === 0 && (
+        {totalRows === 0 && (
           <div className="py-8 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>
         )}
       </div>
@@ -518,7 +666,7 @@ function ProductModal({ onClose, product }: { onClose: () => void; product: Prod
   const lines = [
     ['ซื้อ', money(product.buyQty), money(product.buyAmount), '-', '-'],
     ['ขาย', money(product.sellQty), money(product.revenue), money(product.cogs), money(product.gp)],
-    ['Stock', money(product.stockQty), money(product.stockValue), '-', '-'],
+    ['สต๊อก', money(product.stockQty), money(product.stockValue), '-', '-'],
   ]
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
@@ -533,14 +681,14 @@ function ProductModal({ onClose, product }: { onClose: () => void; product: Prod
         <div className="bg-slate-50 p-4">
           {/* Desktop modal table */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500 text-xs"><tr>{['เอกสาร', 'จำนวน', 'มูลค่า', 'COGS', 'GP'].map((header) => <th key={header} className="p-2 text-left font-semibold">{header}</th>)}</tr></thead>
-              <tbody>{lines.map((line) => <tr key={line[0]} className="border-t border-slate-100">{line.map((cell, index) => <td key={`${line[0]}-${index}`} className={`p-2 ${index > 0 ? 'text-right font-mono' : 'font-bold text-slate-700'}`}>{cell}</td>)}</tr>)}</tbody>
+            <table className="ns-table w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs"><tr>{['เอกสาร', 'จำนวน', 'มูลค่า', 'COGS', 'GP'].map((header, index) => <th key={header} className={`p-2 font-semibold ${index === 0 ? 'text-left' : 'text-right'}`}>{header}</th>)}</tr></thead>
+              <tbody>{lines.map((line) => <tr key={line[0]} className="border-t border-slate-100">{line.map((cell, index) => <td key={`${line[0]}-${index}`} className={`p-3 ${index > 0 ? 'text-right font-mono' : 'font-bold text-slate-700'}`}>{cell}</td>)}</tr>)}</tbody>
             </table>
           </div>
           
           {/* Mobile modal card list */}
-          <div className="block sm:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 rounded-lg">
+          <div className="block sm:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 rounded-xl">
             {lines.map((line) => (
               <div key={line[0]} className="py-2.5 flex flex-col gap-1 text-xs">
                 <div className="font-bold text-slate-800">{line[0]}</div>
@@ -568,7 +716,7 @@ function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: str
       label: header,
       defaultWidth: index === 0 ? 180 : 120,
       minWidth: index === 0 ? 130 : 95,
-      align: index > 1 ? 'right' : 'left',
+      align: index === 0 ? 'left' : 'right',
     }))
   }, [headers])
   const columnResize = useResizableColumns(`main.profit-cost-analysis.${tableKey}.v1`, columns)
@@ -597,11 +745,11 @@ function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: str
       {/* Desktop view */}
       {columnResize.hasCustomWidths ? (
         <div className="mb-2 hidden justify-end lg:flex">
-          <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-normal text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
         </div>
       ) : null}
       <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className={`${profitTableFont.variable} profit-analysis-table ns-table min-w-full divide-y divide-slate-200 text-sm`} style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {columns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -614,6 +762,7 @@ function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: str
                   key={column.key}
                   activeSortKey={sortKey ?? undefined}
                   align={column.align}
+                  className="!font-medium"
                   direction={sortDirection}
                   label={column.label}
                   sortKey={column.key}
@@ -624,7 +773,7 @@ function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: str
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {sortedRows.map((row, index) => <tr key={`${row[0]}-${index}`} className="transition-colors hover:bg-slate-50">{row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className={`px-3 py-3 ${cellIndex > 1 ? 'text-right font-mono whitespace-nowrap tabular-nums' : 'text-slate-700 font-medium min-w-0 overflow-hidden'}`}><div className={cellIndex <= 1 ? "truncate" : ""} title={cellIndex <= 1 ? cell : undefined}>{cell}</div></td>)}</tr>)}
+            {sortedRows.map((row, index) => <tr key={`${row[0]}-${index}`} className="transition-colors hover:bg-slate-50">{row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className={`px-3 py-3 ${cellIndex > 1 ? 'text-right font-mono whitespace-nowrap tabular-nums' : 'min-w-0 overflow-hidden font-normal text-slate-700'}`}><div className={cellIndex <= 1 ? "truncate" : ""} title={cellIndex <= 1 ? cell : undefined}>{cell}</div></td>)}</tr>)}
             {sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={headers.length}>ไม่มีข้อมูล</td></tr> : null}
           </tbody>
         </table>
@@ -633,13 +782,24 @@ function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: str
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[500px] overflow-y-auto">
         {sortedRows.map((row, index) => (
-          <div key={index} className="p-3 bg-white rounded-lg border border-slate-100 mb-2 shadow-sm flex flex-col gap-1 text-xs">
-            {row.map((cell, cellIndex) => (
-              <div key={cellIndex} className="flex justify-between py-0.5">
-                <span className="text-slate-500 font-medium">{headers[cellIndex]}</span>
-                <span className={`font-bold ${cellIndex > 1 ? 'font-mono text-slate-950' : 'text-slate-800'}`}>{cell}</span>
+          <div key={index} className="mb-2 flex flex-col gap-2 rounded-xl border border-slate-100 bg-white p-3 text-xs shadow-sm">
+            <div className="font-bold text-slate-800">{row[0]}</div>
+            {row.length > 2 ? (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-slate-50 px-2 py-1.5 text-slate-600">
+                {row.slice(1, -1).map((cell, cellIndex) => (
+                  <div key={cellIndex} className="flex min-w-0 justify-between gap-2">
+                    <span className="truncate">{headers[cellIndex + 1]}</span>
+                    <span className="shrink-0 text-right font-medium text-slate-800">{cell}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : null}
+            {row.length > 1 ? (
+              <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                <span className="text-slate-500">{headers[row.length - 1]}</span>
+                <span className="font-mono font-bold text-slate-950">{row[row.length - 1]}</span>
+              </div>
+            ) : null}
           </div>
         ))}
         {sortedRows.length === 0 && (

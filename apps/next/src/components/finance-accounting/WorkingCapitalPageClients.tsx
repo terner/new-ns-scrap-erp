@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { KpiCard as SharedKpiCard, type KpiCardTone } from '@/components/ui/KpiCard'
 import { RotateCcw } from 'lucide-react'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -180,13 +182,19 @@ export function WorkingCapitalPageClient() {
   const s = data?.summary
   const maxDays = Math.max(s?.arDays ?? 0, s?.invDays ?? 0, s?.apDays ?? 0, 1)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const ccc = s?.ccc ?? 0
+  const cccTone = ccc < 60 ? 'emerald' : ccc < 90 ? 'amber' : 'red'
+  const cccLabel = ccc < 60 ? 'หมุนเงินได้ดี' : ccc < 90 ? 'พอใช้' : 'เงินจมค่อนข้างนาน'
+  const annualizedTurnover = s?.annualizedTurnover ?? 0
+  const turnoverLabel = annualizedTurnover >= 12 ? 'สต็อกหมุนดี' : annualizedTurnover >= 6 ? 'พอใช้' : 'สต็อกหมุนช้า'
+  const selectedBranchName = branchId ? data?.branches.find((branch) => branch.id === branchId)?.name ?? 'เลือกสาขา' : 'ทุกสาขา'
 
   return (
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:flex">
         <span className="text-sm">ช่วงวิเคราะห์</span>
         <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))}>
           {[30, 60, 90, 180, 365].map((days) => <option key={days} value={days}>{days} วันล่าสุด{days === 90 ? ' (แนะนำ)' : ''}</option>)}
@@ -197,7 +205,7 @@ export function WorkingCapitalPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
+      <div className="mb-4 space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
         <div className="flex gap-2 items-center">
           <select 
             aria-label="Period days select"
@@ -265,29 +273,64 @@ export function WorkingCapitalPageClient() {
           </div>
         </MobileFilterSheet>
       ) : null}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="bg-white p-5 border border-slate-100 rounded-md shadow-sm flex items-center gap-4">
-          <div className="min-w-0 flex-1">
-            <div className={`text-xs font-semibold ${(s?.ccc ?? 0) < 60 ? 'text-emerald-600' : (s?.ccc ?? 0) < 90 ? 'text-amber-600' : 'text-red-600'} truncate`}>
-              {(s?.ccc ?? 0) < 60 ? 'Cash Conversion Cycle (ดี)' : (s?.ccc ?? 0) < 90 ? 'Cash Conversion Cycle (พอใช้)' : 'Cash Conversion Cycle (เสี่ยง)'}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.9fr)]">
+        <div className={`rounded-md border bg-white p-5 shadow-sm ${cccTone === 'emerald' ? 'border-emerald-200' : cccTone === 'amber' ? 'border-amber-200' : 'border-red-200'}`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className={`text-xs font-bold uppercase ${cccTone === 'emerald' ? 'text-emerald-700' : cccTone === 'amber' ? 'text-amber-700' : 'text-red-700'}`}>ภาพรวมรอบเงินสด</div>
+              <div className="mt-1 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">{ccc.toFixed(1)} <span className="text-base font-semibold text-slate-500">วัน</span></div>
+              <div className="mt-2 text-sm font-semibold text-slate-700">{cccLabel}</div>
+              <div className="mt-1 text-xs text-slate-500">สูตร: วันเก็บเงินลูกค้า + วันคงเหลือสต็อก - วันจ่ายเจ้าหนี้</div>
             </div>
-            <div className="mt-0.5 text-2xl font-extrabold text-slate-900 tracking-tight">{(s?.ccc ?? 0).toFixed(1)} <span className="text-xs font-medium text-slate-500">วัน</span></div>
-            <div className="mt-3 text-xs text-slate-400 pt-2 border-t border-slate-100">
-              AR ({(s?.arDays ?? 0).toFixed(0)}) + Inv ({(s?.invDays ?? 0).toFixed(0)}) - AP ({(s?.apDays ?? 0).toFixed(0)})
+            <div className={`rounded-md px-3 py-2 text-xs ${cccTone === 'emerald' ? 'border border-emerald-200 bg-emerald-50 text-emerald-800' : cccTone === 'amber' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-red-200 bg-red-50 text-red-800'}`}>
+              <div className="font-bold">ตัวกรองปัจจุบัน</div>
+              <div className="mt-0.5">{periodDays} วันล่าสุด</div>
+              <div>{selectedBranchName}</div>
             </div>
           </div>
+          <div className="mt-5 grid grid-cols-1 gap-2 border-t border-slate-100 pt-4 sm:grid-cols-3">
+            <Mini label="เก็บเงินลูกค้า" value={`${(s?.arDays ?? 0).toFixed(1)} วัน`} />
+            <Mini label="สต็อกคงเหลือ" value={`${(s?.invDays ?? 0).toFixed(1)} วัน`} />
+            <Mini label="จ่ายเจ้าหนี้" value={`${(s?.apDays ?? 0).toFixed(1)} วัน`} />
+          </div>
         </div>
-        <Panel className="md:col-span-2" title="รอบเงินสด (CCC) — แสดงเงินจมแต่ละขั้น">
+        <Panel title="เงินจมอยู่ตรงไหนบ้าง">
           <BreakdownBar label="วันเก็บเงินลูกค้า" tone="blue" value={s?.arDays ?? 0} max={maxDays} amount={s?.ar ?? 0} />
           <BreakdownBar label="วันคงเหลือสต็อก" tone="amber" value={s?.invDays ?? 0} max={maxDays} amount={s?.inv ?? 0} />
           <BreakdownBar label="วันจ่ายเจ้าหนี้" tone="emerald" value={s?.apDays ?? 0} max={maxDays} amount={s?.ap ?? 0} />
+          <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            ยิ่งแถบของลูกหนี้หรือสต็อกยาวขึ้น เงินจะยิ่งกลับมาเป็นเงินสดช้า ส่วนเจ้าหนี้ช่วยยืดเวลาการจ่ายเงินออกไป
+          </div>
+        </Panel>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Panel title="สภาพคล่องระยะสั้น">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Mini label="สินทรัพย์หมุนเวียน" value={money(s?.currentAssets)} />
+            <Mini label="หนี้สินหมุนเวียน" value={money(s?.currentLiab)} />
+            <Mini label="เงินสด + ธนาคาร" value={money(s?.cash)} />
+            <Mini label="หนี้เงินกู้ 12 เดือน" value={money(s?.currentLoan)} />
+          </div>
+        </Panel>
+        <Panel title="ภาพรวมการหมุนสต็อก">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Mini label="รอบหมุนในช่วงที่เลือก" value={`${(s?.stockTurnover ?? 0).toFixed(2)}x`} />
+            <Mini label="เทียบเป็นต่อปี" value={`${annualizedTurnover.toFixed(1)}x/ปี`} />
+            <Mini label="มูลค่าสต็อก" value={money(s?.inv)} />
+            <Mini label="ต้นทุนขาย" value={money(s?.cogs)} />
+          </div>
         </Panel>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Gauge title="อัตราส่วนทุนหมุนเวียน" value={s?.currentRatio ?? 0} kind="current" footer="(สินทรัพย์หมุนเวียน ÷ หนี้สินหมุนเวียน)" />
         <Gauge title="อัตราส่วนสภาพคล่องเร็ว" value={s?.quickRatio ?? 0} kind="quick" footer="((เงินสด + AR) ÷ หนี้สินหมุนเวียน)" />
-        <Panel title="รอบหมุนสต็อก">
-          <div className="py-4 text-center"><div className="text-5xl font-bold text-purple-700">{(s?.stockTurnover ?? 0).toFixed(2)}<span className="text-xl">x</span></div><div className="mt-1 text-sm text-slate-500">ใน {periodDays} วัน</div><div className="mt-2 text-xs text-slate-400">= <b className="text-purple-600">{(s?.annualizedTurnover ?? 0).toFixed(1)}x</b> ต่อปี</div><div className={`mt-1 text-xs ${(s?.annualizedTurnover ?? 0) >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>{(s?.annualizedTurnover ?? 0) >= 12 ? 'สต็อกหมุนดี' : (s?.annualizedTurnover ?? 0) >= 6 ? 'พอใช้' : 'สต็อกหมุนช้า'}</div></div>
+        <Panel title="ธุรกิจหมุนเงินดีขึ้นหรือแย่ลง?">
+          <div className="py-4 text-center">
+            <div className="text-5xl font-bold text-purple-700">{(s?.stockTurnover ?? 0).toFixed(2)}<span className="text-xl">x</span></div>
+            <div className="mt-1 text-sm text-slate-500">หมุนได้ในช่วง {periodDays} วัน</div>
+            <div className="mt-2 text-xs text-slate-400">= <b className="text-purple-600">{annualizedTurnover.toFixed(1)}x</b> ต่อปี</div>
+            <div className={`mt-1 text-xs ${annualizedTurnover >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>{turnoverLabel}</div>
+          </div>
         </Panel>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
@@ -300,10 +343,10 @@ export function WorkingCapitalPageClient() {
         <Kpi label="อัตราส่วนสภาพคล่องเร็ว" value={(s?.quickRatio ?? 0).toFixed(2)} tone={(s?.quickRatio ?? 0) >= 0.5 ? 'emerald' : 'red'} />
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Insight tone="amber" title=" เงินจมใน Stock กี่วัน" value={`${(s?.invDays ?? 0).toFixed(0)} วัน`} body={`Stock มูลค่า ${money(s?.inv)} ÷ COGS เฉลี่ย/วัน ${money((s?.cogs ?? 0) / periodDays)}`} />
-        <Insight tone="blue" title=" ลูกหนี้เก็บเงินกี่วัน" value={`${(s?.arDays ?? 0).toFixed(0)} วัน`} body={`AR ${money(s?.ar)} ÷ Sales เฉลี่ย/วัน ${money((s?.revenue ?? 0) / periodDays)}`} />
-        <Insight tone="emerald" title=" เจ้าหนี้จ่ายเงินกี่วัน" value={`${(s?.apDays ?? 0).toFixed(0)} วัน`} body={`AP ${money(s?.ap)} ÷ Purchases เฉลี่ย/วัน ${money((s?.purchases ?? 0) / periodDays)}`} />
-        <Insight tone="purple" title=" ซื้อของแล้วขายออกเร็วไหม?" value={`${(s?.annualizedTurnover ?? 0).toFixed(1)}x/ปี`} body="Stock Turnover (Annualized): COGS/Avg Inventory" />
+        <Insight tone="amber" title="เงินจมในสต็อกกี่วัน" value={`${(s?.invDays ?? 0).toFixed(0)} วัน`} body={`เอามูลค่าสต็อก ${money(s?.inv)} เทียบกับต้นทุนขายเฉลี่ยต่อวัน ${money((s?.cogs ?? 0) / periodDays)}`} />
+        <Insight tone="blue" title="ลูกหนี้เก็บเงินกี่วัน" value={`${(s?.arDays ?? 0).toFixed(0)} วัน`} body={`เอายอดลูกหนี้ ${money(s?.ar)} เทียบกับยอดขายเฉลี่ยต่อวัน ${money((s?.revenue ?? 0) / periodDays)}`} />
+        <Insight tone="emerald" title="เจ้าหนี้จ่ายเงินกี่วัน" value={`${(s?.apDays ?? 0).toFixed(0)} วัน`} body={`เอายอดเจ้าหนี้ ${money(s?.ap)} เทียบกับยอดซื้อเฉลี่ยต่อวัน ${money((s?.purchases ?? 0) / periodDays)}`} />
+        <Insight tone="purple" title="ธุรกิจหมุนเงินดีขึ้นหรือแย่ลง?" value={`${annualizedTurnover.toFixed(1)}x/ปี`} body="ใช้ Stock Turnover แบบ annualized เพื่อดูว่าซื้อของแล้วขายออกได้กี่รอบต่อปี" />
       </div>
       <DetailTable isLoading={isLoading} rows={data?.calculationRows ?? []} />
     </section>
@@ -325,6 +368,7 @@ export function StockFinancePageClient() {
   ]
   const [showAllTopProducts, setShowAllTopProducts] = useState(false)
   const [stockTableTab, setStockTableTab] = useState<StockTableTab>('products')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const topProducts = data?.topProducts ?? []
   const visibleTopProducts = showAllTopProducts ? topProducts : topProducts.slice(0, 5)
   const canToggleTopProducts = topProducts.length > 5
@@ -332,7 +376,69 @@ export function StockFinancePageClient() {
   return (
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+
+      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
+        <DateInput label="ณ วันที่" value={asOf} onChange={setAsOf} />
+        <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
+      </div>
+
+      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
+        <div className="flex gap-2 items-center">
+          <div className="flex-1 flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 font-semibold shrink-0">ณ วันที่</span>
+            <DatePickerInput className="w-full text-xs" value={asOf} onChange={setAsOf} />
+          </div>
+          <button
+            type="button"
+            className="h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
+            onClick={() => setShowMobileFilters(true)}
+          >
+            ตัวกรอง {branchId ? '(มี)' : ''}
+          </button>
+        </div>
+      </div>
+
+      {showMobileFilters ? (
+        <MobileFilterSheet
+          title="ตัวกรองเพิ่มเติม"
+          onClose={() => setShowMobileFilters(false)}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setBranchId('')
+                }}
+                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                ล้างตัวกรอง
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMobileFilters(false)}
+                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                ตกลง
+              </button>
+            </>
+          }
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">สาขา</label>
+            <select
+              aria-label="Branch select"
+              className="h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm outline-none transition focus:border-slate-400"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+            >
+              <option value="">ทุกสาขา</option>
+              {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </div>
+        </MobileFilterSheet>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-md border border-amber-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
@@ -345,17 +451,17 @@ export function StockFinancePageClient() {
                 <span className="text-slate-300">/</span>
                 <span>WAC ตามตัวกรองปัจจุบัน</span>
               </div>
+              <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Mini label="จ่ายแล้ว" value={money(data?.summary.paidValue)} />
+                <Mini label="ยังไม่จ่าย" value={money(data?.summary.unpaidValue)} />
+                <Mini label="โอกาสกำไร" value={money(opportunityValue)} />
+              </div>
             </div>
-            <div className="rounded-md border border-amber-100 bg-amber-50/40 px-3 py-2 text-xs text-amber-800">
+            <div className="rounded-md border border-amber-100 bg-amber-50/40 px-4 py-3 text-xs text-amber-800 lg:w-[220px]">
               <div className="font-bold">เงินจม 90+ วัน</div>
-              <div className="mt-0.5 text-lg font-extrabold tracking-tight">{money(oldStock?.value)}</div>
-              <div className="text-amber-700/80">{oldStock?.count ?? 0} รายการ</div>
+              <div className="mt-1 text-2xl font-extrabold tracking-tight">{money(oldStock?.value)}</div>
+              <div className="mt-1 text-amber-700/80">{oldStock?.count ?? 0} รายการ · {oldStockPct}% ของมูลค่ารวม</div>
             </div>
-          </div>
-          <div className="mt-5 grid grid-cols-1 gap-2 border-t border-slate-100 pt-4 sm:grid-cols-3">
-            <Mini label="จ่ายแล้ว" value={money(data?.summary.paidValue)} />
-            <Mini label="ยังไม่จ่าย" value={money(data?.summary.unpaidValue)} />
-            <Mini label="โอกาสกำไร" value={money(data?.summary.marginPotential)} />
           </div>
         </div>
         <Panel title="สถานะสต็อกตามการผลิต">
@@ -384,7 +490,8 @@ export function StockFinancePageClient() {
           </div>
         </Panel>
       </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel title="อายุสต็อกตามมูลค่า">{(data?.aging ?? []).map((row) => <AgingBar key={row.key} row={row} total={total} />)}</Panel>
         <Panel title="สินค้า 10 อันดับมูลค่าสูงสุด">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -411,7 +518,7 @@ export function StockFinancePageClient() {
             Stock ทั้งหมด <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{data?.products.length ?? 0}</span>
           </TabsTrigger>
           <TabsTrigger value="slowMoving" variant="line">
-            สินค้าหมุนช้า / ควรเร่งระบาย <span className="ml-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{data?.slowMoving.length ?? 0}</span>
+            Slow Moving / สินค้าที่ควรรีบขาย (Top 15 — ไม่ขาย &gt; 60 วัน) <span className="ml-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{data?.slowMoving.length ?? 0}</span>
           </TabsTrigger>
         </TabsList>
         {stockTableTab === 'products' ? (
@@ -439,7 +546,7 @@ export function ProfitLeakPageClient() {
       {error ? <ErrorBox message={error} /> : null}
       
       {/* Desktop Filter Panel */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:flex">
         <DateInput label="จาก" value={from} onChange={setFrom} />
         <DateInput label="ถึง" value={to} onChange={setTo} />
         <label className="flex items-center gap-2 text-xs text-slate-600 font-semibold">
@@ -451,7 +558,7 @@ export function ProfitLeakPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-md bg-white p-3 shadow lg:hidden space-y-3">
+      <div className="mb-4 space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
         <div className="flex gap-2 items-center">
           <div className="flex-1 grid grid-cols-2 gap-2">
             <div className="flex items-center gap-1">
@@ -530,7 +637,7 @@ export function ProfitLeakPageClient() {
         </MobileFilterSheet>
       ) : null}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="bg-white p-5 border border-red-200 rounded-md shadow-sm flex items-center gap-4">
+        <div className="bg-white p-5 border border-red-200 rounded-xl shadow-sm flex items-center gap-4">
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-red-600">รวมเงินที่รั่วไหล</div>
             <div className="mt-0.5 text-2xl font-extrabold text-red-700 tracking-tight">{money(data?.summary.totalLeak)}</div>
@@ -552,9 +659,9 @@ export function ProfitLeakPageClient() {
         <Kpi label="ขาดทุนสต็อก" value={money(data?.summary.stockLoss)} tone="red" />
         <Kpi label="ขาดทุนผลิต" value={money(data?.summary.productionLoss)} tone="rose" />
         <Kpi label="ขาดทุน FX" value={money(data?.summary.fxLoss)} tone="cyan" />
-        <Kpi label=" Bank Fee" value={money(data?.summary.bankFee)} tone="slate" />
+        <Kpi label="ค่าธรรมเนียมธนาคาร" value={money(data?.summary.bankFee)} tone="slate" />
         <Kpi label=" ลูกค้ากำไรต่ำ" value={String(data?.lowCustomers.length ?? 0)} tone="yellow" />
-        <Kpi label=" Supplier ราคาแพง" value={String(data?.highSuppliers.length ?? 0)} tone="emerald" />
+        <Kpi label="ผู้ขายราคาสูง" value={String(data?.highSuppliers.length ?? 0)} tone="emerald" />
       </div>
       <NegativeMarginTable rows={data?.negMarginItems ?? []} total={data?.summary.negTotal ?? 0} />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3"><LowMarginTable rows={data?.lowMarginBills ?? []} targetMargin={targetMargin} /><LowCustomerTable rows={data?.lowCustomers ?? []} /><HighSupplierTable rows={data?.highSuppliers ?? []} /></div>
@@ -587,7 +694,7 @@ function percent(value: number, total: number) {
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">{children}</div>
 }
 
 function DateInput({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
@@ -599,7 +706,7 @@ function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; on
 }
 
 function Panel({ children, className = '', title }: { children: ReactNode; className?: string; title: string }) {
-  return <div className={`rounded-md border border-slate-100 bg-white p-4 shadow-sm ${className}`}><div className="mb-3 text-xs font-bold text-slate-800">{title}</div>{children}</div>
+  return <div className={`rounded-xl border border-slate-100 bg-white p-4 shadow-sm ${className}`}><div className="mb-3 text-xs font-bold text-slate-800">{title}</div>{children}</div>
 }
 
 function BreakdownBar({ amount, label, max, tone, value }: { amount: number; label: string; max: number; tone: 'amber' | 'blue' | 'emerald'; value: number }) {
@@ -625,26 +732,8 @@ function Gauge({ footer, kind, title, value }: { footer: string; kind: 'current'
   return <Panel title={title}><svg viewBox="0 0 200 110" className="h-[100px] w-full"><path d="M 30 90 A 70 70 0 0 1 170 90" stroke="#e2e8f0" strokeLinecap="round" strokeWidth="14" fill="none" /><path d="M 30 90 A 70 70 0 0 1 170 90" stroke={color} strokeDasharray={`${dash} 220`} strokeLinecap="round" strokeWidth="14" fill="none" /><text fill={color} fontSize="28" fontWeight="bold" textAnchor="middle" x="100" y="80">{value.toFixed(2)}</text><text fill="#64748b" fontSize="12" textAnchor="middle" x="100" y="100">{text}</text></svg><div className="mt-1 text-center text-xs text-slate-500">{footer}</div></Panel>
 }
 
-function Kpi({ label, tone, value }: { label: string; tone: string; value: string }) {
-  const map: Record<string, string> = {
-    amber: 'border-amber-200 bg-amber-50/40 text-amber-800',
-    blue: 'border-blue-200 bg-blue-50/40 text-blue-800',
-    cyan: 'border-cyan-200 bg-cyan-50/40 text-cyan-800',
-    emerald: 'border-emerald-200 bg-emerald-50/40 text-emerald-800',
-    orange: 'border-orange-200 bg-orange-50/40 text-orange-800',
-    purple: 'border-purple-200 bg-purple-50/40 text-purple-800',
-    red: 'border-red-200 bg-red-50/40 text-red-800',
-    rose: 'border-rose-200 bg-rose-50/40 text-rose-800',
-    slate: 'border-slate-100 bg-slate-50/40 text-slate-800',
-    yellow: 'border-yellow-200 bg-yellow-50/40 text-yellow-800'
-  }
-  const cls = map[tone] ?? map.slate
-  return (
-    <div className={`rounded-md border p-3 shadow-sm ${cls}`}>
-      <div className="text-xs text-slate-500 font-semibold uppercase">{label}</div>
-      <div className="text-sm font-bold tracking-tight mt-0.5">{value}</div>
-    </div>
-  )
+function Kpi({ label, tone, value }: { label: string; tone: KpiCardTone; value: string }) {
+  return <SharedKpiCard label={label} tone={tone} value={value} />
 }
 
 function Insight({ body, title, tone, value }: { body: string; title: string; tone: string; value: string }) {
@@ -715,7 +804,7 @@ function DetailTable({ isLoading, rows }: { isLoading: boolean; rows: WorkingPay
       </div>
       <div className="overflow-x-auto">
         {/* Desktop View */}
-        <table className="hidden lg:table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table hidden lg:table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {detailColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -877,14 +966,7 @@ function StockTablePagination({
             <RotateCcw className="h-3 w-3" /> คืนค่าเดิมตาราง
           </button>
         ) : null}
-        <select
-          aria-label="จำนวนรายการต่อหน้า"
-          className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-500"
-          value={pageSize}
-          onChange={(event) => onPageSizeChange(Number(event.target.value) as StockTablePageSize)}
-        >
-          {stockTablePageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
-        </select>
+        <PageSizeDropdown options={stockTablePageSizeOptions} value={pageSize} onChange={(size) => onPageSizeChange(size as StockTablePageSize)} />
         <button
           className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 outline-none transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={currentPage <= 1}
@@ -975,15 +1057,15 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-sm font-bold text-slate-800">สินค้าหมุนช้า / ควรเร่งระบาย</div>
-          <div className="mt-0.5 text-xs font-medium text-slate-500">Top 15 ที่ไม่ขายเกิน 60 วัน · {rows.length} รายการ</div>
+          <div className="text-sm font-bold text-slate-800">Slow Moving / สินค้าที่ควรรีบขาย</div>
+          <div className="mt-0.5 text-xs font-medium text-slate-500">Top 15 — ไม่ขาย &gt; 60 วัน · {rows.length} รายการ</div>
         </div>
       </div>
       <div className="hidden flex-wrap items-center gap-2 border-b border-slate-100 bg-white p-3 lg:flex">
         <DateInput label="ณ วันที่" value={asOf} onChange={onAsOfChange} />
         <BranchSelect branches={branches} value={branchId} onChange={onBranchIdChange} />
         <input
-          aria-label="ค้นหาสินค้าหมุนช้า"
+          aria-label="ค้นหา Slow Moving"
           className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
           placeholder="ค้นหารหัส / ชื่อ / หมวด"
           type="search"
@@ -991,7 +1073,7 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
           onChange={(event) => setSearch(event.target.value)}
         />
         <select
-          aria-label="หมวดสินค้าหมุนช้า"
+          aria-label="หมวดสินค้า Slow Moving"
           className="h-9 w-[180px] rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
           value={groupFilter}
           onChange={(event) => setGroupFilter(event.target.value)}
@@ -1016,9 +1098,9 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
       <div className="border-b border-slate-100 bg-white p-3 lg:hidden">
         <div className="flex gap-2">
           <input
-            aria-label="ค้นหาสินค้าหมุนช้า"
+            aria-label="ค้นหา Slow Moving"
             className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
-            placeholder="ค้นหาสินค้าหมุนช้า"
+            placeholder="ค้นหา Slow Moving"
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -1047,7 +1129,7 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
 
       {showFilters ? (
         <MobileFilterSheet
-          title="ตัวกรองสินค้าหมุนช้า"
+          title="ตัวกรอง Slow Moving"
           onClose={() => setShowFilters(false)}
           footer={
             <>
@@ -1092,7 +1174,7 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">หมวดสินค้า</label>
             <select
-              aria-label="หมวดสินค้าหมุนช้า"
+              aria-label="หมวดสินค้า Slow Moving"
               className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
               value={groupFilter}
               onChange={(event) => setGroupFilter(event.target.value)}
@@ -1105,7 +1187,7 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
       ) : null}
 
       <div className="hidden overflow-x-auto bg-white lg:block">
-        <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {slowMovingColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -1114,8 +1196,8 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
           <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
             <tr>
               <ResizableTableHead label="รหัส" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="code" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('code', 'รหัส')} />
-              <ResizableTableHead label="ชื่อ" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="name" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อ')} />
-              <ResizableTableHead label="หมวด" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="metalGroup" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('metalGroup', 'หมวด')} />
+              <ResizableTableHead align="right" label="ชื่อ" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="name" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อ')} />
+              <ResizableTableHead align="right" label="หมวด" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="metalGroup" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('metalGroup', 'หมวด')} />
               <ResizableTableHead align="right" label="จำนวน" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="qty" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('qty', 'จำนวน')} />
               <ResizableTableHead align="right" label="WAC" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="wac" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('wac', 'WAC')} />
               <ResizableTableHead align="right" label="มูลค่า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="value" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('value', 'มูลค่า')} />
@@ -1129,8 +1211,8 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
             {pagedRows.map((row) => (
               <tr className="border-t border-slate-100 transition hover:bg-slate-50/50" key={row.id}>
                 <Td mono className="font-bold text-slate-700">{row.code}</Td>
-                <Td className="whitespace-normal font-semibold text-slate-900">{row.name}</Td>
-                <Td>{row.metalGroup}</Td>
+                <Td align="right" className="whitespace-normal font-semibold text-slate-900">{row.name}</Td>
+                <Td align="right">{row.metalGroup}</Td>
                 <Td align="right">{money(row.qty)}</Td>
                 <Td align="right">{money(row.wac)}</Td>
                 <Td align="right" className="font-bold text-slate-900">{money(row.value)}</Td>
@@ -1139,7 +1221,7 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
                 <Td align="right" className={row.marginPotential < 0 ? 'font-semibold text-red-700' : 'font-semibold text-emerald-700'}>{money(row.marginPotential)}</Td>
               </tr>
             ))}
-            {!isLoading && !totalRows ? <tr><td className="py-8 text-center text-slate-400" colSpan={9}>ไม่มีสินค้าหมุนช้าตามเงื่อนไขนี้</td></tr> : null}
+            {!isLoading && !totalRows ? <tr><td className="py-8 text-center text-slate-400" colSpan={9}>ไม่มี Slow Moving ตามเงื่อนไขนี้</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -1148,7 +1230,7 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
         {isLoading && !totalRows ? (
           <div className="py-8 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล</div>
         ) : !totalRows ? (
-          <div className="py-8 text-center text-slate-400 text-xs">ไม่มีสินค้าหมุนช้าตามเงื่อนไขนี้</div>
+          <div className="py-8 text-center text-slate-400 text-xs">ไม่มี Slow Moving ตามเงื่อนไขนี้</div>
         ) : (
           pagedRows.map((row) => (
             <div key={row.id} className="space-y-2 p-4 text-xs transition hover:bg-slate-50/50">
@@ -1159,7 +1241,7 @@ function SlowMovingTable({ asOf, branchId, branches, isLoading, rows, onAsOfChan
                 </div>
                 <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{row.metalGroup}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-100/50 bg-slate-50/50 p-2.5 text-xs">
+              <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-100/50 bg-slate-50/50 p-2.5 text-xs">
                 <div><span className="text-slate-400">จำนวน:</span> <span className="font-semibold text-slate-800">{money(row.qty)} กก.</span></div>
                 <div><span className="text-slate-400">มูลค่า:</span> <span className="font-bold text-slate-900">{money(row.value)}</span></div>
                 <div><span className="text-slate-400">WAC:</span> <span className="font-medium text-slate-600">{money(row.wac)}</span></div>
@@ -1250,21 +1332,22 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="text-sm font-bold text-slate-800">Stock ทั้งหมด</div>
+          <div className="text-sm font-bold text-slate-800">สต็อกทั้งหมด</div>
           <div className="mt-0.5 text-xs font-medium text-slate-500">เริ่มต้นเรียงตามมูลค่าสูงสุด</div>
         </div>
       </div>
-      <div className="hidden flex-wrap items-center gap-2 border-b border-slate-100 bg-white p-3 lg:flex">
-        <DateInput label="ณ วันที่" value={asOf} onChange={onAsOfChange} />
-        <BranchSelect branches={branches} value={branchId} onChange={onBranchIdChange} />
+      <div className="hidden border-b border-slate-100 bg-white p-4 lg:block">
+        <div className="flex flex-wrap items-center gap-2">
         <input
-          aria-label="ค้นหา Stock"
+          aria-label="ค้นหาสต็อก"
           className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500"
           placeholder="ค้นหารหัส / ชื่อ / หมวด"
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
+          <DateInput label="ณ วันที่" value={asOf} onChange={onAsOfChange} />
+          <BranchSelect branches={branches} value={branchId} onChange={onBranchIdChange} />
         <select
           aria-label="หมวดสินค้า"
           className="h-9 w-[150px] rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
@@ -1274,20 +1357,8 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
           <option value="all">ทุกหมวด</option>
           {groups.map((group) => <option key={group} value={group}>{group}</option>)}
         </select>
-        <select
-          aria-label="อายุ Stock"
-          className="h-9 w-[140px] rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
-          value={ageFilter}
-          onChange={(event) => setAgeFilter(event.target.value)}
-        >
-          <option value="all">ทุกอายุ</option>
-          <option value="0-30">0-30 วัน</option>
-          <option value="31-60">31-60 วัน</option>
-          <option value="61-90">61-90 วัน</option>
-          <option value="90+">90+ วัน</option>
-        </select>
         <button
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 outline-none transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-normal text-slate-600 outline-none transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!hasFilters}
           type="button"
           onClick={() => {
@@ -1300,6 +1371,26 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
         >
           ล้างตัวกรอง
         </button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500">อายุสต็อก:</span>
+          {[
+            { label: 'ทุกอายุ', value: 'all' },
+            { label: '0-30 วัน', value: '0-30' },
+            { label: '31-60 วัน', value: '31-60' },
+            { label: '61-90 วัน', value: '61-90' },
+            { label: '90+ วัน', value: '90+' },
+          ].map((option) => (
+            <button
+              className={`rounded-md border px-3 py-1 text-xs font-medium ${ageFilter === option.value ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+              key={option.value}
+              type="button"
+              onClick={() => setAgeFilter(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="border-b border-slate-100 bg-white p-3 lg:hidden">
         <div className="flex gap-2">
@@ -1312,7 +1403,7 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
             onChange={(event) => setSearch(event.target.value)}
           />
           <button
-            className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-50"
+            className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-3 text-xs font-normal text-slate-700 outline-none transition hover:bg-slate-50"
             type="button"
             onClick={() => setShowProductFilters(true)}
           >
@@ -1323,7 +1414,7 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
       <StockTablePagination
         currentPage={currentPage}
         pageSize={pageSize}
-        summary={totalRows !== rows.length ? <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold">จากทั้งหมด {rows.length}</span> : undefined}
+        summary={totalRows !== rows.length ? <span className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold">จากทั้งหมด {rows.length}</span> : undefined}
         totalPages={totalPages}
         totalRows={totalRows}
         onPageChange={setPage}
@@ -1349,14 +1440,14 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
                   setGroupFilter('all')
                   setAgeFilter('all')
                 }}
-                className="h-10 rounded-md border border-slate-200 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                className="h-10 rounded-md border border-slate-200 text-sm font-normal text-slate-600 transition hover:bg-slate-50"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowProductFilters(false)}
-                className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
+                className="h-10 rounded-md bg-blue-600 text-sm font-normal text-white transition hover:bg-blue-700"
               >
                 ใช้ตัวกรอง
               </button>
@@ -1411,7 +1502,7 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
 
       {/* Desktop View */}
       <div className="hidden lg:block overflow-x-auto bg-white">
-        <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {stockProductColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -1420,12 +1511,12 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
           <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
             <tr>
               <ResizableTableHead label="รหัส" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="code" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('code', 'รหัส')} />
-              <ResizableTableHead label="ชื่อ" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="name" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อ')} />
-              <ResizableTableHead label="หมวด" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="metalGroup" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('metalGroup', 'หมวด')} />
+              <ResizableTableHead align="right" label="ชื่อ" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="name" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อ')} />
+              <ResizableTableHead align="right" label="หมวด" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="metalGroup" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('metalGroup', 'หมวด')} />
               <ResizableTableHead align="right" label="จำนวน" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="qty" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('qty', 'จำนวน')} />
               <ResizableTableHead align="right" label="WAC" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="wac" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('wac', 'WAC')} />
               <ResizableTableHead align="right" label="มูลค่า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="value" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('value', 'มูลค่า')} />
-              <ResizableTableHead align="right" label="อายุ Stock" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="ageDays" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('ageDays', 'อายุ Stock')} />
+              <ResizableTableHead align="right" label="อายุสต็อก" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="ageDays" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('ageDays', 'อายุสต็อก')} />
               <ResizableTableHead align="right" label="ราคามาตรฐาน" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="stdPrice" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('stdPrice', 'ราคามาตรฐาน')} />
               <ResizableTableHead align="right" label="โอกาสกำไร" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="marginPotential" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('marginPotential', 'โอกาสกำไร')} />
             </tr>
@@ -1435,8 +1526,8 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
             {pagedRows.map((row) => (
               <tr className="border-t border-slate-100 hover:bg-slate-50/50 transition" key={row.id}>
                 <Td mono className="font-bold text-amber-700">{row.code}</Td>
-                <Td className="whitespace-normal font-semibold text-slate-900">{row.name}</Td>
-                <Td>{row.metalGroup}</Td>
+                <Td align="right" className="whitespace-normal font-semibold text-slate-900">{row.name}</Td>
+                <Td align="right">{row.metalGroup}</Td>
                 <Td align="right">{money(row.qty)}</Td>
                 <Td align="right">{money(row.wac)}</Td>
                 <Td align="right" className="font-bold text-slate-900">{money(row.value)}</Td>
@@ -1466,7 +1557,7 @@ function ProductTable({ asOf, branchId, branches, isLoading, rows, onAsOfChange,
                 </div>
                 <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{row.metalGroup}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/50 p-2.5 rounded-lg border border-slate-100/50">
+              <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/50 p-2.5 rounded-xl border border-slate-100/50">
                 <div><span className="text-slate-400">จำนวน:</span> <span className="font-semibold text-slate-800">{money(row.qty)} กก.</span></div>
                 <div><span className="text-slate-400">มูลค่าสต็อก:</span> <span className="font-bold text-slate-900">{money(row.value)}</span></div>
                 <div><span className="text-slate-400">WAC:</span> <span className="font-medium text-slate-600">{money(row.wac)}</span></div>
@@ -1537,7 +1628,7 @@ function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginIt
       
       {/* Desktop View */}
       <div className="hidden lg:block overflow-x-auto rounded-md border border-slate-100 bg-white shadow-sm">
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {negMarginColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -1546,10 +1637,10 @@ function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginIt
           <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
             <tr>
               <ResizableTableHead label="วันที่" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="date" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
-              <ResizableTableHead label="บิล" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="docNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('docNo', 'บิล')} />
-              <ResizableTableHead label="ลูกค้า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="customer" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('customer', 'ลูกค้า')} />
-              <ResizableTableHead label="สินค้า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="productName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} />
-              <ResizableTableHead align="right" label="Qty" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="qty" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('qty', 'Qty')} />
+              <ResizableTableHead align="right" label="บิล" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="docNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('docNo', 'บิล')} />
+              <ResizableTableHead align="right" label="ลูกค้า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="customer" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('customer', 'ลูกค้า')} />
+              <ResizableTableHead align="right" label="สินค้า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="productName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} />
+              <ResizableTableHead align="right" label="จำนวน" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="qty" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('qty', 'จำนวน')} />
               <ResizableTableHead align="right" label="ราคา" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="price" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('price', 'ราคา')} />
               <ResizableTableHead align="right" label="WAC" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="unitCost" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('unitCost', 'WAC')} />
               <ResizableTableHead align="right" label="ขาดทุน" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="loss" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('loss', 'ขาดทุน')} />
@@ -1559,9 +1650,9 @@ function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginIt
             {sortedRows.map((row) => (
               <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors transition">
                 <Td>{row.date}</Td>
-                <Td mono className="font-semibold text-slate-800">{row.docNo}</Td>
-                <Td>{row.customer}</Td>
-                <Td className="font-medium text-slate-900">{row.productName}</Td>
+                <Td align="right" mono className="font-semibold text-slate-800">{row.docNo}</Td>
+                <Td align="right">{row.customer}</Td>
+                <Td align="right" className="font-medium text-slate-900">{row.productName}</Td>
                 <Td align="right">{money(row.qty)}</Td>
                 <Td align="right">{money(row.price)}</Td>
                 <Td align="right">{money(row.unitCost)}</Td>
@@ -1588,7 +1679,7 @@ function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginIt
                 <span className="rounded bg-red-50 border border-red-100 px-2 py-0.5 text-xs font-bold text-red-700">ขาดทุน {money(row.loss)}</span>
               </div>
               <div className="font-bold text-slate-900">{row.productName}</div>
-              <div className="grid grid-cols-3 gap-2 text-xs bg-slate-50/50 p-2.5 rounded-lg border border-slate-100/50">
+              <div className="grid grid-cols-3 gap-2 text-xs bg-slate-50/50 p-2.5 rounded-xl border border-slate-100/50">
                 <div><span className="text-slate-400 block text-xs">จำนวน</span><span className="font-semibold text-slate-800">{money(row.qty)} kg</span></div>
                 <div><span className="text-slate-400 block text-xs">ราคาขาย</span><span className="font-semibold text-slate-800">{money(row.price)}</span></div>
                 <div><span className="text-slate-400 block text-xs">ต้นทุน WAC</span><span className="font-semibold text-slate-800">{money(row.unitCost)}</span></div>
@@ -1653,7 +1744,7 @@ function LowMarginTable({ rows, targetMargin }: { rows: ProfitPayload['lowMargin
       
       {/* Desktop View */}
       <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {lowMarginColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -1662,7 +1753,7 @@ function LowMarginTable({ rows, targetMargin }: { rows: ProfitPayload['lowMargin
           <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
             <tr>
               <ResizableTableHead label="บิล" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="docNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('docNo', 'บิล')} />
-              <ResizableTableHead label="ลูกค้า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="customer" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('customer', 'ลูกค้า')} />
+              <ResizableTableHead align="right" label="ลูกค้า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="customer" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('customer', 'ลูกค้า')} />
               <ResizableTableHead align="right" label="GP%" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="gpPct" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('gpPct', 'GP%')} />
               <ResizableTableHead align="right" label="ขาด" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="shortfall" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('shortfall', 'ขาด')} />
             </tr>
@@ -1671,7 +1762,7 @@ function LowMarginTable({ rows, targetMargin }: { rows: ProfitPayload['lowMargin
             {sortedRows.map((row) => (
               <tr className="border-t border-slate-100 hover:bg-slate-50/50 transition" key={row.id}>
                 <Td mono className="font-semibold text-slate-800">{row.docNo}</Td>
-                <Td>{row.customer}</Td>
+                <Td align="right">{row.customer}</Td>
                 <Td align="right" className="font-semibold text-slate-700">{row.gpPct.toFixed(1)}%</Td>
                 <Td align="right" className="font-bold text-red-600">{money(row.shortfall)}</Td>
               </tr>
@@ -1756,7 +1847,7 @@ function LowCustomerTable({ rows }: { rows: ProfitPayload['lowCustomers'] }) {
       
       {/* Desktop View */}
       <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {lowCustomerColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -1862,7 +1953,7 @@ function HighSupplierTable({ rows }: { rows: ProfitPayload['highSuppliers'] }) {
       
       {/* Desktop View */}
       <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {highSupplierColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -1870,8 +1961,8 @@ function HighSupplierTable({ rows }: { rows: ProfitPayload['highSuppliers'] }) {
           </colgroup>
           <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
             <tr>
-              <ResizableTableHead label="Supplier" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="supplierName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('supplierName', 'Supplier')} />
-              <ResizableTableHead label="สินค้า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="productName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} />
+              <ResizableTableHead label="ผู้ขาย" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="supplierName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('supplierName', 'ผู้ขาย')} />
+              <ResizableTableHead align="right" label="สินค้า" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="productName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} />
               <ResizableTableHead align="right" label="+%" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="premiumPct" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('premiumPct', '+%')} />
               <ResizableTableHead align="right" label="ส่วนเกิน" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="premiumValue" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('premiumValue', 'ส่วนเกิน')} />
             </tr>
@@ -1880,7 +1971,7 @@ function HighSupplierTable({ rows }: { rows: ProfitPayload['highSuppliers'] }) {
             {sortedRows.map((row) => (
               <tr className="border-t border-slate-100 hover:bg-slate-50/50 transition" key={row.id}>
                 <Td className="font-semibold text-slate-800">{row.supplierName}</Td>
-                <Td>{row.productName}</Td>
+                <Td align="right">{row.productName}</Td>
                 <Td align="right" className="font-semibold text-red-600">{row.premiumPct.toFixed(1)}%</Td>
                 <Td align="right" className="font-bold text-red-600">{money(row.premium * row.qty)}</Td>
               </tr>
@@ -1964,7 +2055,7 @@ function OutlierTable({ rows }: { rows: ProfitPayload['outliers'] }) {
       </div>
       <div className="overflow-x-auto">
         {/* Desktop View */}
-        <table className="hidden lg:table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table hidden lg:table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {outlierColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -1973,9 +2064,9 @@ function OutlierTable({ rows }: { rows: ProfitPayload['outliers'] }) {
           <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
             <tr>
               <ResizableTableHead label="วันที่" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="date" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
-              <ResizableTableHead label="หมวด" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="category" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('category', 'หมวด')} />
-              <ResizableTableHead label="เลขที่" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="docNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
-              <ResizableTableHead label="ผู้รับ" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="payee" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('payee', 'ผู้รับ')} />
+              <ResizableTableHead align="right" label="หมวด" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="category" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('category', 'หมวด')} />
+              <ResizableTableHead align="right" label="เลขที่" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="docNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
+              <ResizableTableHead align="right" label="ผู้รับ" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="payee" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('payee', 'ผู้รับ')} />
               <ResizableTableHead align="right" label="จำนวน" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="amount" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('amount', 'จำนวน')} />
               <ResizableTableHead align="right" label="ค่าเฉลี่ย" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="mean" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('mean', 'ค่าเฉลี่ย')} />
               <ResizableTableHead align="right" label="เกินกว่าปกติ" activeSortKey={sortKey || undefined} direction={sortDirection} sortKey="over" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('over', 'เกินกว่าปกติ')} />
@@ -1984,7 +2075,7 @@ function OutlierTable({ rows }: { rows: ProfitPayload['outliers'] }) {
           <tbody>
             {sortedRows.map((row) => (
               <tr className="border-t border-slate-100 hover:bg-slate-50/50 transition" key={row.id}>
-                <Td>{row.date}</Td><Td>{row.category}</Td><Td mono className="font-semibold text-slate-800">{row.docNo}</Td><Td>{row.payee}</Td>
+                <Td>{row.date}</Td><Td align="right">{row.category}</Td><Td align="right" mono className="font-semibold text-slate-800">{row.docNo}</Td><Td align="right">{row.payee}</Td>
                 <Td align="right" className="font-bold text-slate-900">{money(row.amount)}</Td>
                 <Td align="right" className="text-slate-500">{money(row.mean)}</Td>
                 <Td align="right" className="font-bold text-red-700">{money(row.over)}</Td>

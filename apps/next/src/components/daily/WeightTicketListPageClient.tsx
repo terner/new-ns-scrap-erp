@@ -12,16 +12,21 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
-import { Select } from '@/components/ui/Select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
+import { useResizableColumns } from '@/components/ui/useResizableColumns'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
 import { cn } from '@/lib/utils'
 import { WeightTicketDetailModal } from './WeightTicketDetailModal'
 import { WeightTicketStockReturnDialog } from './WeightTicketStockReturnDialog'
 import { WeightTicketsPageClient } from './WeightTicketsPageClient'
+import {
+  WEIGHT_TICKET_COLUMN_STORAGE_KEY,
+  WEIGHT_TICKET_TABLE_COLUMN_COUNT,
+  weightTicketColumns,
+} from './weight-ticket-table-layout'
 import {
   cancelWeightTicket,
   confirmWeightTicket,
@@ -40,21 +45,8 @@ import {
 
 type TypeFilter = WeightTicketType
 type StatusFilter = WeightTicketStatus
-type WeightTicketColumnKey = 'action' | 'branch' | 'containerDeductionWeight' | 'createdAt' | 'documentNo' | 'netWeight' | 'partyName' | 'status' | 'updatedAt' | 'vehicleNo'
 
 const pageSizeOptions = [10, 25, 50, 100] as const
-const weightTicketColumns: Array<ResizableColumnDefinition<WeightTicketColumnKey>> = [
-  { key: 'documentNo', defaultWidth: 150, minWidth: 120 },
-  { key: 'createdAt', defaultWidth: 170, minWidth: 130 },
-  { key: 'partyName', defaultWidth: 210, minWidth: 150 },
-  { key: 'branch', defaultWidth: 140, minWidth: 110 },
-  { key: 'vehicleNo', defaultWidth: 130, minWidth: 110 },
-  { key: 'netWeight', defaultWidth: 150, minWidth: 120 },
-  { key: 'containerDeductionWeight', defaultWidth: 160, minWidth: 130 },
-  { key: 'status', defaultWidth: 160, minWidth: 130 },
-  { key: 'updatedAt', defaultWidth: 170, minWidth: 130 },
-  { key: 'action', defaultWidth: 380, minWidth: 300 },
-]
 
 const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; values: StatusFilter[] }>> = {
   WTI: [
@@ -175,8 +167,14 @@ function canOpenSalesBillFromTicket(ticket: WeightTicketRecord) {
   return ticket.type === 'WTO' && ticket.status === 'delivered' && ticket.usedInSalesBillCount === 0
 }
 
-function canConfirmWto(ticket: WeightTicketRecord) {
-  return ticket.type === 'WTO' && ticket.status === 'draft' && ticket.usedInSalesBillCount === 0
+function canConfirmTicket(ticket: WeightTicketRecord) {
+  return ticket.status === 'draft'
+    && ticket.usedInPurchaseBillCount === 0
+    && ticket.usedInSalesBillCount === 0
+}
+
+function confirmTicketLabel(ticket: WeightTicketRecord) {
+  return ticket.type === 'WTI' ? 'ยืนยันรับของ' : 'ยืนยันส่งของ'
 }
 
 function canReturnWtoStock(ticket: WeightTicketRecord) {
@@ -206,7 +204,7 @@ export function WeightTicketListPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [cancelTicket, setCancelTicket] = useState<WeightTicketRecord | null>(null)
-  const columnResize = useResizableColumns('daily.weight-ticket-list', weightTicketColumns)
+  const columnResize = useResizableColumns(WEIGHT_TICKET_COLUMN_STORAGE_KEY, weightTicketColumns)
   const [cancelNote, setCancelNote] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
@@ -358,7 +356,7 @@ export function WeightTicketListPageClient() {
       const updated = await confirmWeightTicket(ticket.id)
       setTickets((current) => current.map((row) => row.id === updated.id ? updated : row))
     } catch (caught) {
-      setLoadError(getErrorMessage(caught, 'ยืนยันใบส่งของไม่ได้'))
+      setLoadError(getErrorMessage(caught, 'ยืนยันใบรับ-ส่งของไม่ได้'))
     } finally {
       setConfirmingTicketId(null)
     }
@@ -454,19 +452,19 @@ export function WeightTicketListPageClient() {
       {/* Desktop Filters (Hidden on Mobile) */}
       <Card className="hidden md:block p-4">
         <div className="space-y-3">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              className="pl-9"
-              placeholder="ค้นหาเลขที่, ผู้ขาย/ลูกค้า, ทะเบียนรถ, สินค้า, สิ่งเจือปน"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                setPage(1)
-              }}
-            />
-          </label>
           <div className="flex flex-wrap items-center gap-3">
+            <label className="relative block min-w-[260px] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                className="pl-9"
+                placeholder="ค้นหาเลขที่, ผู้ขาย/ลูกค้า, ทะเบียนรถ, สินค้า, สิ่งเจือปน"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value)
+                  setPage(1)
+                }}
+              />
+            </label>
             <label className="text-xs text-slate-500">วันที่:</label>
             <DatePickerInput value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} />
             <span className="text-slate-400">→</span>
@@ -486,6 +484,23 @@ export function WeightTicketListPageClient() {
               }}
             />
             <Button disabled={!activeFilters} type="button" variant="secondary" onClick={clearFilters}>ล้างตัวกรอง</Button>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-500">สถานะเอกสาร:</span>
+              {statusOptions.map((option) => (
+                <SegmentMulti
+                  current={statusFilter}
+                  key={`${typeFilter}-${option.label}`}
+                  label={option.label}
+                  onClick={(values) => {
+                    setStatusFilter(values as WeightTicketStatus[])
+                    setPage(1)
+                  }}
+                  values={option.values}
+                />
+              ))}
+            </div>
             <div className="ml-auto flex items-center gap-2">
               <Button asChild className="gap-2" variant="export">
                 <a href={exportHref}>
@@ -499,26 +514,11 @@ export function WeightTicketListPageClient() {
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500">สถานะเอกสาร:</span>
-            {statusOptions.map((option) => (
-              <SegmentMulti
-                current={statusFilter}
-                key={`${typeFilter}-${option.label}`}
-                label={option.label}
-                onClick={(values) => {
-                  setStatusFilter(values as WeightTicketStatus[])
-                  setPage(1)
-                }}
-                values={option.values}
-              />
-            ))}
-          </div>
         </div>
       </Card>
 
       {/* Mobile Filters Toolbar (Hidden on Desktop) */}
-      <div className="space-y-2 p-3 border border-slate-200 bg-white rounded-md md:hidden">
+      <div className="space-y-2 p-3 border border-slate-200 bg-white rounded-xl md:hidden">
         <div className="flex gap-2 items-center">
           <label className="relative block flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -627,20 +627,10 @@ export function WeightTicketListPageClient() {
         <div>{summaryText}</div>
         <div className="flex flex-wrap items-center gap-2">
           {columnResize.hasCustomWidths ? <Button className="hidden lg:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
-          <Select
-            aria-label="จำนวนรายการต่อหน้า"
-            className="h-9 w-auto px-2 py-1"
-            disabled={isLoading}
-            value={pageSize}
-            onChange={(event) => {
-              setPageSize(Number(event.target.value) as (typeof pageSizeOptions)[number])
-              setPage(1)
-            }}
-          >
-            {pageSizeOptions.map((option) => (
-              <option key={option} value={option}>{option} / หน้า</option>
-            ))}
-          </Select>
+          <PageSizeDropdown disabled={isLoading} options={pageSizeOptions} value={pageSize} onChange={(size) => {
+            setPageSize(size as (typeof pageSizeOptions)[number])
+            setPage(1)
+          }} />
           <Button disabled={safePage <= 1 || isLoading} size="sm" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
           <span className="px-1">หน้า {safePage} / {totalPages}</span>
           <Button disabled={safePage >= totalPages || isLoading} size="sm" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
@@ -650,11 +640,11 @@ export function WeightTicketListPageClient() {
       {/* Mobile Card List (Hidden on Desktop) */}
       <div className="block md:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : loadError ? (
-          <div className="rounded-md bg-white p-8 text-center text-red-600 shadow-sm border border-slate-200">{loadError}</div>
+          <div className="rounded-xl bg-white p-8 text-center text-red-600 shadow-sm border border-slate-200">{loadError}</div>
         ) : tickets.length === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">ยังไม่มีรายการตามเงื่อนไข</div>
+          <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">ยังไม่มีรายการตามเงื่อนไข</div>
         ) : (
           tickets.map((ticket) => {
             const isCancelled = ticket.status === 'cancelled'
@@ -737,14 +727,14 @@ export function WeightTicketListPageClient() {
                     เปิดบิลขาย
                   </button>
                 ) : null}
-                {canConfirmWto(ticket) ? (
+                {canConfirmTicket(ticket) ? (
                   <button
                     className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
                     disabled={confirmingTicketId === ticket.id}
                     type="button"
                     onClick={() => void handleConfirmTicket(ticket)}
                   >
-                    {confirmingTicketId === ticket.id ? 'ยืนยัน...' : 'ยืนยัน'}
+                    {confirmingTicketId === ticket.id ? 'ยืนยัน...' : confirmTicketLabel(ticket)}
                   </button>
                 ) : null}
                 {canReturnWtoStock(ticket) ? (
@@ -807,15 +797,11 @@ export function WeightTicketListPageClient() {
       {/* Desktop Tables (Hidden on Mobile) */}
       <div className="hidden md:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>
-              {weightTicketColumns.map((column, index) => {
-              const style = columnResize.getColumnStyle(column.key);
-              if (index === weightTicketColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
-              return <col key={column.key} style={style} />;
-            })}
+              {weightTicketColumns.map((column) => (
+                <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+              ))}
             </colgroup>
             <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
               <tr>
@@ -834,15 +820,15 @@ export function WeightTicketListPageClient() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td className="px-3 py-10 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td>
+                  <td className="px-3 py-10 text-center text-slate-500" colSpan={WEIGHT_TICKET_TABLE_COLUMN_COUNT}>กำลังโหลดข้อมูล</td>
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td className="px-3 py-10 text-center text-red-600" colSpan={9}>{loadError}</td>
+                  <td className="px-3 py-10 text-center text-red-600" colSpan={WEIGHT_TICKET_TABLE_COLUMN_COUNT}>{loadError}</td>
                 </tr>
               ) : tickets.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-10 text-center text-slate-500" colSpan={9}>ยังไม่มีรายการตามเงื่อนไข</td>
+                  <td className="px-3 py-10 text-center text-slate-500" colSpan={WEIGHT_TICKET_TABLE_COLUMN_COUNT}>ยังไม่มีรายการตามเงื่อนไข</td>
                 </tr>
               ) : tickets.map((ticket) => {
                 const { date: ticketDate, time: ticketTime } = formatDateTimeSplit(ticket.createdAt)
@@ -916,7 +902,7 @@ export function WeightTicketListPageClient() {
                             เปิดบิลขาย
                           </button>
                         ) : null}
-                        {canConfirmWto(ticket) ? (
+                        {canConfirmTicket(ticket) ? (
                           <button
                             className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
                             disabled={confirmingTicketId === ticket.id}
@@ -926,7 +912,7 @@ export function WeightTicketListPageClient() {
                               void handleConfirmTicket(ticket)
                             }}
                           >
-                            {confirmingTicketId === ticket.id ? 'ยืนยัน...' : 'ยืนยัน'}
+                            {confirmingTicketId === ticket.id ? 'ยืนยัน...' : confirmTicketLabel(ticket)}
                           </button>
                         ) : null}
                         {canReturnWtoStock(ticket) ? (

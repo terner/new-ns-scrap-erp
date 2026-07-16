@@ -152,17 +152,17 @@ export const accountsPageConfig: MasterDataPageConfig = {
     { key: 'odLimit', label: 'วงเงิน OD', type: 'number', inputFormat: 'money', section: 'ยอดตั้งต้นและวงเงิน OD' },
   ],
   columns: [
-    { key: 'code', label: 'รหัส' },
-    { key: 'name', label: 'ชื่อบัญชีบริษัท' },
-    { key: 'typeLabel', label: 'วิธีจ่าย/รับเงิน' },
-    { key: 'subtypeLabel', label: 'ประเภทบัญชี' },
-    { key: 'bankName', label: 'ธนาคาร' },
-    { key: 'bankBranch', label: 'สาขาธนาคาร' },
-    { key: 'accountNo', label: 'เลขที่บัญชี' },
-    { key: 'currency', label: 'สกุลเงิน', align: 'center' },
-    { key: 'realBalance', label: 'ยอดคงเหลือจริง', align: 'right', format: 'money' },
-    { key: 'branchName', label: 'สาขา' },
-    statusColumn,
+    { key: 'code', label: 'รหัส', width: 110, minWidth: 90 },
+    { key: 'name', label: 'ชื่อบัญชีบริษัท', width: 220, minWidth: 170 },
+    { key: 'typeLabel', label: 'วิธีจ่าย/รับเงิน', width: 160, minWidth: 135 },
+    { key: 'subtypeLabel', label: 'ประเภทบัญชี', width: 145, minWidth: 120 },
+    { key: 'bankName', label: 'ธนาคาร', width: 150, minWidth: 120 },
+    { key: 'bankBranch', label: 'สาขาธนาคาร', width: 150, minWidth: 125 },
+    { key: 'accountNo', label: 'เลขที่บัญชี', width: 160, minWidth: 135 },
+    { key: 'currency', label: 'สกุลเงิน', align: 'center', width: 110, minWidth: 95 },
+    { key: 'realBalance', label: 'ยอดคงเหลือจริง', align: 'right', format: 'money', width: 160, minWidth: 135 },
+    { key: 'branchName', label: 'สาขา', width: 150, minWidth: 120 },
+    { ...statusColumn, width: 110, minWidth: 90 },
   ],
 }
 
@@ -485,16 +485,16 @@ export const assetCategoriesPageConfig: MasterDataPageConfig = {
 
 export const departmentsPageConfig: MasterDataPageConfig = {
   apiPath: '/api/master-data/departments',
-  createLabel: 'เพิ่มแผนก',
-  entityName: 'แผนก',
-  emptyMessage: 'ไม่พบข้อมูลแผนก',
+  createLabel: 'เพิ่มฝ่าย',
+  entityName: 'ฝ่าย',
+  emptyMessage: 'ไม่พบข้อมูลฝ่าย',
   fields: [
-    { key: 'code', label: 'รหัสแผนก' },
-    { key: 'name', label: 'ชื่อแผนก', required: true },
+    { key: 'code', label: 'รหัสฝ่าย' },
+    { key: 'name', label: 'ชื่อฝ่าย', required: true },
   ],
   columns: [
     { key: 'code', label: 'รหัส' },
-    { key: 'name', label: 'ชื่อแผนก' },
+    { key: 'name', label: 'ชื่อฝ่าย' },
     statusColumn,
   ],
 }

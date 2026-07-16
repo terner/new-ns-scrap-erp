@@ -5,11 +5,12 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronLeft, ChevronRight, ClipboardList, Package2, Printer, RotateCcw, Scale, SquarePen, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Package2, Printer, RotateCcw, Scale, SquarePen, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import { PageTitleOverride } from '@/components/layout/PageTitleOverride'
 import {
   WeightTicketProductBreakdownTable,
@@ -19,7 +20,7 @@ import {
 import { WeightTicketStockReturnDialog, type StockReturnPayload } from '@/components/daily/WeightTicketStockReturnDialog'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
-import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, type WeightTicketStatus, typeLabels, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
+import { cancelWeightTicket, confirmWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, type WeightTicketStatus, typeLabels, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
 import { getErrorMessage } from '@/lib/api-client'
 
 function formatDateTime(value?: string | null) {
@@ -35,10 +36,10 @@ function formatDateTime(value?: string | null) {
   })
 }
 
-function timelineLabel(eventKey: string, action: string) {
+function timelineLabel(eventKey: string, action: string, type: WeightTicketRecord['type']) {
   if (action === 'created') return 'สร้างเอกสาร'
   if (action === 'edited') return 'แก้ไขเอกสาร'
-  if (action === 'confirmed') return 'ยืนยันใบส่งของ'
+  if (action === 'confirmed') return type === 'WTI' ? 'ยืนยันรับของ' : 'ยืนยันส่งของ'
   if (action === 'cancelled') return 'ยกเลิกเอกสาร'
   if (action === 'status_synced') return 'ปรับสถานะปัจจุบัน'
   if (action === 'usage_status_changed') return 'เปลี่ยนสถานะจากการใช้งาน'
@@ -111,6 +112,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
   const [cancelNote, setCancelNote] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
   const [previewImage, setPreviewImage] = useState<{ fileName: string; url: string } | null>(null)
   const [isPrinting, setIsPrinting] = useState(false)
   const [canReturnStock, setCanReturnStock] = useState(false)
@@ -212,6 +214,18 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
     }
   }
 
+  async function handleConfirmTicket() {
+    if (!ticket) return
+    setIsConfirming(true)
+    try {
+      setTicket(await confirmWeightTicket(ticket.id))
+    } catch (caught) {
+      window.alert(getErrorMessage(caught, 'ยืนยันใบรับ-ส่งของไม่ได้'))
+    } finally {
+      setIsConfirming(false)
+    }
+  }
+
   async function handlePrintReceipt() {
     if (!ticket) return
     setIsPrinting(true)
@@ -241,7 +255,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
   const activeGalleryImage = lineGallery?.images[lineGallery.activeIndex] ?? null
 
   if (isLoading) {
-    return <div className="rounded-md border border-slate-100 bg-white px-4 py-10 text-center text-sm text-slate-500">กำลังโหลดข้อมูล</div>
+    return <div className="rounded-xl border border-slate-100 bg-white px-4 py-10 text-center text-sm text-slate-500">กำลังโหลดข้อมูล</div>
   }
 
   if (loadError || !ticket) {
@@ -264,6 +278,12 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
+          {ticket.status === 'draft' ? (
+            <Button disabled={isConfirming} type="button" onClick={() => void handleConfirmTicket()}>
+              <CheckCircle2 className="mr-2 size-4" />
+              {isConfirming ? 'กำลังยืนยัน...' : ticket.type === 'WTI' ? 'ยืนยันรับของ' : 'ยืนยันส่งของ'}
+            </Button>
+          ) : null}
           <Button disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
             <Printer className="mr-2 size-4" />
             {isPrinting ? 'กำลังเตรียมใบพิมพ์...' : ticket.type === 'WTI' ? 'พิมพ์ใบรับสินค้า' : 'พิมพ์ใบส่งของ'}
@@ -363,7 +383,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
               <div className="grid gap-4 md:grid-cols-2">
                 <DetailItem label={ticket.type === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} value={ticket.partyName} />
                 <DetailItem label="ทะเบียนรถ" value={ticket.vehicleNo} />
-                <DetailItem label="โกดัง" value={ticket.warehouseName || '-'} />
+                <DetailItem label="โกดัง" value={ticket.godownName || '-'} />
               </div>
               <div>
                 <div className="mb-2 text-sm font-semibold text-slate-500">รูปภาพรถส่งของ</div>
@@ -442,9 +462,9 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
             </div>
             <div className="space-y-3 p-4 lg:hidden">
               {ticket.usageTimeline.length === 0 ? (
-                <div className="rounded-md border border-slate-100 bg-white px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีประวัติการใช้งาน</div>
+                <div className="rounded-xl border border-slate-100 bg-white px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีประวัติการใช้งาน</div>
               ) : ticket.usageTimeline.map((event) => (
-                <div key={event.id} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+                <div key={event.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-semibold text-slate-900">{usageActionLabel(event.action)}</div>
@@ -487,7 +507,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
               ))}
             </div>
             <div className="hidden overflow-x-auto lg:block">
-              <table className="min-w-full divide-y divide-slate-100 text-sm">
+              <table className="ns-table min-w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold text-xs">
                   <tr>
                     <th className="px-3 py-3 text-left">เวลา</th>
@@ -550,9 +570,9 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
           </div>
           <div className="space-y-3 p-4 lg:hidden">
             {ticket.downstreamAllocations.length === 0 ? (
-              <div className="rounded-md border border-slate-100 bg-white px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีปลายทางการใช้งาน</div>
+              <div className="rounded-xl border border-slate-100 bg-white px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีปลายทางการใช้งาน</div>
             ) : ticket.downstreamAllocations.map((allocation) => (
-              <div key={allocation.id} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+              <div key={allocation.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-semibold text-slate-900">{downstreamDocLabel(allocation.targetType)}</div>
@@ -594,7 +614,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
             ))}
           </div>
           <div className="hidden overflow-x-auto lg:block">
-            <table className="min-w-full divide-y divide-slate-100 text-sm">
+            <table className="ns-table min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold text-xs">
                 <tr>
                   <th className="px-3 py-3 text-left">เวลา</th>
@@ -662,9 +682,9 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                 <div className="relative pl-6" key={event.id}>
                   {index < ticket.timeline.length - 1 ? <div className="absolute left-[9px] top-5 h-[calc(100%-0.25rem)] w-px bg-slate-200" /> : null}
                   <div className={cn('absolute left-0 top-1.5 size-[18px] rounded-full border-2 bg-white', timelineDotClass(event.action))} />
-                  <div className="rounded-md border border-slate-100 bg-white px-3 py-3">
+                  <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-medium text-slate-900">{timelineLabel(event.eventKey, event.action)}</div>
+                      <div className="font-medium text-slate-900">{timelineLabel(event.eventKey, event.action, ticket.type)}</div>
                       <div className="text-sm text-slate-500 font-medium">{formatDateTime(event.occurredAt)}</div>
                     </div>
                     <div className="mt-1 text-sm text-slate-600">{event.actorName}</div>
@@ -862,12 +882,7 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 function MetricCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-slate-100 bg-white px-4 py-4 shadow-sm">
-      <div className="flex items-center gap-2 text-xs uppercase text-slate-500">{icon}{label}</div>
-      <div className="mt-2 text-lg font-semibold tabular-nums text-slate-950">{value}</div>
-    </div>
-  )
+  return <SharedKpiCard icon={icon} label={label} tone="slate" value={value} />
 }
 
 function DetailItem({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {

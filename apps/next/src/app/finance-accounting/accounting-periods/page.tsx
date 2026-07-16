@@ -2,36 +2,41 @@ import type { Metadata } from 'next'
 import { AccountingPeriodsLockImpactTable } from './AccountingPeriodsLockImpactTable'
 
 export const metadata: Metadata = {
-  title: 'Accounting Periods | NS Scrap ERP',
+  title: 'งวดบัญชี | NS Scrap ERP',
 }
 
 const periodStates = [
   {
     code: 'open',
+    badge: 'เปิด',
     label: 'เปิดงวด',
     meaning: 'เอกสารลงวันที่ในงวดนี้ยังบันทึก แก้ไข ยกเลิก หรือ reverse ได้ตามสิทธิ์ของแต่ละ flow',
     tone: 'green',
   },
   {
     code: 'soft_closed',
+    badge: 'ปิดเบื้องต้น',
     label: 'ปิดงวดเบื้องต้น',
     meaning: 'เตือนและจำกัดงานย้อนหลังบางส่วน แต่ยังให้ admin แก้ได้พร้อม audit เมื่อมีเหตุผล',
     tone: 'amber',
   },
   {
     code: 'locked',
+    badge: 'ล็อก',
     label: 'ล็อกงวด',
     meaning: 'ต้อง block write ที่ลงวันที่ในงวดปิดตาม enforcement matrix ของ Sales, Purchase, Stock, Bank, Asset และ Tax',
     tone: 'red',
   },
   {
     code: 'reopened',
+    badge: 'เปิดใหม่',
     label: 'เปิดงวดใหม่',
     meaning: 'เปิดงวดที่เคย lock แล้วแบบมีเหตุผล ผู้อนุมัติ และ rebuild snapshot หลังแก้ข้อมูล',
     tone: 'blue',
   },
   {
     code: 'year_closed',
+    badge: 'ปิดปี',
     label: 'ปิดปี',
     meaning: 'freeze งบรายปีและ carry กำไรขาดทุนไป retained earnings ตาม policy ที่อนุมัติแล้ว',
     tone: 'slate',
@@ -91,7 +96,7 @@ const pendingWork = [
 export default function AccountingPeriodsPage() {
   return (
     <section className="space-y-4">
-      <section className="rounded-md bg-white p-4 shadow">
+      <section className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-slate-900">สถานะงวดบัญชี</h3>
@@ -99,10 +104,10 @@ export default function AccountingPeriodsPage() {
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
           {periodStates.map((state) => (
-            <div key={state.code} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+            <div key={state.code} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-sm font-bold text-slate-900">{state.label}</h4>
-                <StatusBadge tone={state.tone}>{state.code}</StatusBadge>
+                <StatusBadge tone={state.tone}>{state.badge}</StatusBadge>
               </div>
               <p className="mt-3 text-xs leading-5 text-slate-600">{state.meaning}</p>
             </div>
@@ -110,13 +115,13 @@ export default function AccountingPeriodsPage() {
         </div>
       </section>
 
-      <section className="rounded-md bg-white p-4 shadow">
+      <section className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <div className="mb-3">
           <h3 className="text-sm font-bold text-slate-900">ความพร้อมก่อนปิดงวด</h3>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {readinessChecks.map((check) => (
-            <div key={check.area} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={check.area} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <h4 className="text-sm font-bold text-slate-800">{check.area}</h4>
                 <StatusBadge tone="slate">{check.status}</StatusBadge>
@@ -130,11 +135,11 @@ export default function AccountingPeriodsPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)]">
         <AccountingPeriodsLockImpactTable rows={lockImpacts} />
 
-        <section className="rounded-md bg-white p-4 shadow">
+        <section className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-bold text-slate-900">งานที่ยังต้องออกแบบก่อนเปิดใช้</h3>
           <div className="mt-3 space-y-2">
             {pendingWork.map((item, index) => (
-              <div key={item} className="flex gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <div key={item} className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
                   {index + 1}
                 </span>

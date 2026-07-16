@@ -2,12 +2,14 @@ import type { Metadata } from 'next'
 import { ProductTrackingPageClient } from '@/components/tracking/ProductTrackingPageClient'
 
 export const metadata: Metadata = {
-  title: 'Product Tracking | NS Scrap ERP',
+  title: 'ติดตามสินค้า | NS Scrap ERP',
 }
 
 type ProductTrackingPageProps = {
   searchParams?: Promise<{
     customerId?: string
+    dateFrom?: string
+    dateTo?: string
     metalGroup?: string
     month?: string
     productId?: string
@@ -22,6 +24,8 @@ export default async function ProductTrackingPage({ searchParams }: ProductTrack
   return (
     <ProductTrackingPageClient
       initialCustomerId={params?.customerId}
+      initialDateFrom={params?.dateFrom}
+      initialDateTo={params?.dateTo}
       initialMetalGroup={params?.metalGroup}
       initialMonth={params?.month}
       initialProductId={params?.productId}

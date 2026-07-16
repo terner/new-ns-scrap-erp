@@ -1,23 +1,10 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, useState } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { isEmailIdentifier, loginSchema } from '@/lib/auth'
-import { getSupabaseClient } from '@/lib/supabase'
-
-type LoginPageClientProps = {
-  devLogin?: {
-    identifier: string
-    password: string
-  }
-}
-
-type AuthMeResponse = {
-  roles?: Array<{
-    code?: string | null
-  }>
-}
+import { loginSchema } from '@/lib/auth'
+import { getSessionSafely, getSupabaseClient } from '@/lib/supabase'
 
 function safeRedirectPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
@@ -32,63 +19,59 @@ function safeRedirectPath(value: string | null) {
   }
 }
 
-function landingPathForRoleCodes(roleCodes: string[]) {
-  if (roleCodes.includes('admin') || roleCodes.includes('owner')) return '/owner-daily'
-  if (roleCodes.includes('production_department')) return '/production/dashboard'
-  if (roleCodes.includes('sorting_department')) return '/daily/weight-ticket-list'
+async function resolveDefaultLandingPath() {
   return '/'
 }
 
-async function resolveDefaultLandingPath() {
-  try {
-    const response = await fetch('/api/auth/me', {
-      cache: 'no-store',
-      credentials: 'same-origin',
-    })
-
-    if (!response.ok) return '/'
-
-    const payload = await response.json() as AuthMeResponse
-    const roleCodes = (payload.roles ?? [])
-      .map((role) => String(role.code ?? '').toLowerCase())
-      .filter(Boolean)
-
-    return landingPathForRoleCodes(roleCodes)
-  } catch {
-    return '/'
+function loginContractErrorMessage(status: number, payload: unknown) {
+  if (status === 403 && payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string') {
+    return payload.error
   }
+  if (status === 401) return 'Session เข้าสู่ระบบไม่ถูกต้อง กรุณาลองใหม่'
+  return 'ตรวจสอบบัญชีผู้ใช้งานไม่สำเร็จ กรุณาลองใหม่'
 }
 
-export function LoginPageClient({ devLogin }: LoginPageClientProps) {
+export function LoginPageClient() {
   const searchParams = useSearchParams()
-  const [identifier, setIdentifier] = useState(devLogin?.identifier ?? '')
-  const [password, setPassword] = useState(devLogin?.password ?? '')
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const supabase = getSupabaseClient()
   const isSupabaseReady = Boolean(supabase)
 
-  async function resolveLoginEmail(loginIdentifier: string) {
-    if (!supabase) return null
-    if (isEmailIdentifier(loginIdentifier)) return loginIdentifier
+  useEffect(() => {
+    if (!supabase) return
 
-    const { data, error: lookupError } = await supabase.rpc('lookup_app_login_email', {
-      _identifier: loginIdentifier,
-    })
+    let mounted = true
 
-    if (lookupError) {
-      throw new Error(lookupError.message)
+    void (async () => {
+      const session = await getSessionSafely(supabase).catch(() => null)
+      if (!mounted || !session) return
+
+      const redirectParam = searchParams.get('redirect')
+      const redirectPath = redirectParam ? safeRedirectPath(redirectParam) : await resolveDefaultLandingPath()
+      const autoRedirectKey = 'ns-scrap-erp-login-auto-redirect'
+      const autoRedirectValue = `${window.location.origin}${redirectPath}`
+
+      if (window.sessionStorage.getItem(autoRedirectKey) === autoRedirectValue) return
+      window.sessionStorage.setItem(autoRedirectKey, autoRedirectValue)
+
+      await supabase.auth.refreshSession().catch(() => undefined)
+      window.location.replace(redirectPath)
+    })()
+
+    return () => {
+      mounted = false
     }
-
-    return typeof data === 'string' && data.includes('@') ? data : null
-  }
+  }, [searchParams, supabase])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
 
-    const parsed = loginSchema.safeParse({ identifier, password })
+    const parsed = loginSchema.safeParse({ email: identifier, password })
 
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'ข้อมูล login ไม่ถูกต้อง')
@@ -102,38 +85,42 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
 
     setIsLoading(true)
 
-    let loginEmail: string | null = null
-
     try {
-      loginEmail = await resolveLoginEmail(parsed.data.identifier)
-    } catch (caught) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: parsed.data.email,
+        password: parsed.data.password,
+      })
+
+      if (signInError) {
+        setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
+        return
+      }
+
+      const loginCompleteResponse = await fetch('/api/auth/login-complete', {
+        cache: 'no-store',
+        credentials: 'include',
+        method: 'POST',
+      })
+      const loginCompletePayload = await loginCompleteResponse.json().catch(() => null)
+
+      if (!loginCompleteResponse.ok) {
+        await supabase.auth.signOut({ scope: 'local' })
+        setError(loginContractErrorMessage(loginCompleteResponse.status, loginCompletePayload))
+        return
+      }
+
+      await supabase.auth.getSession().catch(() => undefined)
+      window.sessionStorage.removeItem('ns-scrap-erp-login-auto-redirect')
+      setPassword('')
+      const redirectParam = searchParams.get('redirect')
+      const redirectPath = redirectParam ? safeRedirectPath(redirectParam) : await resolveDefaultLandingPath()
+      window.location.assign(redirectPath)
+    } catch {
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
+      setError('เชื่อมต่อระบบเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
       setIsLoading(false)
-      setError(caught instanceof Error ? `ตรวจสอบบัญชีไม่สำเร็จ: ${caught.message}` : 'ตรวจสอบบัญชีไม่สำเร็จ')
-      return
     }
-
-    if (!loginEmail) {
-      setIsLoading(false)
-      setError('ไม่พบบัญชีผู้ใช้งานที่เปิดใช้งานอยู่')
-      return
-    }
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
-      password: parsed.data.password,
-    })
-
-    setIsLoading(false)
-
-    if (signInError) {
-      setError(`เข้าสู่ระบบไม่สำเร็จ: ${signInError.message}`)
-      return
-    }
-
-    setPassword('')
-    const redirectParam = searchParams.get('redirect')
-    const redirectPath = redirectParam ? safeRedirectPath(redirectParam) : await resolveDefaultLandingPath()
-    window.location.assign(redirectPath)
   }
 
   function submitOnPasswordEnter(event: KeyboardEvent<HTMLInputElement>) {
@@ -144,7 +131,7 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
 
   return (
     <section className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-md rounded-md bg-white p-8 shadow-xl">
+      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
           <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-indigo-700 text-2xl font-bold text-white">
             NS
@@ -158,22 +145,16 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
           </div>
         ) : null}
 
-        {devLogin?.identifier || devLogin?.password ? (
-          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-            เติมบัญชีทดสอบแล้ว
-          </div>
-        ) : null}
-
         <form className="space-y-4" onSubmit={submit}>
           <label className="block text-sm font-medium text-slate-700">
-            Email / Username
+            Email
             <input
-              autoComplete="username"
+              autoComplete="email"
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
               disabled={isLoading}
               onChange={(event) => setIdentifier(event.target.value)}
-              placeholder="ns-aom@nsscrap.com"
-              type="text"
+              placeholder="name@company.com"
+              type="email"
               value={identifier}
             />
           </label>

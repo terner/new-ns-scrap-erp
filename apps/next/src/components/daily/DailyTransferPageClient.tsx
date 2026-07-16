@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -37,10 +38,10 @@ const transferColumns: Array<ResizableColumnDefinition<TransferColumnKey>> = [
   { key: 'date', defaultWidth: 120, minWidth: 100 },
   { key: 'from', defaultWidth: 240, minWidth: 150 },
   { key: 'to', defaultWidth: 240, minWidth: 150 },
-  { key: 'amount', defaultWidth: 110, minWidth: 90 },
-  { key: 'fee', defaultWidth: 100, minWidth: 80 },
-  { key: 'byPerson', defaultWidth: 160, minWidth: 120 },
-  { key: 'notes', defaultWidth: 200, minWidth: 120 },
+  { key: 'amount', defaultWidth: 130, minWidth: 110 },
+  { key: 'fee', defaultWidth: 130, minWidth: 110 },
+  { key: 'byPerson', defaultWidth: 180, minWidth: 140 },
+  { key: 'notes', defaultWidth: 240, minWidth: 160 },
   { key: 'action', defaultWidth: 180, minWidth: 150 },
 ]
 
@@ -76,7 +77,7 @@ export function DailyTransferPageClient() {
   const [fromAccountId, setFromAccountId] = useState('')
   const [toAccountId, setToAccountId] = useState('')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
-  const columnResize = useResizableColumns('daily.transfer.v5', transferColumns)
+  const columnResize = useResizableColumns('daily.transfer.v6', transferColumns)
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
@@ -300,7 +301,7 @@ export function DailyTransferPageClient() {
     <section className="space-y-4">
       {error && !formOpen ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-1 flex-wrap items-center gap-2">
             <Input className="h-9 min-w-[260px] flex-1" placeholder="ค้นหาเลขที่ TRF / ผู้ทำรายการ / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -330,7 +331,6 @@ export function DailyTransferPageClient() {
               {search || dateFrom || dateTo || fromAccountId || toAccountId ? <Button size="sm" type="button" variant="secondary" onClick={clearFilters}>ล้างตัวกรอง</Button> : null}
             </div>
           </div>
-          <Button className="hidden lg:inline-flex ml-auto" size="sm" type="button" onClick={openCreateForm}>+ โอนเงินใหม่</Button>
         </div>
 
         {/* Desktop Period Buttons */}
@@ -340,6 +340,7 @@ export function DailyTransferPageClient() {
           <PeriodButton active={period === 'today'} label="วันนี้" onClick={() => applyPeriod('today')} />
           <PeriodButton active={period === 'week'} label="7 วัน" onClick={() => applyPeriod('week')} />
           <PeriodButton active={period === 'month'} label="เดือนนี้" onClick={() => applyPeriod('month')} />
+          <Button className="ml-auto" size="sm" type="button" onClick={openCreateForm}>+ โอนเงินใหม่</Button>
         </div>
       </div>
 
@@ -468,14 +469,7 @@ export function DailyTransferPageClient() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {columnResize.hasCustomWidths ? <Button className="font-normal" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
-          <select
-            aria-label="จำนวนรายการต่อหน้า"
-            className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1 text-sm"
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-          >
-            {pageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
-          </select>
+          <PageSizeDropdown options={pageSizeOptions} value={pageSize} onChange={setPageSize} />
           <Button className="font-normal" disabled={currentPage <= 1} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</Button>
           <span className="px-1">หน้า {currentPage} / {totalPages}</span>
           <Button className="font-normal" disabled={currentPage >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</Button>
@@ -563,7 +557,7 @@ export function DailyTransferPageClient() {
                   <SummaryBox label="ยอดออกจากบัญชีต้นทาง" value={formatMoney(selectedRow.amount + selectedRow.fee)} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="col-span-2 sm:col-span-1">
                   <DetailItem label="วันที่" value={formatDateDisplay(selectedRow.date)} />
                 </div>
@@ -578,7 +572,7 @@ export function DailyTransferPageClient() {
                 </div>
                 <DetailItem className="col-span-2" label="หมายเหตุ" value={selectedRow.notes || '-'} />
               </div>
-              <div className="rounded-lg border border-slate-100 bg-white shadow-sm overflow-hidden">
+              <div className="rounded-md border border-slate-100 bg-white shadow-sm overflow-hidden">
                 <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">ผลกระทบ Bank Statement</div>
                 <div className="grid grid-cols-2 gap-0 text-sm">
                   <div className="border-r border-slate-100 px-4 py-3">
@@ -601,12 +595,12 @@ export function DailyTransferPageClient() {
       {/* Mobile Card List */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : null}
         {!isLoading && pagedRows.map((row) => (
           <div
             key={row.id}
-            className="rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
             onClick={() => openDetail(row)}
           >
             <div className="flex justify-between items-start mb-2">
@@ -637,20 +631,16 @@ export function DailyTransferPageClient() {
           </div>
         ))}
         {!isLoading && pagedRows.length === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">ยังไม่มีรายการ</div>
+          <div className="rounded-xl bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">ยังไม่มีรายการ</div>
         ) : null}
       </div>
 
       <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
         <Table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
-            {transferColumns.map((column, index) => {
-              const style = columnResize.getColumnStyle(column.key);
-              if (index === transferColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
-              return <col key={column.key} style={style} />;
-            })}
+            {transferColumns.map((column) => (
+              <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            ))}
           </colgroup>
           <TableHeader>
             <tr>
@@ -812,4 +802,3 @@ function SelectField(props: { error?: string; label: string; onChange: (value: s
     </label>
   )
 }
-

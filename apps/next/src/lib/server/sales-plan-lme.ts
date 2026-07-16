@@ -58,6 +58,12 @@ export async function getSalesPlanLmeConfig() {
   return toConfig(row)
 }
 
+function shouldAutoRefreshConfig(config: SalesPlanLmeConfig) {
+  const lastUpdated = Date.parse(config.updatedAt)
+  if (!Number.isFinite(lastUpdated)) return true
+  return Date.now() - lastUpdated >= 6 * 60 * 60 * 1000
+}
+
 export async function saveSalesPlanLmeConfig(
   values: SalesPlanLmeConfigInput,
   context: Parameters<typeof currentActor>[0],
@@ -75,11 +81,13 @@ export async function saveSalesPlanLmeConfigByActor(
     create: {
       description: 'Sales Plan LME reference pricing config (manual + live fetched values)',
       key: SALES_PLAN_LME_CONFIG_KEY,
+      updated_at: new Date(),
       updated_by: updatedBy,
       value: JSON.stringify(parsed),
     },
     update: {
       description: 'Sales Plan LME reference pricing config (manual + live fetched values)',
+      updated_at: new Date(),
       updated_by: updatedBy,
       value: JSON.stringify(parsed),
     },
@@ -269,4 +277,16 @@ export async function fetchLiveSalesPlanLmeConfig(currentConfig: SalesPlanLmeCon
     liveFetchNote: `${notes.join(' · ')} · fetched ${fetchedAt}`,
     source: 'mixed',
   })
+}
+
+export async function getSalesPlanLmeConfigAutoRefresh() {
+  const currentConfig = await getSalesPlanLmeConfig()
+  if (!process.env.EXCHANGERATE_API_KEY) return currentConfig
+  if (!shouldAutoRefreshConfig(currentConfig)) return currentConfig
+  try {
+    const nextConfig = await fetchLiveSalesPlanLmeConfig(currentConfig)
+    return await saveSalesPlanLmeConfigByActor(nextConfig, 'system:auto-live-refresh')
+  } catch {
+    return currentConfig
+  }
 }

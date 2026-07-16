@@ -24,6 +24,7 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 - If the user requests modifications or code improvements, only perform the code changes and verify compilation locally. Do NOT run browser or DOM UAT testing unless the user explicitly requests testing (i.e. do not use browser sub-agent unless told to test).
 - Split large refactors into reviewable batches with one clear module, transform, or behavior change per batch.
 - During clone/migration batches, use `docs/design.md` as the active design convention source and keep legacy/Vue parity unless a difference is documented and approved.
+- When the user asks for a UI/design/page report, design judgment, or "คิดว่าไง" on a concrete app page, you MUST inspect the real rendered page in the browser first, then inspect the relevant code, and only then report findings or recommend edits. Do not report from code scans alone unless the page cannot be opened; if it cannot be opened, say that explicitly.
 - For every UI/page change in `apps/next/`, check these three inputs before editing:
   1. the business flow / requirement for that page,
   2. `docs/design.md`,
@@ -34,6 +35,16 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 - If a field looks numeric but represents money, identifier, or business code, do not infer the input type from appearance alone; use the matrix and the page flow.
 - Do not change application code outside the intended business flow just to tolerate bad, legacy, or malformed data. If data violates the target contract, fix the data, migration, seed, or source-of-truth process instead of adding compatibility branches, fallback logic, skip-row handling, or silent coercion in runtime code.
 - After a batch is validated, committed, and pushed, immediately start the next batch from `docs/migration/00-current-work.md` and the relevant tracker unless the user pauses, redirects, or the next step requires explicit approval for high-risk work.
+
+## User Reporting Preference
+
+For user-facing task reports, default to Thai and use the user's preferred combined table format:
+
+1. Problem / duplication report: columns `#`, `Problem found`, `Severity`, `Recommended action`.
+2. Files changed report: columns `File`, `What changed`, `Status`; use status symbols such as `✅` and `❌` in the `Status` column.
+3. Design decision report: columns `Topic`, `Decision`.
+
+After those tables, add only a short validation and remaining-risk summary. For tiny answers, a concise Thai confirmation is acceptable.
 
 ## Team Git Workflow
 
@@ -48,6 +59,10 @@ codex/* or feature/*
 
 - `main` is production-ready only. Do not work directly on `main`, and do not push directly to `main` unless the user explicitly asks for a coordinated release or hotfix.
 - `uat` is for UAT/pre-production verification. Merge or promote from `dev` only after the integrated batch is ready for broader QA.
+- Important: the word `UAT` in task discussion means the active UAT environment determined by the deployment/database env in use, not merely whatever branch happens to be named `uat`. Always verify the actual target from env/deployment settings first.
+- **Customer UAT Git/deployment:** the customer-facing UAT repository is remote `uat-origin` (`nserprich99-creator/ns-erp`). Vercel currently deploys that UAT environment from `uat-origin/uat`, not from `main` or `new-origin/uat`. When the user says `push UAT` or `promote dev to UAT` without naming another remote, promote the validated `new-origin/dev` commit to `uat-origin/uat` only.
+- Do not use a local `uat` branch as the promotion source. Fetch `uat-origin` first, verify its current `uat` head and ancestry, then push the intended validated commit/ref to `uat-origin/uat`.
+- Promote `uat-origin/uat` to `uat-origin/main` only when the user explicitly asks to release/promote UAT main. Verify `main` is an ancestor first. `main` is currently a release snapshot and is not the Vercel UAT deployment branch.
 - The old remote branch `staging` has been deleted to avoid confusion. Do not recreate, push to, or promote through `staging`.
 - `dev` is the shared integration branch. Start normal feature, bugfix, migration, and refactor work from `dev`.
 - `codex/*` or `feature/*` branches are for scoped work. Keep each branch focused on one feature, bugfix, migration batch, or behavior change.
@@ -126,7 +141,10 @@ Do not treat this as a greenfield rewrite unless explicitly instructed.
 - Active branches on `new-origin`: `main`, `uat`, `dev`
 - Dev/target Supabase: `fhglqymcdmrgbsbadnwr`
 - Legacy production/source Supabase: `mqsgptraslgpyzbpndlg` read-only
-- Git UAT branch: `uat` (`staging` remote branch has been deleted)
+- Customer UAT Supabase: `oolzfvqhovmjhiocfqdw`
+- Customer Git UAT remote: `uat-origin` = `nserprich99-creator/ns-erp`
+- Customer Vercel UAT deployment branch: `uat-origin/uat`; `uat-origin/main` is promoted only by explicit release instruction
+- Current customer-facing UAT deployment/environment must still be verified from deployment/env settings before a promotion
 - New production: not created yet
 - Project MCP config: `.mcp.json`
 - Project skills: `.agents/skills/`

@@ -7,6 +7,8 @@ import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
+import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -195,7 +197,7 @@ export function WeightTicketDashboardPageClient() {
       setData(payload)
     } catch (caught) {
       setData(null)
-      setError(caught instanceof Error ? caught.message : 'โหลด Dashboard ใบรับ-ส่งของไม่ได้')
+      setError(caught instanceof Error ? caught.message : 'โหลดแดชบอร์ดใบรับ-ส่งของไม่ได้')
     } finally {
       setIsLoading(false)
     }
@@ -244,51 +246,58 @@ export function WeightTicketDashboardPageClient() {
         <KpiCard icon={Scale} label="WTI รับเข้า" note={`${formatCount(data?.summary.wtiDocuments ?? 0)} ใบ`} tone="emerald" value={isLoading ? '...' : weightText(data?.summary.wtiNetWeight ?? 0)} />
         <KpiCard icon={TriangleAlert} label="WTI รอเปิด PB" note={`${formatCount(data?.summary.wtiWaitingBillCount ?? 0)} ใบ`} tone="amber" value={isLoading ? '...' : weightText(data?.summary.wtiWaitingBillWeight ?? 0)} />
         <KpiCard icon={Truck} label="WTO ส่งออก" note={`${formatCount(data?.summary.wtoDocuments ?? 0)} ใบ`} tone="blue" value={isLoading ? '...' : weightText(data?.summary.wtoNetWeight ?? 0)} />
-        <KpiCard className="col-span-2 xl:col-span-1" icon={TriangleAlert} label="WTO pending out" note={`${formatCount(data?.summary.wtoPendingOutCount ?? 0)} ใบ`} tone="purple" value={isLoading ? '...' : weightText(data?.summary.wtoPendingOutWeight ?? 0)} />
+        <KpiCard className="col-span-2 xl:col-span-1" icon={TriangleAlert} label="WTO รอออกจากสต็อก" note={`${formatCount(data?.summary.wtoPendingOutCount ?? 0)} ใบ`} tone="purple" value={isLoading ? '...' : weightText(data?.summary.wtoPendingOutWeight ?? 0)} />
       </div>
 
       <Tabs className="min-w-0" value={activeTab} onValueChange={(value) => setActiveTab(value as DashboardTab)}>
-        <div className="min-w-0 overflow-hidden rounded-md bg-white shadow-sm">
-          <TabsList className="w-full min-w-0 overflow-x-auto px-1 sm:px-2" variant="line">
-            {dashboardTabs.map((tab) => {
-              const count = tabCounts[tab.value]
-              return (
-                <TabsTrigger aria-label={tab.label} className="min-w-0 flex-1 gap-1 px-2 text-xs sm:flex-none sm:gap-2 sm:px-3 sm:text-sm" key={tab.value} value={tab.value} variant="line">
-                  <span className="min-w-0 truncate">
-                    <span className="sm:hidden">{mobileTabLabels[tab.value]}</span>
-                    <span className="hidden sm:inline">{tab.label}</span>
-                  </span>
-                  {count !== undefined ? <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">{formatCount(count)}</span> : null}
-                </TabsTrigger>
-              )
-            })}
-          </TabsList>
-        </div>
+        <TabsList className="w-full min-w-0 overflow-x-auto" variant="line">
+          {dashboardTabs.map((tab) => {
+            const count = tabCounts[tab.value]
+            return (
+              <TabsTrigger aria-label={tab.label} className="min-w-0 shrink-0 gap-1 px-2 text-xs sm:gap-2 sm:px-3 sm:text-sm" key={tab.value} value={tab.value} variant="line">
+                <span className="min-w-0 truncate">
+                  <span className="sm:hidden">{mobileTabLabels[tab.value]}</span>
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </span>
+                {count !== undefined ? <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">{formatCount(count)}</span> : null}
+              </TabsTrigger>
+            )
+          })}
+        </TabsList>
       </Tabs>
 
-      <div className="hidden rounded-md border border-slate-200 bg-white p-4 shadow-sm lg:block">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="grid gap-3 lg:grid-cols-[130px_130px_190px]">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">จากวันที่</label>
-                <DatePickerInput className="w-full" value={dateRange.dateFrom} onChange={(value) => setDateRange((current) => ({ ...current, dateFrom: value }))} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">ถึงวันที่</label>
-                <DatePickerInput className="w-full" value={dateRange.dateTo} onChange={(value) => setDateRange((current) => ({ ...current, dateTo: value }))} />
-              </div>
-              <BranchSelectCombobox
-                allOptionLabel="ทุกสาขา"
-                branches={branches}
-                includeAllOption
-                inputId="weight-ticket-dashboard-branch"
-                label="สาขา"
-                placeholder="เลือกสาขา"
-                value={branchId === 'all' ? null : branchId}
-                onChange={(nextBranchId) => setBranchId(nextBranchId ?? 'all')}
-              />
-            </div>
+      <div className="hidden rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:block">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">วันที่:</span>
+            <DatePickerInput value={dateRange.dateFrom} onChange={(value) => setDateRange((current) => ({ ...current, dateFrom: value }))} />
+            <span className="text-slate-400">→</span>
+            <DatePickerInput value={dateRange.dateTo} onChange={(value) => setDateRange((current) => ({ ...current, dateTo: value }))} />
+            <BranchSelectCombobox
+              allOptionLabel="ทุกสาขา"
+              branches={branches}
+              className="w-[12rem]"
+              includeAllOption
+              inputId="weight-ticket-dashboard-branch"
+              label=""
+              placeholder="เลือกสาขา"
+              value={branchId === 'all' ? null : branchId}
+              onChange={(nextBranchId) => setBranchId(nextBranchId ?? 'all')}
+            />
+            {hasActiveFilters ? <Button size="sm" type="button" variant="secondary" onClick={resetFilters}>ล้างตัวกรอง</Button> : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">ช่วงเวลา:</span>
+            {quickRangeOptions.map((option) => (
+              <button
+                className={`rounded-md border px-3 py-1 text-xs font-medium transition ${isQuickRangeActive(option.value) ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                key={option.value}
+                type="button"
+                onClick={() => setQuickRange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
             <div className="ml-auto flex flex-wrap gap-2">
               <Button asChild className="gap-2" size="sm" variant="outline">
                 <Link href="/daily/weight-ticket-list">
@@ -308,33 +317,19 @@ export function WeightTicketDashboardPageClient() {
                   สร้าง WTO
                 </Link>
               </Button>
-              {hasActiveFilters ? <Button size="sm" type="button" variant="outline" onClick={resetFilters}>ล้างตัวกรอง</Button> : null}
               <Button className="gap-2" disabled={isLoading} size="sm" type="button" onClick={() => void loadData()}>
                 <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} />
                 รีเฟรช
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-600">ช่วงเวลา:</span>
-            {quickRangeOptions.map((option) => (
-              <button
-                className={`rounded-md border px-3 py-1 text-xs font-medium transition ${isQuickRangeActive(option.value) ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
-                key={option.value}
-                type="button"
-                onClick={() => setQuickRange(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm lg:hidden">
+      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-bold text-slate-900">Dashboard ใบรับ-ส่งของ</div>
+            <div className="truncate text-sm font-bold text-slate-900">แดชบอร์ดใบรับ-ส่งของ</div>
             <div className="truncate text-xs text-slate-500">{activeFilterText}</div>
           </div>
           <Button size="sm" type="button" variant="outline" onClick={() => setShowMobileFilters(true)}>ตัวกรอง {hasActiveFilters ? '(มี)' : ''}</Button>
@@ -352,7 +347,7 @@ export function WeightTicketDashboardPageClient() {
 
       {showMobileFilters ? (
         <MobileFilterSheet
-          title="ตัวกรอง Dashboard ใบรับ-ส่งของ"
+          title="ตัวกรองแดชบอร์ดใบรับ-ส่งของ"
           onClose={() => setShowMobileFilters(false)}
           footer={
             <>
@@ -434,7 +429,7 @@ export function WeightTicketDashboardPageClient() {
       {activeTab === 'wto' ? (
         <FlowTablePanel
           emptyText="ยังไม่มีเอกสาร WTO ตามเงื่อนไข"
-          followUpLabel="WTO pending out"
+          followUpLabel="WTO รอออกจากสต็อก"
           followUpTone="purple"
           isLoading={isLoading}
           rows={data?.wtoRows ?? []}
@@ -448,39 +443,13 @@ export function WeightTicketDashboardPageClient() {
 }
 
 function KpiCard({ className = '', icon: Icon, label, note, tone, value }: { className?: string; icon: LucideIcon; label: string; note: string; tone: 'amber' | 'blue' | 'emerald' | 'purple' | 'slate'; value: string }) {
-  const toneClass = {
-    amber: 'bg-amber-50 text-amber-700',
-    blue: 'bg-blue-50 text-blue-700',
-    emerald: 'bg-emerald-50 text-emerald-700',
-    purple: 'bg-purple-50 text-purple-700',
-    slate: 'bg-slate-100 text-slate-700',
-  }[tone]
-  const valueClass = {
-    amber: 'text-amber-700',
-    blue: 'text-blue-700',
-    emerald: 'text-emerald-700',
-    purple: 'text-purple-700',
-    slate: 'text-slate-900',
-  }[tone]
-
-  return (
-    <div className={`flex min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm sm:gap-3 sm:p-4 ${className}`}>
-      <div className={`flex size-9 shrink-0 items-center justify-center rounded-md sm:size-10 ${toneClass}`}>
-        <Icon className="size-4 sm:size-5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold leading-tight text-slate-500">{label}</div>
-        <div className={`mt-1 break-words font-mono text-base font-bold leading-tight tabular-nums sm:text-lg ${valueClass}`}>{value}</div>
-        <div className="mt-0.5 text-xs leading-tight text-slate-400">{note}</div>
-      </div>
-    </div>
-  )
+  return <SharedKpiCard className={className} icon={<Icon className="size-4 sm:size-5" />} label={label} note={note} tone={tone} value={value} />
 }
 
 function StatusPanel({ isLoading, rows }: { isLoading: boolean; rows: StatusRow[] }) {
   const maxCount = Math.max(1, ...rows.map((row) => row.count))
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="text-sm font-bold text-slate-800">สรุปตามสถานะ</div>
       <div className="mt-3 space-y-3">
         {isLoading ? <div className="py-8 text-center text-sm text-slate-400">กำลังโหลดข้อมูล</div> : null}
@@ -504,7 +473,7 @@ function StatusPanel({ isLoading, rows }: { isLoading: boolean; rows: StatusRow[
 
 function BranchPanel({ isLoading, rows }: { isLoading: boolean; rows: BranchRow[] }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="text-sm font-bold text-slate-800">สรุปตามสาขา</div>
       <div className="mt-3 divide-y divide-slate-100">
         {isLoading ? <div className="py-8 text-center text-sm text-slate-400">กำลังโหลดข้อมูล</div> : null}
@@ -519,7 +488,7 @@ function BranchPanel({ isLoading, rows }: { isLoading: boolean; rows: BranchRow[
               <MetricLine label="WTI" value={weightText(row.wtiNetWeight)} />
               <MetricLine label="WTO" value={weightText(row.wtoNetWeight)} />
               <MetricLine label="รอ PB" value={weightText(row.wtiWaitingBillWeight)} />
-              <MetricLine label="Pending out" value={weightText(row.pendingOutWeight)} />
+              <MetricLine label="รอออกจากสต็อก" value={weightText(row.pendingOutWeight)} />
             </div>
           </div>
         ))}
@@ -544,7 +513,7 @@ function ProductPanel({ isLoading, rows }: { isLoading: boolean; rows: ProductRo
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-3">
         <div>
           <div className="text-sm font-bold text-slate-800">สรุปตามสินค้า</div>
-          <div className="text-xs text-slate-500">น้ำหนักรับเข้า, รอเปิด PB, ส่งออก และ pending out</div>
+          <div className="text-xs text-slate-500">น้ำหนักรับเข้า, รอเปิด PB, ส่งออก และรอออกจากสต็อก</div>
         </div>
         {columnResize.hasCustomWidths ? (
           <Button className="hidden lg:inline-flex" size="xs" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าตาราง</Button>
@@ -552,9 +521,9 @@ function ProductPanel({ isLoading, rows }: { isLoading: boolean; rows: ProductRo
       </div>
 
       <div className="hidden overflow-x-auto lg:block">
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className="ns-table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
-            {productColumns.map((column, index) => <col key={column.key} style={index === productColumns.length - 1 ? undefined : columnResize.getColumnStyle(column.key)} />)}
+            {productColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
           </colgroup>
           <thead className="border-b border-slate-200 bg-slate-50 text-slate-700">
             <tr>
@@ -563,7 +532,7 @@ function ProductPanel({ isLoading, rows }: { isLoading: boolean; rows: ProductRo
               <ResizableTableHead align="right" label="WTI รับเข้า" resizeProps={columnResize.getResizeHandleProps('wtiNet', 'WTI รับเข้า')} />
               <ResizableTableHead align="right" label="WTI รอ PB" resizeProps={columnResize.getResizeHandleProps('wtiRemaining', 'WTI รอ PB')} />
               <ResizableTableHead align="right" label="WTO ส่งออก" resizeProps={columnResize.getResizeHandleProps('wtoNet', 'WTO ส่งออก')} />
-              <ResizableTableHead align="right" label="WTO pending" resizeProps={columnResize.getResizeHandleProps('pendingOut', 'WTO pending')} />
+              <ResizableTableHead align="right" label="WTO รอออกจากสต็อก" resizeProps={columnResize.getResizeHandleProps('pendingOut', 'WTO รอออกจากสต็อก')} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -602,7 +571,7 @@ function ProductPanel({ isLoading, rows }: { isLoading: boolean; rows: ProductRo
               <MetricLine label="WTI รับเข้า" value={weightText(row.wtiNetWeight)} />
               <MetricLine label="WTI รอ PB" value={weightText(row.wtiRemainingWeight)} />
               <MetricLine label="WTO ส่งออก" value={weightText(row.wtoNetWeight)} />
-              <MetricLine label="WTO pending" value={weightText(row.pendingOutWeight)} />
+              <MetricLine label="WTO รอออกจากสต็อก" value={weightText(row.pendingOutWeight)} />
             </div>
           </div>
         ))}
@@ -667,16 +636,10 @@ function FlowTablePanel({
           {columnResize.hasCustomWidths ? (
             <Button className="hidden lg:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button>
           ) : null}
-          <select
-            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800"
-            value={pageSize}
-            onChange={(event) => {
-              setPageSize(Number(event.target.value))
-              setPage(1)
-            }}
-          >
-            {pageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
-          </select>
+          <PageSizeDropdown options={pageSizeOptions} value={pageSize} onChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }} />
           <Button disabled={page <= 1} size="sm" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
           <span className="px-1 text-sm font-medium text-slate-600">หน้า {page} / {totalPages}</span>
           <Button disabled={page >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
@@ -684,9 +647,9 @@ function FlowTablePanel({
       </div>
 
       <div className="hidden overflow-x-auto lg:block">
-        <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className="ns-table w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
-            {flowColumns.map((column, index) => <col key={column.key} style={index === flowColumns.length - 1 ? undefined : columnResize.getColumnStyle(column.key)} />)}
+            {flowColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
           </colgroup>
           <thead className="border-b border-slate-200 bg-slate-100 text-slate-700">
             <tr>

@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
+import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
@@ -85,6 +88,12 @@ const loanContractColumns: Array<ResizableColumnDefinition<LoanContractColumnKey
   { key: 'overdue', defaultWidth: 135, minWidth: 115 },
   { key: 'status', defaultWidth: 115, minWidth: 95 },
 ]
+
+const loanStatusLabels: Record<string, string> = {
+  active: 'ใช้งาน',
+  closed: 'ปิดสัญญา',
+  overdue: 'เกินกำหนด',
+}
 
 const dueColumns: Array<ResizableColumnDefinition<DueColumnKey>> = [
   { key: 'dueDate', defaultWidth: 120, minWidth: 100 },
@@ -202,39 +211,44 @@ export function LoanContractsPageClient() {
   return (
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="จำนวนสัญญา" value={data?.summary.count ?? 0} />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <StatCard label="วงเงินรวม" value={formatMoney(data?.summary.financed)} tone="blue" />
         <StatCard label="หนี้คงเหลือ" value={formatMoney(data?.summary.outstanding)} tone="cyan" />
         <StatCard label="เกินกำหนด" value={formatMoney(data?.summary.overdue)} tone="red" />
       </div>
 
       {/* Desktop Filter Panel */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow-sm border border-slate-200">
-        <input autoComplete="off" className="min-w-0 flex-1 h-9 rounded-md border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-slate-400 transition" placeholder="ค้นหา loanNo/contractNo/lender..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+      <div className="hidden rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:block">
+        <div className="flex flex-wrap items-center gap-2">
+          <input autoComplete="off" className="min-w-[260px] flex-1 h-9 rounded-md border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-slate-400 transition" placeholder="ค้นหาเลขที่สัญญา / ผู้ให้กู้..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
         <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={type} onChange={(event) => setType(event.target.value)}>
-          <option value="all">Type: ทั้งหมด</option>
+          <option value="all">ทุกประเภท</option>
           {(data?.filters.types ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <select className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="all">Status: ทั้งหมด</option>
-          {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-        </select>
+          <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 transition hover:bg-slate-50" type="button" onClick={() => { setSearch(''); setType('all'); setStatus('all') }}>ล้างตัวกรอง</button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500">สถานะสัญญา:</span>
+          <button className={`rounded-md border px-3 py-1 text-xs font-medium ${status === 'all' ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} type="button" onClick={() => setStatus('all')}>ทุกสถานะ</button>
+          {(data?.filters.statuses ?? []).map((item) => (
+            <button key={item} className={`rounded-md border px-3 py-1 text-xs font-medium ${status === item ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} type="button" onClick={() => setStatus(item)}>{loanStatusLabel(item)}</button>
+          ))}
+        </div>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 rounded-md border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden space-y-3">
+      <div className="mb-4 space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:hidden">
         <div className="flex gap-2 items-center">
           <input 
-            autoComplete="off" className="flex-1 h-9 rounded-lg border border-slate-300 px-3 text-xs outline-none bg-white placeholder-slate-400 focus:border-slate-400 transition" 
-            placeholder="ค้นหา loanNo/contractNo/lender..." 
+            autoComplete="off" className="h-9 flex-1 rounded-md border border-slate-300 bg-white px-3 text-xs outline-none placeholder-slate-400 transition focus:border-slate-400"
+            placeholder="ค้นหาเลขที่สัญญา / ผู้ให้กู้..."
             type="search" 
             value={search} 
             onChange={(event) => setSearch(event.target.value)} 
           />
           <button
             type="button"
-            className="h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition outline-none"
+            className="h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-normal text-slate-700 hover:bg-slate-50 transition outline-none"
             onClick={() => setShowMobileFilters(true)}
           >
             ตัวกรอง {(type !== 'all' || status !== 'all') ? '(มี)' : ''}
@@ -254,14 +268,14 @@ export function LoanContractsPageClient() {
                   setType('all')
                   setStatus('all')
                 }}
-                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                className="flex-1 h-10 rounded-md border border-slate-200 text-slate-600 font-normal text-sm hover:bg-slate-50 transition"
               >
                 ล้างตัวกรอง
               </button>
               <button
                 type="button"
                 onClick={() => setShowMobileFilters(false)}
-                className="flex-1 h-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                className="flex-1 h-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-normal text-sm transition"
               >
                 ตกลง
               </button>
@@ -278,7 +292,7 @@ export function LoanContractsPageClient() {
               value={type}
               onChange={(event) => setType(event.target.value)}
             >
-              <option value="all">Type: ทั้งหมด</option>
+              <option value="all">ทุกประเภท</option>
               {(data?.filters.types ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </div>
@@ -291,14 +305,14 @@ export function LoanContractsPageClient() {
               value={status}
               onChange={(event) => setStatus(event.target.value)}
             >
-              <option value="all">Status: ทั้งหมด</option>
-              {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+              <option value="all">ทุกสถานะ</option>
+              {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{loanStatusLabel(item)}</option>)}
             </select>
           </div>
         </MobileFilterSheet>
       ) : null}
       {/* Pagination Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-4">
         <div>
           พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
         </div>
@@ -312,14 +326,7 @@ export function LoanContractsPageClient() {
               รีเซ็ตความกว้างตาราง
             </button>
           ) : null}
-          <select
-            aria-label="จำนวนรายการต่อหน้า"
-            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-          >
-            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
-          </select>
+          <PageSizeDropdown value={pageSize} onChange={setPageSize} />
           <button
             className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
             disabled={currentPage <= 1}
@@ -344,28 +351,25 @@ export function LoanContractsPageClient() {
       <div className="hidden lg:block">
         <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
-                {loanContractColumns.map((column, index) => {
-                  if (index === loanContractColumns.length - 1) {
-                    return <col key={column.key} style={{ minWidth: column.minWidth }} />
-                  }
-                  return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
-                })}
+                {loanContractColumns.map((column) => (
+                  <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+                ))}
               </colgroup>
               <thead className="sticky top-0 z-10 bg-slate-100">
                 <tr>
                   <ResizableTableHead label="เลขสัญญา" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="contractNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('contractNo', 'เลขสัญญา')} />
-                  <ResizableTableHead label="ผู้ให้กู้" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="lenderName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('lenderName', 'ผู้ให้กู้')} />
-                  <ResizableTableHead label="ประเภท" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="loanType" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('loanType', 'ประเภท')} />
-                  <ResizableTableHead label="หลักทรัพย์/ทรัพย์สิน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="asset" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('asset', 'หลักทรัพย์/ทรัพย์สิน')} />
+                  <ResizableTableHead align="right" label="ผู้ให้กู้" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="lenderName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('lenderName', 'ผู้ให้กู้')} />
+                  <ResizableTableHead align="right" label="ประเภท" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="loanType" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('loanType', 'ประเภท')} />
+                  <ResizableTableHead align="right" label="หลักทรัพย์/ทรัพย์สิน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="asset" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('asset', 'หลักทรัพย์/ทรัพย์สิน')} />
                   <ResizableTableHead align="right" label="วงเงิน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="principalAmount" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('principalAmount', 'วงเงิน')} />
                   <ResizableTableHead align="right" label="หนี้คงเหลือ" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="outstanding" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('outstanding', 'หนี้คงเหลือ')} />
                   <ResizableTableHead align="right" label="งวดผ่อน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="installment" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('installment', 'งวดผ่อน')} />
-                  <ResizableTableHead align="center" label="จ่ายแล้ว" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="duePaid" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('duePaid', 'จ่ายแล้ว')} />
-                  <ResizableTableHead label="งวดถัดไป" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="nextDue" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('nextDue', 'งวดถัดไป')} />
+                  <ResizableTableHead align="right" label="จ่ายแล้ว" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="duePaid" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('duePaid', 'จ่ายแล้ว')} />
+                  <ResizableTableHead align="right" label="งวดถัดไป" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="nextDue" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('nextDue', 'งวดถัดไป')} />
                   <ResizableTableHead align="right" label="เกินกำหนด" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="overdue" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('overdue', 'เกินกำหนด')} />
-                  <ResizableTableHead align="center" label="สถานะ" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="status" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+                  <ResizableTableHead align="right" label="สถานะ" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="status" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -373,16 +377,16 @@ export function LoanContractsPageClient() {
                 {pagedRows.map((row) => (
                   <tr key={row.contractNo} className="transition-colors hover:bg-slate-50/50">
                     <td className="whitespace-nowrap px-3 py-3 font-mono font-semibold text-blue-700">{row.contractNo}</td>
-                    <td className="px-3 py-3 font-medium text-slate-900">{row.lenderName}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-600">{row.loanType}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-400">-</td>
+                    <td className="px-3 py-3 text-right font-medium text-slate-900">{row.lenderName}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-slate-600">{row.loanType}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-slate-400">-</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{formatMoney(row.principalAmount)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-slate-900">{formatMoney(row.outstanding)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{formatMoney(row.installmentAmount)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-center font-mono tabular-nums text-slate-700">{row.duePaid}/{row.dueTotal}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-700">{row.nextDue || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{row.duePaid}/{row.dueTotal}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-slate-700">{row.nextDue || '-'}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-red-700">{formatMoney(row.overdue)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-center"><StatusPill status={row.status} /></td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right"><StatusPill status={row.status} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -405,7 +409,7 @@ export function LoanContractsPageClient() {
               </div>
               <StatusPill status={row.status} />
             </div>
-            <div className="grid grid-cols-2 gap-2.5 text-xs bg-slate-50/50 p-2.5 rounded-lg border border-slate-100/50">
+            <div className="grid grid-cols-2 gap-2.5 text-xs bg-slate-50/50 p-2.5 rounded-xl border border-slate-100/50">
               <div><span className="text-slate-400 block">วงเงิน (Financed)</span><span className="font-semibold text-slate-800">{formatMoney(row.principalAmount)}</span></div>
               <div><span className="text-slate-400 block">ยอดคงเหลือ</span><span className="font-bold text-slate-900">{formatMoney(row.outstanding)}</span></div>
               <div><span className="text-slate-400 block">งวดผ่อนชำระ</span><span className="font-semibold text-slate-800">{formatMoney(row.installmentAmount)}</span></div>
@@ -429,11 +433,13 @@ export function LoanDashboardPageClient() {
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="relative overflow-hidden rounded-md bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-700 p-6 text-white shadow-lg lg:col-span-2">
-          <div className="text-sm opacity-80">ภาระหนี้รวม</div>
-          <div className="mt-2 text-4xl font-bold md:text-5xl">{formatMoney(data?.summary.totalOutstanding)}</div>
-          <div className="mt-1 text-sm opacity-90">บาท · ทุกประเภทสินเชื่อ</div>
-          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-white/20 pt-4 text-sm"><MiniHero label="ครบเดือนนี้" value={formatMoney(data?.summary.dueThisMonth)} /><MiniHero label="เกินกำหนด" value={formatMoney(data?.summary.overdueAmount)} tone="red" /><MiniHero label="ดอกเบี้ยเดือนนี้" value={formatMoney(data?.summary.interestThisMonth)} tone="amber" /></div>
+        <div className="space-y-3 lg:col-span-2">
+          <SharedKpiCard icon="💳" label="ภาระหนี้รวม" note="บาท · ทุกประเภทสินเชื่อ" tone="blue" value={formatMoney(data?.summary.totalOutstanding)} />
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <MiniHero label="ครบเดือนนี้" value={formatMoney(data?.summary.dueThisMonth)} />
+            <MiniHero label="เกินกำหนด" value={formatMoney(data?.summary.overdueAmount)} tone="red" />
+            <MiniHero label="ดอกเบี้ยเดือนนี้" value={formatMoney(data?.summary.interestThisMonth)} tone="amber" />
+          </div>
         </div>
         <Panel title=" สัดส่วนหนี้ตามประเภท">{(data?.byType ?? []).map((row) => <Bar key={row.label} color="bg-blue-500" label={row.label} max={maxType} value={row.value} />)} {!isLoading && (data?.byType.length ?? 0) === 0 ? <EmptyText>ยังไม่มีข้อมูลสินเชื่อ</EmptyText> : null}</Panel>
       </div>
@@ -461,7 +467,7 @@ export function EquityMaintenancePageClient() {
   return (
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
-      <div className="max-w-xl rounded-md bg-white p-5 shadow">
+      <div className="max-w-xl rounded-xl border border-slate-200/60 bg-white p-5 shadow-sm">
         <div className="grid grid-cols-2 gap-3 text-sm">
           <ReadField label="ทุนจดทะเบียน" value={formatMoney(row?.registeredCapital)} />
           <ReadField label="ทุนชำระแล้ว (Paid-up)" value={formatMoney(row?.paidUpCapital)} />
@@ -483,7 +489,11 @@ export function OpeningBalancePageClient() {
   return (
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
-      <div className="flex flex-wrap gap-2 rounded-md bg-white p-3 shadow">{tabs.map((tab, index) => <span key={tab} className={`rounded-md px-3 py-2 text-sm ${index === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{tab}</span>)}</div>
+      <Tabs value={tabs[0]} className="gap-0">
+        <TabsList variant="line" className="w-full flex-wrap overflow-x-auto">
+          {tabs.map((tab) => <TabsTrigger key={tab} value={tab} variant="line">{tab}</TabsTrigger>)}
+        </TabsList>
+      </Tabs>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5"><StatCard label="AR" value={formatMoney(data?.summary.ar)} tone="blue" /><StatCard label="AP ต้นทุน" value={formatMoney(data?.summary.apCost)} tone="red" /><StatCard label="AP ค่าใช้จ่าย" value={formatMoney(data?.summary.apExpense)} tone="red" /><StatCard label="สต็อก" value={formatMoney(data?.summary.stock)} tone="amber" /><StatCard label="สุทธิอื่นๆ" value={formatMoney(data?.summary.netOther)} /></div>
       <Panel title="ข้อมูลพื้นฐาน"><div className="grid grid-cols-2 gap-3 text-sm"><ReadField label="วันที่ตัดยอด" value="2026-04-30" /><ReadField label="วันเริ่มใช้งาน" value="2026-05-01" /></div><div className="mt-3 text-xs text-slate-400">อัปเดตล่าสุด: {data?.row.updatedAt || '-'}</div></Panel>
       {/* Desktop Table View */}
@@ -501,24 +511,21 @@ export function OpeningBalancePageClient() {
             </div>
           ) : null}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
-                {openingAccountColumns.map((column, index) => {
-                  if (index === openingAccountColumns.length - 1) {
-                    return <col key={column.key} style={{ minWidth: column.minWidth }} />
-                  }
-                  return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
-                })}
+                {openingAccountColumns.map((column) => (
+                  <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+                ))}
               </colgroup>
               <thead className="sticky top-0 z-10 bg-slate-100">
                 <tr>
                   <ResizableTableHead label="เลขที่บัญชี" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="code" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('code', 'เลขที่บัญชี')} />
-                  <ResizableTableHead label="ชื่อบัญชี" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="name" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อบัญชี')} />
-                  <ResizableTableHead label="ประเภท" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="type" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} />
-                  <ResizableTableHead label="สาขา/คลัง" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="branch" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('branch', 'สาขาหรือคลัง')} />
-                  <ResizableTableHead label="สกุลเงิน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="currency" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('currency', 'สกุลเงิน')} />
+                  <ResizableTableHead align="right" label="ชื่อบัญชี" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="name" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อบัญชี')} />
+                  <ResizableTableHead align="right" label="ประเภท" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="type" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} />
+                  <ResizableTableHead align="right" label="สาขา/คลัง" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="branch" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('branch', 'สาขาหรือคลัง')} />
+                  <ResizableTableHead align="right" label="สกุลเงิน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="currency" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('currency', 'สกุลเงิน')} />
                   <ResizableTableHead align="right" label="ยอดเปิดบัญชี" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="openingBalance" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('openingBalance', 'ยอดเปิดบัญชี')} />
-                  <ResizableTableHead align="right" label="OD Limit" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="odLimit" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('odLimit', 'OD Limit')} />
+                  <ResizableTableHead align="right" label="วงเงิน OD" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="odLimit" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('odLimit', 'วงเงิน OD')} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -526,10 +533,10 @@ export function OpeningBalancePageClient() {
                 {sortedRows.map((account) => (
                   <tr key={`${account.code || account.name}-${account.name}`} className="transition-colors hover:bg-slate-50/50">
                     <td className="whitespace-nowrap px-3 py-3 font-mono text-slate-700">{account.code || '-'}</td>
-                    <td className="px-3 py-3 font-medium text-slate-900">{account.name}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-600">{account.type}</td>
-                    <td className="px-3 py-3 text-slate-600">{account.branchName || account.branchCode || '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-600">{account.currency}</td>
+                    <td className="px-3 py-3 text-right font-medium text-slate-900">{account.name}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-slate-600">{account.type}</td>
+                    <td className="px-3 py-3 text-right text-slate-600">{account.branchName || account.branchCode || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-slate-600">{account.currency}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-900">{formatMoney(account.openingBalance)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{formatMoney(account.odLimit)}</td>
                   </tr>
@@ -589,7 +596,13 @@ export function HistoricalDataPageClient() {
   return (
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
-      <div className="flex flex-wrap gap-2"><TabButton active={tab === 'expense'} onClick={() => setTab('expense')}> ค่าใช้จ่าย (Expenses)</TabButton><TabButton active={tab === 'pnl'} onClick={() => setTab('pnl')}> งบกำไรขาดทุน (P&amp;L)</TabButton><TabButton active={tab === 'cashflow'} onClick={() => setTab('cashflow')}> งบกระแสเงินสด (Cash Flow)</TabButton></div>
+      <Tabs className="gap-0" value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
+        <TabsList className="w-full flex-nowrap overflow-x-auto" variant="line">
+          <TabsTrigger value="expense" variant="line">ค่าใช้จ่าย (Expenses)</TabsTrigger>
+          <TabsTrigger value="pnl" variant="line">งบกำไรขาดทุน (P&amp;L)</TabsTrigger>
+          <TabsTrigger value="cashflow" variant="line">งบกระแสเงินสด</TabsTrigger>
+        </TabsList>
+      </Tabs>
       {/* Desktop Table View */}
       <div className="hidden lg:block">
         <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
@@ -605,14 +618,11 @@ export function HistoricalDataPageClient() {
             </div>
           ) : null}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
-                {historicalColumns.map((column, index) => {
-                  if (index === historicalColumns.length - 1) {
-                    return <col key={column.key} style={{ minWidth: column.minWidth }} />
-                  }
-                  return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
-                })}
+                {historicalColumns.map((column) => (
+                  <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+                ))}
               </colgroup>
               <thead className="sticky top-0 z-10 bg-slate-100">
                 <tr>
@@ -657,30 +667,15 @@ function useApi<T>(url: string) {
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-100 bg-white p-3 shadow-sm">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">{children}</div>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-md border border-slate-100 bg-white p-4 shadow-sm"><h2 className="mb-3 text-xs font-bold text-slate-800">{title}</h2>{children}</div>
+  return <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"><h2 className="mb-3 text-xs font-bold text-slate-800">{title}</h2>{children}</div>
 }
 
-function StatCard({ label, tone, value }: { label: string; tone?: 'amber' | 'blue' | 'cyan' | 'red'; value: number | string }) {
-  const toneStyles = {
-    blue: { text: 'text-blue-600' },
-    cyan: { text: 'text-cyan-600' },
-    amber: { text: 'text-amber-600' },
-    red: { text: 'text-red-600' },
-    default: { text: 'text-slate-600' }
-  }
-  const current = toneStyles[tone ?? 'default']
-  return (
-    <div className="bg-white p-3.5 border border-slate-100 rounded-md shadow-sm">
-      <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold text-slate-500 truncate uppercase">{label}</div>
-        <div className={`mt-0.5 text-sm sm:text-base font-bold tracking-tight ${current.text}`}>{value}</div>
-      </div>
-    </div>
-  )
+function StatCard({ label, tone = 'slate', value }: { label: string; tone?: 'amber' | 'blue' | 'cyan' | 'red' | 'slate'; value: number | string }) {
+  return <SharedKpiCard label={label} tone={tone} value={value} />
 }
 
 function MiniHero({ label, tone, value }: { label: string; tone?: 'amber' | 'red'; value: string }) {
@@ -730,20 +725,17 @@ function DueTable({ isLoading, rows, title, tone }: { isLoading: boolean; rows: 
       
       {/* Desktop Table View */}
       <div className="hidden lg:block overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
-            {dueColumns.map((column, index) => {
-              if (index === dueColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />
-              }
-              return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
-            })}
+            {dueColumns.map((column) => (
+              <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            ))}
           </colgroup>
           <thead className="sticky top-0 z-10 bg-slate-100">
             <tr>
               <ResizableTableHead label="วันครบกำหนด" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="dueDate" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('dueDate', 'วันครบกำหนด')} />
-              <ResizableTableHead label="เลขสัญญา" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="contractNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('contractNo', 'เลขสัญญา')} />
-              <ResizableTableHead label="ผู้ให้กู้" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="lenderName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('lenderName', 'ผู้ให้กู้')} />
+              <ResizableTableHead align="right" label="เลขสัญญา" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="contractNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('contractNo', 'เลขสัญญา')} />
+              <ResizableTableHead align="right" label="ผู้ให้กู้" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="lenderName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('lenderName', 'ผู้ให้กู้')} />
               <ResizableTableHead align="right" label="ยอดต้องจ่าย" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="amount" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดต้องจ่าย')} />
             </tr>
           </thead>
@@ -752,8 +744,8 @@ function DueTable({ isLoading, rows, title, tone }: { isLoading: boolean; rows: 
             {sortedRows.map((row) => (
               <tr key={row.id} className="transition-colors hover:bg-slate-50/50">
                 <td className="whitespace-nowrap px-3 py-3 text-slate-700">{row.dueDate}</td>
-                <td className="whitespace-nowrap px-3 py-3 font-mono font-semibold text-blue-700">{row.contractNo}</td>
-                <td className="px-3 py-3 font-medium text-slate-900">{row.lenderName}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-semibold text-blue-700">{row.contractNo}</td>
+                <td className="px-3 py-3 text-right font-medium text-slate-900">{row.lenderName}</td>
                 <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-slate-900">{formatMoney(row.totalDueAmount - row.paidAmount)}</td>
               </tr>
             ))}
@@ -802,7 +794,7 @@ function ReadField({ label, value }: { label: string; value: string }) {
   return (
     <label className="block text-xs font-medium text-slate-600">
       <span className="mb-1 block">{label}</span>
-      <input className="w-full rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-right text-xs outline-none focus:ring-0" readOnly value={value} />
+      <input className="w-full rounded-md border border-slate-100 bg-slate-50 px-3 py-1.5 text-right text-xs outline-none focus:ring-0" readOnly value={value} />
     </label>
   )
 }
@@ -827,7 +819,7 @@ function HistoricalRowsMobile({ isLoading, months, rows }: { isLoading: boolean;
   return rows.map((row) => (
     <div key={row.category} className="p-4 space-y-2 text-xs hover:bg-slate-50/50 transition">
       <div className="font-semibold text-slate-900 text-sm">{row.category}</div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs bg-slate-50/50 p-2.5 rounded-lg border border-slate-100/50 text-slate-650">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs bg-slate-50/50 p-2.5 rounded-xl border border-slate-100/50 text-slate-650">
         {months.map((month) => (
           <div key={month.label} className="flex justify-between">
             <span>{month.label}:</span>
@@ -843,18 +835,6 @@ function HistoricalRowsMobile({ isLoading, months, rows }: { isLoading: boolean;
   ))
 }
 
-function TabButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
-  return (
-    <button
-      className={`rounded-lg px-4 py-2 text-xs font-bold transition outline-none focus:ring-0 ${active ? 'bg-[#0F172A] text-white hover:bg-slate-800 shadow-sm' : 'bg-slate-50 border border-slate-100 text-slate-650 hover:bg-slate-100'}`}
-      type="button" 
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  )
-}
-
 function LoadingOrEmpty({ colSpan, emptyText = 'ยังไม่มีข้อมูล', isLoading, rows }: { colSpan: number; emptyText?: string; isLoading: boolean; rows: number }) {
   if (isLoading) return <tr><td className="py-8 text-center text-slate-400" colSpan={colSpan}>กำลังโหลดข้อมูล</td></tr>
   if (rows === 0) return <tr><td className="py-8 text-center text-slate-400" colSpan={colSpan}>{emptyText}</td></tr>
@@ -862,8 +842,13 @@ function LoadingOrEmpty({ colSpan, emptyText = 'ยังไม่มีข้�
 }
 
 function StatusPill({ status }: { status: string }) {
-  const color = status === 'Active' ? 'bg-emerald-50 text-emerald-700' : status === 'Closed' ? 'bg-blue-50 text-blue-700' : status === 'Overdue' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-700'
-  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${color}`}>{status}</span>
+  const normalizedStatus = status.toLowerCase()
+  const color = normalizedStatus === 'active' ? 'bg-emerald-50 text-emerald-700' : normalizedStatus === 'closed' ? 'bg-blue-50 text-blue-700' : normalizedStatus === 'overdue' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-700'
+  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${color}`}>{loanStatusLabel(status)}</span>
+}
+
+function loanStatusLabel(status: string) {
+  return loanStatusLabels[status.toLowerCase()] ?? status
 }
 
 function EmptyText({ children }: { children: ReactNode }) {

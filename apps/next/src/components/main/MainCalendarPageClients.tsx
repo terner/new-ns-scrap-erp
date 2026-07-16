@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { KpiCard as SharedKpiCard, type KpiCardTone } from '@/components/ui/KpiCard'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 
 type CashEntry = { account: string; date: string; description: string; id: string; in: number; out: number; refNo: string; type: string }
@@ -69,9 +71,9 @@ type BusinessModeRow = BusinessDoc & { date: string }
 const weekdays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์']
 const cashEntryColumns: Array<TableColumn<CashEntryColumnKey>> = [
   { key: 'type', label: 'ประเภท', defaultWidth: 130, minWidth: 110 },
-  { key: 'description', label: 'รายละเอียด', defaultWidth: 240, minWidth: 170 },
-  { key: 'account', label: 'บัญชี', defaultWidth: 180, minWidth: 140 },
-  { key: 'refNo', label: 'เลขอ้างอิง', defaultWidth: 150, minWidth: 120 },
+  { key: 'description', label: 'รายละเอียด', defaultWidth: 240, minWidth: 170, align: 'right' },
+  { key: 'account', label: 'บัญชี', defaultWidth: 180, minWidth: 140, align: 'right' },
+  { key: 'refNo', label: 'เลขอ้างอิง', defaultWidth: 150, minWidth: 120, align: 'right' },
   { key: 'cashIn', label: 'เงินเข้า', defaultWidth: 130, minWidth: 115, align: 'right' },
   { key: 'cashOut', label: 'เงินออก', defaultWidth: 130, minWidth: 115, align: 'right' },
 ]
@@ -84,27 +86,27 @@ const businessCombinedColumns: Array<TableColumn<BusinessCombinedColumnKey>> = [
   { key: 'expenseAmount', label: 'ค่าใช้จ่าย', defaultWidth: 130, minWidth: 115, align: 'right' },
   { key: 'receiptAmount', label: 'รับเงิน', defaultWidth: 125, minWidth: 110, align: 'right' },
   { key: 'paymentAmount', label: 'จ่ายเงิน', defaultWidth: 125, minWidth: 110, align: 'right' },
-  { key: 'netCash', label: 'Net Cash', defaultWidth: 130, minWidth: 115, align: 'right' },
+  { key: 'netCash', label: 'เงินสดสุทธิ', defaultWidth: 130, minWidth: 115, align: 'right' },
   { key: 'arIncrease', label: 'AR เพิ่ม', defaultWidth: 120, minWidth: 105, align: 'right' },
   { key: 'apIncrease', label: 'AP เพิ่ม', defaultWidth: 120, minWidth: 105, align: 'right' },
 ]
 const businessModeColumns: Record<Exclude<Mode, 'combined'>, Array<TableColumn<BusinessModeColumnKey>>> = {
   expense: [
     { key: 'date', label: 'วันที่จ่าย', defaultWidth: 120, minWidth: 105 },
-    { key: 'docNo', label: 'เลขที่ EXP', defaultWidth: 140, minWidth: 120 },
-    { key: 'category', label: 'หมวดค่าใช้จ่าย', defaultWidth: 190, minWidth: 150 },
-    { key: 'payee', label: 'ผู้รับเงิน', defaultWidth: 190, minWidth: 150 },
+    { key: 'docNo', label: 'เลขที่ EXP', defaultWidth: 140, minWidth: 120, align: 'right' },
+    { key: 'category', label: 'หมวดค่าใช้จ่าย', defaultWidth: 190, minWidth: 150, align: 'right' },
+    { key: 'payee', label: 'ผู้รับเงิน', defaultWidth: 190, minWidth: 150, align: 'right' },
     { key: 'amount', label: 'ยอดจ่าย', defaultWidth: 130, minWidth: 115, align: 'right' },
   ],
   purchase: [
     { key: 'date', label: 'วันที่เอกสาร', defaultWidth: 120, minWidth: 105 },
-    { key: 'docNo', label: 'เลขที่ PB', defaultWidth: 150, minWidth: 125 },
+    { key: 'docNo', label: 'เลขที่ PB', defaultWidth: 150, minWidth: 125, align: 'right' },
     { key: 'qty', label: 'น้ำหนัก', defaultWidth: 125, minWidth: 110, align: 'right' },
     { key: 'amount', label: 'ยอดซื้อ', defaultWidth: 140, minWidth: 120, align: 'right' },
   ],
   sales: [
     { key: 'date', label: 'วันที่เอกสาร', defaultWidth: 120, minWidth: 105 },
-    { key: 'docNo', label: 'เลขที่ SB', defaultWidth: 150, minWidth: 125 },
+    { key: 'docNo', label: 'เลขที่ SB', defaultWidth: 150, minWidth: 125, align: 'right' },
     { key: 'qty', label: 'น้ำหนัก', defaultWidth: 125, minWidth: 110, align: 'right' },
     { key: 'amount', label: 'ยอดขาย', defaultWidth: 140, minWidth: 120, align: 'right' },
     { key: 'cogs', label: 'COGS', defaultWidth: 130, minWidth: 115, align: 'right' },
@@ -203,14 +205,14 @@ export function CashFlowCalendarPageClient() {
         <Metric label="ยอดต้นเดือน" value={money(summary.openingCash)} tone="slate" />
         <Metric label="เงินเข้ารวม" value={money(summary.totalIn)} tone="emerald" />
         <Metric label="เงินออกรวม" value={money(summary.totalOut)} tone="red" />
-        <Metric label="Net Cash Flow" value={money((summary.totalIn ?? 0) - (summary.totalOut ?? 0))} tone={(summary.totalIn ?? 0) >= (summary.totalOut ?? 0) ? 'blue' : 'red'} />
+        <Metric label="กระแสเงินสดสุทธิ" value={money((summary.totalIn ?? 0) - (summary.totalOut ?? 0))} tone={(summary.totalIn ?? 0) >= (summary.totalOut ?? 0) ? 'blue' : 'red'} />
         <Metric label="ยอดปลายเดือน" value={money(summary.endingCash)} tone="gradient" />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel title="📈 เงินเข้า-ออกรายวัน">
           <DailyCashInOutChart days={data?.days ?? []} />
         </Panel>
-        <Panel title="📈 ยอดเงินสะสม (Running Balance)">
+        <Panel title="ยอดเงินคงเหลือสะสม">
           <RunningBalanceLineChart days={data?.days ?? []} maxBalance={maxBalance} minBalance={minBalance} />
         </Panel>
       </div>
@@ -257,25 +259,25 @@ function RunningBalanceLineChart({ days, maxBalance, minBalance }: { days: CashD
         <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-2">
           <div className="flex h-72 items-center justify-center text-xs font-bold text-slate-700 [writing-mode:vertical-rl] rotate-180">บาท</div>
           <svg aria-label="กราฟเส้นยอดเงินสะสม" className="h-72 w-full overflow-visible" preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`}>
-            <rect fill="#f8fafc" height={chartHeight} rx="8" width={chartWidth} x={padding.left} y={padding.top} />
+            <rect fill="var(--color-slate-50)" height={chartHeight} rx="8" width={chartWidth} x={padding.left} y={padding.top} />
             {ticks.map((tick, index) => (
               <g key={`${tick}-${index}`}>
-                <line stroke="#e2e8f0" x1={padding.left} x2={padding.left + chartWidth} y1={yFor(tick)} y2={yFor(tick)} />
-                <text fill="#64748b" fontSize="12" textAnchor="end" x={padding.left - 10} y={yFor(tick) + 4}>
+                <line stroke="var(--color-slate-200)" x1={padding.left} x2={padding.left + chartWidth} y1={yFor(tick)} y2={yFor(tick)} />
+                <text fill="var(--color-slate-500)" fontSize="12" textAnchor="end" x={padding.left - 10} y={yFor(tick) + 4}>
                   {compactMoney(tick)}
                 </text>
               </g>
             ))}
-            <line stroke="#94a3b8" strokeDasharray="5 5" x1={padding.left} x2={padding.left + chartWidth} y1={zeroY} y2={zeroY} />
-            <text fill="#64748b" fontSize="12" textAnchor="end" x={padding.left + chartWidth - 8} y={zeroY - 6}>0 บาท</text>
-            <path d={linePath} fill="none" stroke="#2563eb" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+            <line stroke="var(--color-slate-400)" strokeDasharray="5 5" x1={padding.left} x2={padding.left + chartWidth} y1={zeroY} y2={zeroY} />
+            <text fill="var(--color-slate-500)" fontSize="12" textAnchor="end" x={padding.left + chartWidth - 8} y={zeroY - 6}>0 บาท</text>
+            <path d={linePath} fill="none" stroke="var(--color-blue-600)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
             {points.map(({ day, x, y }, index) => (
               <g key={day.date}>
-                <circle cx={x} cy={y} fill={day.ending < 0 ? '#ef4444' : '#2563eb'} r="4">
+                <circle cx={x} cy={y} fill={day.ending < 0 ? 'var(--color-red-500)' : 'var(--color-blue-600)'} r="4">
                   <title>{`${dateLabel(day.date)} ยอดสะสม ${money(day.ending)}`}</title>
                 </circle>
                 {(days.length <= 8 || index % labelEvery === 0) ? (
-                  <text fill="#475569" fontSize="12" textAnchor="middle" x={x} y={height - 10}>
+                  <text fill="var(--color-slate-600)" fontSize="12" textAnchor="middle" x={x} y={height - 10}>
                     {dateLabel(day.date)}
                   </text>
                 ) : null}
@@ -362,18 +364,25 @@ export function BusinessCalendarPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <MonthControls month={month} setMonth={setMonth} />
-        <div className="flex flex-wrap gap-2 rounded-xl bg-white p-2 shadow-sm border border-slate-100">{(['combined', 'purchase', 'sales', 'expense'] as Mode[]).map((item) => <ModeButton key={item} active={mode === item} mode={item} onClick={() => setMode(item)} />)}</div>
+        <Tabs className="gap-0" value={mode} onValueChange={(value) => setMode(value as Mode)}>
+          <TabsList aria-label="เลือกข้อมูลปฏิทินธุรกิจ" variant="line">
+            <TabsTrigger value="combined" variant="line">ทั้งหมด</TabsTrigger>
+            <TabsTrigger value="purchase" variant="line">ซื้อ</TabsTrigger>
+            <TabsTrigger value="sales" variant="line">ขาย</TabsTrigger>
+            <TabsTrigger value="expense" variant="line">ค่าใช้จ่าย</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-7">
         <Metric label="ซื้อ" value={money(summary.purchaseAmount)} tone="blue" />
         <Metric label="ขาย" value={money(summary.saleAmount)} tone="emerald" />
-        <Metric label="Actual GP" value={money(summary.gp)} tone={(summary.gp ?? 0) >= 0 ? 'purple' : 'red'} />
+        <Metric label="กำไรขั้นต้นจริง" value={money(summary.gp)} tone={(summary.gp ?? 0) >= 0 ? 'purple' : 'red'} />
         <Metric label="ค่าใช้จ่าย" value={money(summary.expenseAmount)} tone="red" />
         <Metric label="รับเงิน" value={money(summary.receiptAmount)} tone="emerald" />
         <Metric label="จ่ายเงิน" value={money(summary.paymentAmount)} tone="red" />
-        <Metric label="Net Cash" value={money(summary.netCash)} tone="gradient" />
+        <Metric label="เงินสดสุทธิ" value={money(summary.netCash)} tone="gradient" />
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="📈 ซื้อ vs ขาย รายวัน">
@@ -397,10 +406,10 @@ export function BusinessCalendarPageClient() {
 
 function MonthControls({ month, setMonth }: { month: string; setMonth: (month: string) => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-100">
-      <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 outline-none" type="button" onClick={() => setMonth(shiftMonth(month, -1))}>← เดือนก่อน</button>
-      <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
-      <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 outline-none" type="button" onClick={() => setMonth(shiftMonth(month, 1))}>เดือนถัดไป →</button>
+    <div className="flex flex-wrap items-center gap-2">
+      <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 outline-none" type="button" onClick={() => setMonth(shiftMonth(month, -1))}>← เดือนก่อน</button>
+      <input className="h-9 rounded-md border border-slate-300 px-3 text-sm font-medium outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+      <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 outline-none" type="button" onClick={() => setMonth(shiftMonth(month, 1))}>เดือนถัดไป →</button>
     </div>
   )
 }
@@ -433,11 +442,11 @@ function BusinessCombinedTable({ days }: { days: BusinessDay[] }) {
       {/* Desktop view */}
       {columnResize.hasCustomWidths ? (
         <div className="mb-2 hidden justify-end lg:flex">
-          <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-normal text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
         </div>
       ) : null}
       <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {businessCombinedColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -481,7 +490,7 @@ function BusinessCombinedTable({ days }: { days: BusinessDay[] }) {
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[600px] overflow-y-auto">
         {sortedDays.map((day) => (
-          <div key={day.date} className={`p-3 rounded-lg border mb-2 shadow-sm flex flex-col gap-1.5 text-xs bg-white ${day.isWeekend ? 'border-red-100 bg-red-50/20' : 'border-slate-100'} ${day.purchaseAmount + day.saleAmount + day.expenseAmount + day.receiptAmount + day.paymentAmount === 0 ? 'opacity-75' : ''}`}>
+          <div key={day.date} className={`p-3 rounded-xl border mb-2 shadow-sm flex flex-col gap-1.5 text-xs bg-white ${day.isWeekend ? 'border-red-100 bg-red-50/20' : 'border-slate-100'} ${day.purchaseAmount + day.saleAmount + day.expenseAmount + day.receiptAmount + day.paymentAmount === 0 ? 'opacity-75' : ''}`}>
             <div className="flex justify-between items-center pb-1 border-b border-slate-50">
               <span className="font-bold text-slate-800">วันที่ {day.day}</span>
               {day.isToday && <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-bold text-yellow-800">วันนี้</span>}
@@ -494,7 +503,7 @@ function BusinessCombinedTable({ days }: { days: BusinessDay[] }) {
               <div>💸 ค่าใช้จ่าย: <span className="font-bold text-red-600">{money(day.expenseAmount)}</span></div>
               <div>💰 รับ: <span className="font-bold text-emerald-600">{money(day.receiptAmount)}</span></div>
               <div>💸 จ่าย: <span className="font-bold text-red-600">{money(day.paymentAmount)}</span></div>
-              <div>📊 Net Cash: <span className={`font-bold ${day.netCash >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{money(day.netCash)}</span></div>
+              <div>เงินสดสุทธิ: <span className={`font-bold ${day.netCash >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{money(day.netCash)}</span></div>
             </div>
             <div className="flex justify-between text-xs text-slate-500 mt-1 pt-1.5 border-t border-slate-50">
               <span>AR เพิ่ม: {money(day.arIncrease)}</span>
@@ -518,9 +527,9 @@ function businessCombinedCellTone(day: BusinessDay, key: BusinessCombinedColumnK
 
 function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<Mode, 'combined'> }) {
   const config = {
-    expense: { docs: (day: BusinessDay) => day.expenseDocs, title: '💸 Expense View' },
-    purchase: { docs: (day: BusinessDay) => day.purchaseDocs, title: '📥 Purchase View' },
-    sales: { docs: (day: BusinessDay) => day.saleDocs, title: '📤 Sales View' },
+    expense: { docs: (day: BusinessDay) => day.expenseDocs, title: '💸 มุมมองค่าใช้จ่าย' },
+    purchase: { docs: (day: BusinessDay) => day.purchaseDocs, title: '📥 มุมมองซื้อ' },
+    sales: { docs: (day: BusinessDay) => day.saleDocs, title: '📤 มุมมองขาย' },
   }[mode]
   const columns = businessModeColumns[mode]
   const [sortKey, setSortKey] = useState<BusinessModeColumnKey | null>(null)
@@ -551,11 +560,11 @@ function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<
       {/* Desktop view */}
       {columnResize.hasCustomWidths ? (
         <div className="mb-2 hidden justify-end lg:flex">
-          <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+          <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-normal text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
         </div>
       ) : null}
       <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {columns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -591,9 +600,9 @@ function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<
       </div>
 
       {/* Mobile view */}
-      <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[500px] overflow-y-auto rounded-lg">
+      <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[500px] overflow-y-auto rounded-xl">
         {sortedRows.map((doc) => (
-          <div key={`${mode}-${doc.id}`} className="p-3 bg-white rounded-lg border border-slate-100 mb-2 shadow-sm flex flex-col gap-1 text-xs">
+          <div key={`${mode}-${doc.id}`} className="p-3 bg-white rounded-xl border border-slate-100 mb-2 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-center">
               <span className="font-bold text-slate-800">{doc.docNo}</span>
               <span className="text-slate-500 text-xs">{doc.date}</span>
@@ -685,11 +694,11 @@ function CashDayModal({ day, onClose }: { day: CashDay; onClose: () => void }) {
           {/* Desktop Table View */}
           {columnResize.hasCustomWidths ? (
             <div className="mb-2 hidden justify-end sm:flex">
-              <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
+              <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-normal text-slate-600 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button>
             </div>
           ) : null}
           <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm sm:block">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {cashEntryColumns.map((column) => (
                   <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -725,9 +734,9 @@ function CashDayModal({ day, onClose }: { day: CashDay; onClose: () => void }) {
           </div>
 
           {/* Mobile view inside Modal */}
-          <div className="block sm:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[300px] overflow-y-auto rounded-lg">
+          <div className="block sm:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[300px] overflow-y-auto rounded-xl">
             {sortedEntries.map((entry) => (
-              <div key={entry.id} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+              <div key={entry.id} className="p-2.5 bg-white rounded-xl border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
                 <div className="flex justify-between items-start">
                   <span className="font-bold text-slate-800">{entry.description || entry.type}</span>
                   <span className="font-mono text-xs text-slate-400">{entry.refNo}</span>
@@ -759,22 +768,8 @@ function cashEntryCellTone(key: CashEntryColumnKey) {
   return 'text-slate-700'
 }
 
-function Metric({ label, tone, value }: { label: string; tone: string; value: string }) {
-  const toneMap: Record<string, { bg: string; text: string }> = {
-    blue: { bg: 'bg-blue-50/50 text-blue-900 border-blue-100', text: 'text-blue-600' },
-    emerald: { bg: 'bg-emerald-50/50 text-emerald-900 border-emerald-100', text: 'text-emerald-600' },
-    red: { bg: 'bg-red-50/50 text-red-900 border-red-100', text: 'text-red-600' },
-    purple: { bg: 'bg-purple-50/50 text-purple-900 border-purple-100', text: 'text-purple-600' },
-    slate: { bg: 'bg-slate-50/50 text-slate-900 border-slate-100', text: 'text-slate-600' },
-    gradient: { bg: 'bg-indigo-50/50 text-indigo-900 border-indigo-100', text: 'text-indigo-600 font-bold' },
-  }
-  const style = toneMap[tone] || toneMap.slate
-  return (
-    <div className="bg-white p-4 shadow-sm border border-slate-100 rounded-xl flex flex-col justify-center">
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className={`mt-1 font-mono text-base sm:text-lg font-bold truncate ${style.text}`}>{value}</div>
-    </div>
-  )
+function Metric({ label, tone, value }: { label: string; tone: KpiCardTone; value: string }) {
+  return <SharedKpiCard label={label} tone={tone} value={value} />
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
@@ -788,17 +783,6 @@ function Panel({ children, title }: { children: ReactNode; title: string }) {
 
 function Legend({ color, text }: { color: string; text: string }) {
   return <span className="inline-flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${color}`} />{text}</span>
-}
-
-function ModeButton({ active, mode, onClick }: { active: boolean; mode: Mode; onClick: () => void }) {
-  const label: Record<Mode, string> = { combined: 'Combined', expense: 'Expense', purchase: 'Purchase', sales: 'Sales' }
-  const activeClass: Record<Mode, string> = {
-    combined: 'bg-purple-600 border-purple-600 text-white',
-    expense: 'bg-red-600 border-red-600 text-white',
-    purchase: 'bg-blue-600 border-blue-600 text-white',
-    sales: 'bg-emerald-600 border-emerald-600 text-white'
-  }
-  return <button className={`rounded-lg border px-3 py-2 text-sm font-bold outline-none ${active ? activeClass[mode] : 'bg-white border-slate-100 text-slate-600 hover:bg-slate-50'}`} type="button" onClick={onClick} onPointerDown={onClick}>{label[mode]}</button>
 }
 
 function ErrorBox({ text }: { text: string }) {

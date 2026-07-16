@@ -47,7 +47,7 @@ export function PostingRulesTable({ rows }: { rows: readonly RuleGroup[] }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-md bg-white shadow">
+    <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
@@ -55,18 +55,18 @@ export function PostingRulesTable({ rows }: { rows: readonly RuleGroup[] }) {
           </div>
           {columnResize.hasCustomWidths ? (
             <button
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none"
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-normal text-slate-700 hover:bg-slate-50 focus-visible:outline-none"
               type="button"
               onClick={columnResize.resetColumnWidths}
             >
-              คืนค่าตาราง
+              คืนค่าเดิมตาราง
             </button>
           ) : null}
         </div>
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <table className="ns-table min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {ruleColumns.map((column) => (
               <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -75,19 +75,19 @@ export function PostingRulesTable({ rows }: { rows: readonly RuleGroup[] }) {
           <thead className="bg-slate-100">
             <tr>
               <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="กลุ่มงาน" resizeProps={columnResize.getResizeHandleProps('group', 'กลุ่มงาน')} sortKey="group" onSort={handleSort} />
-              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="แหล่งข้อมูลตัวอย่าง" resizeProps={columnResize.getResizeHandleProps('source', 'แหล่งข้อมูลตัวอย่าง')} sortKey="source" onSort={handleSort} />
-              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="ประเด็นการผูกบัญชี" resizeProps={columnResize.getResizeHandleProps('concern', 'ประเด็นการผูกบัญชี')} sortKey="concern" onSort={handleSort} />
-              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="ความพร้อม" resizeProps={columnResize.getResizeHandleProps('readiness', 'ความพร้อม')} sortKey="readiness" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="แหล่งข้อมูลตัวอย่าง" resizeProps={columnResize.getResizeHandleProps('source', 'แหล่งข้อมูลตัวอย่าง')} sortKey="source" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="ประเด็นการผูกบัญชี" resizeProps={columnResize.getResizeHandleProps('concern', 'ประเด็นการผูกบัญชี')} sortKey="concern" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="ความพร้อม" resizeProps={columnResize.getResizeHandleProps('readiness', 'ความพร้อม')} sortKey="readiness" onSort={handleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white">
             {sortedRows.map((rule) => (
               <tr key={rule.group} className="transition-colors hover:bg-slate-50">
                 <td className="whitespace-nowrap p-3 align-top font-semibold text-slate-900">{rule.group}</td>
-                <td className="min-w-0 p-3 align-top text-slate-700"><span className="break-words">{rule.source}</span></td>
-                <td className="min-w-0 p-3 align-top text-slate-700"><span className="break-words">{rule.concern}</span></td>
-                <td className="p-3 align-top">
-                  <RuleStatusBadge>{rule.readiness}</RuleStatusBadge>
+                <td className="min-w-0 p-3 align-top text-right text-slate-700"><span className="block break-words">{rule.source}</span></td>
+                <td className="min-w-0 p-3 align-top text-right text-slate-700"><span className="block break-words">{rule.concern}</span></td>
+                <td className="p-3 align-top text-right">
+                  <span className="inline-flex"><RuleStatusBadge>{rule.readiness}</RuleStatusBadge></span>
                 </td>
               </tr>
             ))}
@@ -97,7 +97,7 @@ export function PostingRulesTable({ rows }: { rows: readonly RuleGroup[] }) {
 
       <div className="space-y-3 p-3 md:hidden">
         {sortedRows.map((rule) => (
-          <div key={rule.group} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div key={rule.group} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-900">{rule.group}</p>

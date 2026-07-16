@@ -359,8 +359,7 @@ function buildFlexMessage(
     docTimeStr = '--:--'
   }
 
-  const uniqueWarehouses = [...new Set(ticket.lines.map(l => l.warehouseName).filter(Boolean))]
-  const warehouseDisplay = ticket.warehouseName || (uniqueWarehouses.length > 0 ? uniqueWarehouses.join(', ') : '-')
+  const godownDisplay = ticket.godownName
 
   const productTypesCount = ticket.productSummaries?.length || 1
   const productDetailRows = buildProductDetailRows(ticket)
@@ -455,7 +454,7 @@ function buildFlexMessage(
                 },
                 {
                   type: 'text' as const,
-                  text: warehouseDisplay,
+                  text: godownDisplay,
                   color: '#0f172a',
                   size: 'sm' as const,
                   weight: 'bold' as const,
@@ -737,7 +736,7 @@ function buildFlexMessage(
                     },
                     {
                       type: 'text' as const,
-                      text: `โกดัง ${warehouseDisplay}`,
+                      text: `โกดัง ${godownDisplay}`,
                       color: isWti ? '#a7f3d0' : '#bae6fd',
                       size: 'xxs' as const
                     }
@@ -959,7 +958,7 @@ ${partyLabel}: ${ticket.partyName}
 ${pdfUrl}`
 }
 
-export async function sendLinePush(targetId: string, messages: any[], token: string, retryKey?: string) {
+export async function sendLinePush(targetId: string, messages: any[], token: string, retryKey?: string, signal?: AbortSignal) {
   if (!token) throw new Error('ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN')
 
   const headers: Record<string, string> = {
@@ -977,6 +976,7 @@ export async function sendLinePush(targetId: string, messages: any[], token: str
     }),
     headers,
     method: 'POST',
+    signal,
   })
 
   if (response.status === 409 && retryKey) {

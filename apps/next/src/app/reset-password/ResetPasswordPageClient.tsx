@@ -88,7 +88,7 @@ export function ResetPasswordPageClient() {
 
   return (
     <section className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-md rounded-md bg-white p-8 shadow-xl">
+      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
           <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-indigo-700 text-2xl font-bold text-white">
             NS
@@ -109,7 +109,7 @@ export function ResetPasswordPageClient() {
         ) : null}
 
         <form className="space-y-4" onSubmit={submit}>
-          <input autoComplete="username" className="hidden" readOnly type="text" value={sessionEmail} />
+          <input autoComplete="email" className="hidden" readOnly type="email" value={sessionEmail} />
           <label className="block text-sm font-medium text-slate-700">
             Password ใหม่
             <span className="relative mt-1 block">

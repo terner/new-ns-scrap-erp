@@ -51,5 +51,11 @@
     "vite": "^6.1.0",
     "vitest": "^3.0.5",
     "vue-tsc": "^2.2.0"
+  },
+  "overrides": {
+    "prisma": {
+      "@prisma/dev": "0.24.14"
+    },
+    "postcss": "$postcss"
   }
 }
