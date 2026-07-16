@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, Download, ImagePlus, Plus, Save, X } from 'lucide-react'
+import { Download, Plus, Save } from 'lucide-react'
 import type React from 'react'
 import type { ButtonHTMLAttributes, Dispatch, SetStateAction } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
@@ -606,9 +607,7 @@ export function AdvancePaymentsPageClient() {
       <span>พบทั้งหมด {data?.pagination.totalRows ?? 0} รายการ</span>
       <div className="flex flex-wrap items-center gap-2">
         {columnResize.hasCustomWidths ? <Button className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
-        <Select aria-label="จำนวนรายการต่อหน้า" className="h-9 w-auto min-w-[96px] px-2" value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
-          {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
-        </Select>
+        <PageSizeDropdown value={pageSize} onChange={(size) => { setPageSize(size); setPage(1) }} />
         <Button className="h-9 font-normal" disabled={page <= 1} size="sm" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
         <span className="px-1">หน้า {data?.pagination.page ?? page} / {data?.pagination.totalPages ?? 1}</span>
         <Button className="h-9 font-normal" disabled={page >= (data?.pagination.totalPages ?? 1)} size="sm" type="button" variant="outline" onClick={() => setPage((current) => current + 1)}>ถัดไป</Button>
@@ -620,18 +619,16 @@ export function AdvancePaymentsPageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      {isFormOpen ? (
-        <>
-          <div>
-            <Button type="button" variant="outline" onClick={closeForm}><ArrowLeft className="mr-1 h-4 w-4" />กลับไปหน้ารายการ</Button>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-4">
+      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) closeForm() }}>
+        <DialogContent className="max-h-[92vh] max-w-7xl rounded-md !p-0 bg-white border-0 overflow-hidden" fallbackTitle={editingAdvanceId ? 'แก้ไขรายการ ADV' : 'สร้างรายการ ADV'} hideClose>
+          <DialogHeader className="flex-row items-start justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-slate-900">{editingAdvanceId ? `แก้ไขรายการ ADV ${editingAdvanceNo ?? ''}` : 'สร้างรายการจ่ายเงินล่วงหน้า / มัดจำ'}</div>
-              <div className="text-xs text-slate-500">{editingAdvanceId ? 'แก้ไขได้เฉพาะรายการที่ยังไม่อนุมัติ และยังไม่ถูกใช้หักบิล' : 'บันทึกเอกสาร ADV ใหม่จากประเภทมัดจำ ข้อมูลผู้ขาย และยอดการจ่ายเงิน'}</div>
+              <DialogTitle>{editingAdvanceId ? `แก้ไขรายการ ADV ${editingAdvanceNo ?? ''}` : 'สร้างรายการจ่ายเงินล่วงหน้า / มัดจำ'}</DialogTitle>
+              <DialogDescription>{editingAdvanceId ? 'แก้ไขได้เฉพาะรายการที่ยังไม่อนุมัติ และยังไม่ถูกใช้หักบิล' : 'บันทึกเอกสาร ADV ใหม่จากประเภทมัดจำ ข้อมูลผู้ขาย และยอดการจ่ายเงิน'}</DialogDescription>
             </div>
-          </div>
+            <Button className="bg-white/10 text-white hover:bg-white/20 hover:text-white" disabled={isSaving} size="sm" type="button" variant="ghost" onClick={closeForm}>ปิด</Button>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4">
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-4">
               <FormSection
@@ -806,19 +803,19 @@ export function AdvancePaymentsPageClient() {
               {!isAdvanceInvoice ? <SummaryLine label="ส่วนต่าง" value={formatMoney(taxBreakdown.totalAmount - computedAmount)} /> : null}
               <div className="mt-4 flex gap-2">
                 <Button disabled={isSaving} type="button" onClick={submitForm}><Save className="mr-1 h-4 w-4" />{isSaving ? 'กำลังบันทึก...' : editingAdvanceId ? 'บันทึกการแก้ไข' : 'บันทึก ADV'}</Button>
-                <Button type="button" variant="outline" onClick={closeForm}>ปิด</Button>
               </div>
             </div>
           </div>
           </div>
-        </>
-      ) : (
-        <>
+        </DialogContent>
+      </Dialog>
+
+      <>
           <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 text-sm">
             <KpiCard label="ยังไม่อนุมัติ" tone="pending" value={`${data?.summary.pendingCount ?? 0}`} />
             <KpiCard label="ใช้หักบิลแล้ว" tone="allocated" value={formatMoney(data?.summary.totalAllocated ?? 0)} />
             <div className="col-span-2 md:col-span-1">
-              <KpiCard label="คงเหลือ" tone="amber" value={formatMoney(data?.summary.totalRemaining ?? 0)} />
+              <KpiCard label="เครดิตฐานคงเหลือ" tone="amber" value={formatMoney(data?.summary.totalRemaining ?? 0)} />
             </div>
           </div>
 
@@ -1001,7 +998,7 @@ export function AdvancePaymentsPageClient() {
                     {row.allocatedAmount > 0 ? <div className="block text-emerald-700">หักแล้ว: <span className="font-semibold">{formatMoney(row.allocatedAmount)}</span></div> : null}
                   </div>
                   <div className="text-right">
-                    <span className="text-xs text-slate-500 block">คงเหลือมัดจำ</span>
+                    <span className="text-xs text-slate-500 block">เครดิตฐานคงเหลือ</span>
                     <span className="font-bold text-amber-700 text-sm tabular-nums">{formatMoney(row.remainingAmount)}</span>
                   </div>
                 </div>
@@ -1009,19 +1006,20 @@ export function AdvancePaymentsPageClient() {
             ))}
           </div>
 
+          <div className="hidden flex-wrap items-center justify-between gap-2 px-1 py-1 text-sm text-slate-600 md:flex">
+            {listControls}
+          </div>
+
           <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm md:block">
-            <div className="flex flex-col gap-3 border-b border-slate-100 px-3 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-              {listControls}
-            </div>
             <div className="overflow-x-auto">
-            <table className="ns-table min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <table className="ns-table min-w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 {advancePaymentColumns.map((column) => {
                   const style = columnResize.getColumnStyle(column.key);
                   return <col key={column.key} style={style} />;
                 })}
               </colgroup>
-              <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
+              <thead className="border-b border-slate-200 bg-slate-100 text-slate-700">
                 <tr>
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={columnResize.getResizeHandleProps('advanceDate', 'วันที่')} sortKey="advanceDate" onSort={changeSort} />
@@ -1031,8 +1029,8 @@ export function AdvancePaymentsPageClient() {
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} sortKey="productName" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'น้ำหนักสุทธิ')} sortKey="netWeight" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดรวมมัดจำ" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดรวมมัดจำ')} sortKey="amount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="นำไปหักแล้ว" resizeProps={columnResize.getResizeHandleProps('allocatedAmount', 'นำไปหักแล้ว')} sortKey="allocatedAmount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="คงเหลือ" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'คงเหลือ')} sortKey="remainingAmount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตฐานที่ใช้" resizeProps={columnResize.getResizeHandleProps('allocatedAmount', 'เครดิตฐานที่ใช้')} sortKey="allocatedAmount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตฐานคงเหลือ" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'เครดิตฐานคงเหลือ')} sortKey="remainingAmount" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
                   <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
                 </tr>
@@ -1042,18 +1040,18 @@ export function AdvancePaymentsPageClient() {
                 {!isLoading && (data?.rows ?? []).length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={12}>ยังไม่มีรายการจ่ายเงินล่วงหน้า</td></tr> : null}
                 {!isLoading && (data?.rows ?? []).map((row) => (
                   <tr key={row.id} className="cursor-pointer hover:bg-slate-50" onClick={() => void loadDetail(row.id)}>
-                    <td className="p-2 whitespace-nowrap text-xs font-semibold text-slate-700">{row.docNo}</td>
-                    <td className="p-2 whitespace-nowrap text-xs font-semibold text-slate-700">{row.advanceDate}</td>
-                    <td className="p-2 text-xs font-semibold text-slate-700">{row.supplierName}</td>
-                    <td className="p-2 text-xs font-semibold text-slate-700">{row.invoiceNo || row.largeScaleDocNo || '-'}</td>
-                    <td className="p-2 whitespace-nowrap text-xs font-semibold text-slate-700">{row.plateNo || '-'}</td>
-                    <td className="p-2 text-xs font-semibold text-slate-700">{row.productName || '-'}</td>
+                    <td className="p-3 whitespace-nowrap font-medium text-slate-700">{row.docNo}</td>
+                    <td className="p-3 whitespace-nowrap font-medium text-slate-700">{row.advanceDate}</td>
+                    <td className="p-3 font-medium text-slate-700">{row.supplierName}</td>
+                    <td className="p-3 font-medium text-slate-700">{row.invoiceNo || row.largeScaleDocNo || '-'}</td>
+                    <td className="p-3 whitespace-nowrap font-medium text-slate-700">{row.plateNo || '-'}</td>
+                    <td className="p-3 font-medium text-slate-700">{row.productName || '-'}</td>
                     <TableNumberCell value={formatMoney(row.netWeight)} />
                     <TableNumberCell value={formatMoney(row.totalAmount)} />
                     <TableNumberCell value={formatMoney(row.allocatedAmount)} />
                     <TableNumberCell tone="amber" value={formatMoney(row.remainingAmount)} />
-                    <td className="p-2"><StatusDot status={row.status} label={row.statusLabel} /></td>
-                    <td className="p-2 text-right">
+                    <td className="p-3"><StatusDot status={row.status} label={row.statusLabel} /></td>
+                    <td className="p-3 text-right">
                       <div className="flex justify-end gap-2">
                         <button
                           className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 cursor-pointer"
@@ -1097,8 +1095,7 @@ export function AdvancePaymentsPageClient() {
             </table>
             </div>
           </div>
-        </>
-      )}
+      </>
       <Dialog open={isDetailOpen} onOpenChange={(open) => {
         setIsDetailOpen(open)
         if (!open) setDetail(null)
@@ -1149,9 +1146,9 @@ export function AdvancePaymentsPageClient() {
             <div className="flex-1 overflow-y-auto space-y-4 p-4 bg-slate-50">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Metric label="ยอดรวมมัดจำ" value={formatMoney(detail.totalAmount)} />
-                <Metric label="ใช้หักบิลแล้ว" value={formatMoney(detail.allocatedAmount)} />
+                <Metric label="เครดิตฐานที่ใช้หักบิลแล้ว" value={formatMoney(detail.allocatedAmount)} />
                 <div className="col-span-2 sm:col-span-1">
-                  <Metric label="คงเหลือ" tone="amber" value={formatMoney(detail.remainingAmount)} />
+                  <Metric label="เครดิตฐานคงเหลือ" tone="amber" value={formatMoney(detail.remainingAmount)} />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <Metric label="สถานะ" value={detail.statusLabel} />

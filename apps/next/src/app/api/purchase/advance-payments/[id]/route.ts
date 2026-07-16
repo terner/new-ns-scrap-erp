@@ -159,7 +159,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           plate_no: values.plateNo,
           price_per_kg: values.pricePerKg,
           product_name: values.productName,
-          remaining_amount: taxBreakdown.totalAmount,
+          remaining_amount: taxBreakdown.subtotalAmount,
           remark: values.remark,
           scale_operator: values.scaleOperator,
           sender_name: values.senderName,

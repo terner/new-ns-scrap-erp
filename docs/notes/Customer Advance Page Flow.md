@@ -12,12 +12,12 @@ tags:
   - page-flow
 status: retired
 created: 2026-06-11
-updated: 2026-07-06
+updated: 2026-07-15
 ---
 
 # Customer Advance Page Flow / Flow หน้ารับล่วงหน้าจาก Customer
 
-> Retired 2026-07-06: หน้า `/finance/customer-advance` ถูกลบออกจาก active app เพราะซ้ำกับ flow รับเงินลูกค้าที่ `/sales/receipts`. การรับเงิน/เงินรับล่วงหน้าฝั่ง Customer ให้ดูและทำงานผ่าน `/sales/receipts`; `GET /api/finance/customer-advance` อาจยังเหลือเป็น read source ภายในจนกว่าจะย้าย CADV/allocation source เข้ากับ sales receipt model ครบ.
+> Retired as an active page. หน้า `/finance/customer-advance` ถูกลบออกจาก active app เพราะซ้ำกับ flow รับเงินลูกค้า. ตั้งแต่ 2026-07-15 canonical target คือ [[Customer Advance Receipt Flow]]: สร้าง `CADV` จาก Packing List ก่อน, ใช้ `/sales/receipts` ออก `RCP` เมื่อรับเงินจริง, แล้วจึงใช้ CADV ที่รับเงินครบไปหัก Sales Bill. เอกสารนี้เก็บ baseline เก่าที่อ่าน `bank_statement.ref_type = CADV` เท่านั้น ไม่ใช่ target implementation ใหม่.
 
 ## Scope
 

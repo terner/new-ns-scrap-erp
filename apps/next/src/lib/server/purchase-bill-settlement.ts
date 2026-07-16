@@ -134,7 +134,7 @@ export async function refreshSupplierAdvancePaymentAllocation(
 ) {
   const [advancePayment, activeAllocations] = await Promise.all([
     tx.supplier_advance_payments.findUnique({
-      select: { amount: true, id: true, status: true, subtotal_amount: true },
+      select: { amount: true, id: true, status: true, subtotal_amount: true, total_amount: true },
       where: { id: advancePaymentId },
     }),
     tx.supplier_advance_allocations.findMany({
@@ -145,19 +145,21 @@ export async function refreshSupplierAdvancePaymentAllocation(
 
   if (!advancePayment) throw new Error('ไม่พบรายการ ADV ที่ต้องการอัปเดตสถานะ')
 
-  const totalAmount = toNumber(advancePayment.subtotal_amount) || toNumber(advancePayment.amount)
+  const baseAmount = toNumber(advancePayment.subtotal_amount)
+  const grossAmount = toNumber(advancePayment.total_amount)
+  if (baseAmount <= 0 || grossAmount <= 0) throw new Error('ข้อมูลยอดเงิน ADV ไม่ถูกต้อง กรุณาแก้ข้อมูลต้นทางก่อนคำนวณสถานะ')
   const allocatedAmount = roundMoney(activeAllocations.reduce((sum, allocation) => (
     sum + (toNumber(allocation.allocated_subtotal_amount) || toNumber(allocation.allocated_amount))
   ), 0))
-  if (allocatedAmount - totalAmount > 0.01) throw new Error('ยอดใช้หักบิลรวมเกินยอด ADV')
+  if (allocatedAmount - baseAmount > 0.01) throw new Error('ยอดใช้หักบิลรวมเกินยอด ADV')
 
-  const remainingAmount = Math.max(0, roundMoney(totalAmount - allocatedAmount))
+  const remainingAmount = Math.max(0, roundMoney(baseAmount - allocatedAmount))
   const approvalSummary = await summarizeAdvancePaymentApprovalStatus(tx, advancePaymentId)
   const nextStatus = deriveAdvancePaymentWorkflowStatus({
     activeApprovalAmount: approvalSummary.activeApprovalAmount,
     allocatedAmount,
     allActiveApprovalsSettled: approvalSummary.allActiveApprovalsSettled,
-    amount: totalAmount,
+    amount: grossAmount,
     currentStatus: advancePayment.status,
     remainingAmount,
     settledAmount: approvalSummary.settledAmount,

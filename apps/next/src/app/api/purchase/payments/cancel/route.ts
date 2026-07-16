@@ -124,6 +124,40 @@ export async function POST(request: Request) {
 
       const approvalIds = [...new Set(payments.map((payment) => payment.payment_approval_id).filter((value): value is bigint => value != null))]
       const billIds = [...new Set(payments.map((payment) => payment.bill_id).filter((value): value is bigint => value != null))]
+      if (approvalIds.length > 0) {
+        const advanceApprovalSources = await txExt.payment_approvals.findMany({
+          select: {
+            approved_amount: true,
+            id: true,
+            source_id: true,
+            source_type: true,
+            status: true,
+          },
+          where: {
+            id: { in: approvalIds },
+            source_type: 'advance_payment',
+          },
+        })
+        const advanceIds = advanceApprovalSources.flatMap((approval) => {
+          const advanceId = parseInternalBigIntId(approval.source_id)
+          return advanceId == null ? [] : [advanceId]
+        })
+        if (advanceIds.length > 0) {
+          const allocatedAdvance = await tx.supplier_advance_allocations.findFirst({
+            select: {
+              purchase_bills: { select: { doc_no: true } },
+              supplier_advance_payments: { select: { doc_no: true } },
+            },
+            where: {
+              advance_payment_id: { in: advanceIds },
+              status: 'active',
+            },
+          })
+          if (allocatedAdvance) {
+            throw new Error(`ยกเลิกการจ่ายเงินไม่ได้ เพราะ ${allocatedAdvance.supplier_advance_payments.doc_no} ถูกใช้หัก ${allocatedAdvance.purchase_bills.doc_no} อยู่ กรุณายกเลิกหรือเปลี่ยน ADV ในบิลซื้อก่อน`)
+          }
+        }
+      }
       const directExpenseIds = [...new Set(payments.flatMap((payment) => {
         const lines = Array.isArray(payment.lines) ? payment.lines : []
         return lines.flatMap((line) => {

@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { MoneyMovementPageClient } from '@/components/daily/MoneyMovementPageClient'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AdvancePaymentsPageClient } from '@/components/purchase-flow/AdvancePaymentsPageClient'
+import { CustomerAdvanceForm } from '@/components/purchase-flow/CustomerAdvanceForm'
 
 type AdvanceTab = 'payment' | 'receipt'
 
@@ -26,7 +26,7 @@ export function AdvancePaymentsTabbedPageClient() {
         <AdvancePaymentsPageClient />
       </TabsContent>
       <TabsContent value="receipt">
-        <MoneyMovementPageClient mode="receipt" />
+        <CustomerAdvanceForm />
       </TabsContent>
     </Tabs>
   )

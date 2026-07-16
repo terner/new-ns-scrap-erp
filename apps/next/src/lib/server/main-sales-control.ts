@@ -195,8 +195,8 @@ function poSellItems(row: { items: unknown; product_id: bigint | null; qty: unkn
 async function buildSalesPlanningSnapshot() {
   const config = await getSalesPlanLmeConfigAutoRefresh()
   const { byKey, refs } = await productsContext()
+  const salesPlanRefs = refs.filter((product) => isCostPoolEligibleMetalGroup(product.metalGroup))
   const productById = new Map(refs.map((product) => [product.id, product] as const))
-  const salesPlanRefs = refs.filter((product) => isCopperOrBrassGroup(product.metalGroup))
   const [poSells, poBuys, stockRows, customers, salesChannels, tradingDeals, purchaseBills, samutSakhonWarehouses] = await Promise.all([
     prisma.po_sells.findMany({ include: { customers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000 }),
     prisma.po_buys.findMany({ orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000 }),
@@ -453,9 +453,7 @@ async function buildSalesPlanningSnapshot() {
     metalGroups: Array.from(new Set(salesPlanRefs.map((product) => product.metalGroup).filter(Boolean))).sort(),
     pendingSaleTable,
     pendingSaleTotals,
-  planProductOptions: refs
-    .filter((product) => isCostPoolEligibleMetalGroup(product.metalGroup))
-    .map((product) => ({
+    planProductOptions: salesPlanRefs.map((product) => ({
       code: product.code,
       id: product.code,
       metalGroup: product.metalGroup,

@@ -731,6 +731,7 @@ model branches {
   assets                    assets[]
   company_profiles          company_profiles?
   customer_receipts         customer_receipts[]
+  customer_advances         customer_advances[]
   expenses                  expenses[]
   grade_adjustments         grade_adjustments[]
   payments                  payments[]
@@ -758,12 +759,13 @@ model branches {
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model currencies {
-  name        String
-  symbol      String?
-  rate_to_thb Decimal?  @default(1) @db.Decimal
-  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
-  code        String    @unique
-  id          BigInt    @id @default(autoincrement())
+  name              String
+  symbol            String?
+  rate_to_thb       Decimal?            @default(1) @db.Decimal
+  updated_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  code              String              @unique
+  id                BigInt              @id @default(autoincrement())
+  customer_advances customer_advances[]
 
   @@schema("public")
 }
@@ -830,6 +832,7 @@ model customers {
   id                                      BigInt                                    @id @default(autoincrement())
   sales_id                                BigInt?
   customer_receipts                       customer_receipts[]
+  customer_advances                       customer_advances[]
   asset_disposals                         asset_disposals[]
   customer_branches                       customer_branches[]
   po_sells                                po_sells[]
@@ -2044,6 +2047,7 @@ model products {
   production_orders                                               production_orders[]
   production_outputs                                              production_outputs[]
   purchase_bill_items                                             purchase_bill_items[]
+  customer_advance_items                                          customer_advance_items[]
   sales_bill_lines                                                sales_bill_lines[]
   sales_bill_po_sell_allocations                                  sales_bill_po_sell_allocations[]
   sales_bill_source_allocations                                   sales_bill_source_allocations[]
@@ -2392,6 +2396,110 @@ model receipts {
   @@index([doc_no], map: "idx_receipts_doc_no")
   @@index([idempotency_key], map: "idx_receipts_idempotency", where: raw("(idempotency_key IS NOT NULL)"))
   @@index([voucher_id], map: "idx_receipts_voucher", where: raw("(voucher_id IS NOT NULL)"))
+  @@schema("public")
+}
+
+model customer_advance_statuses {
+  id                                                                     BigInt                         @id @default(autoincrement())
+  code                                                                   String                         @unique
+  name                                                                   String
+  sort_order                                                             Int                            @unique
+  is_initial                                                             Boolean                        @default(false)
+  active                                                                 Boolean                        @default(true)
+  created_at                                                             DateTime                       @default(now()) @db.Timestamptz(6)
+  updated_at                                                             DateTime                       @default(now()) @db.Timestamptz(6)
+  customer_advances                                                      customer_advances[]
+  customer_advance_status_logs_from_status_idTocustomer_advance_statuses customer_advance_status_logs[] @relation("customer_advance_status_logs_from_status_idTocustomer_advance_statuses")
+  customer_advance_status_logs_to_status_idTocustomer_advance_statuses   customer_advance_status_logs[] @relation("customer_advance_status_logs_to_status_idTocustomer_advance_statuses")
+
+  @@schema("public")
+}
+
+model customer_advances {
+  id                           BigInt                         @id @default(autoincrement())
+  doc_no                       String                         @unique
+  document_date                DateTime                       @db.Date
+  branch_id                    BigInt
+  customer_id                  BigInt
+  customer_code_snapshot       String
+  customer_name_snapshot       String
+  invoice_no                   String?
+  contract_no                  String?
+  currency_code                String
+  target_amount                Decimal                        @db.Decimal(18, 2)
+  received_amount              Decimal                        @default(0) @db.Decimal(18, 2)
+  available_amount             Decimal                        @default(0) @db.Decimal(18, 2)
+  allocated_amount             Decimal                        @default(0) @db.Decimal(18, 2)
+  status_id                    BigInt
+  remark                       String?
+  created_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  created_by                   String
+  updated_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  updated_by                   String
+  version                      Int                            @default(1)
+  cancelled_at                 DateTime?                      @db.Timestamptz(6)
+  cancelled_by                 String?
+  cancel_reason                String?
+  branches                     branches                       @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  customers                    customers                      @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  currencies                   currencies                     @relation(fields: [currency_code], references: [code], onUpdate: NoAction)
+  customer_advance_statuses    customer_advance_statuses      @relation(fields: [status_id], references: [id], onUpdate: NoAction)
+  customer_advance_items       customer_advance_items[]
+  customer_advance_status_logs customer_advance_status_logs[]
+
+  @@index([document_date(sort: Desc), doc_no(sort: Desc)], map: "idx_customer_advances_document_date")
+  @@index([branch_id, document_date(sort: Desc), doc_no(sort: Desc)], map: "idx_customer_advances_branch_date")
+  @@index([customer_id, document_date(sort: Desc), doc_no(sort: Desc)], map: "idx_customer_advances_customer_date")
+  @@index([status_id, document_date(sort: Desc), doc_no(sort: Desc)], map: "idx_customer_advances_status_date")
+  @@index([invoice_no], map: "idx_customer_advances_invoice_no", where: raw("(invoice_no IS NOT NULL)"))
+  @@index([contract_no], map: "idx_customer_advances_contract_no", where: raw("(contract_no IS NOT NULL)"))
+  @@schema("public")
+}
+
+model customer_advance_items {
+  id                    BigInt            @id @default(autoincrement())
+  customer_advance_id   BigInt
+  line_no               Int
+  product_id            BigInt
+  product_code_snapshot String
+  product_name_snapshot String
+  quantity              Decimal           @db.Decimal(18, 2)
+  gross_weight          Decimal           @db.Decimal(18, 2)
+  net_weight            Decimal           @db.Decimal(18, 2)
+  created_at            DateTime          @default(now()) @db.Timestamptz(6)
+  created_by            String
+  updated_at            DateTime          @default(now()) @db.Timestamptz(6)
+  updated_by            String
+  customer_advances     customer_advances @relation(fields: [customer_advance_id], references: [id], onUpdate: NoAction)
+  products              products          @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+
+  @@unique([customer_advance_id, line_no], map: "customer_advance_items_line_key")
+  @@index([customer_advance_id, line_no], map: "idx_customer_advance_items_advance_line")
+  @@index([product_id], map: "idx_customer_advance_items_product")
+  @@schema("public")
+}
+
+model customer_advance_status_logs {
+  id                                                                  BigInt                     @id @default(autoincrement())
+  event_key                                                           String                     @unique
+  customer_advance_id                                                 BigInt
+  customer_advance_doc_no                                             String
+  from_status_id                                                      BigInt?
+  to_status_id                                                        BigInt
+  action                                                              String
+  target_amount_snapshot                                              Decimal                    @db.Decimal(18, 2)
+  received_amount_snapshot                                            Decimal                    @db.Decimal(18, 2)
+  available_amount_snapshot                                           Decimal                    @db.Decimal(18, 2)
+  allocated_amount_snapshot                                           Decimal                    @db.Decimal(18, 2)
+  note                                                                String?
+  meta                                                                Json?
+  created_at                                                          DateTime                   @default(now()) @db.Timestamptz(6)
+  created_by                                                          String
+  customer_advances                                                   customer_advances          @relation(fields: [customer_advance_id], references: [id], onUpdate: NoAction)
+  customer_advance_statuses_from_status_idTocustomer_advance_statuses customer_advance_statuses? @relation("customer_advance_status_logs_from_status_idTocustomer_advance_statuses", fields: [from_status_id], references: [id], onUpdate: NoAction)
+  customer_advance_statuses_to_status_idTocustomer_advance_statuses   customer_advance_statuses  @relation("customer_advance_status_logs_to_status_idTocustomer_advance_statuses", fields: [to_status_id], references: [id], onUpdate: NoAction)
+
+  @@index([customer_advance_id, created_at(sort: Desc)], map: "idx_customer_advance_status_logs_advance_created")
   @@schema("public")
 }
 
@@ -3344,10 +3452,10 @@ model stock_ledger {
 }
 
 model supplier_advance_allocations {
-  allocated_amount                 Decimal                            @db.Decimal
-  allocated_subtotal_amount        Decimal                            @default(0) @db.Decimal
-  allocated_vat_amount             Decimal                            @default(0) @db.Decimal
-  allocated_total_amount           Decimal                            @default(0) @db.Decimal
+  allocated_amount                 Decimal                            @db.Decimal(18, 2)
+  allocated_subtotal_amount        Decimal                            @default(0) @db.Decimal(18, 2)
+  allocated_vat_amount             Decimal                            @default(0) @db.Decimal(18, 2)
+  allocated_total_amount           Decimal                            @default(0) @db.Decimal(18, 2)
   status                           String                             @default("active")
   allocated_at                     DateTime                           @default(now()) @db.Timestamptz(6)
   allocated_by                     String?
@@ -3368,6 +3476,7 @@ model supplier_advance_allocations {
   @@index([advance_payment_id], map: "idx_supplier_advance_allocations_advance")
   @@index([purchase_bill_id], map: "idx_supplier_advance_allocations_bill")
   @@index([status], map: "idx_supplier_advance_allocations_status")
+  @@unique([purchase_bill_id], map: "uq_supplier_advance_allocations_active_bill", where: raw("(status = 'active'::text)"))
   @@schema("public")
 }
 
@@ -3406,12 +3515,12 @@ model supplier_advance_payments {
   invoice_no                       String?
   vat_type                         String                             @default("NONE")
   vat_rate_percent                 Decimal                            @default(7.00) @db.Decimal(5, 2)
-  subtotal_amount                  Decimal                            @default(0) @db.Decimal
-  vat_amount                       Decimal                            @default(0) @db.Decimal
-  total_amount                     Decimal                            @default(0) @db.Decimal
-  amount                           Decimal                            @default(0) @db.Decimal
-  allocated_amount                 Decimal                            @default(0) @db.Decimal
-  remaining_amount                 Decimal                            @default(0) @db.Decimal
+  subtotal_amount                  Decimal                            @default(0) @db.Decimal(18, 2)
+  vat_amount                       Decimal                            @default(0) @db.Decimal(18, 2)
+  total_amount                     Decimal                            @default(0) @db.Decimal(18, 2)
+  amount                           Decimal                            @default(0) @db.Decimal(18, 2)
+  allocated_amount                 Decimal                            @default(0) @db.Decimal(18, 2)
+  remaining_amount                 Decimal                            @default(0) @db.Decimal(18, 2)
   payment_method                   String?
   status                           String                             @default("pending_approval")
   large_scale_doc_no               String?
