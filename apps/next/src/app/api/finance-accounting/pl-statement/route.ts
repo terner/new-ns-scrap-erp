@@ -24,9 +24,11 @@ export async function GET(request: NextRequest) {
     const now = new Date()
     const from = parseDate(params.get('from'), firstDayOfMonth(now))
     const to = parseDate(params.get('to'), now)
+    const costBasis = params.get('costBasis')
     const transactionMode = params.get('transactionMode')
     const payload = await buildPlStatement({
       branchId: params.get('branchId') || undefined,
+      costBasis: costBasis === 'DEAL' || costBasis === 'COMPARE' ? costBasis : 'WAC',
       from,
       to,
       transactionMode: transactionMode === 'STOCK' || transactionMode === 'TRADING' ? transactionMode : 'ALL',
