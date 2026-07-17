@@ -72,6 +72,32 @@ type LoanRow = Prisma.loansGetPayload<{
   include: { loan_payments: true; loan_schedules: true }
 }>
 
+const CASHFLOW_CATEGORIES = {
+  EXCLUDE_INTERNAL: { dir: '-', label: 'โอนภายใน (Internal Transfer) — ไม่นับใน CF', section: 'Excluded' },
+  FIN_IN_CAPITAL: { dir: 'IN', label: 'เพิ่มทุน', section: 'Financing' },
+  FIN_IN_DIRECTOR_LOAN: { dir: 'IN', label: 'รับเงินกู้กรรมการ', section: 'Financing' },
+  FIN_IN_LOAN: { dir: 'IN', label: 'รับเงินกู้', section: 'Financing' },
+  FIN_OUT_DIRECTOR_LOAN: { dir: 'OUT', label: 'คืนเงินกู้กรรมการ', section: 'Financing' },
+  FIN_OUT_DIVIDEND: { dir: 'OUT', label: 'จ่ายเงินปันผล', section: 'Financing' },
+  FIN_OUT_LEASE_PRIN: { dir: 'OUT', label: 'จ่ายเงินต้น Leasing', section: 'Financing' },
+  FIN_OUT_LOAN_PRIN: { dir: 'OUT', label: 'จ่ายเงินต้นเงินกู้', section: 'Financing' },
+  INV_IN_ASSET_SALE: { dir: 'IN', label: 'รับจากการขายทรัพย์สิน', section: 'Investing' },
+  INV_IN_DEPOSIT_REFUND: { dir: 'IN', label: 'รับเงินมัดจำคืน', section: 'Investing' },
+  INV_OUT_ASSET_PURCHASE: { dir: 'OUT', label: 'ซื้อทรัพย์สิน', section: 'Investing' },
+  INV_OUT_DEPOSIT: { dir: 'OUT', label: 'จ่ายเงินมัดจำ', section: 'Investing' },
+  OP_IN_CUST_RECEIPT: { dir: 'IN', label: 'รับเงินจากลูกค้า', section: 'Operating' },
+  OP_IN_OTHER: { dir: 'IN', label: 'รายรับการดำเนินงานอื่น', section: 'Operating' },
+  OP_OUT_EXPENSE: { dir: 'OUT', label: 'จ่ายค่าใช้จ่าย', section: 'Operating' },
+  OP_OUT_INTEREST: { dir: 'OUT', label: 'จ่ายดอกเบี้ย', section: 'Operating' },
+  OP_OUT_SALARY: { dir: 'OUT', label: 'จ่ายเงินเดือน / ค่าแรง', section: 'Operating' },
+  OP_OUT_SUPPLIER: { dir: 'OUT', label: 'จ่ายผู้ขาย / Supplier', section: 'Operating' },
+  OP_OUT_TAX: { dir: 'OUT', label: 'จ่ายภาษี', section: 'Operating' },
+} as const
+
+type CashFlowCategoryKey = keyof typeof CASHFLOW_CATEGORIES
+type CashFlowGroupKey = 'EX' | 'FIN_IN' | 'FIN_OUT' | 'INV_IN' | 'INV_OUT' | 'OP_IN' | 'OP_OUT'
+type CashFlowDetailRow = DetailRow & { cfCat: CashFlowCategoryKey; label: string }
+
 function dateOnly(date: Date) {
   return toDateOnly(date)
 }
@@ -135,11 +161,87 @@ function isInternalTransfer(row: BankRow) {
   return text.includes('transfer') || text.includes('internal') || text.includes('โอนระหว่าง')
 }
 
-function classifyCashFlow(row: BankRow): 'operating' | 'investing' | 'financing' {
+function normalizeCashFlowCategory(row: BankRow): CashFlowCategoryKey {
+  const explicit = row.cash_flow_category?.trim().toUpperCase()
+  if (explicit && explicit in CASHFLOW_CATEGORIES) return explicit as CashFlowCategoryKey
+
+  const refType = row.ref_type?.trim().toUpperCase() ?? ''
+  if (refType === 'PMT') return 'OP_OUT_SUPPLIER'
+  if (refType === 'RCP') return 'OP_IN_CUST_RECEIPT'
+  if (refType === 'EXP') return 'OP_OUT_EXPENSE'
+  if (refType === 'TRF') return 'EXCLUDE_INTERNAL'
+  if (refType === 'LOAN-PAY') return 'FIN_OUT_LOAN_PRIN'
+  if (refType === 'LOAN-IN') return 'FIN_IN_LOAN'
+
+  const inflow = toNumber(row.amount_in)
+  const outflow = toNumber(row.amount_out)
+  const signedAmount = inflow - outflow
   const text = [row.cash_flow_category, row.ref_type, row.description, row.desc, row.note].filter(Boolean).join(' ').toLowerCase()
-  if (text.includes('invest') || text.includes('asset') || text.includes('fixed')) return 'investing'
-  if (text.includes('financ') || text.includes('loan') || text.includes('equity') || text.includes('capital')) return 'financing'
-  return 'operating'
+
+  if (isInternalTransfer(row)) return 'EXCLUDE_INTERNAL'
+  if (text.includes('interest') || text.includes('ดอกเบี้ย')) return 'OP_OUT_INTEREST'
+  if (text.includes('salary') || text.includes('wage') || text.includes('เงินเดือน') || text.includes('ค่าแรง')) return 'OP_OUT_SALARY'
+  if (text.includes('tax') || text.includes('vat') || text.includes('wht') || text.includes('ภาษี')) return 'OP_OUT_TAX'
+  if (text.includes('dividend') || text.includes('ปันผล')) return 'FIN_OUT_DIVIDEND'
+  if (text.includes('director') || text.includes('กรรมการ')) return signedAmount >= 0 ? 'FIN_IN_DIRECTOR_LOAN' : 'FIN_OUT_DIRECTOR_LOAN'
+  if (text.includes('lease') || text.includes('leasing')) return signedAmount >= 0 ? 'FIN_IN_LOAN' : 'FIN_OUT_LEASE_PRIN'
+  if (text.includes('loan') || text.includes('capital') || text.includes('equity') || text.includes('finance')) return signedAmount >= 0 ? 'FIN_IN_LOAN' : 'FIN_OUT_LOAN_PRIN'
+  if (text.includes('deposit refund') || text.includes('คืนมัดจำ')) return 'INV_IN_DEPOSIT_REFUND'
+  if (text.includes('deposit') || text.includes('มัดจำ')) return signedAmount >= 0 ? 'INV_IN_DEPOSIT_REFUND' : 'INV_OUT_DEPOSIT'
+  if (text.includes('asset sale') || text.includes('ขายทรัพย์สิน')) return 'INV_IN_ASSET_SALE'
+  if (text.includes('asset') || text.includes('fixed') || text.includes('ลงทุน') || text.includes('ทรัพย์สิน')) return signedAmount >= 0 ? 'INV_IN_ASSET_SALE' : 'INV_OUT_ASSET_PURCHASE'
+  return signedAmount >= 0 ? 'OP_IN_OTHER' : 'OP_OUT_EXPENSE'
+}
+
+function cashFlowGroupKey(category: CashFlowCategoryKey): CashFlowGroupKey {
+  const config = CASHFLOW_CATEGORIES[category]
+  if (config.section === 'Excluded') return 'EX'
+  if (config.section === 'Operating') return config.dir === 'IN' ? 'OP_IN' : 'OP_OUT'
+  if (config.section === 'Investing') return config.dir === 'IN' ? 'INV_IN' : 'INV_OUT'
+  return config.dir === 'IN' ? 'FIN_IN' : 'FIN_OUT'
+}
+
+function sumCashFlowDetails(rows: CashFlowDetailRow[]) {
+  return rows.reduce((sum, row) => sum + row.amount, 0)
+}
+
+function summarizeCashFlowDetails(rows: CashFlowDetailRow[]) {
+  const net = sumCashFlowDetails(rows)
+  return {
+    inflow: rows.filter((row) => row.amount > 0).reduce((sum, row) => sum + row.amount, 0),
+    net,
+    outflow: Math.abs(rows.filter((row) => row.amount < 0).reduce((sum, row) => sum + row.amount, 0)),
+    rows: rows.map(({ amount, date, description, refNo }) => ({ amount, date, description, refNo })),
+  }
+}
+
+function historicalMonthOverlaps(row: Prisma.historical_monthlyGetPayload<Record<string, never>>, from: Date, to: Date) {
+  const year = row.year ?? 0
+  const month = row.month ?? 0
+  if (!year || !month) return false
+  const start = new Date(year, month - 1, 1)
+  const end = new Date(year, month, 0, 23, 59, 59, 999)
+  return start <= to && end >= from
+}
+
+function sumHistoricalCashFlow(rows: Prisma.historical_monthlyGetPayload<Record<string, never>>[], categoryId: string, from: Date, to: Date) {
+  return rows
+    .filter((row) => row.metric_type === 'cashflow' && row.category_id === categoryId && historicalMonthOverlaps(row, from, to))
+    .reduce((sum, row) => sum + toNumber(row.amount), 0)
+}
+
+function computeCashBalance(accounts: AccountReferenceRecord[], rows: BankRow[]) {
+  const balances = new Map<bigint, number>()
+  accounts.forEach((account) => balances.set(account.id, cachedMoney(account.openingBalance)))
+  rows.forEach((row) => {
+    if (!row.account_id) return
+    const previous = balances.get(row.account_id) ?? 0
+    const next = row.balance === null || row.balance === undefined
+      ? previous + toNumber(row.amount_in) - toNumber(row.amount_out)
+      : toNumber(row.balance)
+    balances.set(row.account_id, next)
+  })
+  return Array.from(balances.values()).reduce((sum, value) => sum + value, 0)
 }
 
 async function listBranches() {
@@ -618,74 +720,201 @@ export async function buildBalanceSheet(filter: AsOfFilter) {
 }
 
 export async function buildCashFlowStatement(filter: PeriodFilter) {
-  const fromStart = filter.from
+  const fromStart = new Date(filter.from)
   const toEnd = endOfDay(filter.to)
   const branch = filter.branchId ? await findActiveBranchReferenceByCodeOrId(filter.branchId) : null
   const accountWhere = branch?.id != null ? { accounts: { branch_id: branch.id } } : {}
-  const [accountsRaw, beforeRowsRaw, periodRowsRaw, branches] = await Promise.all([
+  const beginningDate = new Date(filter.from)
+  beginningDate.setDate(beginningDate.getDate() - 1)
+  const beginningEnd = endOfDay(beginningDate)
+  const [accountsRaw, beforeRowsRaw, periodRowsRaw, loanPaymentsRaw, historicalMonthly, branches] = await Promise.all([
     listActiveAccounts().then((rows) => rows.filter((account: AccountReferenceRecord) => branch?.id == null || account.branchId === branch.id)),
     prisma.bank_statement.findMany({
       include: { accounts: { select: { account_no: true, bank_name: true, name: true, type: true } } },
-      orderBy: [{ date: 'asc' }, { id: 'asc' }],
+      orderBy: [{ account_id: 'asc' }, { date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
       take: 30000,
-      where: { ...accountWhere, date: { lt: fromStart } },
+      where: { ...accountWhere, date: { lte: beginningEnd } },
     }),
     prisma.bank_statement.findMany({
       include: { accounts: { select: { account_no: true, bank_name: true, name: true, type: true } } },
-      orderBy: [{ date: 'asc' }, { id: 'asc' }],
+      orderBy: [{ account_id: 'asc' }, { date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
       take: 30000,
       where: { ...accountWhere, date: { gte: fromStart, lte: toEnd } },
+    }),
+    prisma.loan_payments.findMany({
+      orderBy: [{ date: 'asc' }, { doc_no: 'asc' }],
+      take: 10000,
+      where: { ...notCancelledWhere(), date: { gte: fromStart, lte: toEnd } },
+    }),
+    prisma.historical_monthly.findMany({
+      orderBy: [{ year: 'asc' }, { month: 'asc' }, { id: 'asc' }],
+      take: 2000,
     }),
     listBranches(),
   ])
   const accounts = accountsRaw.filter((account: AccountReferenceRecord) => branch?.id == null || account.branchId === branch.id)
   const beforeRows = beforeRowsRaw as BankRow[]
   const periodRows = periodRowsRaw as BankRow[]
-  const openingCash = accounts.reduce((sum: number, account: AccountReferenceRecord) => sum + cachedMoney(account.openingBalance), 0) + beforeRows.reduce((sum, row) => sum + toNumber(row.amount_in) - toNumber(row.amount_out), 0)
-  const activityRows = periodRows.filter((row: BankRow) => !isInternalTransfer(row)).map((row: BankRow) => {
+  type PeriodLoanPayment = (typeof loanPaymentsRaw)[number]
+  const openingCash = computeCashBalance(accounts, beforeRows)
+  const endingCash = computeCashBalance(accounts, [...beforeRows, ...periodRows])
+  const groups: Record<CashFlowGroupKey, CashFlowDetailRow[]> = {
+    EX: [],
+    FIN_IN: [],
+    FIN_OUT: [],
+    INV_IN: [],
+    INV_OUT: [],
+    OP_IN: [],
+    OP_OUT: [],
+  }
+
+  periodRows.forEach((row: BankRow) => {
     const inflow = toNumber(row.amount_in)
     const outflow = toNumber(row.amount_out)
-    return {
-      amount: inflow - outflow,
-      category: classifyCashFlow(row),
+    const amount = inflow - outflow
+    const cfCat = normalizeCashFlowCategory(row)
+    const groupKey = cashFlowGroupKey(cfCat)
+    const detail: CashFlowDetailRow = {
+      amount,
+      cfCat,
       date: dateOnly(row.date),
-      description: row.description || row.desc || row.accounts?.name || '-',
-      inflow,
-      outflow,
+      description: row.description || row.desc || row.accounts?.name || CASHFLOW_CATEGORIES[cfCat].label,
+      label: CASHFLOW_CATEGORIES[cfCat].label,
       refNo: bankRef(row),
     }
+    groups[groupKey].push(detail)
   })
-  const internalTransfers = periodRows.filter((row: BankRow) => isInternalTransfer(row)).reduce((sum, row) => sum + Math.abs(toNumber(row.amount_in) - toNumber(row.amount_out)), 0)
-  const byCategory = (category: 'operating' | 'investing' | 'financing') => {
-    const rows = activityRows.filter((row) => row.category === category)
-    return {
-      inflow: rows.reduce((sum, row) => sum + row.inflow, 0),
-      net: rows.reduce((sum, row) => sum + row.amount, 0),
-      outflow: rows.reduce((sum, row) => sum + row.outflow, 0),
-      rows,
-    }
+
+  ;(loanPaymentsRaw as PeriodLoanPayment[]).forEach((payment) => {
+    const interestAmount = toNumber(payment.interest_amount)
+    if (interestAmount <= 0) return
+    groups.OP_OUT.push({
+      amount: -interestAmount,
+      cfCat: 'OP_OUT_INTEREST',
+      date: dateOnly(payment.date),
+      description: `Interest on ${payment.loan_id ?? payment.doc_no ?? '-'}`,
+      label: CASHFLOW_CATEGORIES.OP_OUT_INTEREST.label,
+      refNo: payment.doc_no || String(payment.id),
+    })
+    groups.FIN_OUT.push({
+      amount: interestAmount,
+      cfCat: 'FIN_OUT_LOAN_PRIN',
+      date: dateOnly(payment.date),
+      description: '(reclass to interest)',
+      label: '(reclass)',
+      refNo: payment.doc_no || String(payment.id),
+    })
+  })
+
+  const histDate = dateOnly(filter.from)
+  const histOpIn = sumHistoricalCashFlow(historicalMonthly, 'cf_op_in', filter.from, filter.to)
+  const histOpOut = sumHistoricalCashFlow(historicalMonthly, 'cf_op_out', filter.from, filter.to)
+  const histInv = sumHistoricalCashFlow(historicalMonthly, 'cf_inv', filter.from, filter.to)
+  const histFinIn = sumHistoricalCashFlow(historicalMonthly, 'cf_fin_in', filter.from, filter.to)
+  const histFinOut = sumHistoricalCashFlow(historicalMonthly, 'cf_fin_out', filter.from, filter.to)
+
+  if (histOpIn > 0) {
+    groups.OP_IN.push({
+      amount: histOpIn,
+      cfCat: 'OP_IN_OTHER',
+      date: histDate,
+      description: '(Pre Go-Live)',
+      label: 'Historical Operating Inflow',
+      refNo: 'HISTORICAL',
+    })
   }
-  const operating = byCategory('operating')
-  const investing = byCategory('investing')
-  const financing = byCategory('financing')
+  if (histOpOut > 0) {
+    groups.OP_OUT.push({
+      amount: -histOpOut,
+      cfCat: 'OP_OUT_EXPENSE',
+      date: histDate,
+      description: '(Pre Go-Live)',
+      label: 'Historical Operating Outflow',
+      refNo: 'HISTORICAL',
+    })
+  }
+  if (histInv !== 0) {
+    groups[histInv >= 0 ? 'INV_IN' : 'INV_OUT'].push({
+      amount: histInv,
+      cfCat: histInv >= 0 ? 'INV_IN_DEPOSIT_REFUND' : 'INV_OUT_ASSET_PURCHASE',
+      date: histDate,
+      description: '(Pre Go-Live)',
+      label: 'Historical Investing',
+      refNo: 'HISTORICAL',
+    })
+  }
+  if (histFinIn > 0) {
+    groups.FIN_IN.push({
+      amount: histFinIn,
+      cfCat: 'FIN_IN_LOAN',
+      date: histDate,
+      description: '(Pre Go-Live)',
+      label: 'Historical Financing Inflow',
+      refNo: 'HISTORICAL',
+    })
+  }
+  if (histFinOut > 0) {
+    groups.FIN_OUT.push({
+      amount: -histFinOut,
+      cfCat: 'FIN_OUT_LOAN_PRIN',
+      date: histDate,
+      description: '(Pre Go-Live)',
+      label: 'Historical Financing Outflow',
+      refNo: 'HISTORICAL',
+    })
+  }
+
+  const internalTransfers = periodRows.filter((row: BankRow) => isInternalTransfer(row)).reduce((sum, row) => sum + Math.abs(toNumber(row.amount_in) - toNumber(row.amount_out)), 0)
+  const operatingIn = summarizeCashFlowDetails(groups.OP_IN)
+  const operatingOut = summarizeCashFlowDetails(groups.OP_OUT)
+  const investingIn = summarizeCashFlowDetails(groups.INV_IN)
+  const investingOut = summarizeCashFlowDetails(groups.INV_OUT)
+  const financingIn = summarizeCashFlowDetails(groups.FIN_IN)
+  const financingOut = summarizeCashFlowDetails(groups.FIN_OUT)
+  const operating = {
+    inflow: operatingIn.inflow,
+    net: operatingIn.net + operatingOut.net,
+    outflow: operatingOut.outflow,
+    rows: [...operatingIn.rows, ...operatingOut.rows],
+  }
+  const investing = {
+    inflow: investingIn.inflow,
+    net: investingIn.net + investingOut.net,
+    outflow: investingOut.outflow,
+    rows: [...investingIn.rows, ...investingOut.rows],
+  }
+  const financing = {
+    inflow: financingIn.inflow,
+    net: financingIn.net + financingOut.net,
+    outflow: financingOut.outflow,
+    rows: [...financingIn.rows, ...financingOut.rows],
+  }
   const netChange = operating.net + investing.net + financing.net
-  const endingCash = openingCash + netChange
 
   return {
     activities: { financing, investing, operating },
     branches,
     filters: { branchId: filter.branchId ?? 'ALL', from: dateOnly(filter.from), method: 'direct', to: dateOnly(filter.to) },
     rows: [
-      moneyLine('operating', 'Operating Activities - Cash In', operating.inflow, operating.rows.filter((row) => row.inflow > 0), 'good'),
-      moneyLine('operating', 'Operating Activities - Cash Out', -operating.outflow, operating.rows.filter((row) => row.outflow > 0), 'bad'),
+      moneyLine('operating', 'Operating Activities - Cash In', operating.inflow, operatingIn.rows, 'good'),
+      moneyLine('operating', 'Operating Activities - Cash Out', -operating.outflow, operatingOut.rows, 'bad'),
       moneyLine('operating', 'Net Cash from Operating Activities', operating.net, undefined, 'total'),
-      moneyLine('investing', 'Net Cash from Investing Activities', investing.net, investing.rows, investing.net >= 0 ? 'good' : 'bad'),
-      moneyLine('financing', 'Net Cash from Financing Activities', financing.net, financing.rows, financing.net >= 0 ? 'good' : 'bad'),
+      moneyLine('investing', 'Investing Activities - Cash In', investing.inflow, investingIn.rows, 'good'),
+      moneyLine('investing', 'Investing Activities - Cash Out', -investing.outflow, investingOut.rows, 'bad'),
+      moneyLine('investing', 'Net Cash from Investing Activities', investing.net, undefined, 'total'),
+      moneyLine('financing', 'Financing Activities - Cash In', financing.inflow, financingIn.rows, 'good'),
+      moneyLine('financing', 'Financing Activities - Cash Out', -financing.outflow, financingOut.rows, 'bad'),
+      moneyLine('financing', 'Net Cash from Financing Activities', financing.net, undefined, 'total'),
       moneyLine('summary', 'Net Increase/(Decrease) in Cash', netChange, undefined, 'total'),
       moneyLine('summary', 'Beginning Cash Balance', openingCash, undefined, 'muted'),
       moneyLine('summary', 'Ending Cash Balance', endingCash, undefined, 'total'),
     ],
-    sourceState: sourceState(['Direct method from bank_statement amount_in/amount_out', 'Internal transfers are excluded from activity totals']),
+    sourceState: sourceState([
+      'Direct method from bank_statement using legacy-style cash flow category mapping',
+      'Loan payments reclass interest from financing to operating to match legacy cash flow statement',
+      'Internal transfers are excluded from activity totals',
+      'Historical monthly cashflow rows are merged company-level when the selected date range overlaps those months',
+    ]),
     summary: {
       endingCash,
       financing: financing.net,

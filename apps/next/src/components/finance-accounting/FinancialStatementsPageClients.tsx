@@ -891,13 +891,6 @@ export function CashFlowStatementPageClient() {
   const totalOutflow = data?.summary.totalOutflow ?? 0
   const internalTransfers = data?.summary.internalTransfers ?? 0
   const netChangePct = openingCash !== 0 ? Math.abs(netChange) / Math.abs(openingCash) * 100 : 0
-  const operatingInflowShare = totalInflow > 0 ? (data?.activities.operating.inflow ?? 0) / totalInflow * 100 : 0
-  const activityContributions: Array<{ label: string; tone: 'amber' | 'emerald' | 'red' | 'slate'; value: string }> = [
-    { label: 'ดำเนินงาน', tone: operating >= 0 ? 'emerald' : 'red' as const, value: money(operating) },
-    { label: 'ลงทุน', tone: investing >= 0 ? 'emerald' : 'red' as const, value: money(investing) },
-    { label: 'จัดหาเงิน', tone: financing >= 0 ? 'emerald' : 'red' as const, value: money(financing) },
-    { label: 'โอนภายใน (ไม่รวม)', tone: 'slate' as const, value: money(internalTransfers) },
-  ]
 
   function openMobileFilters() {
     setMobileFrom(from)
@@ -1023,51 +1016,18 @@ export function CashFlowStatementPageClient() {
       ) : null}
 
       <KpiCardGrid className="lg:grid-cols-4 xl:grid-cols-4">
-        <SharedKpiCard className={statementKpiClassName} icon={<Wallet aria-hidden="true" className="size-5" />} label="เงินสดต้นงวด" note={periodLabel} tone="blue" value={money(openingCash)} />
+        <SharedKpiCard className={statementKpiClassName} icon={<Wallet aria-hidden="true" className="size-5" />} label="Beginning Cash / เงินสดต้นงวด" note={periodLabel} tone="blue" value={money(openingCash)} />
         <SharedKpiCard className={statementKpiClassName} icon={netChange >= 0 ? <ArrowUpRight aria-hidden="true" className="size-5" /> : <ArrowDownRight aria-hidden="true" className="size-5" />} label="เงินสดสุทธิเพิ่ม/ลด" note={openingCash !== 0 ? `${netChange >= 0 ? 'เปลี่ยนแปลง' : 'ลดลง'} ${percent(netChangePct)}` : 'ไม่มีฐานต้นงวดให้เทียบ'} tone={netChange >= 0 ? 'emerald' : 'red'} value={money(netChange)} />
         <SharedKpiCard className={statementKpiClassName} icon={<Activity aria-hidden="true" className="size-5" />} label="กระแสเงินสดจากดำเนินงาน" note={operating >= 0 ? 'ธุรกิจหลักสร้างเงินสดได้' : 'ธุรกิจหลักใช้เงินสดสุทธิ'} tone={operating >= 0 ? 'cyan' : 'red'} value={money(operating)} />
-        <SharedKpiCard className={statementKpiClassName} icon={<Landmark aria-hidden="true" className="size-5" />} label="เงินสดปลายงวด" note={`หลังรวมลงทุนและจัดหาเงิน`} tone="purple" value={money(endingCash)} />
+        <SharedKpiCard className={statementKpiClassName} icon={<Landmark aria-hidden="true" className="size-5" />} label="Ending Cash / เงินสดปลายงวด" note={`หลังรวมลงทุนและจัดหาเงิน`} tone="purple" value={money(endingCash)} />
       </KpiCardGrid>
 
-      <AnalysisPanel subtitle={`สรุปภาพรวมของ ${selectedBranch} ในช่วง ${periodLabel} ก่อนลงไปอ่านตารางงบเต็ม`} title="สรุปที่ควรอ่านก่อน">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <StatementInsightCard
-            body={money(operating)}
-            title={operating >= 0 ? 'กิจกรรมดำเนินงานยังสร้างเงินสด' : 'กิจกรรมดำเนินงานใช้เงินสดสุทธิ'}
-            tone={operating >= 0 ? 'good' : 'bad'}
-          />
-          <StatementInsightCard
-            body={money(investing)}
-            title={investing <= 0 ? 'เงินสดไหลออกไปกับการลงทุน' : 'มีเงินสดรับกลับจากการลงทุน'}
-            tone={investing < 0 ? 'warn' : 'default'}
-          />
-          <StatementInsightCard
-            body={money(financing)}
-            title={financing >= 0 ? 'มีเงินสดเข้าจากการจัดหาเงิน' : 'มีเงินสดออกจากการชำระหนี้/คืนทุน'}
-            tone={financing > 0 ? 'warn' : financing < 0 ? 'default' : 'good'}
-          />
-          <StatementInsightCard
-            body={totalInflow > 0 ? percent(operatingInflowShare) : '0.0%'}
-            title="สัดส่วนเงินสดรับจากกิจกรรมดำเนินงาน"
-            tone={operatingInflowShare >= 50 ? 'good' : operatingInflowShare >= 25 ? 'warn' : 'default'}
-          />
-        </div>
-      </AnalysisPanel>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4">
         <AnalysisPanel
-          className="lg:col-span-2"
-          subtitle="เริ่มจากเงินสดต้นงวด แล้วดูว่ากิจกรรมดำเนินงาน ลงทุน และจัดหาเงิน ทำให้เงินสดปลายงวดเปลี่ยนอย่างไร"
+          subtitle="เริ่มจาก Beginning Cash / เงินสดต้นงวด แล้วดูว่ากิจกรรมดำเนินงาน ลงทุน และจัดหาเงิน ทำให้ Ending Cash / เงินสดปลายงวดเปลี่ยนอย่างไร"
           title="สะพานกระแสเงินสด"
         >
-          <Waterfall rows={[['เงินสดต้นงวด', openingCash], ['ดำเนินงาน', operating], ['ลงทุน', investing], ['จัดหาเงิน', financing], ['เงินสดปลายงวด', endingCash]]} />
-        </AnalysisPanel>
-        <AnalysisPanel subtitle="ตัวเลขสำคัญที่ช่วยอ่านว่าเงินสดมาจากไหนและออกไปทางไหน" title="จุดที่ควรติดตาม">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            {activityContributions.map((item) => (
-              <MiniMetric key={item.label} label={item.label} tone={item.tone} value={item.value} />
-            ))}
-          </div>
+          <CashFlowRealityLines endingCash={endingCash} financing={financing} investing={investing} openingCash={openingCash} operating={operating} />
         </AnalysisPanel>
       </div>
 
@@ -1083,7 +1043,7 @@ export function CashFlowStatementPageClient() {
             <MiniMetric label="เงินสดรับรวม" tone="emerald" value={money(totalInflow)} />
             <MiniMetric label="เงินสดจ่ายรวม" tone="red" value={money(totalOutflow)} />
             <MiniMetric label="โอนเงินภายใน (ไม่รวม)" tone="slate" value={money(internalTransfers)} />
-            <MiniMetric label="เงินสดปลายงวด" tone={endingCash >= 0 ? 'emerald' : 'red'} value={money(endingCash)} />
+            <MiniMetric label="Ending Cash / เงินสดปลายงวด" tone={endingCash >= 0 ? 'emerald' : 'red'} value={money(endingCash)} />
           </div>
         </AnalysisPanel>
       </div>
@@ -1692,6 +1652,68 @@ function Waterfall({ legacyRed = false, rows }: { legacyRed?: boolean; rows: Arr
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function CashFlowRealityLines({
+  endingCash,
+  financing,
+  investing,
+  openingCash,
+  operating,
+}: {
+  endingCash: number
+  financing: number
+  investing: number
+  openingCash: number
+  operating: number
+}) {
+  const rows = [
+    { kind: 'balance' as const, label: 'Beginning Cash / เงินสดต้นงวด', value: openingCash },
+    { kind: 'activity' as const, label: 'ดำเนินงาน', value: operating },
+    { kind: 'activity' as const, label: 'ลงทุน', value: investing },
+    { kind: 'activity' as const, label: 'จัดหาเงิน', value: financing },
+    { kind: 'balance' as const, label: 'Ending Cash / เงินสดปลายงวด', value: endingCash },
+  ]
+  const balanceRows = rows.filter((row) => row.kind === 'balance')
+  const maxMagnitude = Math.max(...rows.map((row) => Math.abs(row.value)), 1)
+  const minBalance = Math.min(...balanceRows.map((row) => row.value))
+  const maxBalance = Math.max(...balanceRows.map((row) => row.value))
+  const balanceRange = Math.max(maxBalance - minBalance, 1)
+
+  const balanceWidth = (value: number) => {
+    const ratio = (value - minBalance) / balanceRange
+    return 78 + ratio * 22
+  }
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row) => {
+        const isBalance = row.kind === 'balance'
+        const isNegative = row.value < 0
+        const width = isBalance ? balanceWidth(row.value) : Math.min(100, Math.abs(row.value) / maxMagnitude * 100)
+        const barClassName = isBalance
+          ? 'bg-emerald-500'
+          : isNegative
+            ? 'bg-red-400'
+            : row.value > 0
+              ? 'bg-emerald-500'
+              : 'bg-slate-300'
+        const valueClassName = isNegative ? 'text-red-700' : isBalance || row.value > 0 ? 'text-slate-800' : 'text-slate-500'
+
+        return (
+          <div key={row.label} className="text-xs">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <span className="text-slate-600">{row.label}</span>
+              <b className={valueClassName}>{money(row.value)}</b>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className={`h-full rounded-full transition-all ${barClassName}`} style={{ minWidth: row.value === 0 ? '0px' : '2px', width: `${width}%` }} />
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
