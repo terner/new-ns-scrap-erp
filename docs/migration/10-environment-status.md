@@ -92,6 +92,7 @@ Schema parity checkpoint on 2026-07-17:
 - Before the SIT-to-UAT promotion, direct schema dumps of `public`, `maintenance`, `auth`, and `supabase_migrations` found UAT missing Customer Advance allocation breakdown migration `20260716082726`, Supplier ADV monetary precision, `sales_plans` RLS, and two `app_users` lifecycle comments.
 - Existing migration `20260716082726_add_customer_advance_allocation_breakdown.sql` was applied and recorded in UAT. New migration `20260717093000_align_finance_precision_and_sales_plan_rls.sql` was applied and recorded in dev-target, SIT, and UAT after confirming no Supplier ADV value had more than two decimal places.
 - Postflight normalized schema dumps for SIT and UAT are identical. UAT retains two historical CADV migration-history rows (`20260715133000`, `20260715143000`) not present in SIT because SIT received the equivalent schema through its database refresh; this is history-only and not schema drift.
+- Promotion completed at commit `77786f70`: `new-origin/dev`, `sit-origin/main`, and customer `uat-origin/main` now point to the same commit. Remote branch `new-origin/uat` was deleted and must not be recreated.
 
 Status update on 2026-07-14:
 - `apps/next/.env.uat.local` exists only as a local ignored reference file for customer UAT credentials and connection strings. It is not committed and is not loaded automatically by Vercel deployments.
