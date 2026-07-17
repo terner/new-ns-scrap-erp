@@ -1,15 +1,17 @@
 'use client'
 
-import { ChevronLeft, ChevronRight, Plus, Save, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { ChevronLeft, ChevronRight, Plus, Save, Trash2, XCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentProps } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ApiError } from '@/lib/api-client'
 import { calculateCustomerAdvanceTaxBreakdown, customerAdvanceFormSchema, type CustomerAdvanceVatType } from '@/lib/customer-advance'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
@@ -28,8 +30,8 @@ type CustomerAdvanceRow = {
   branchId: string
   branchName: string
   contractNo: string
-  currencyCode: string
   customerCode: string
+  customerId: string
   customerName: string
   documentDate: string
   docNo: string
@@ -37,20 +39,23 @@ type CustomerAdvanceRow = {
   invoiceNo: string
   status: string
   statusLabel: string
+  canCancel: boolean
+  canEdit: boolean
   subtotalAmount: number
   targetAmount: number
   totalGrossWeight: number
   totalNetWeight: number
+  usableCreditAmount: number
   vatAmount: number
   vatRatePercent: number
   vatType: CustomerAdvanceVatType
   vatTypeLabel: string
+  version: number
 }
 
 type CustomerAdvanceResponse = {
   branches: Array<{ active: boolean | null; code: string; id: string; name: string }>
   customers: MasterOption[]
-  currencies: Array<{ code: string; name: string; symbol: string | null }>
   filters: { statuses: Array<{ label: string; value: string }> }
   pagination: { page: number; pageSize: number; totalPages: number; totalRows: number }
   products: MasterOption[]
@@ -73,17 +78,46 @@ type CustomerAdvanceLine = {
   quantity: string
 }
 
+type CustomerAdvanceSortDirection = 'asc' | 'desc'
+type CustomerAdvanceSortKey = 'availableAmount' | 'customerName' | 'documentDate' | 'docNo' | 'status' | 'targetAmount'
+type CustomerAdvanceColumnKey = 'action' | 'availableAmount' | 'branchName' | 'customerName' | 'documentDate' | 'docNo' | 'reference' | 'status' | 'targetAmount' | 'totalNetWeight' | 'usableCreditAmount'
+
 type CustomerAdvanceFormState = {
   amount: string
   branchId: string
   contractNo: string
-  currencyCode: string
   customerId: string
   documentDate: string
   invoiceNo: string
   lines: CustomerAdvanceLine[]
   remark: string
   vatType: CustomerAdvanceVatType
+}
+
+type CustomerAdvanceDetail = CustomerAdvanceRow & {
+  remark: string
+  lines: Array<{
+    grossWeight: number
+    lineNo: number
+    netWeight: number
+    productCode: string
+    productId: string
+    productName: string
+    quantity: number
+    unit: string | null
+  }>
+  timeline: Array<{
+    action: string
+    allocatedAmount: number
+    availableAmount: number
+    createdAt: string
+    createdBy: string
+    fromStatus: string | null
+    note: string
+    receivedAmount: number
+    targetAmount: number
+    toStatus: string
+  }>
 }
 
 type FormErrors = Record<string, string>
@@ -94,7 +128,6 @@ const initialForm = (): CustomerAdvanceFormState => ({
   amount: '',
   branchId: '',
   contractNo: '',
-  currencyCode: '',
   customerId: '',
   documentDate: '',
   invoiceNo: '',
@@ -102,6 +135,20 @@ const initialForm = (): CustomerAdvanceFormState => ({
   remark: '',
   vatType: 'NONE',
 })
+
+const customerAdvanceColumns: Array<ResizableColumnDefinition<CustomerAdvanceColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'documentDate', defaultWidth: 130, minWidth: 112 },
+  { key: 'branchName', defaultWidth: 150, minWidth: 120 },
+  { key: 'customerName', defaultWidth: 260, minWidth: 170 },
+  { key: 'reference', defaultWidth: 180, minWidth: 140 },
+  { key: 'totalNetWeight', defaultWidth: 130, minWidth: 110 },
+  { key: 'targetAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'usableCreditAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'availableAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'status', defaultWidth: 150, minWidth: 125 },
+  { key: 'action', defaultWidth: 160, minWidth: 150 },
+]
 
 function decimalValue(value: string) {
   return value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1')
@@ -134,8 +181,16 @@ function lineFieldError(errors: FormErrors, index: number, key: Exclude<keyof Cu
 
 export function CustomerAdvanceForm() {
   const lineSequence = useRef(1)
+  const detailRequestSequence = useRef(0)
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [detailRow, setDetailRow] = useState<CustomerAdvanceRow | null>(null)
+  const [editingDocNo, setEditingDocNo] = useState<string | null>(null)
+  const [cancelRow, setCancelRow] = useState<CustomerAdvanceRow | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [detailDocNo, setDetailDocNo] = useState<string | null>(null)
+  const [detail, setDetail] = useState<CustomerAdvanceDetail | null>(null)
+  const [detailError, setDetailError] = useState('')
+  const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [form, setForm] = useState<CustomerAdvanceFormState>(initialForm)
   const [formErrors, setFormErrors] = useState<FormErrors>({})
   const [loadError, setLoadError] = useState('')
@@ -152,16 +207,19 @@ export function CustomerAdvanceForm() {
   const [status, setStatus] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [sortDirection, setSortDirection] = useState<CustomerAdvanceSortDirection>('desc')
+  const [sortKey, setSortKey] = useState<CustomerAdvanceSortKey>('documentDate')
+  const columnResize = useResizableColumns('sales.customer-advances.v1', customerAdvanceColumns)
 
   const queryString = useMemo(() => {
-    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), sortDirection, sortKey })
     if (branchFilter) params.set('branchId', branchFilter)
     if (query.trim()) params.set('q', query.trim())
     if (status) params.set('status', status)
     if (dateFrom) params.set('dateFrom', dateFrom)
     if (dateTo) params.set('dateTo', dateTo)
     return params.toString()
-  }, [branchFilter, dateFrom, dateTo, page, pageSize, query, status])
+  }, [branchFilter, dateFrom, dateTo, page, pageSize, query, sortDirection, sortKey, status])
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -235,17 +293,75 @@ export function CustomerAdvanceForm() {
 
   const openCreateForm = () => {
     resetForm()
+    setEditingDocNo(null)
     setIsFormOpen(true)
   }
 
-  const closeCreateForm = () => {
+  const closeForm = () => {
     setIsFormOpen(false)
+    setEditingDocNo(null)
     setSubmitError('')
     setFormErrors({})
   }
 
-  const openDetail = (row: CustomerAdvanceRow) => {
-    setDetailRow(row)
+  const openEditForm = async (row: CustomerAdvanceRow) => {
+    setSubmitError('')
+    setFormErrors({})
+    try {
+      const detail = await dailyFetchJson<CustomerAdvanceDetail>(`/api/sales/customer-advances/${encodeURIComponent(row.docNo)}`)
+      if (!detail.canEdit) {
+        throw new Error('แก้ไข CADV ไม่ได้ เพราะเอกสารถูกนำไปใช้ในขั้นตอนรับเงินหรือบิลขายแล้ว')
+      }
+      lineSequence.current = detail.lines.length
+      setForm({
+        amount: String(detail.subtotalAmount),
+        branchId: detail.branchId,
+        contractNo: detail.contractNo,
+        customerId: detail.customerId,
+        documentDate: detail.documentDate,
+        invoiceNo: detail.invoiceNo,
+        lines: detail.lines.map((line, index) => ({
+          grossWeight: String(line.grossWeight),
+          id: `line-${index}`,
+          netWeight: String(line.netWeight),
+          productId: line.productId,
+          quantity: String(line.quantity),
+        })),
+        remark: detail.remark,
+        vatType: detail.vatType,
+      })
+      setEditingDocNo(detail.docNo)
+      setIsFormOpen(true)
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'โหลดข้อมูล CADV สำหรับแก้ไขไม่ได้')
+    }
+  }
+
+  const closeDetail = () => {
+    detailRequestSequence.current += 1
+    setDetailDocNo(null)
+    setDetail(null)
+    setDetailError('')
+    setIsDetailLoading(false)
+  }
+
+  const openDetail = async (row: CustomerAdvanceRow) => {
+    const requestSequence = detailRequestSequence.current + 1
+    detailRequestSequence.current = requestSequence
+    setDetailDocNo(row.docNo)
+    setDetail(null)
+    setDetailError('')
+    setIsDetailLoading(true)
+    try {
+      const result = await dailyFetchJson<CustomerAdvanceDetail>(`/api/sales/customer-advances/${encodeURIComponent(row.docNo)}`)
+      if (detailRequestSequence.current !== requestSequence) return
+      setDetail(result)
+    } catch (caught) {
+      if (detailRequestSequence.current !== requestSequence) return
+      setDetailError(caught instanceof Error ? caught.message : 'โหลดรายละเอียด CADV ไม่ได้')
+    } finally {
+      if (detailRequestSequence.current === requestSequence) setIsDetailLoading(false)
+    }
   }
 
   const appendLine = () => {
@@ -277,13 +393,13 @@ export function CustomerAdvanceForm() {
     setIsSaving(true)
     setSubmitError('')
     try {
-      const created = await dailyFetchJson<{ docNo: string; id: string }>('/api/sales/customer-advances', {
+      const saved = await dailyFetchJson<{ docNo: string }>(editingDocNo ? `/api/sales/customer-advances/${encodeURIComponent(editingDocNo)}` : '/api/sales/customer-advances', {
         body: JSON.stringify(parsed.data),
-        method: 'POST',
+        method: editingDocNo ? 'PUT' : 'POST',
       })
-      setLastCreatedDocNo(created.docNo)
-      setSaveSuccessMessage(`สร้างเอกสาร ${created.docNo} สำเร็จ`)
-      closeCreateForm()
+      setLastCreatedDocNo(saved.docNo)
+      setSaveSuccessMessage(`${editingDocNo ? 'แก้ไข' : 'สร้าง'}เอกสาร ${saved.docNo} สำเร็จ`)
+      closeForm()
       setPage(1)
       await loadData()
     } catch (caught) {
@@ -296,9 +412,40 @@ export function CustomerAdvanceForm() {
     }
   }
 
+  const submitCancel = async () => {
+    if (!cancelRow) return
+    setIsCancelling(true)
+    setSubmitError('')
+    try {
+      const updated = await dailyFetchJson<{ docNo: string }>(`/api/sales/customer-advances/${encodeURIComponent(cancelRow.docNo)}`, {
+        body: JSON.stringify({ reason: cancelReason }),
+        method: 'PATCH',
+      })
+      setCancelRow(null)
+      setCancelReason('')
+      setLastCreatedDocNo(updated.docNo)
+      setSaveSuccessMessage(`ยกเลิกเอกสาร ${updated.docNo} สำเร็จ`)
+      await loadData()
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'ยกเลิกรายการ CADV ไม่ได้')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
   const canPrevious = data ? data.pagination.page > 1 : false
   const canNext = data ? data.pagination.page < data.pagination.totalPages : false
   const hasActiveFilters = Boolean(query.trim() || branchFilter || dateFrom || dateTo || status)
+
+  const changeSort = (nextKey: CustomerAdvanceSortKey) => {
+    if (sortKey === nextKey) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(nextKey)
+      setSortDirection('asc')
+    }
+    setPage(1)
+  }
 
   const clearFilters = () => {
     setQuery('')
@@ -310,16 +457,16 @@ export function CustomerAdvanceForm() {
   }
 
   const createFormDialog = (
-    <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) closeCreateForm() }}>
-      <DialogContent className="max-h-[92vh] max-w-7xl rounded-md !p-0 bg-white border-0 overflow-hidden" fallbackTitle="สร้างรายการรับเงินล่วงหน้า" hideClose>
+    <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) closeForm() }}>
+      <DialogContent className="max-h-[92vh] max-w-7xl rounded-md !p-0 bg-white border-0 overflow-hidden" fallbackTitle={editingDocNo ? 'แก้ไขรายการรับเงินล่วงหน้า' : 'สร้างรายการรับเงินล่วงหน้า'} hideClose>
         <DialogHeader className="flex-row items-start justify-between gap-4">
           <div>
-            <DialogTitle>สร้างรายการรับเงินล่วงหน้า</DialogTitle>
-            <DialogDescription>บันทึก CADV จาก Packing List เพื่อใช้สร้างใบเสร็จรับเงินในขั้นตอนถัดไป</DialogDescription>
+            <DialogTitle>{editingDocNo ? `แก้ไขรายการรับเงินล่วงหน้า ${editingDocNo}` : 'สร้างรายการรับเงินล่วงหน้า'}</DialogTitle>
+            <DialogDescription>{editingDocNo ? 'แก้ไขเอกสารก่อนเริ่มรับเงินจริงหรือใช้หักบิลขาย' : 'บันทึก CADV จาก Packing List เพื่อใช้สร้างใบเสร็จรับเงินในขั้นตอนถัดไป'}</DialogDescription>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button className="bg-white/10 text-white hover:bg-white/20 hover:text-white" disabled={isSaving} size="sm" type="button" variant="ghost" onClick={resetForm}>ล้างข้อมูล</Button>
-            <Button className="bg-white/10 text-white hover:bg-white/20 hover:text-white" disabled={isSaving} size="sm" type="button" variant="ghost" onClick={closeCreateForm}>ปิด</Button>
+            {!editingDocNo ? <Button className="bg-white/10 text-white hover:bg-white/20 hover:text-white" disabled={isSaving} size="sm" type="button" variant="ghost" onClick={resetForm}>ล้างข้อมูล</Button> : null}
+            <Button className="bg-white/10 text-white hover:bg-white/20 hover:text-white" disabled={isSaving} size="sm" type="button" variant="ghost" onClick={closeForm}>ปิด</Button>
           </div>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4">
@@ -347,66 +494,126 @@ export function CustomerAdvanceForm() {
 
               <FormSection description="ยอดที่ต้องรับจากลูกค้าสำหรับรายการ CADV นี้" title="ยอดรับเงินล่วงหน้า">
                 <div className="grid gap-3 md:grid-cols-6">
-                  <Field error={formErrors.amount} label={form.vatType === 'INCLUDE' ? 'ยอดก่อน VAT *' : 'ยอดเงินล่วงหน้าที่ต้องรับ *'} className="md:col-span-2">
+                  <Field error={formErrors.amount} label={form.vatType === 'INCLUDE' ? 'ยอดก่อน VAT *' : 'ยอดเงินล่วงหน้าที่ต้องรับ *'} className="md:col-span-3">
                     <DecimalInput aria-label={form.vatType === 'INCLUDE' ? 'ยอดก่อน VAT' : 'ยอดเงินล่วงหน้าที่ต้องรับ'} digits={2} value={form.amount} onChange={(value) => updateField('amount', value)} />
                   </Field>
-                  <Field error={formErrors.vatType || vatConfigurationError} label="VAT *" className="md:col-span-2">
+                  <Field error={formErrors.vatType || vatConfigurationError} label="VAT *" className="md:col-span-3">
                     <Select className={form.vatType === 'INCLUDE' ? 'border-amber-500 bg-amber-50 font-medium text-slate-800' : ''} value={form.vatType} onChange={(event) => updateField('vatType', event.target.value as CustomerAdvanceVatType)}>
                       <option value="NONE">ไม่มี VAT</option>
                       <option value="INCLUDE">มี VAT</option>
                     </Select>
                   </Field>
-                  <Field error={formErrors.currencyCode} label="สกุลเงิน *" className="md:col-span-2"><Select disabled={isLoading || !data} value={form.currencyCode} onChange={(event) => updateField('currencyCode', event.target.value)}><option value="">เลือกสกุลเงิน</option>{data?.currencies.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} - {currency.name}</option>)}</Select></Field>
                 </div>
               </FormSection>
 
               <FormSection description="ข้อมูลเพิ่มเติมที่ไม่มีใน Packing List" title="หมายเหตุ"><Field error={formErrors.remark} label="หมายเหตุ"><textarea className="min-h-20 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-blue-100" placeholder="ระบุหมายเหตุ" value={form.remark} onChange={(event) => updateField('remark', event.target.value)} /></Field></FormSection>
             </div>
-            <aside className="h-fit rounded-md border border-slate-200 bg-slate-50 p-4"><h3 className="text-sm font-semibold text-slate-900">สรุปรายการ CADV</h3><dl className="mt-3 space-y-2 text-sm"><SummaryRow label="จำนวนสินค้า" value={formatQuantity(totals.quantity)} /><SummaryRow label="น้ำหนักรวม" value={`${formatQuantity(totals.grossWeight)} กก.`} /><SummaryRow label="น้ำหนักสุทธิ" value={`${formatQuantity(totals.netWeight)} กก.`} /></dl>{taxBreakdown ? <><div className="my-4 border-t border-slate-200" /><dl className="space-y-2 text-sm"><SummaryRow label="VAT" value={form.vatType === 'INCLUDE' ? `มี VAT ${formatQuantity(taxBreakdown.vatRatePercent)}%` : 'ไม่มี VAT'} />{form.vatType === 'INCLUDE' ? <SummaryRow label="ยอดก่อน VAT" value={`${formatMoney(taxBreakdown.subtotalAmount)}${form.currencyCode ? ` ${form.currencyCode}` : ''}`} /> : null}{form.vatType === 'INCLUDE' ? <SummaryRow label="ยอด VAT" value={`${formatMoney(taxBreakdown.vatAmount)}${form.currencyCode ? ` ${form.currencyCode}` : ''}`} /> : null}<SummaryRow strong label="ยอดเงินล่วงหน้าที่ต้องรับ" value={`${formatMoney(taxBreakdown.targetAmount)}${form.currencyCode ? ` ${form.currencyCode}` : ''}`} /></dl></> : null}<div className="mt-4 space-y-2"><Button className="w-full gap-2" disabled={isSaving || isLoading || !data || Boolean(vatConfigurationError)} type="button" onClick={() => void submit()}><Save className="h-4 w-4" />{isSaving ? 'กำลังบันทึก' : 'บันทึก CADV'}</Button></div></aside>
+            <aside className="h-fit rounded-md border border-slate-200 bg-slate-50 p-4"><h3 className="text-sm font-semibold text-slate-900">สรุปรายการ CADV</h3><dl className="mt-3 space-y-2 text-sm"><SummaryRow label="จำนวนสินค้า" value={formatQuantity(totals.quantity)} /><SummaryRow label="น้ำหนักรวม" value={`${formatQuantity(totals.grossWeight)} กก.`} /><SummaryRow label="น้ำหนักสุทธิ" value={`${formatQuantity(totals.netWeight)} กก.`} /></dl>{taxBreakdown ? <><div className="my-4 border-t border-slate-200" /><dl className="space-y-2 text-sm"><SummaryRow label="VAT" value={form.vatType === 'INCLUDE' ? `มี VAT ${formatQuantity(taxBreakdown.vatRatePercent)}%` : 'ไม่มี VAT'} />{form.vatType === 'INCLUDE' ? <SummaryRow label="ยอดก่อน VAT" value={formatMoney(taxBreakdown.subtotalAmount)} /> : null}{form.vatType === 'INCLUDE' ? <SummaryRow label="ยอด VAT" value={formatMoney(taxBreakdown.vatAmount)} /> : null}<SummaryRow strong label="ยอดเงินล่วงหน้าที่ต้องรับ" value={formatMoney(taxBreakdown.targetAmount)} /></dl></> : null}<div className="mt-4 space-y-2"><Button className="w-full gap-2" disabled={isSaving || isLoading || !data || Boolean(vatConfigurationError)} type="button" onClick={() => void submit()}><Save className="h-4 w-4" />{isSaving ? 'กำลังบันทึก' : editingDocNo ? 'บันทึกการแก้ไข' : 'บันทึก CADV'}</Button></div></aside>
           </div>
         </div>
       </DialogContent>
     </Dialog>
   )
 
+  const cancelDialog = (
+    <Dialog open={Boolean(cancelRow)} onOpenChange={(open) => {
+      if (!open) {
+        setCancelRow(null)
+        setCancelReason('')
+      }
+    }}>
+      <DialogContent className="max-w-lg rounded-md bg-white" fallbackTitle="ยกเลิก CADV" hideClose>
+        <DialogHeader>
+          <DialogTitle>ยกเลิกเอกสาร {cancelRow?.docNo}</DialogTitle>
+          <DialogDescription>ยกเลิกได้เฉพาะ CADV ที่ยังไม่ถูกใช้รับเงินจริงหรือหักบิลขาย</DialogDescription>
+        </DialogHeader>
+        <Field label="เหตุผลการยกเลิก *">
+          <textarea
+            className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-blue-100"
+            placeholder="ระบุเหตุผลการยกเลิก"
+            value={cancelReason}
+            onChange={(event) => setCancelReason(event.target.value)}
+          />
+        </Field>
+        {submitError ? <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{submitError}</p> : null}
+        <div className="flex justify-end gap-2">
+          <Button disabled={isCancelling} type="button" variant="outline" onClick={() => {
+            setCancelRow(null)
+            setCancelReason('')
+          }}>ปิด</Button>
+          <Button className="bg-rose-600 text-white hover:bg-rose-700 hover:text-white" disabled={isCancelling || !cancelReason.trim()} type="button" onClick={() => void submitCancel()}>
+            <XCircle className="h-4 w-4" />{isCancelling ? 'กำลังยกเลิก' : 'ยืนยันยกเลิก'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+
   const detailDialog = (
-    <Dialog open={Boolean(detailRow)} onOpenChange={(open) => { if (!open) setDetailRow(null) }}>
+    <Dialog open={Boolean(detailDocNo)} onOpenChange={(open) => { if (!open) closeDetail() }}>
       <DialogContent className="max-h-[90vh] max-w-4xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" fallbackTitle="รายละเอียด CADV" hideClose>
         <DialogHeader className="p-4 bg-slate-900 text-white shrink-0">
           <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
             <div className="min-w-0">
-              <DialogTitle className="truncate text-white">{detailRow?.docNo ? `รายละเอียด ${detailRow.docNo}` : 'รายละเอียด CADV'}</DialogTitle>
-              <DialogDescription className="truncate text-slate-300">ข้อมูลเอกสารรับเงินล่วงหน้าและยอดคงเหลือ</DialogDescription>
+              <DialogTitle className="truncate text-white">{detail ? `รายละเอียด ${detail.docNo}` : `รายละเอียด ${detailDocNo}`}</DialogTitle>
+              <DialogDescription className="truncate text-slate-300">ข้อมูลเอกสารรับเงินล่วงหน้า ยอดคงเหลือ และประวัติรายการ</DialogDescription>
             </div>
-            <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setDetailRow(null)}>ปิด</Button>
+            <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={closeDetail}>ปิด</Button>
           </div>
         </DialogHeader>
-        {detailRow ? (
+        {isDetailLoading ? (
+          <div className="flex-1 bg-slate-50 p-6 text-sm text-slate-500">กำลังโหลดรายละเอียด CADV...</div>
+        ) : null}
+        {detailError ? (
+          <div className="flex-1 bg-slate-50 p-6 text-sm text-rose-700">{detailError}</div>
+        ) : null}
+        {detail ? (
           <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50 p-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <DetailMetric label="ยอดรวมที่ต้องรับ" value={`${formatMoney(detailRow.targetAmount)} ${detailRow.currencyCode}`} />
-              <DetailMetric label="คงเหลือ" value={`${formatMoney(detailRow.availableAmount)} ${detailRow.currencyCode}`} />
-              <DetailMetric label="น้ำหนักรวม" value={`${formatQuantity(detailRow.totalGrossWeight)} กก.`} />
-              <DetailMetric label="น้ำหนักสุทธิ" value={`${formatQuantity(detailRow.totalNetWeight)} กก.`} />
+              <DetailMetric label="ยอดรวมที่ต้องรับ" value={formatMoney(detail.targetAmount)} />
+              <DetailMetric label="เครดิตคงเหลือ" value={formatMoney(detail.availableAmount)} />
+              <DetailMetric label="น้ำหนักรวม" value={`${formatQuantity(detail.totalGrossWeight)} กก.`} />
+              <DetailMetric label="น้ำหนักสุทธิ" value={`${formatQuantity(detail.totalNetWeight)} กก.`} />
             </div>
 
             <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
               <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลเอกสาร</div>
               <DetailGrid
                 items={[
-                  ['เลขที่ CADV', detailRow.docNo],
-                  ['วันที่เอกสาร', formatDateDisplay(detailRow.documentDate)],
-                  ['สาขา', detailRow.branchName],
-                  ['ลูกค้า', detailRow.customerName],
-                  ['รหัสลูกค้า', detailRow.customerCode],
-                  ['Invoice No.', detailRow.invoiceNo || '-'],
-                  ['Contract No.', detailRow.contractNo || '-'],
-                  ['VAT', detailRow.vatType === 'INCLUDE' ? `${detailRow.vatTypeLabel} ${formatQuantity(detailRow.vatRatePercent)}%` : detailRow.vatTypeLabel],
-                  ['ยอดก่อน VAT', `${formatMoney(detailRow.subtotalAmount)} ${detailRow.currencyCode}`],
-                  ['ยอด VAT', `${formatMoney(detailRow.vatAmount)} ${detailRow.currencyCode}`],
-                  ['สถานะ', detailRow.statusLabel],
+                  ['เลขที่ CADV', detail.docNo],
+                  ['วันที่เอกสาร', formatDateDisplay(detail.documentDate)],
+                  ['สาขา', detail.branchName],
+                  ['ลูกค้า', detail.customerName],
+                  ['รหัสลูกค้า', detail.customerCode],
+                  ['Invoice No.', detail.invoiceNo || '-'],
+                  ['Contract No.', detail.contractNo || '-'],
+                  ['VAT', detail.vatType === 'INCLUDE' ? `${detail.vatTypeLabel} ${formatQuantity(detail.vatRatePercent)}%` : detail.vatTypeLabel],
+                  ['ยอดก่อน VAT', formatMoney(detail.subtotalAmount)],
+                  ['ยอด VAT', formatMoney(detail.vatAmount)],
+                  ['สถานะ', detail.statusLabel],
                 ]}
               />
+            </section>
+
+            <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+              <div className="mb-3 text-sm font-semibold text-slate-900">Timeline</div>
+              {detail.timeline.length === 0 ? <div className="text-sm text-slate-400">ยังไม่มีประวัติรายการ CADV</div> : (
+                <div className="space-y-3">
+                  {detail.timeline.map((event) => (
+                    <div key={`${event.createdAt}-${event.action}`} className="flex gap-3 rounded-md bg-slate-50 p-3">
+                      <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${customerAdvanceTimelineTone(event)}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-sm font-medium text-slate-900">{customerAdvanceTimelineLabel(event.action)}</div>
+                          <div className="text-xs text-slate-500">{formatDateTimeDisplay(event.createdAt)}</div>
+                        </div>
+                        <div className="mt-1 text-xs text-slate-600">โดย {event.createdBy}</div>
+                        <div className="mt-1 text-xs text-slate-500">{customerAdvanceTimelineMetadata(event)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           </div>
         ) : null}
@@ -417,6 +624,7 @@ export function CustomerAdvanceForm() {
   return (
     <section className="space-y-4">
       {createFormDialog}
+      {cancelDialog}
       {detailDialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -513,6 +721,7 @@ export function CustomerAdvanceForm() {
             <span>พบทั้งหมด {data.pagination.totalRows.toLocaleString('th-TH')} รายการ</span>
             <div className="flex flex-wrap items-center gap-2">
               <PageSizeDropdown value={pageSize} onChange={(value) => { setPageSize(value); setPage(1) }} />
+              {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
               <Button aria-label="หน้าก่อนหน้า" disabled={!canPrevious} size="sm" type="button" variant="outline" onClick={() => setPage((current) => current - 1)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -524,24 +733,29 @@ export function CustomerAdvanceForm() {
           </div>
           <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
-              <table className="ns-table min-w-[1140px] w-full text-sm">
-                <thead className="bg-slate-100 text-left text-xs font-semibold text-slate-700">
+              <table className="ns-table min-w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+                <colgroup>
+                  {customerAdvanceColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+                </colgroup>
+                <thead className="border-b border-slate-200 bg-slate-100 text-slate-700">
                   <tr>
-                    <th className="p-2">เลขที่ CADV</th>
-                    <th className="p-2">วันที่เอกสาร</th>
-                    <th className="p-2">สาขา</th>
-                    <th className="p-2">ลูกค้า</th>
-                    <th className="p-2">Invoice / Contract</th>
-                    <th className="p-2 text-right">น้ำหนักสุทธิ</th>
-                    <th className="p-2 text-right">ยอดที่ต้องรับ</th>
-                    <th className="p-2 text-right">คงเหลือ</th>
-                    <th className="p-2">สถานะ</th>
+                    <CustomerAdvanceSortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่ CADV" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่ CADV')} sortKey="docNo" onSort={changeSort} />
+                    <CustomerAdvanceSortHeader activeKey={sortKey} direction={sortDirection} label="วันที่เอกสาร" resizeProps={columnResize.getResizeHandleProps('documentDate', 'วันที่เอกสาร')} sortKey="documentDate" onSort={changeSort} />
+                    <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branchName', 'สาขา')} />
+                    <CustomerAdvanceSortHeader activeKey={sortKey} direction={sortDirection} label="ลูกค้า" resizeProps={columnResize.getResizeHandleProps('customerName', 'ลูกค้า')} sortKey="customerName" onSort={changeSort} />
+                    <ResizableTableHead label="Invoice / Contract" resizeProps={columnResize.getResizeHandleProps('reference', 'Invoice / Contract')} />
+                    <ResizableTableHead align="right" label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('totalNetWeight', 'น้ำหนักสุทธิ')} />
+                    <CustomerAdvanceSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดที่ต้องรับ" resizeProps={columnResize.getResizeHandleProps('targetAmount', 'ยอดที่ต้องรับ')} sortKey="targetAmount" onSort={changeSort} />
+                    <ResizableTableHead align="right" label="เครดิตที่ใช้ได้" resizeProps={columnResize.getResizeHandleProps('usableCreditAmount', 'เครดิตที่ใช้ได้')} />
+                    <CustomerAdvanceSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตคงเหลือ" resizeProps={columnResize.getResizeHandleProps('availableAmount', 'เครดิตคงเหลือ')} sortKey="availableAmount" onSort={changeSort} />
+                    <CustomerAdvanceSortHeader activeKey={sortKey} direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
+                    <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
                   </tr>
                 </thead>
                 <tbody>
                   {data.rows.length === 0 ? (
                     <tr>
-                      <td className="p-8 text-center text-sm text-slate-500" colSpan={9}>ไม่พบรายการรับเงินล่วงหน้า</td>
+                      <td className="p-8 text-center text-sm text-slate-500" colSpan={11}>ไม่พบรายการรับเงินล่วงหน้า</td>
                     </tr>
                   ) : data.rows.map((row) => (
                     <tr
@@ -556,12 +770,12 @@ export function CustomerAdvanceForm() {
                         }
                       }}
                     >
-                      <td className="p-3 font-medium text-slate-900">
+                      <td className="p-3 font-medium text-slate-900 whitespace-nowrap">
                         {row.docNo}
                         {row.docNo === lastCreatedDocNo ? <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">ล่าสุด</span> : null}
                       </td>
-                      <td className="p-3">{formatDateDisplay(row.documentDate)}</td>
-                      <td className="p-3 text-slate-700">{row.branchName}</td>
+                      <td className="p-3 whitespace-nowrap">{formatDateDisplay(row.documentDate)}</td>
+                      <td className="p-3 text-slate-700 whitespace-nowrap">{row.branchName}</td>
                       <td className="p-3">
                         <p className="font-medium text-slate-900">{row.customerName}</p>
                         <p className="text-xs text-slate-500">{row.customerCode}</p>
@@ -570,14 +784,45 @@ export function CustomerAdvanceForm() {
                         <p>{row.invoiceNo || '-'}</p>
                         <p className="text-xs">{row.contractNo || '-'}</p>
                       </td>
-                      <td className="p-3 text-right tabular-nums">{formatQuantity(row.totalNetWeight)} กก.</td>
-                      <td className="p-3 text-right tabular-nums"><p>{formatMoney(row.targetAmount)} {row.currencyCode}</p><p className="text-xs text-slate-500">{row.vatTypeLabel}</p></td>
-                      <td className="p-3 text-right tabular-nums">{formatMoney(row.availableAmount)} {row.currencyCode}</td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatQuantity(row.totalNetWeight)} กก.</td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap"><p>{formatMoney(row.targetAmount)}</p><p className="text-xs text-slate-500">{row.vatTypeLabel}</p></td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatMoney(row.usableCreditAmount)}</td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatMoney(row.availableAmount)}</td>
                       <td className="p-3">
                         <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-slate-700">
                           <span className="size-1.5 rounded-full bg-slate-500" />
                           {row.statusLabel}
                         </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={!row.canEdit}
+                            title={!row.canEdit ? 'รายการนี้ยังแก้ไขไม่ได้' : undefined}
+                            type="button"
+                            onClick={(event) => {
+                            event.stopPropagation()
+                            void openEditForm(row)
+                            }}
+                          >
+                            แก้ไข
+                          </button>
+                          <button
+                            className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={!row.canCancel}
+                            title={!row.canCancel ? 'รายการนี้ยังยกเลิกไม่ได้' : undefined}
+                            type="button"
+                            onClick={(event) => {
+                            event.stopPropagation()
+                            setSubmitError('')
+                            setCancelReason('')
+                            setCancelRow(row)
+                            }}
+                          >
+                            ยกเลิก
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -597,6 +842,26 @@ function FilterSegment({ active, label, onClick }: { active: boolean; label: str
       {label}
     </button>
   )
+}
+
+function CustomerAdvanceSortHeader({
+  activeKey,
+  align = 'left',
+  direction,
+  label,
+  onSort,
+  resizeProps,
+  sortKey,
+}: {
+  activeKey: CustomerAdvanceSortKey
+  align?: 'left' | 'right'
+  direction: CustomerAdvanceSortDirection
+  label: string
+  onSort: (key: CustomerAdvanceSortKey) => void
+  resizeProps?: ButtonHTMLAttributes<HTMLButtonElement>
+  sortKey: CustomerAdvanceSortKey
+}) {
+  return <ResizableTableHead activeSortKey={activeKey} align={align} direction={direction} label={label} resizeProps={resizeProps} sortKey={sortKey} onSort={onSort} />
 }
 
 function DetailMetric({ label, value }: { label: string; value: string }) {
@@ -619,6 +884,41 @@ function DetailGrid({ items }: { items: Array<[string, string]> }) {
       ))}
     </dl>
   )
+}
+
+function formatDateTimeDisplay(value: string) {
+  return new Intl.DateTimeFormat('th-TH', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
+function customerAdvanceTimelineTone(event: CustomerAdvanceDetail['timeline'][number]) {
+  if (event.action === 'cancelled') return 'bg-red-500'
+  if (event.action.includes('allocated')) return 'bg-blue-500'
+  return 'bg-emerald-500'
+}
+
+function customerAdvanceTimelineLabel(action: string) {
+  if (action === 'created') return 'สร้างรายการ CADV'
+  if (action === 'edited') return 'แก้ไขรายการ CADV'
+  if (action === 'cancelled') return 'ยกเลิกรายการ CADV'
+  if (action === 'status_partially_received') return 'รับชำระ CADV บางส่วน'
+  if (action === 'status_received') return 'รับชำระ CADV ครบ'
+  if (action === 'status_partially_allocated') return 'ใช้ CADV หักบิลบางส่วน'
+  if (action === 'status_allocated') return 'ใช้ CADV หักบิลครบ'
+  if (action === 'status_pending_receipt') return 'คืนสถานะรอรับชำระ'
+  return action
+}
+
+function customerAdvanceTimelineMetadata(event: CustomerAdvanceDetail['timeline'][number]) {
+  const statusTransition = event.fromStatus ? `${event.fromStatus} -> ${event.toStatus}` : `สถานะ ${event.toStatus}`
+  const amounts = [
+    `ยอดต้องรับ ${formatMoney(event.targetAmount)}`,
+    `รับแล้ว ${formatMoney(event.receivedAmount)}`,
+    `เครดิตคงเหลือ ${formatMoney(event.availableAmount)}`,
+  ]
+  return [statusTransition, ...amounts, event.note].filter(Boolean).join(' · ')
 }
 
 function DecimalInput({ className, digits = 2, error, onChange, ...props }: Omit<ComponentProps<typeof Input>, 'onChange' | 'type'> & { digits?: number; error?: string; onChange: (value: string) => void }) { return <div><Input className={`text-right tabular-nums ${className ?? ''}`.trim()} inputMode="decimal" placeholder={digits === 2 ? '0.00' : '0.000'} {...props} onChange={(event) => onChange(decimalValue(event.target.value))} />{error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}</div> }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { Prisma } from '../../../../../generated/prisma/client'
-import { calculateCustomerAdvanceTaxBreakdown, customerAdvanceFormSchema, customerAdvanceVatTypeLabel } from '@/lib/customer-advance'
+import { calculateCustomerAdvancePaidBaseCapacity, calculateCustomerAdvanceTaxBreakdown, customerAdvanceFormSchema, customerAdvanceVatTypeLabel } from '@/lib/customer-advance'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { recordAuditLog } from '@/lib/server/app-logging'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
@@ -8,10 +8,12 @@ import { normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { isCustomerEligibleForBranch } from '@/lib/server/party-branch-eligibility'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { prisma } from '@/lib/server/prisma'
-import { findCurrencyReferenceByCode, listActiveBranches, listActiveCustomerBranchOptions, listCurrencies } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActiveCustomerBranchOptions } from '@/lib/server/reference-master-cache'
 import { requiredActiveVatRatePercent } from '@/lib/server/tax-settings'
 
 export const runtime = 'nodejs'
+
+const CUSTOMER_ADVANCE_CURRENCY_CODE = 'THB'
 
 type CustomerAdvanceRow = Prisma.customer_advancesGetPayload<{
   include: {
@@ -32,7 +34,7 @@ function parseSortDirection(value: string | null): Prisma.SortOrder {
 }
 
 function parseSortKey(value: string | null) {
-  const allowed = new Set(['customerName', 'documentDate', 'docNo', 'status', 'targetAmount'])
+  const allowed = new Set(['availableAmount', 'customerName', 'documentDate', 'docNo', 'status', 'targetAmount'])
   return allowed.has(value ?? '') ? value! : 'documentDate'
 }
 
@@ -42,6 +44,7 @@ function orderByFor(sortKey: string, direction: Prisma.SortOrder): Prisma.custom
       case 'customerName': return { customer_name_snapshot: direction }
       case 'docNo': return { doc_no: direction }
       case 'status': return { customer_advance_statuses: { sort_order: direction } }
+      case 'availableAmount': return { available_amount: direction }
       case 'targetAmount': return { target_amount: direction }
       case 'documentDate':
       default: return { document_date: direction }
@@ -51,31 +54,46 @@ function orderByFor(sortKey: string, direction: Prisma.SortOrder): Prisma.custom
 }
 
 function rowJson(row: CustomerAdvanceRow) {
+  const subtotalAmount = toNumber(row.subtotal_amount)
+  const targetAmount = toNumber(row.target_amount)
+  const receivedAmount = toNumber(row.received_amount)
+  const canMutate = row.customer_advance_statuses.code === 'pending_receipt'
+    && receivedAmount === 0
+    && toNumber(row.allocated_amount) === 0
+
   return {
     allocatedAmount: toNumber(row.allocated_amount),
     availableAmount: toNumber(row.available_amount),
     branchId: row.branches.code,
     branchName: row.branches.name,
     contractNo: row.contract_no ?? '',
-    currencyCode: row.currency_code,
     customerCode: row.customer_code_snapshot,
+    customerId: row.customer_id.toString(),
     customerName: row.customer_name_snapshot,
     documentDate: toDateOnly(row.document_date),
     docNo: row.doc_no,
     id: row.id.toString(),
     invoiceNo: row.invoice_no ?? '',
     itemCount: row.customer_advance_items.length,
-    receivedAmount: toNumber(row.received_amount),
+    receivedAmount,
     status: row.customer_advance_statuses.code,
     statusLabel: row.customer_advance_statuses.name,
-    subtotalAmount: toNumber(row.subtotal_amount),
-    targetAmount: toNumber(row.target_amount),
+    canCancel: canMutate,
+    canEdit: canMutate,
+    subtotalAmount,
+    targetAmount,
     totalGrossWeight: row.customer_advance_items.reduce((total, item) => total + toNumber(item.gross_weight), 0),
     totalNetWeight: row.customer_advance_items.reduce((total, item) => total + toNumber(item.net_weight), 0),
     vatAmount: toNumber(row.vat_amount),
     vatRatePercent: toNumber(row.vat_rate_percent),
     vatType: row.vat_type,
     vatTypeLabel: customerAdvanceVatTypeLabel(row.vat_type),
+    usableCreditAmount: calculateCustomerAdvancePaidBaseCapacity({
+      receivedGrossAmount: receivedAmount,
+      subtotalAmount,
+      targetAmount,
+    }),
+    version: row.version,
   }
 }
 
@@ -142,7 +160,7 @@ export async function GET(request: Request) {
       } : {}),
     }
 
-    const [branches, rows, totalRows, customers, products, currencies, statuses, vatRates] = await Promise.all([
+    const [branches, rows, totalRows, customers, products, statuses, vatRates] = await Promise.all([
       listActiveBranches(),
       prisma.customer_advances.findMany({
         include: {
@@ -162,7 +180,6 @@ export async function GET(request: Request) {
         select: { code: true, id: true, name: true, unit: true },
         where: { active: true },
       }),
-      listCurrencies(),
       prisma.customer_advance_statuses.findMany({
         orderBy: { sort_order: 'asc' },
         select: { code: true, name: true },
@@ -183,7 +200,6 @@ export async function GET(request: Request) {
         id: customer.id.toString(),
         name: customer.name,
       })),
-      currencies,
       filters: { statuses: statuses.map((statusOption) => ({ label: statusOption.name, value: statusOption.code })) },
       pagination: { page, pageSize, totalPages: Math.max(1, Math.ceil(totalRows / pageSize)), totalRows },
       products: products.map((product) => ({ code: product.code, id: product.id.toString(), name: product.name, unit: product.unit })),
@@ -210,10 +226,9 @@ export async function POST(request: Request) {
     const values = customerAdvanceFormSchema.parse(await request.json())
     const actor = actorEmail(context)
 
-    const [branch, customer, currency, initialStatuses, products, vatRatePercent] = await Promise.all([
+    const [branch, customer, initialStatuses, products, vatRatePercent] = await Promise.all([
       findActiveBranchReferenceByCodeOrId(values.branchId),
       prisma.customers.findFirst({ select: { code: true, id: true, name: true }, where: { active: true, id: BigInt(values.customerId) } }),
-      findCurrencyReferenceByCode(values.currencyCode),
       prisma.customer_advance_statuses.findMany({ select: { id: true }, where: { active: true, is_initial: true } }),
       prisma.products.findMany({
         select: { code: true, id: true, name: true },
@@ -226,7 +241,6 @@ export async function POST(request: Request) {
 
     if (!branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { branchId: ['เลือกสาขา'] } }, { status: 400 })
     if (!customer) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ลูกค้าไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { customerId: ['เลือกลูกค้า'] } }, { status: 400 })
-    if (!currency) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สกุลเงินไม่ถูกต้อง', fieldErrors: { currencyCode: ['เลือกสกุลเงิน'] } }, { status: 400 })
     if (initialStatuses.length !== 1) throw new Error('กำหนดสถานะเริ่มต้นของ CADV ไม่ถูกต้อง')
     if (!(await isCustomerEligibleForBranch({ branchId: branch.id, customerId: customer.id }))) {
       return NextResponse.json({
@@ -262,7 +276,7 @@ export async function POST(request: Request) {
           branch_id: branch.id,
           contract_no: values.contractNo,
           created_by: actor,
-          currency_code: currency.code,
+          currency_code: CUSTOMER_ADVANCE_CURRENCY_CODE,
           customer_code_snapshot: customer.code,
           customer_id: customer.id,
           customer_name_snapshot: customer.name,

@@ -43,7 +43,6 @@ created: 2026-07-15
 | Contract No. | No | snapshot จากเอกสารภายนอก |
 | VAT | Yes | dropdown `ไม่มี VAT` / `มี VAT`; อัตรามาจาก VAT master ตามวันที่เอกสาร ไม่มี hardcode/fallback |
 | ยอดเงินล่วงหน้าที่ต้องรับ | Yes | amount > 0; เมื่อเลือก `มี VAT` ช่องนี้คือยอดก่อน VAT และระบบคำนวณยอด VAT/ยอดรวมที่ RCP ต้องรับ |
-| สกุลเงิน | Yes | เลือกจาก Currency master; ไม่มี default/fallback ใน client |
 | หมายเหตุ | No | ข้อความอ้างอิงเพิ่ม |
 | ไฟล์ Packing List/Invoice | No | attachment reference; ไม่เก็บ Data URL ใน row |
 
@@ -86,6 +85,18 @@ flowchart LR
 | `allocated` | ใช้หักบิลครบ | ใช้ยอดครบแล้ว | อ่านประวัติเท่านั้น |
 | `cancelled` | ยกเลิก | ยกเลิกก่อนหรือหลัง reverse ความสัมพันธ์ครบ | ห้ามเลือกต่อ |
 
+### การแก้ไขและยกเลิก CADV
+
+หน้ารายการ CADV แสดงปุ่ม `แก้ไข` และ `ยกเลิก` เฉพาะเอกสารสถานะ `pending_receipt` ที่ `received_amount = 0` และ `allocated_amount = 0` เท่านั้น. API ตรวจซ้ำว่าต้องไม่มี `sales_bill_customer_advance_allocations` ที่ active ก่อนทำรายการ จึงห้ามแก้เอกสารหลังเริ่มรับเงินจริงหรือใช้หัก SB แม้ UI จะเป็นข้อมูลเก่าจากการโหลดก่อนหน้า.
+
+- แก้ไข: คง `doc_no` เดิม, validate สาขา/ลูกค้า/สินค้า/VAT ใหม่, replace item snapshots ใน transaction เดียว, เพิ่ม `version`, status log action `edited`, และ audit log.
+- ยกเลิก: ต้องระบุเหตุผล, set cancellation snapshot (`cancelled_at`, `cancelled_by`, `cancel_reason`), เปลี่ยนสถานะเป็น `cancelled`, เพิ่ม status log action `cancelled`, และ audit log.
+- เอกสารที่รับเงินจริงหรือถูกใช้หัก SB แล้วไม่แสดงปุ่ม และ endpoint ปฏิเสธโดยไม่ใช้ fallback หรือแก้ข้อมูลย้อนหลัง.
+
+### Detail Timeline
+
+หน้า detail ของ CADV ต้องอ่าน `customer_advance_status_logs` โดยตรงผ่าน `GET /api/sales/customer-advances/{docNo}` และแสดงเรียงล่าสุดก่อน ไม่ใช้ข้อมูลแถว list หรือ audit log รวมเป็นตัวเดาประวัติ. แต่ละเหตุการณ์แสดง action, ผู้ทำ, เวลา, สถานะก่อน/หลัง, ยอดที่ต้องรับ, ยอดรับจริง, เครดิตคงเหลือ และหมายเหตุ/เหตุผลยกเลิกเมื่อมี. เหตุการณ์ที่ write path ต้อง append อย่างน้อยคือ `created`, `edited`, `cancelled`; เมื่อยอดรับจริงหรือยอดหักบิลทำให้สถานะเปลี่ยน ให้ settlement เขียน `status_{code}` เช่น `status_partially_received`, `status_received`, `status_partially_allocated`, `status_allocated` ใน transaction เดียวกับยอดและสถานะ.
+
 ## Page Surface Matrix
 
 | Page / Route | Current role | CADV behavior | Source of truth |
@@ -99,6 +110,13 @@ flowchart LR
 
 ผู้ใช้ทำงานกับ CADV ผ่าน tab `รับเงินล่วงหน้า` ใน `/purchase/advance-payments` เพราะเป็น source document ก่อนเงินเข้า. การรับเงินจริงต้องอยู่ใน `/sales/receipts`; การใช้หักบิลต้องอยู่ใน `/sales/bills`; การดูยอดลูกหนี้ต้องอยู่ใน `/finance/ar`.
 
+### ตาราง CADV
+
+ตารางรายการใช้ server-side pagination, filter, และ sort เพื่อไม่ให้เรียงเพียงข้อมูลของหน้าปัจจุบัน. ผู้ใช้ปรับความกว้างคอลัมน์ได้ผ่าน shared `useResizableColumns` และ browser จดจำความกว้างตามตาราง; มีปุ่ม `คืนค่าเดิมตาราง` เมื่อขนาดถูกแก้ไข.
+
+- sortable: เลขที่ CADV, วันที่เอกสาร, ลูกค้า, ยอดที่ต้องรับ, เครดิตคงเหลือ, และสถานะ เพราะเป็นค่าที่เก็บโดยตรงใน `customer_advances` หรือ status relation
+- display-only: สาขา, Invoice/Contract, น้ำหนักสุทธิ, และเครดิตที่ใช้ได้ เพราะเป็น snapshot หลายค่า, aggregate item lines, หรือคำนวณจากยอดรับเงินจริงกับ VAT; ห้าม client-side sort เพื่อหลีกเลี่ยงลำดับที่ไม่ตรงกับข้อมูลทั้งชุด
+
 ## API Design
 
 ### Customer Advance source document
@@ -107,9 +125,9 @@ flowchart LR
 |---|---|
 | `GET /api/sales/customer-advances` | list/filter CADV, summary และ pagination |
 | `POST /api/sales/customer-advances` | สร้าง CADV + item snapshots; ไม่เขียน bank statement |
-| `GET /api/sales/customer-advances/{docNo}` | detail, item lines, RCP/SB allocation timeline |
-| `PATCH /api/sales/customer-advances/{docNo}` | แก้ header/item ก่อนมี active RCP หรือ SB allocation |
-| `PATCH /api/sales/customer-advances/{docNo}` with `action=cancel` | ยกเลิกได้เมื่อไม่มี active RCP/allocation หรือ reverse เหตุการณ์ต้นทางครบแล้ว |
+| `GET /api/sales/customer-advances/{docNo}` | detail, item lines และ status timeline |
+| `PUT /api/sales/customer-advances/{docNo}` | แก้ header/item ก่อนมี active RCP หรือ SB allocation |
+| `PATCH /api/sales/customer-advances/{docNo}` | ยกเลิกได้เมื่อไม่มี active RCP/allocation หรือ reverse เหตุการณ์ต้นทางครบแล้ว; request ต้องมี `reason` |
 
 `POST` request target:
 
@@ -122,7 +140,6 @@ flowchart LR
   contractNo?: "MAX-2606002",
   amount: "500000.00",
   vatType: "INCLUDE",
-  currencyCode: "THB",
   remark?: "",
   lines: [{
     productId: "501",
@@ -187,7 +204,7 @@ Sales Bill เลือกได้เฉพาะ CADV ที่ `received/part
 | `customer_name_snapshot` | customer name ตอนสร้าง | ใช้แสดง/พิมพ์เอกสาร |
 | `invoice_no` | เลข invoice ภายนอก | optional reference; ไม่ unique |
 | `contract_no` | เลข contract ภายนอก | optional reference; ไม่ unique |
-| `currency_code` | สกุลเงิน | FK ไป `currencies.code`; phase ปัจจุบันทำงานหลักเป็น THB |
+| `currency_code` | สกุลเงินทางเทคนิค | ระบบบันทึก `THB` เสมอเพื่อรักษา FK และประวัติข้อมูล; CADV ไม่มีการเลือกหรือแสดงสกุลเงิน เพราะรับเป็นเงินบาทเท่านั้น |
 | `vat_type` | VAT mode | `NONE` หรือ `INCLUDE`; `INCLUDE` หมายถึงผู้ใช้กรอกยอดก่อน VAT |
 | `vat_rate_percent` | VAT rate snapshot | มาจาก VAT master ตาม `document_date`; ห้าม hardcode ใน client |
 | `subtotal_amount` | ยอดฐานก่อน VAT | เป็นเครดิตฐานสูงสุดที่ใช้หัก SB หลังรับเงินครบตามสัดส่วน |
@@ -207,8 +224,8 @@ Balance invariant:
 | Formula | Meaning |
 |---|---|
 | `target_amount = subtotal_amount + vat_amount` | ยอดเงินสดที่ต้องรับรวม VAT |
+| `paid_base_capacity = min(subtotal_amount, received_amount * subtotal_amount / target_amount)` | เครดิตฐานก่อน VAT ที่ใช้ได้ตามเงินที่รับจริง |
 | `available_amount = paid_base_capacity - allocated_amount` | เครดิตฐานคงเหลือสำหรับหัก SB |
-| `paid_base_capacity = min(subtotal_amount, received_amount * subtotal_amount / target_amount)` | แปลงเงินสด gross ที่รับจริงเป็นฐานก่อน VAT |
 
 ### `customer_advance_items`
 

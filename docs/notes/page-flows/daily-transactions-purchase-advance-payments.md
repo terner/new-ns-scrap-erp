@@ -40,13 +40,15 @@ ADV เป็น source document ของเงินล่วงหน้า S
 
 หน้า list เป็น working surface หลักของทั้งสอง tab. การสร้าง/แก้ไข `ADV` และการสร้าง `CADV` ต้องเปิดเป็น modal จากหน้ารายการ เพื่อไม่ให้ผู้ใช้เสีย context ของ filter, pagination, และรายการเอกสารที่กำลังตรวจอยู่. Modal เป็นเพียง editing surface ชั่วคราว; หลังบันทึกสำเร็จต้องปิด modal, reload list, และคง filter เดิม.
 
+Tab ปัจจุบันเป็น page context: เมื่อเลือก `รับเงินล่วงหน้า` ระบบเขียน `/purchase/advance-payments?tab=receipt`; เมื่อเลือก `จ่ายเงินล่วงหน้า` จะไม่มี `tab` parameter. ดังนั้น refresh, เปิด URL ซ้ำ และ browser back/forward จะกลับมาที่ tab เดิม โดยไม่เก็บ state ธุรกิจไว้ใน browser storage.
+
 ## CADV Tab Contract
 
 | Area | Contract |
 |---|---|
 | List source | `GET /api/sales/customer-advances` |
 | Create source | `POST /api/sales/customer-advances` |
-| Header fields | สาขา, วันที่เอกสาร, ลูกค้า, invoice no, contract no, VAT, ยอดฐาน/ยอดรวม, currency, remark |
+| Header fields | สาขา, วันที่เอกสาร, ลูกค้า, invoice no, contract no, VAT, ยอดฐาน/ยอดรวม, remark |
 | Line fields | product, quantity, gross weight, net weight |
 | Status source | `customer_advance_statuses` |
 | Balance source | `customer_advances.received_amount`, `available_amount`, `allocated_amount` |
@@ -132,6 +134,7 @@ Data dictionary ของ CADV อยู่ใน [[Customer Advance Receipt Flo
 - ถ้า ADV มี VAT ต้องเก็บ tax breakdown เป็น snapshot: `subtotalAmount`, `vatAmount`, `totalAmount/amount`, `vatRate`
 - DB compatibility rule: `supplier_advance_payments.amount` เป็น legacy gross/total amount เพื่อให้ check constraint และ PMA/PMT/AP compatibility ยังถูกต้อง; ยอดก่อน VAT ต้องอ่านจาก `subtotal_amount`
 - balance rule: `supplier_advance_payments.allocated_amount` และ `remaining_amount` เป็นเครดิตฐานก่อน VAT เสมอ และต้องรวมกันเท่ากับ `subtotal_amount`; ห้ามสลับกลับไปเก็บยอด gross หลัง allocation
+- ADV list แสดง `ยอดรวมมัดจำ` เป็นยอดรวมหลัง VAT, `เครดิตที่ใช้ได้` เป็น `subtotal_amount` และ `เครดิตคงเหลือ` เป็น `remaining_amount`; ไม่ใช้ `allocated_amount` เป็นเครดิตที่ใช้ได้ เพราะเป็นยอดที่ถูกหักบิลไปแล้ว
 - allocation rule: `supplier_advance_allocations.allocated_amount` เท่ากับ `allocated_subtotal_amount` (เครดิตฐานที่ใช้), `allocated_vat_amount` เป็น VAT ของ PB ที่ลดลง และ `allocated_total_amount` เป็นผลรวมที่ PB ลดลง
 - modal Supplier Advance ต้องบังคับเลือก `สาขา` ก่อน `ผู้ขาย`; Supplier selector ต้อง disabled จนกว่าจะเลือกสาขา
 - supplier options ต้องกรองตามสาขาเอกสารจาก active `supplier_branches`; ถ้าเปลี่ยนสาขาแล้วผู้ขายที่เลือกอยู่ไม่ผูกกับสาขาใหม่ ต้อง clear supplier และให้ผู้ใช้เลือกใหม่

@@ -31,7 +31,7 @@ function customerAdvanceStatusCode(params: {
 export async function refreshCustomerAdvanceAllocation(
   tx: CustomerAdvanceSettlementTx,
   customerAdvanceId: bigint,
-  actor?: string | null,
+  actor: string,
 ) {
   const [advance, statuses] = await Promise.all([
     tx.customer_advances.findUnique({
@@ -100,7 +100,7 @@ export async function refreshCustomerAdvanceAllocation(
       available_amount: availableAmount,
       status_id: nextStatus.id,
       updated_at: new Date(),
-      updated_by: actor ?? 'system',
+      updated_by: actor,
     },
     where: { id: customerAdvanceId },
   })
@@ -111,7 +111,7 @@ export async function refreshCustomerAdvanceAllocation(
         action: `status_${nextStatusCode}`,
         allocated_amount_snapshot: allocatedAmount,
         available_amount_snapshot: availableAmount,
-        created_by: actor ?? 'system',
+        created_by: actor,
         customer_advance_doc_no: advance.doc_no,
         customer_advance_id: advance.id,
         event_key: `customer-advance.status.${advance.doc_no}.${nextStatusCode}.${Date.now()}`,

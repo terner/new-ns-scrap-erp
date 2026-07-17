@@ -1,17 +1,37 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AdvancePaymentsPageClient } from '@/components/purchase-flow/AdvancePaymentsPageClient'
 import { CustomerAdvanceForm } from '@/components/purchase-flow/CustomerAdvanceForm'
 
 type AdvanceTab = 'payment' | 'receipt'
 
+function tabFromLocation(): AdvanceTab {
+  return new URLSearchParams(window.location.search).get('tab') === 'receipt' ? 'receipt' : 'payment'
+}
+
 export function AdvancePaymentsTabbedPageClient() {
   const [activeTab, setActiveTab] = useState<AdvanceTab>('payment')
 
+  useEffect(() => {
+    const syncFromLocation = () => setActiveTab(tabFromLocation())
+    syncFromLocation()
+    window.addEventListener('popstate', syncFromLocation)
+    return () => window.removeEventListener('popstate', syncFromLocation)
+  }, [])
+
+  const changeTab = (value: string) => {
+    const nextTab: AdvanceTab = value === 'receipt' ? 'receipt' : 'payment'
+    const url = new URL(window.location.href)
+    if (nextTab === 'receipt') url.searchParams.set('tab', 'receipt')
+    else url.searchParams.delete('tab')
+    window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
+    setActiveTab(nextTab)
+  }
+
   return (
-    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AdvanceTab)}>
+    <Tabs value={activeTab} onValueChange={changeTab}>
       <div className="border-b border-slate-200">
         <TabsList variant="line" aria-label="ประเภทเงินล่วงหน้า">
           <TabsTrigger value="payment" variant="line">

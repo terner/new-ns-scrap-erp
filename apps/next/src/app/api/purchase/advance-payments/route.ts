@@ -119,6 +119,8 @@ function orderByFor(sortKey: string, direction: Prisma.SortOrder): Prisma.suppli
         return { remaining_amount: direction }
       case 'status':
         return { status: direction }
+      case 'subtotalAmount':
+        return { subtotal_amount: direction }
       case 'supplierName':
         return { suppliers: { name: direction } }
       case 'advanceDate':

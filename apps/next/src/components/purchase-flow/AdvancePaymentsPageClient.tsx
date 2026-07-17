@@ -37,8 +37,8 @@ type StatusOption = {
 }
 
 type AdvancePaymentSortDirection = 'asc' | 'desc'
-type AdvancePaymentSortKey = 'accountName' | 'advanceDate' | 'allocatedAmount' | 'amount' | 'docNo' | 'largeScaleDocNo' | 'netWeight' | 'productName' | 'remainingAmount' | 'status' | 'supplierName'
-type AdvancePaymentColumnKey = 'action' | 'advanceDate' | 'allocatedAmount' | 'amount' | 'docNo' | 'largeScaleDocNo' | 'netWeight' | 'plateNo' | 'productName' | 'remainingAmount' | 'status' | 'supplierName'
+type AdvancePaymentSortKey = 'accountName' | 'advanceDate' | 'allocatedAmount' | 'amount' | 'docNo' | 'largeScaleDocNo' | 'netWeight' | 'productName' | 'remainingAmount' | 'status' | 'subtotalAmount' | 'supplierName'
+type AdvancePaymentColumnKey = 'action' | 'advanceDate' | 'amount' | 'docNo' | 'largeScaleDocNo' | 'netWeight' | 'plateNo' | 'productName' | 'remainingAmount' | 'status' | 'subtotalAmount' | 'supplierName'
 
 type AdvancePaymentRow = {
   accountName: string
@@ -161,7 +161,7 @@ const advancePaymentColumns: Array<ResizableColumnDefinition<AdvancePaymentColum
   { key: 'productName', defaultWidth: 200, minWidth: 130 },
   { key: 'netWeight', defaultWidth: 110, minWidth: 90 },
   { key: 'amount', defaultWidth: 110, minWidth: 90 },
-  { key: 'allocatedAmount', defaultWidth: 110, minWidth: 90 },
+  { key: 'subtotalAmount', defaultWidth: 110, minWidth: 90 },
   { key: 'remainingAmount', defaultWidth: 110, minWidth: 90 },
   { key: 'status', defaultWidth: 140, minWidth: 120 },
   { key: 'action', defaultWidth: 180, minWidth: 150 },
@@ -227,7 +227,7 @@ export function AdvancePaymentsPageClient() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
-  const columnResize = useResizableColumns('daily.advance-payments.v5', advancePaymentColumns)
+  const columnResize = useResizableColumns('daily.advance-payments.v6', advancePaymentColumns)
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
       page: String(page),
@@ -995,6 +995,8 @@ export function AdvancePaymentsPageClient() {
                   <div className="text-xs text-slate-500 space-y-0.5">
                     <span>น้ำหนักสุทธิ: <span className="font-semibold text-slate-700">{formatMoney(row.netWeight)}</span> กก.</span>
                     <div className="block">ยอดรวมมัดจำ: <span className="font-semibold text-slate-700">{formatMoney(row.totalAmount)}</span></div>
+                    <div className="block">VAT: <span className="font-semibold text-slate-700">{row.vatTypeLabel}</span></div>
+                    <div className="block">เครดิตที่ใช้ได้: <span className="font-semibold text-slate-700">{formatMoney(row.subtotalAmount)}</span></div>
                     {row.allocatedAmount > 0 ? <div className="block text-emerald-700">หักแล้ว: <span className="font-semibold">{formatMoney(row.allocatedAmount)}</span></div> : null}
                   </div>
                   <div className="text-right">
@@ -1029,8 +1031,8 @@ export function AdvancePaymentsPageClient() {
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} sortKey="productName" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'น้ำหนักสุทธิ')} sortKey="netWeight" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดรวมมัดจำ" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดรวมมัดจำ')} sortKey="amount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตฐานที่ใช้" resizeProps={columnResize.getResizeHandleProps('allocatedAmount', 'เครดิตฐานที่ใช้')} sortKey="allocatedAmount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตฐานคงเหลือ" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'เครดิตฐานคงเหลือ')} sortKey="remainingAmount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตที่ใช้ได้" resizeProps={columnResize.getResizeHandleProps('subtotalAmount', 'เครดิตที่ใช้ได้')} sortKey="subtotalAmount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตคงเหลือ" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'เครดิตคงเหลือ')} sortKey="remainingAmount" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
                   <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
                 </tr>
@@ -1047,8 +1049,11 @@ export function AdvancePaymentsPageClient() {
                     <td className="p-3 whitespace-nowrap font-medium text-slate-700">{row.plateNo || '-'}</td>
                     <td className="p-3 font-medium text-slate-700">{row.productName || '-'}</td>
                     <TableNumberCell value={formatMoney(row.netWeight)} />
-                    <TableNumberCell value={formatMoney(row.totalAmount)} />
-                    <TableNumberCell value={formatMoney(row.allocatedAmount)} />
+                    <td className="p-3 text-right tabular-nums">
+                      <p>{formatMoney(row.totalAmount)}</p>
+                      <p className="text-xs text-slate-500">{row.vatTypeLabel}</p>
+                    </td>
+                    <TableNumberCell value={formatMoney(row.subtotalAmount)} />
                     <TableNumberCell tone="amber" value={formatMoney(row.remainingAmount)} />
                     <td className="p-3"><StatusDot status={row.status} label={row.statusLabel} /></td>
                     <td className="p-3 text-right">

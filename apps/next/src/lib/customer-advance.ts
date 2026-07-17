@@ -136,7 +136,6 @@ export const customerAdvanceFormSchema = z.object({
   amount: positiveDecimal('ยอดเงินล่วงหน้าที่ต้องรับ'),
   branchId: requiredCode('สาขา'),
   contractNo: optionalReference('เลขที่ Contract'),
-  currencyCode: requiredCode('สกุลเงิน'),
   customerId: requiredMasterId('ลูกค้า'),
   documentDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่เอกสารต้องเป็นรูปแบบ YYYY-MM-DD'),
   invoiceNo: optionalReference('เลขที่ Invoice'),
@@ -162,3 +161,11 @@ export const customerAdvanceFormSchema = z.object({
 })
 
 export type CustomerAdvanceFormValues = z.infer<typeof customerAdvanceFormSchema>
+
+export const customerAdvanceCancelSchema = z.object({
+  reason: z.string()
+    .trim()
+    .min(1, 'ระบุเหตุผลการยกเลิก')
+    .max(500, 'เหตุผลการยกเลิกยาวเกินไป')
+    .regex(documentTextPattern, 'เหตุผลการยกเลิกมีรูปแบบไม่ถูกต้อง'),
+})
