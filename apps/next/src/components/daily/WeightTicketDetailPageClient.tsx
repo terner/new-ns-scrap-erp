@@ -17,6 +17,7 @@ import {
   WeightTicketTimelinePendingOutChanges,
   weightTicketTimelinePendingOutChangeCount,
 } from '@/components/daily/WeightTicketProductBreakdownTable'
+import { WeightTicketImageGallery } from '@/components/daily/WeightTicketImageGallery'
 import { WeightTicketStockReturnDialog, type StockReturnPayload } from '@/components/daily/WeightTicketStockReturnDialog'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
@@ -455,6 +456,11 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
             </Card>
           </div>
 
+          <WeightTicketImageGallery
+            imageNames={ticket.imageNames}
+            onOpen={(gallery) => setLineGallery(gallery)}
+          />
+
         {ticket.type === 'WTI' ? (
           <Card className="overflow-hidden p-0">
             <div className="border-b border-slate-100 px-5 py-4">
@@ -821,6 +827,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                   {lineGallery.images.length > 1 ? (
                     <>
                       <button
+                        aria-label="รูปก่อนหน้า"
                         className="absolute left-3 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70"
                         type="button"
                         onClick={() => setLineGallery((current) => current ? ({
@@ -831,6 +838,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                         <ChevronLeft className="size-5" />
                       </button>
                       <button
+                        aria-label="รูปถัดไป"
                         className="absolute right-3 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70"
                         type="button"
                         onClick={() => setLineGallery((current) => current ? ({

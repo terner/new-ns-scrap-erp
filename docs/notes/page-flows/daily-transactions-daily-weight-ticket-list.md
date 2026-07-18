@@ -4,7 +4,7 @@ tags:
   - page-flow
   - menu
 status: accepted-baseline
-updated: 2026-06-30
+updated: 2026-07-19
 route: /daily/weight-ticket-list
 ---
 
@@ -92,6 +92,23 @@ User decision updated on 2026-07-11: WTO draft/save must not reserve stock. The 
 - รายละเอียดสิ่งเจือปนที่เป็นสินค้าในใบพิมพ์ต้องแสดงในแถว `สรุปรวมจากเต๋า` ของสินค้าต้นทาง โดยแจกแจงเป็นหลายบรรทัด เช่น `1. สินค้าอื่น 10 กก. ซื้อเป็น กระป๋องอลูมิเนียม` และ `2. สินค้าอื่น 20 กก. ไม่ซื้อ`; ไม่ต้องมีแถวสีเหลือง/แถว `หักสิ่งเจือปน` แยก
 - เมื่อกดแก้ไขเอกสาร ต้องโหลดโครงสร้างกลับมาเหมือนตอนสร้าง: เต๋าจริงต้องยังเป็นเต๋า, รายการซื้อเพิ่มจากสิ่งเจือปนต้องไม่กลายเป็นเต๋าปลอม, และแถว `สินค้าอื่น` ต้องจำ `ซื้อ/ไม่ซื้อ` กับสินค้าที่ปนมาได้
 - Runtime update 2026-06-20: `weight_ticket_lines.parent_line_no` และ `weight_ticket_lines.impurity_source_line_no` เป็น source of truth สำหรับโหลดโครงสร้าง edit กลับมา ไม่เดาจากลำดับสินค้า/หมายเหตุเป็นหลักอีกต่อไป
+
+### Detail Image Album
+
+- ทั้ง detail modal จากรายการและหน้า `/daily/weight-ticket-list/[docNo]` แสดง card `รูปภาพประกอบ` หลังกลุ่ม `รายละเอียดสินค้าและที่มา` / `สถานะ` และก่อนประวัติการใช้งานหรือ timeline เพื่อให้ตรวจหลักฐานทั้งหมดก่อนอ่านผลการนำเอกสารไปใช้
+- `ticket.imageNames` คือ read model ที่รวมรูปรถและรูปของทุก line/เต๋าตามลำดับเดิม จึงไม่เพิ่ม API, query, storage field หรือการประกอบ fallback รายหน้า; ปุ่ม `ดูรูป` ราย line ยังคงอยู่สำหรับตรวจเฉพาะเต๋า
+- รูปที่เปิดได้แสดงเป็น grid 3 คอลัมน์แบบยืดตามพื้นที่ (ตัวอย่าง 6 รูปจึงเป็น 3 x 2 และที่ 390px ยังไม่สร้าง document overflow) กดรูปใดจะเปิด lightbox เดิมที่รูปนั้น และใช้ `รูปก่อนหน้า` / `รูปถัดไป` แบบวนรอบได้; 0 รูปแสดง empty state และ 1 รูปเปิดเป็น gallery หนึ่งรายการโดยไม่แสดง navigation ที่ไม่จำเป็น
+- ค่า legacy ที่มีเพียง filename ถูกนับเป็นหลักฐานเดิมแต่ไม่สร้าง `<img>` ที่เสีย ระบบแสดงจำนวนที่ยัง preview ไม่ได้แทน ห้ามเดา URL หรือ fallback ไป legacy binary/base64 ตอน runtime
+
+Image delivery contract ของ album นี้:
+
+1. รูปเป็นหลักฐานเอกสารระดับ L5 และ source of truth คือ metadata ของ WTI/WTO ใน DB ร่วมกับ object URL ที่ API detail ส่งมาใน `ticket.imageNames`; detail API ยังคง `private, no-store`
+2. ใช้ URL/storage key และ cache header เดิมของ attachment โดยไม่เพิ่ม cache key, TTL, browser persistence หรือ invalidation path ใหม่ใน batch นี้
+3. ห้าม cache binary, transaction response, party data หรือเอกสารลง Redis, `localStorage` หรือ `sessionStorage` เพราะเป็นหลักฐานธุรกรรมที่ต้องตามสิทธิ์และสถานะปัจจุบัน
+4. album อยู่บน detail surface จึงใช้ attachment URL ปัจจุบันเป็นรูปหลักและ full preview; ยังไม่เพิ่ม thumbnail derivative เพราะ contract ปัจจุบันมี URL เดียว รูปยังอยู่ภายใต้ privacy policy/bucket เดิมและ batch นี้ไม่เปลี่ยน public/private policy
+5. focused tests ครอบ 0/1/6 รูป, การเปิด gallery จาก index ที่กด, previous/next wrap contract, mixed previewable + legacy filename-only, responsive grid และตำแหน่ง component บน detail ทั้งสอง surface
+
+What is what: album เป็นภาพรวมหลักฐานทั้งเอกสาร ส่วน `ดูรูป` ในตารางสินค้าเป็นทางลัดเฉพาะ line. Why it has to be like this: ผู้ตรวจเอกสารต้องเห็นรูปรถและรูปสินค้าครบในจุดเดียวโดยไม่ไล่เปิดทีละเต๋า แต่ยังต้องย้อนตรวจที่มาราย line และอ่านเอกสารเก่าที่มีเพียงชื่อไฟล์ได้อย่างปลอดภัย
 
 ## Page Responsibilities
 
