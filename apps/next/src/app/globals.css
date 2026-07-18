@@ -43,8 +43,8 @@
   color: #172033;
   background: #f3f6f9;
   --ns-sort-active: #1677ff;
-  --ns-field-focus: #737373;
-  --ns-field-focus-ring: rgb(115 115 115 / 0.25);
+  --ns-field-focus: #3b82f6;
+  --ns-field-focus-ring: rgb(59 130 246 / 0.25);
 }
 
 .dark {
@@ -52,8 +52,8 @@
   color: #f8fafc;
   background: #0f172a;
   --ns-sort-active: #69b1ff;
-  --ns-field-focus: #737373;
-  --ns-field-focus-ring: rgb(115 115 115 / 0.35);
+  --ns-field-focus: #3b82f6;
+  --ns-field-focus-ring: rgb(59 130 246 / 0.35);
   
   /* Redefine Tailwind's base theme variables */
   --color-white: #1e293b;
@@ -864,15 +864,15 @@ aside a:visited {
   box-shadow: none;
 }
 
-/* TweakCN is used only for active-field emphasis, not for field surfaces. */
+/* Keep every editable control on one blue active-field treatment. */
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea):focus,
-:where([role="combobox"]):focus-within {
+:where([role="combobox"], [data-slot="input-group"]):focus-within {
   border-color: var(--ns-field-focus) !important;
   box-shadow: 0 0 0 3px var(--ns-field-focus-ring) !important;
 }
 
 .dark :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea):focus,
-.dark :where([role="combobox"]):focus-within {
+.dark :where([role="combobox"], [data-slot="input-group"]):focus-within {
   border-color: var(--ns-field-focus) !important;
   box-shadow: 0 0 0 3px var(--ns-field-focus-ring) !important;
 }

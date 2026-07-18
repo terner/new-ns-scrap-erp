@@ -227,7 +227,7 @@ export function SearchCombobox({
         aria-haspopup="listbox"
         aria-invalid={Boolean(error)}
         className={cn(
-          'h-10 w-full rounded-md border px-3 py-2 text-base focus-visible:!border-[#737373] focus-visible:!ring-[3px] focus-visible:!ring-neutral-500/20 sm:text-sm',
+          'h-10 w-full rounded-md border px-3 py-2 text-base focus-visible:!border-[var(--ns-field-focus)] focus-visible:!ring-[3px] focus-visible:!ring-[var(--ns-field-focus-ring)] sm:text-sm',
           error ? 'border-red-400 bg-red-50 focus-visible:!border-red-500 focus-visible:!ring-red-500/20 dark:border-red-500 dark:bg-red-950/20' : 'border-slate-300 dark:[border-color:var(--ns-dark-border-strong)]',
           inputClassName,
         )}
