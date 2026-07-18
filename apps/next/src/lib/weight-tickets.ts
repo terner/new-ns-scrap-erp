@@ -330,8 +330,51 @@ export const weightTicketFormSchema = z.object({
     .regex(/^[\p{L}\p{M}\p{N}\s.-]+$/u, 'ทะเบียนรถมีรูปแบบไม่ถูกต้อง'),
   godownName: z.string().trim().min(1, 'กรอกโกดัง').max(100, 'ชื่อโกดังยาวเกินไป'),
 }).superRefine((value, ctx) => {
+  const lineById = new Map<string, (typeof value.lines)[number]>()
+  value.lines.forEach((line, index) => {
+    if (lineById.has(line.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'รหัสรายการซ้ำกัน',
+        path: ['lines', index, 'id'],
+      })
+      return
+    }
+    lineById.set(line.id, line)
+  })
+  value.lines.forEach((line, index) => {
+    if (!line.parentId) return
+    if (line.parentId === line.id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'รายการไม่สามารถอ้างตัวเองเป็นรายการหลักได้',
+        path: ['lines', index, 'parentId'],
+      })
+    } else if (!lineById.has(line.parentId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'ไม่พบรายการหลักที่อ้างถึง',
+        path: ['lines', index, 'parentId'],
+      })
+    } else {
+      const ancestorIds = new Set([line.id])
+      let ancestorId: string | undefined = line.parentId
+      while (ancestorId) {
+        if (ancestorIds.has(ancestorId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'รายการหลักและรายการย่อยอ้างอิงกันเป็นวงจร',
+            path: ['lines', index, 'parentId'],
+          })
+          break
+        }
+        ancestorIds.add(ancestorId)
+        ancestorId = lineById.get(ancestorId)?.parentId
+      }
+    }
+  })
+
   if (value.type === 'WTI') {
-    const lineById = new Map(value.lines.map((line) => [line.id, line]))
     value.lines.forEach((line, index) => {
       const parent = line.parentId ? lineById.get(line.parentId) : null
       if (parent && parent.productId.trim().toUpperCase() !== line.productId.trim().toUpperCase()) {

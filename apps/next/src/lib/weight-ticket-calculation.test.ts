@@ -13,6 +13,30 @@ import {
   buildWeightTicketProductSummaryRows,
 } from './server/weight-tickets'
 
+const validWtiLine = (id: string, parentId?: string) => ({
+  containerDeductionWeight: 0,
+  deductionMode: 'none',
+  deductionValue: 0,
+  grossWeight: 10,
+  id,
+  imageNames: [`${id}.jpg`],
+  impurityId: '',
+  parentId,
+  productId: 'PROD-A',
+  warehouseId: '',
+})
+
+const validWtiPayload = (lines: ReturnType<typeof validWtiLine>[]) => ({
+  branchId: 'BR10',
+  godownName: 'โกดังทดสอบ',
+  lines,
+  partyId: 'SUP-1',
+  remark: '',
+  type: 'WTI',
+  vehicleImageNames: [],
+  vehicleNo: 'TEST-1',
+})
+
 describe('weight ticket totals', () => {
   it('deducts a child impurity from the whole product instead of clipping it to the first lot', () => {
     const totals = calculateTicketTotals([
@@ -179,6 +203,56 @@ describe('weight ticket totals', () => {
     expect(result.error.issues).toContainEqual(expect.objectContaining({
       message: 'สินค้าของรายการย่อยต้องตรงกับสินค้าของรายการหลัก',
       path: ['lines', 1, 'productId'],
+    }))
+  })
+
+  it('rejects duplicate line ids before they can collide in weight maps', () => {
+    const result = weightTicketFormSchema.safeParse(validWtiPayload([
+      validWtiLine('duplicate-line'),
+      validWtiLine('duplicate-line'),
+    ]))
+
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error('Expected duplicate line ids to fail validation')
+    expect(result.error.issues).toContainEqual(expect.objectContaining({
+      path: ['lines', 1, 'id'],
+    }))
+  })
+
+  it('rejects a line whose parent id does not resolve inside the payload', () => {
+    const result = weightTicketFormSchema.safeParse(validWtiPayload([
+      validWtiLine('orphan-child', 'missing-parent'),
+    ]))
+
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error('Expected an orphan parent id to fail validation')
+    expect(result.error.issues).toContainEqual(expect.objectContaining({
+      path: ['lines', 0, 'parentId'],
+    }))
+  })
+
+  it('rejects a line that points to itself as its parent', () => {
+    const result = weightTicketFormSchema.safeParse(validWtiPayload([
+      validWtiLine('self-parent', 'self-parent'),
+    ]))
+
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error('Expected a self-parent line to fail validation')
+    expect(result.error.issues).toContainEqual(expect.objectContaining({
+      path: ['lines', 0, 'parentId'],
+    }))
+  })
+
+  it('rejects a parent cycle that has no root line', () => {
+    const result = weightTicketFormSchema.safeParse(validWtiPayload([
+      validWtiLine('cycle-a', 'cycle-b'),
+      validWtiLine('cycle-b', 'cycle-a'),
+    ]))
+
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error('Expected a parent cycle to fail validation')
+    expect(result.error.issues).toContainEqual(expect.objectContaining({
+      path: ['lines', 0, 'parentId'],
     }))
   })
 
