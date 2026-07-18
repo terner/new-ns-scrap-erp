@@ -224,7 +224,7 @@ export function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: bool
           detail: cleanNote(line.note),
           grossWeight: line.grossWeightValue,
           label: `เต๋าที่ ${lotIndex + 1}`,
-          netWeight: line.netWeight,
+          netWeight: Math.max(0, line.grossWeightValue - line.containerDeductionWeightValue - line.deductionWeight),
           productName: summary.productName,
         })
       })

@@ -230,6 +230,7 @@ export async function POST(request: Request) {
       impuritySourceLineId: line.impuritySourceLineId,
       parentId: line.parentId,
       impurityId: line.impurityId,
+      productId: line.productId,
     })))
 
     const created = await prisma.$transaction(async (tx) => {

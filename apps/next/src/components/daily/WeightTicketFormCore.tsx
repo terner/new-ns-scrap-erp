@@ -19,7 +19,6 @@ import { ApiError, getErrorMessage } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { cachedWeightTicketReferences } from '@/lib/weight-ticket-reference-cache'
 import {
-  calculateTicketTotals,
   calculateWeightTicketLineTotals,
   createWeightTicketLine,
   decodeStoredImageAsset,
@@ -240,8 +239,10 @@ async function createAttachmentPreviewFromFile(file: File): Promise<AttachmentPr
   }
 }
 
-function calculateAdjustedLineTotals(line: FormWeightTicketLine, allLines: FormWeightTicketLine[]) {
-  const calculation = calculateWeightTicketLineTotals(allLines)
+function calculateAdjustedLineTotals(
+  line: FormWeightTicketLine,
+  calculation: ReturnType<typeof calculateWeightTicketLineTotals>,
+) {
   return line.parentId
     ? calculation.lineTotalsById.get(line.id)!
     : calculation.sourceTotalsByLineId.get(line.id)!
@@ -511,7 +512,8 @@ export function WeightTicketFormCore({
     if (!form.branchId) return []
     return options.filter((option) => option.branchIds?.includes(form.branchId))
   }, [customers, form.branchId, form.type, suppliers])
-  const totals = useMemo(() => calculateTicketTotals(form.lines), [form.lines])
+  const lineCalculation = useMemo(() => calculateWeightTicketLineTotals(form.lines), [form.lines])
+  const totals = lineCalculation.totals
 
   const isImpurityProduct = useCallback((p: OptionItem) => {
     const cat = p.category?.toLowerCase() || ''
@@ -834,7 +836,7 @@ export function WeightTicketFormCore({
         }
 
         if (isParent) {
-          const lineTotals = calculateAdjustedLineTotals(line, form.lines)
+          const lineTotals = calculateAdjustedLineTotals(line, lineCalculation)
           const children = form.lines.filter((l) => l.parentId === line.id)
           const impurities = children.filter((l) => l.deductionMode !== 'none')
           if (lineTotals.containerDeductionWeight + lineTotals.deductionWeight > lineTotals.grossWeight) {
@@ -871,7 +873,7 @@ export function WeightTicketFormCore({
       }
     })
     return next
-  }, [form, impurityOptions])
+  }, [form, impurityOptions, lineCalculation])
 
   const ticketTheme = form.type === 'WTI'
     ? {
@@ -1103,7 +1105,10 @@ export function WeightTicketFormCore({
         const currentSourceLine = current.lines.find((line) => line.id === sourceLine.id)
         if (!currentSourceLine || !targetProductId) return current.lines
         const baseLines = current.lines.filter((line) => line.impuritySourceLineId !== currentSourceLine.id)
-        const lineTotals = calculateAdjustedLineTotals(currentSourceLine, current.lines)
+        const lineTotals = calculateAdjustedLineTotals(
+          currentSourceLine,
+          calculateWeightTicketLineTotals(current.lines),
+        )
         const deductionWeight = String(lineTotals.deductionWeight)
         const parentLine = current.lines.find(l => l.id === currentSourceLine.parentId)
         const existingTargetParentLine = baseLines.find((line) =>
@@ -1521,7 +1526,7 @@ export function WeightTicketFormCore({
                   {(() => {
                     const parentLines = getMainParentLines(form.lines)
                     return parentLines.map((line, index) => {
-                      const lineTotals = calculateAdjustedLineTotals(line, form.lines)
+                      const lineTotals = calculateAdjustedLineTotals(line, lineCalculation)
                       const childIds = form.lines.filter((l) => l.parentId === line.id).map((l) => l.id)
                       const allRelatedIds = [line.id, ...childIds]
                       const hasError = allRelatedIds.some((id) =>
@@ -1569,13 +1574,13 @@ export function WeightTicketFormCore({
                 const line = activeLine
                 const parentLines = getMainParentLines(form.lines)
                 const index = parentLines.findIndex((entry) => entry.id === line.id)
-                const lineTotals = calculateAdjustedLineTotals(line, form.lines)
+                const lineTotals = calculateAdjustedLineTotals(line, lineCalculation)
                 const hasSelectedProduct = Boolean(line.productId)
                 const isPurchaseOnlyLine = isImpurityPurchaseLine(line)
                 const realLotSummary = calculateRealLotSummary(line, form.lines)
                 const canAddImpurityLine = hasSelectedProduct && realLotSummary.lotCount > 0
                 const boughtImpurityLinesForLine = getBoughtImpurityEntriesForLine(line, form.lines)
-                const boughtImpurityTotal = boughtImpurityLinesForLine.reduce((sum, entry) => sum + calculateAdjustedLineTotals(entry.sourceLine, form.lines).deductionWeight, 0)
+                const boughtImpurityTotal = boughtImpurityLinesForLine.reduce((sum, entry) => sum + calculateAdjustedLineTotals(entry.sourceLine, lineCalculation).deductionWeight, 0)
                 const purchaseOnlyNote = isPurchaseOnlyLine && boughtImpurityLinesForLine.length > 0
                   ? `ซื้อเพิ่มจากสิ่งเจือปน ${boughtImpurityLinesForLine.length} รายการ รวม ${formatWeight(boughtImpurityTotal)} กก.`
                   : ''
@@ -1858,7 +1863,7 @@ export function WeightTicketFormCore({
 	                                  const impurityName = impurityOptions.find((entry) => entry.id === sourceLine.impurityId)?.label ?? 'สิ่งเจือปน'
 	                                  const sourceParentLine = sourceLine.parentId ? form.lines.find((entry) => entry.id === sourceLine.parentId) : null
 	                                  const sourceProduct = sourceParentLine ? products.find((entry) => entry.id === sourceParentLine.productId) : null
-	                                  const purchaseWeight = calculateAdjustedLineTotals(sourceLine, form.lines).deductionWeight
+	                                  const purchaseWeight = calculateAdjustedLineTotals(sourceLine, lineCalculation).deductionWeight
 	                                  const deductionTypeLabel = sourceLine.deductionMode === 'percent'
 	                                    ? `หัก ${formatWeight(Number(sourceLine.deductionValue || 0))}%`
 	                                    : `หัก ${formatWeight(Number(sourceLine.deductionValue || 0))} กก.`
@@ -1959,7 +1964,7 @@ export function WeightTicketFormCore({
                                 const selectedImpurityProductLabel = impurityPurchaseProducts.find((option) => option.id === child.impurityProductId)?.label ?? ''
                                 const mustSelectImpurityProductFirst = isOtherProductImpurity && child.impurityPurchaseAction === 'buy' && !child.impurityProductId
                                 const canEditImpurityDeduction = hasSelectedProduct && hasSelectedImpurity
-                                const calculatedDeductionWeight = calculateAdjustedLineTotals(child, form.lines).deductionWeight
+                                const calculatedDeductionWeight = calculateAdjustedLineTotals(child, lineCalculation).deductionWeight
                                 return (
                                   <div key={child.id} className="bg-white p-2 rounded-xl border border-slate-200/60">
                                     <div className={cn(

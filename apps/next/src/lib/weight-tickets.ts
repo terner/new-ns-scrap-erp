@@ -330,6 +330,19 @@ export const weightTicketFormSchema = z.object({
     .regex(/^[\p{L}\p{M}\p{N}\s.-]+$/u, 'ทะเบียนรถมีรูปแบบไม่ถูกต้อง'),
   godownName: z.string().trim().min(1, 'กรอกโกดัง').max(100, 'ชื่อโกดังยาวเกินไป'),
 }).superRefine((value, ctx) => {
+  if (value.type === 'WTI') {
+    const lineById = new Map(value.lines.map((line) => [line.id, line]))
+    value.lines.forEach((line, index) => {
+      const parent = line.parentId ? lineById.get(line.parentId) : null
+      if (parent && parent.productId.trim().toUpperCase() !== line.productId.trim().toUpperCase()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'สินค้าของรายการย่อยต้องตรงกับสินค้าของรายการหลัก',
+          path: ['lines', index, 'productId'],
+        })
+      }
+    })
+  }
   if (value.type !== 'WTO') return
   const parentBucketByKey = new Map<string, number>()
   value.lines.forEach((line, index) => {
@@ -735,7 +748,7 @@ export function roundWeight(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
-type WeightTicketCalculationLine = Pick<WeightTicketLine, 'deductionMode' | 'id'> & {
+type WeightTicketCalculationLine = Pick<WeightTicketLine, 'deductionMode' | 'id' | 'productId'> & {
   containerDeductionWeight: number | string
   deductionValue: number | string
   grossWeight: number | string
@@ -765,6 +778,8 @@ export function calculateWeightTicketLineTotals(lines: WeightTicketCalculationLi
 
   lines.forEach((line) => {
     if (!line.parentId) return
+    const parent = lineById.get(line.parentId)
+    if (!parent || parent.productId.trim().toUpperCase() !== line.productId.trim().toUpperCase()) return
     const children = childrenByParentId.get(line.parentId) ?? []
     children.push(line)
     childrenByParentId.set(line.parentId, children)

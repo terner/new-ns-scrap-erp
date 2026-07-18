@@ -247,6 +247,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       impuritySourceLineId: line.impuritySourceLineId,
       parentId: line.parentId,
       impurityId: line.impurityId,
+      productId: line.productId,
     })))
 
     const updated = await prisma.$transaction(async (tx) => {

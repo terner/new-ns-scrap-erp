@@ -6,6 +6,7 @@ import {
   calculateWeightTicketLineTotals,
   type WeightTicketFormValues,
   type WeightTicketRecord,
+  weightTicketFormSchema,
 } from './weight-tickets'
 import {
   buildWeightTicketLineRows,
@@ -21,6 +22,7 @@ describe('weight ticket totals', () => {
         deductionValue: '0',
         grossWeight: '22',
         id: 'product-a-lot-1',
+        productId: 'PROD-A',
       },
       {
         containerDeductionWeight: '0',
@@ -29,6 +31,7 @@ describe('weight ticket totals', () => {
         grossWeight: '228',
         id: 'product-a-lot-2',
         parentId: 'product-a-lot-1',
+        productId: 'PROD-A',
       },
       {
         containerDeductionWeight: '0',
@@ -38,6 +41,7 @@ describe('weight ticket totals', () => {
         id: 'product-a-impurity',
         impurityId: 'impurity-1',
         parentId: 'product-a-lot-1',
+        productId: 'PROD-A',
       },
     ])
 
@@ -57,6 +61,7 @@ describe('weight ticket totals', () => {
         deductionValue: '0',
         grossWeight: '10',
         id: 'product-a-lot',
+        productId: 'PROD-A',
       },
       {
         containerDeductionWeight: '0',
@@ -66,6 +71,7 @@ describe('weight ticket totals', () => {
         id: 'product-a-impurity',
         impurityId: 'impurity-a',
         parentId: 'product-a-lot',
+        productId: 'PROD-A',
       },
       {
         containerDeductionWeight: '0',
@@ -73,6 +79,7 @@ describe('weight ticket totals', () => {
         deductionValue: '0',
         grossWeight: '100',
         id: 'product-b-lot',
+        productId: 'PROD-B',
       },
     ])
 
@@ -85,6 +92,94 @@ describe('weight ticket totals', () => {
     expect(calculation.lineTotalsById.get('product-a-impurity')?.deductionWeight).toBe(10)
     expect(calculation.sourceTotalsByLineId.get('product-a-lot')?.netWeight).toBe(0)
     expect(calculation.sourceTotalsByLineId.get('product-b-lot')?.netWeight).toBe(100)
+  })
+
+  it('does not let a mismatched child product fund its parent product impurity', () => {
+    const lines = [
+      {
+        containerDeductionWeight: 0,
+        deductionMode: 'none' as const,
+        deductionValue: 0,
+        grossWeight: 10,
+        id: 'product-a-lot',
+        productId: 'PROD-A',
+      },
+      {
+        containerDeductionWeight: 0,
+        deductionMode: 'none' as const,
+        deductionValue: 0,
+        grossWeight: 100,
+        id: 'crafted-product-b-lot',
+        parentId: 'product-a-lot',
+        productId: 'PROD-B',
+      },
+      {
+        containerDeductionWeight: 0,
+        deductionMode: 'kg' as const,
+        deductionValue: 20,
+        grossWeight: 0,
+        id: 'product-a-impurity',
+        impurityId: 'impurity-a',
+        parentId: 'product-a-lot',
+        productId: 'PROD-A',
+      },
+    ]
+
+    const calculation = calculateWeightTicketLineTotals(lines)
+
+    expect(calculation.lineTotalsById.get('product-a-impurity')?.deductionWeight).toBe(10)
+    expect(calculation.lineTotalsById.get('crafted-product-b-lot')?.netWeight).toBe(100)
+    expect(calculation.sourceTotalsByLineId.get('product-a-lot')?.netWeight).toBe(0)
+    expect(calculation.totals).toEqual({
+      containerDeductionWeight: 0,
+      deductionWeight: 10,
+      grossWeight: 110,
+      netWeight: 100,
+    })
+  })
+
+  it('rejects mismatched WTI child products at the shared create and update request schema', () => {
+    const result = weightTicketFormSchema.safeParse({
+      branchId: 'BR10',
+      godownName: 'โกดังทดสอบ',
+      lines: [
+        {
+          containerDeductionWeight: 0,
+          deductionMode: 'none',
+          deductionValue: 0,
+          grossWeight: 10,
+          id: 'product-a-lot',
+          imageNames: ['lot-a.jpg'],
+          impurityId: '',
+          productId: 'PROD-A',
+          warehouseId: '',
+        },
+        {
+          containerDeductionWeight: 0,
+          deductionMode: 'none',
+          deductionValue: 0,
+          grossWeight: 100,
+          id: 'crafted-product-b-lot',
+          imageNames: ['lot-b.jpg'],
+          impurityId: '',
+          parentId: 'product-a-lot',
+          productId: 'PROD-B',
+          warehouseId: '',
+        },
+      ],
+      partyId: 'SUP-1',
+      remark: '',
+      type: 'WTI',
+      vehicleImageNames: [],
+      vehicleNo: 'TEST-1',
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error('Expected the WTI request to fail validation')
+    expect(result.error.issues).toContainEqual(expect.objectContaining({
+      message: 'สินค้าของรายการย่อยต้องตรงกับสินค้าของรายการหลัก',
+      path: ['lines', 1, 'productId'],
+    }))
   })
 
   it('persists the sample line allocation and product summary with the same 214 kg net weight', () => {
@@ -283,14 +378,28 @@ describe('weight ticket totals', () => {
       row.className === 'product-total' && row.productName === 'สินค้า A'
     ))
     const purchaseRows = rows.filter((row) => row.className === 'purchase-row')
+    const impurityDisplayRows = rows.filter((row) => row.deductionWeight === 32)
 
-    expect(lotRows.map((row) => row.deductionWeight)).toEqual([0, 0])
+    expect(lotRows.map((row) => ({
+      containerDeductionWeight: row.containerDeductionWeight,
+      deductionWeight: row.deductionWeight,
+      grossWeight: row.grossWeight,
+      netWeight: row.netWeight,
+    }))).toEqual([
+      { containerDeductionWeight: 4, deductionWeight: 0, grossWeight: 22, netWeight: 18 },
+      { containerDeductionWeight: 0, deductionWeight: 0, grossWeight: 228, netWeight: 228 },
+    ])
+    lotRows.forEach((row) => {
+      expect(row.netWeight).toBe(row.grossWeight - row.containerDeductionWeight - row.deductionWeight)
+    })
     expect(sourceProductSummaryRows).toHaveLength(1)
     expect(sourceProductSummaryRows[0]).toMatchObject({
       containerDeductionWeight: 4,
       deductionWeight: 32,
       netWeight: 214,
     })
+    expect(impurityDisplayRows).toHaveLength(1)
+    expect(impurityDisplayRows[0]).toBe(sourceProductSummaryRows[0])
     expect(purchaseRows).toHaveLength(1)
     expect(purchaseRows[0]).toMatchObject({ deductionWeight: 0, grossWeight: 32, netWeight: 32 })
     expect(rows.some((row) => row.className === 'source-row')).toBe(false)
