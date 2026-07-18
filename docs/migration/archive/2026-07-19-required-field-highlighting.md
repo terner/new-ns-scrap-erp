@@ -32,3 +32,9 @@ The audit covered 289 TSX files, including 97 files containing form controls. Co
 - Daily Transfer and shared Master Data opened without console errors or overflow, but their create modals were not detected; no field-level browser claim is made for those two routes.
 
 PO Sell now enforces its required branch in the page form while preserving the existing API contract for legacy branchless documents, and maps nested item validation back to the exact row fields. Read-only text inputs that act only as user-editable combobox triggers are marked explicitly so required dropdowns stay yellow without turning business read-only data yellow. No database schema, calculation, permission, or successful document-save behavior changed in this checkpoint.
+
+## SIT merge checkpoint
+
+The validated promotion candidate combines development source `4e3d862a5` with SIT source `a58709102` before updating either integration remote. SIT's per-stock-item sales-bill cost logic and options payload are preserved together with the required-field/VAT UI batch. The only shared file, `TransactionBillsPageClient.tsx`, retains both source patches exactly by stable patch ID.
+
+Focused sales-bill, LINE bill-contract, and required-field regressions passed `13/13`; ESLint passed with zero errors and the existing `qa-thai-font.tsx` warning; type-check passed after removing an invalid variable-level `as const` from the incoming SIT route; and the production build generated `311/311` pages. The same merge commit is intended for `new-origin/dev` and `sit-origin/main` so a later development promotion cannot discard the SIT-only cost corrections.
