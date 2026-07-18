@@ -200,7 +200,7 @@ export async function GET() {
       total_amount: true,
     }
 
-    const [accounts, customers, outstandingBills, allocatedBills, receipts, paymentMethods] = await Promise.all([
+    const [accounts, customers, outstandingBills, allocatedBills, customerAdvances, receipts, paymentMethods] = await Promise.all([
       listDailyAccounts(),
       listActiveCustomers(),
       prisma.sales_bills.findMany({
@@ -222,6 +222,25 @@ export async function GET() {
           },
         },
       }),
+      prisma.customer_advances.findMany({
+        select: {
+          customer_id: true,
+          customer_code_snapshot: true,
+          customer_advance_statuses: { select: { code: true } },
+          document_date: true,
+          doc_no: true,
+          id: true,
+          received_amount: true,
+          target_amount: true,
+          available_amount: true,
+        },
+        orderBy: [{ document_date: 'desc' }, { doc_no: 'desc' }],
+        take: CUSTOMER_RECEIPT_LIST_LIMIT,
+        where: {
+          customer_advance_statuses: { code: { in: ['pending_receipt', 'partially_received'] } },
+          cancelled_at: null,
+        },
+      }),
       prisma.customer_receipts.findMany({
         select: {
           account_code_snapshot: true,
@@ -237,6 +256,14 @@ export async function GET() {
               withholding_tax_amount: true,
             },
           },
+          customer_receipt_advance_allocations: {
+            orderBy: [{ line_no: 'asc' }],
+            select: {
+              customer_advance_doc_no_snapshot: true,
+              line_no: true,
+              receipt_amount: true,
+            },
+          },
           customer_code_snapshot: true,
           customer_name_snapshot: true,
           date: true,
@@ -246,6 +273,7 @@ export async function GET() {
           net_cash_in: true,
           notes: true,
           payment_method_name_snapshot: true,
+          source_type: true,
           status: true,
           withholding_tax_total: true,
         },
@@ -302,6 +330,18 @@ export async function GET() {
         receivableBalance: toNumber(bill.receivable_balance),
         totalAmount: toNumber(bill.total_amount),
       })),
+      customerAdvances: customerAdvances
+        .filter((advance) => toNumber(advance.target_amount) - toNumber(advance.received_amount) > 0.005)
+        .map((advance) => ({
+          availableAmount: Math.max(0, toNumber(advance.target_amount) - toNumber(advance.received_amount)),
+          customerId: advance.customer_code_snapshot || stringifyBusinessValue(advance.customer_id),
+          date: toDateOnly(advance.document_date),
+          docNo: advance.doc_no,
+          id: advance.doc_no,
+          receivedAmount: toNumber(advance.received_amount),
+          status: advance.customer_advance_statuses.code,
+          targetAmount: toNumber(advance.target_amount),
+        })),
       customers: customers.map((customer) => ({
         active: true,
         code: customer.code,
@@ -339,6 +379,7 @@ export async function GET() {
             }],
           accountSummaries,
           amount: toNumber(receipt.gross_amount),
+          customerAdvanceDocNos: receipt.customer_receipt_advance_allocations.map((allocation) => allocation.customer_advance_doc_no_snapshot),
           billDocNos: receipt.customer_receipt_allocations.map((allocation) => allocation.sales_bill_doc_no_snapshot),
           billId: receipt.customer_receipt_allocations[0]?.sales_bill_doc_no_snapshot ?? '',
           customerId: receipt.customer_code_snapshot,
@@ -351,6 +392,11 @@ export async function GET() {
           netAmount: toNumber(receipt.net_cash_in),
           notes: receipt.notes ?? '',
           partyName: receipt.customer_name_snapshot,
+          customerAdvanceLines: receipt.customer_receipt_advance_allocations.map((allocation) => ({
+            customerAdvanceDocNo: allocation.customer_advance_doc_no_snapshot,
+            lineNo: allocation.line_no,
+            receiptAmount: toNumber(allocation.receipt_amount),
+          })),
           receiptLines: receipt.customer_receipt_allocations.map((allocation) => ({
             discountAmount: toNumber(allocation.discount_amount),
             lineNo: allocation.line_no,
@@ -358,6 +404,7 @@ export async function GET() {
             salesBillDocNo: allocation.sales_bill_doc_no_snapshot,
             withholdingTaxAmount: toNumber(allocation.withholding_tax_amount),
           })),
+          sourceType: receipt.source_type as 'SB' | 'CADV',
           status: receipt.status,
           withholdingTax: toNumber(receipt.withholding_tax_total),
         }

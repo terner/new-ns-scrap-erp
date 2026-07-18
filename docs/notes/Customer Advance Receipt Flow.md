@@ -9,7 +9,7 @@ tags:
   - finance
   - customer-advance
   - receipt
-status: proposed
+status: implemented
 created: 2026-07-15
 ---
 
@@ -152,15 +152,15 @@ flowchart LR
 
 ### Receipt integration
 
-`/sales/receipts` ต้องเพิ่ม CADV เป็น source อีกชนิดหนึ่ง โดยไม่ปนกับ SB allocation:
+`/sales/receipts` รองรับ CADV เป็น source อีกชนิดหนึ่ง โดยไม่ปนกับ SB allocation:
 
 | Endpoint / payload | Contract |
 |---|---|
-| `GET /api/sales/receipts` | ส่ง `customerAdvanceOptions` เฉพาะ CADV ของลูกค้าที่เลือกและยังมียอด `remaining_to_receive > 0` |
-| `POST /api/sales/receipts` | รับ `customerAdvanceAllocations: [{ customerAdvanceDocNo, receivedAmount }]` พร้อมข้อมูลวิธีรับเงิน/บัญชีรับเงิน |
-| `PATCH /api/sales/receipts/{docNo}` cancel/reissue | reverse CADV receipt allocation และ bank statement ก่อนออก RCP ใหม่ |
+| `GET /api/sales/receipts` | ส่ง `customerAdvances` เฉพาะ CADV ที่ยังมี `availableAmount > 0` สำหรับเลือกใน modal |
+| `POST /api/sales/receipts` | รับ `sourceType: 'CADV'` และ `customerAdvanceLines: [{ customerAdvanceDocNo, receiptAmount }]` พร้อมข้อมูลวิธีรับเงิน/บัญชีรับเงิน |
+| `PATCH /api/sales/receipts` cancel/reissue | reverse CADV receipt allocation และ bank statement ก่อนออก RCP ใหม่ |
 
-เมื่อ RCP commit สำเร็จใน transaction เดียว ต้อง: สร้าง receipt header/line, สร้าง `customer_receipt_advance_allocations`, สร้าง bank statement เงินเข้า, recalculate CADV received/remaining/status, และ append timeline. CADV ไม่สร้าง AR; AR เกิดและลดที่ SB เท่านั้น.
+ใน modal ผู้ใช้เลือก `ประเภทเอกสารรับเงิน` ก่อน (`SB` หรือ `CADV`) แล้วเลือก source lines ได้เพียงประเภทเดียว. เมื่อ RCP commit สำเร็จใน transaction เดียว ต้อง: สร้าง receipt header, สร้าง `customer_receipt_advance_allocations`, สร้าง bank statement เงินเข้า, recalculate CADV received/remaining/status, และ append timeline. CADV ไม่สร้าง AR; AR เกิดและลดที่ SB เท่านั้น. ไม่มีการใช้ `billId` เดิมเป็น fallback เพื่อเดา source.
 
 ### Sales Bill integration
 
@@ -172,7 +172,7 @@ Sales Bill เลือกได้เฉพาะ CADV ที่ `received/part
 |---|---|
 | `customer_advances` | CADV header, required branch FK, customer snapshot, invoice/contract, VAT snapshot, requested/received/allocated/remaining amounts, status |
 | `customer_advance_items` | product/qty/gross/net snapshots ต่อ CADV |
-| `customer_receipt_advance_allocations` | RCP -> CADV receipt facts; แยกจาก RCP -> SB allocation |
+| `customer_receipt_advance_allocations` | RCP -> CADV receipt facts; แยกจาก RCP -> SB allocation โดยเก็บยอดก่อน/หลังรับและคงเหลือ |
 | `sales_bill_customer_advance_allocations` | CADV -> SB application facts; มีอยู่แล้วใน Sales Bill contract |
 | `customer_advance_status_logs` | append-only lifecycle/audit |
 

@@ -100,7 +100,11 @@
 - [x] Add focused CADV calculation tests for receipt base capacity, allocation split, VAT recalculation, and cap-at-bill-base behavior
 - [x] Apply the CADV allocation-breakdown migration to dev-target `fhglqymcdmrgbsbadnwr` and record migration version `20260716082726`
 - [ ] Apply the CADV allocation-breakdown migration to any SIT/UAT/production runtime database before deploying this code there
-- [ ] Implement `/sales/receipts` -> CADV receipt allocation so RCP populates CADV `received_amount` and `available_amount` from real cash receipts
+- [x] Implement `/sales/receipts` -> CADV receipt allocation so RCP populates CADV `received_amount` and `available_amount` from real cash receipts
+  - Receipt modal now requires explicit `sourceType` (`SB` or `CADV`) and keeps source line collections separate; mixed-source payloads are rejected without fallback.
+  - CADV RCP writes `customer_receipt_advance_allocations`, bank statement cash-in, CADV received/remaining/status snapshots, and reverses those facts on cancel/reissue.
+  - GET `/api/sales/receipts` exposes pending CADV options and source-aware receipt history.
+  - Migration `20260718100000_add_customer_receipt_advance_allocations.sql` and dev-target application remain a deployment prerequisite; Supabase MCP permission currently blocks applying it from this session.
 
 ## Active Follow-up: Reference Master Redis Cache
 
@@ -234,12 +238,35 @@
 - [x] **Batch F: Browser cache boundary**
   - [x] client memory cache เฉพาะ allowlisted L1 + branch/warehouse
   - [x] API runtime `private, no-store`; ไม่ใช้ persistent browser cache สำหรับ business data
-- [ ] ตรวจ request reduction, scope change และ client invalidation หลัง deploy
+- [ ] ตรวจ request reduction, scope change และ client invalidation หลัง deploy (รวมไว้ใน CACHE-M5-A)
 - [x] **Batch G: Completion audit**
   - [x] ตรวจทุก write path ของ cache-enabled master มี server/Redis invalidation
   - [x] ตรวจ cache key ที่ไม่มี consumerหรือไม่มี repeated-read evidence แล้วไม่ถูกนำไปใช้ใน consumer ใหม่
   - [x] อัปเดต flow summary และ current-work หลังปิดทุก batch
-  - [ ] runtime hit/miss, Redis latency/error และ request reduction หลัง deploy ยังรอข้อมูลจาก SIT/UAT
+  - [ ] runtime hit/miss, Redis latency/error และ request reduction หลัง deploy ยังรอข้อมูลจาก SIT/UAT (รายละเอียดใน CACHE-M5-A)
+
+#### CACHE-M5 Runtime Evidence And Image Delivery
+
+งาน code migration ของ reference cache เสร็จแล้ว เหลืองานหลัง deploy และงานส่งรูปภาพที่ต้องตรวจแยกจาก Redis cache:
+
+- [ ] **CACHE-M5-A: Runtime cache evidence**
+  - [x] เพิ่ม duration telemetry ใน `reference_cache_read`/`reference_cache_error` และ `client_reference_cache_read` โดยไม่ log query, user id หรือ scope value
+  - [ ] เก็บ `reference_cache_read` แยกตาม key family ใน SIT/UAT: server-cache hit, Redis hit, DB miss, error และ latency
+  - [ ] ตรวจ Redis error, stale data และผล invalidation หลัง create/update/deactivate ของ master ที่ cache-enabled
+  - [ ] วัด request reduction และ client invalidation ของ browser memory cache สำหรับ L1 กับ branch/warehouse
+  - [ ] ตรวจ user/branch/permission scope isolation ไม่ให้ cache ข้ามขอบเขตผู้ใช้หรือสาขา
+  - [ ] ตรวจ key ที่ไม่มี consumer หรือไม่มี repeated-read evidence แล้ว retire; key ที่ยังใช้ให้คง TTL ตามหลักฐานจริง
+  - [ ] บันทึกผลและ decision เรื่อง TTL/key ใน `docs/notes/Reference Master Cache Flow.md`
+- [ ] **CACHE-M5-B: Image delivery and legacy cleanup**
+  - [x] audit rows ที่มี `image_storage_key`/`image_thumbnail_storage_key` และตรวจ missing/orphan objects ใน dev/SIT/UAT
+  - [x] ปรับ product/impurity product original และ thumbnail จาก `cacheControl: '3600'` เป็น `31536000` โดยใช้ versioned storage key
+  - [x] ยืนยัน list/picker ใช้ thumbnail เท่านั้น และ product detail/edit preview โหลด original เมื่อมี key
+  - [x] audit `next/image`, `loading`, `sizes`, stable dimensions และ no-preload สำหรับ persisted product/impurity/WTI/WTO surfaces; local upload previews ใช้ fixed dimensions และไม่ใช่ CDN list asset
+  - [ ] ตรวจ bucket/privacy และ signed/public URL policy ของ WTI/WTO attachments ให้ตรงกับข้อมูลที่มีความอ่อนไหว
+  - [x] ล้างข้อมูลและ drop legacy `products.image_names` ผ่าน migrations `20260718140000_clear_legacy_product_image_names.sql` และ `20260718143000_drop_legacy_product_image_names.sql` หลัง Prisma/schema consumer audit ผ่าน
+  - [ ] วัด image request count, bytes, Storage/CDN latency และ broken-image rate แยกจาก Redis cache metrics
+
+**CACHE-M5 exit criteria:** มี runtime evidence จาก SIT/UAT, invalidation/scope isolation ผ่าน, key/TTL decision ถูกบันทึก, image delivery audit ผ่าน และ legacy image data ถูก cleanup หรือมี blocker ที่ระบุเจ้าของงานชัดเจน.
 
 ### Deferred, Not An Active Task
 
@@ -993,7 +1020,7 @@ Reporting rule:
 - [x] เพิ่ม master ย่อยใต้สินค้า: `/master-data/product-types` และ `/master-data/product-units`; หน้า Products ใช้ dropdown จาก DB สำหรับประเภทสินค้าและหน่วยสินค้า โดย seed หน่วย `กิโลกรัม (กก.)`, `ลัง` และประเภท `อิเล็กทรอนิกส์`
 - [x] เพิ่มช่อง `รูปสินค้า` แบบ profile upload รูปเดียวใน `/master-data/products` create/edit modal พร้อม preview, replace/remove-before-save, persistence ผ่าน `products.image_names`, และ export เฉพาะชื่อไฟล์
 - [x] แยก `/daily/weight-tickets` option bootstrap ออกจาก master product full-list API: ใช้ `/api/daily/weight-tickets/options` สำหรับ header options แบบเบา และ preload `/api/daily/weight-tickets/products` ต่อทันทีหลัง options สำเร็จโดยไม่รอ user เลือก header โดย route สินค้าคืนรูปสินค้าแรกมาพร้อมแต่ละ product row เพื่อคง requirement รูปโดยไม่เรียก master product full-list
-- [ ] ย้ายรูปสินค้าออกจาก `products.image_names` base64 ไป Storage และสร้าง thumbnail URL สำหรับ product option/picker
+- [x] ย้ายรูปสินค้าออกจาก `products.image_names` base64 ไป Storage และสร้าง thumbnail URL สำหรับ product option/picker
   - [x] เพิ่ม `products.image_storage_key` และ bucket/policy สำหรับ `product-images`
   - [x] เปลี่ยน `/master-data/products` modal ให้ upload รูปผ่าน Supabase Storage ภายใต้ user session แทนการส่ง base64 เข้า DB
   - [x] เพิ่ม `products.image_thumbnail_storage_key` และเก็บไฟล์ `original + thumb` แยกกันใน Storage
@@ -1001,7 +1028,7 @@ Reporting rule:
   - [x] ให้ `/api/master-data/products` และ `/api/daily/weight-tickets/products` ส่ง `thumbnailUrl` จาก thumb object จริง
   - [x] ใช้ flow เดียวกันกับ WTI/WTO product picker โดยไม่แยก image API เพิ่ม
   - [x] backfill รูป legacy จาก `products.image_names` ไป `image_storage_key` + `image_thumbnail_storage_key` สำหรับข้อมูลเดิม
-  - [ ] ล้าง/ตัดข้อมูล legacy `products.image_names` หลังย้าย flow เสร็จ โดยไม่ทำ runtime fallback
+- [x] ล้าง/ตัดข้อมูล legacy `products.image_names` หลังย้าย flow เสร็จ โดยไม่ทำ runtime fallback ผ่าน CACHE-M5-B migrations
 - [x] เพิ่ม master ย่อยใต้บัญชีเงิน: `/master-data/bank-names`; หน้า Accounts ใช้ dropdown ชื่อธนาคารจาก DB และ API validate ว่าชื่อธนาคารต้อง active
 - [x] เปลี่ยน active/inactive form control เป็น toggle ใน customer, supplier, และ shared master-data forms
 - [x] reset branch กลับ checkpoint `d6e8b29` หลังทดลอง sidebar/shadcn design; Tailwind v4/shadcn sidebar ไม่อยู่ใน baseline ปัจจุบัน

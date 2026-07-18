@@ -178,6 +178,9 @@ export const supplierPaymentFormSchema = z.object({
 
 export type SupplierPaymentFormValues = z.infer<typeof supplierPaymentFormSchema>
 
+export const customerReceiptSourceTypeValues = ['SB', 'CADV'] as const
+export type CustomerReceiptSourceType = typeof customerReceiptSourceTypeValues[number]
+
 export const customerReceiptLineFormSchema = z.object({
   id: optionalSafeId('รหัสบรรทัดรับเงิน'),
   salesBillDocNo: requiredDocNo('บิลขาย'),
@@ -186,10 +189,17 @@ export const customerReceiptLineFormSchema = z.object({
   discountAmount: money('ส่วนลด').default(0),
 })
 
+export const customerAdvanceReceiptLineFormSchema = z.object({
+  id: optionalSafeId('รหัสบรรทัดรับเงินล่วงหน้า'),
+  customerAdvanceDocNo: requiredDocNo('รับเงินล่วงหน้า Customer'),
+  receiptAmount: positiveMoney('ยอดรับเงินล่วงหน้า'),
+})
+
 export const customerReceiptFormSchema = z.object({
   id: optionalSafeId('รหัสรายการ'),
   docNo: optionalDocNo,
   date: requiredDate,
+  sourceType: z.enum(customerReceiptSourceTypeValues, { message: 'เลือกประเภทเอกสารรับเงิน' }),
   billId: optionalSafeId('บิลขาย'),
   customerId: z.string().trim().min(1, 'เลือกลูกค้า'),
   accountId: z.string().trim().min(1, 'เลือกบัญชีรับเงิน'),
@@ -199,7 +209,8 @@ export const customerReceiptFormSchema = z.object({
   fee: money('ค่าธรรมเนียม').default(0),
   method: z.string().trim().min(1, 'เลือกวิธีรับเงิน').max(80, 'วิธีรับเงินยาวเกินไป').regex(businessTextPattern, 'วิธีรับเงินมีรูปแบบไม่ถูกต้อง'),
   notes: optionalGeneralText('หมายเหตุ', 500),
-  lines: z.array(customerReceiptLineFormSchema).optional(),
+  salesBillLines: z.array(customerReceiptLineFormSchema).default([]),
+  customerAdvanceLines: z.array(customerAdvanceReceiptLineFormSchema).default([]),
   splits: z.array(z.object({
     method: z.string().trim().min(1, 'เลือกวิธีรับเงิน').max(80, 'วิธีรับเงินยาวเกินไป').regex(businessTextPattern, 'วิธีรับเงินมีรูปแบบไม่ถูกต้อง'),
     accountId: z.string().trim().min(1, 'เลือกบัญชีรับเงิน').max(80, 'บัญชีรับเงินยาวเกินไป').regex(/^[A-Za-z0-9_.:-]+$/, 'บัญชีรับเงินมีรูปแบบไม่ถูกต้อง'),
@@ -207,13 +218,20 @@ export const customerReceiptFormSchema = z.object({
     id: optionalSafeId('รหัสแยกบัญชีรับเงิน'),
   })).min(1, 'เลือกบัญชีรับเงินอย่างน้อย 1 รายการ').optional(),
 }).superRefine((value, context) => {
-  if (value.lines && value.lines.length > 0) return
-  if (!value.billId) {
+  const hasSalesBillLines = value.salesBillLines.length > 0
+  const hasCustomerAdvanceLines = value.customerAdvanceLines.length > 0
+  if (hasSalesBillLines === hasCustomerAdvanceLines) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'เลือกบิลขายอย่างน้อย 1 รายการ',
-      path: ['billId'],
+      message: 'เลือกเอกสารต้นทางประเภทเดียว และเลือกอย่างน้อย 1 รายการ',
+      path: ['sourceType'],
     })
+  }
+  if (value.sourceType === 'SB' && !hasSalesBillLines) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกบิลขายอย่างน้อย 1 รายการ', path: ['salesBillLines'] })
+  }
+  if (value.sourceType === 'CADV' && !hasCustomerAdvanceLines) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือก CADV อย่างน้อย 1 รายการ', path: ['customerAdvanceLines'] })
   }
 })
 

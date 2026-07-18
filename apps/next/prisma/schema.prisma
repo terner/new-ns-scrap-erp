@@ -2035,7 +2035,6 @@ model products {
   type                                                            String?
   grade                                                           String?
   id                                                              BigInt                            @id @default(autoincrement())
-  image_names                                                     String[]                          @default([])
   image_storage_key                                               String?
   image_thumbnail_storage_key                                     String?
   grade_adjustments                                               grade_adjustments[]
@@ -2449,6 +2448,7 @@ model customer_advances {
   currencies                   currencies                     @relation(fields: [currency_code], references: [code], onUpdate: NoAction)
   customer_advance_statuses    customer_advance_statuses      @relation(fields: [status_id], references: [id], onUpdate: NoAction)
   customer_advance_items       customer_advance_items[]
+  customer_receipt_advance_allocations customer_receipt_advance_allocations[]
   customer_advance_status_logs customer_advance_status_logs[]
 
   @@index([document_date(sort: Desc), doc_no(sort: Desc)], map: "idx_customer_advances_document_date")
@@ -2525,6 +2525,7 @@ model customer_receipts {
   account_name_snapshot        String
   bank_statement_doc_no        String?
   notes                        String?
+  source_type                  String                         @default("SB")
   cancel_reason                String?
   cancelled_at                 DateTime?                      @db.Timestamptz(6)
   cancelled_by                 String?
@@ -2540,6 +2541,7 @@ model customer_receipts {
   bank_statement_id            BigInt?                        @unique
   asset_disposals              asset_disposals[]
   customer_receipt_allocations customer_receipt_allocations[]
+  customer_receipt_advance_allocations customer_receipt_advance_allocations[]
   customer_receipt_status_logs customer_receipt_status_logs[]
   accounts                     accounts                       @relation(fields: [account_id], references: [id], onUpdate: NoAction)
   bank_statement               bank_statement?                @relation(fields: [bank_statement_id], references: [id], onUpdate: NoAction)
@@ -2587,6 +2589,35 @@ model customer_receipt_allocations {
   @@index([status], map: "idx_customer_receipt_allocations_status")
   @@index([receipt_line_id], map: "idx_customer_receipt_allocations_receipt_line", where: raw("(receipt_line_id IS NOT NULL)"))
   @@index([sales_bill_id], map: "idx_customer_receipt_allocations_active_sales_bill", where: raw("(status = 'active'::text)"))
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model customer_receipt_advance_allocations {
+  id                              BigInt            @id @default(autoincrement())
+  receipt_id                      BigInt
+  customer_advance_id             BigInt
+  line_no                         Int
+  customer_advance_doc_no_snapshot String
+  customer_code_snapshot          String
+  receipt_amount                  Decimal           @default(0) @db.Decimal(18, 2)
+  received_before                 Decimal           @default(0) @db.Decimal(18, 2)
+  received_after                  Decimal           @default(0) @db.Decimal(18, 2)
+  available_before                Decimal           @default(0) @db.Decimal(18, 2)
+  available_after                 Decimal           @default(0) @db.Decimal(18, 2)
+  status                          String            @default("active")
+  created_at                      DateTime          @default(now()) @db.Timestamptz(6)
+  created_by                      String?
+  updated_at                      DateTime          @default(now()) @db.Timestamptz(6)
+  updated_by                      String?
+  version                         Int               @default(1)
+  customer_advances               customer_advances @relation(fields: [customer_advance_id], references: [id], onUpdate: NoAction)
+  customer_receipts               customer_receipts @relation(fields: [receipt_id], references: [id], onUpdate: NoAction)
+
+  @@unique([receipt_id, line_no], map: "customer_receipt_advance_allocations_line_key")
+  @@index([receipt_id, line_no], map: "idx_customer_receipt_advance_allocations_receipt")
+  @@index([customer_advance_id, status, created_at(sort: Desc)], map: "idx_customer_receipt_advance_allocations_advance")
+  @@index([customer_advance_id], map: "idx_customer_receipt_advance_allocations_active_advance", where: raw("(status = 'active'::text)"))
   @@schema("public")
 }
 

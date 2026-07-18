@@ -55,6 +55,16 @@ type Bill = {
   supplierId?: string | null
   totalAmount: number
 }
+type CustomerAdvance = {
+  availableAmount: number
+  customerId?: string | null
+  date?: string
+  docNo: string
+  id: string
+  receivedAmount: number
+  status?: string
+  targetAmount: number
+}
 type MoneyRow = {
   accountId?: string
   accountName: string
@@ -72,6 +82,7 @@ type MoneyRow = {
   billDocNo?: string
   billDocNos?: string[]
   customerId?: string
+  customerAdvanceDocNos?: string[]
   date: string
   docNo: string
   discount?: number
@@ -88,6 +99,12 @@ type MoneyRow = {
     salesBillDocNo: string
     withholdingTaxAmount: number
   }>
+  customerAdvanceLines?: Array<{
+    customerAdvanceDocNo: string
+    lineNo: number
+    receiptAmount: number
+  }>
+  sourceType?: 'SB' | 'CADV'
   status?: string
   supplierId?: string
   withholdingTax?: number
@@ -95,6 +112,7 @@ type MoneyRow = {
 type Payload = {
   accounts: DailyAccountOption[]
   bills: Bill[]
+  customerAdvances?: CustomerAdvance[]
   customers?: Party[]
   paymentMethods?: Array<{ name: string; type: PaymentMethodGroup }>
   rows: MoneyRow[]
@@ -135,7 +153,8 @@ type PaymentHistoryDetail = {
 type MoneyForm = SupplierPaymentFormValues | CustomerReceiptFormValues
 type PaymentLine = NonNullable<SupplierPaymentFormValues['lines']>[number] & { billText?: string }
 type PaymentSplit = SupplierPaymentFormValues['splits'][number]
-type ReceiptLine = NonNullable<CustomerReceiptFormValues['lines']>[number]
+type ReceiptLine = NonNullable<CustomerReceiptFormValues['salesBillLines']>[number]
+type CustomerAdvanceReceiptLine = NonNullable<CustomerReceiptFormValues['customerAdvanceLines']>[number]
 type ReceiptSplit = NonNullable<CustomerReceiptFormValues['splits']>[number]
 type PaymentBillSort = 'age_asc' | 'age_desc' | 'balance_asc' | 'balance_desc' | 'date_asc' | 'date_desc' | 'doc_asc' | 'doc_desc' | 'paid_asc' | 'paid_desc' | 'source_asc' | 'source_desc' | 'supplier_asc' | 'supplier_desc' | 'total_asc' | 'total_desc'
 type PaymentBillSortField = 'age' | 'balance' | 'date' | 'docNo' | 'paidAmount' | 'sourceDocNo' | 'supplier' | 'totalAmount'
@@ -220,6 +239,10 @@ function newReceiptSplit(): ReceiptSplit {
 
 function newReceiptLine(): ReceiptLine {
   return { discountAmount: 0, id: `RL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, receiptAmount: 0, salesBillDocNo: '', withholdingTaxAmount: 0 }
+}
+
+function newCustomerAdvanceReceiptLine(): CustomerAdvanceReceiptLine {
+  return { customerAdvanceDocNo: '', id: `CAL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, receiptAmount: 0 }
 }
 
 function receiptLineMoneyKey(line: ReceiptLine, index: number, field: 'discountAmount' | 'receiptAmount' | 'withholdingTaxAmount') {
@@ -352,7 +375,7 @@ function initialForm(mode: 'payment' | 'receipt'): MoneyForm {
     id: null,
     method: '',
     notes: null,
-    ...(mode === 'payment' ? { lines: [newPaymentLine()], splits: [newPaymentSplit()], supplierId: '' } : { customerId: '', lines: [newReceiptLine()], splits: [newReceiptSplit()] }),
+    ...(mode === 'payment' ? { lines: [newPaymentLine()], splits: [newPaymentSplit()], supplierId: '' } : { customerId: '', sourceType: 'SB', salesBillLines: [newReceiptLine()], customerAdvanceLines: [], splits: [newReceiptSplit()] }),
     withholdingTax: 0,
   } as MoneyForm
 }
@@ -1010,14 +1033,17 @@ export function MoneyMovementPageClient({
     })), [data.customers])
   const supplierMap = useMemo(() => new Map((data.suppliers ?? []).map((supplier) => [supplier.id, supplier])), [data.suppliers])
   const billMap = useMemo(() => new Map(data.bills.map((bill) => [bill.id, bill])), [data.bills])
+  const customerAdvanceMap = useMemo(() => new Map((data.customerAdvances ?? []).map((advance) => [advance.id, advance])), [data.customerAdvances])
   const paymentLines = useMemo(() => (mode === 'payment' ? (form as SupplierPaymentFormValues).lines ?? [] : []), [form, mode])
-  const receiptLines = useMemo(() => (mode === 'receipt' ? (form as CustomerReceiptFormValues).lines ?? [] : []), [form, mode])
+  const receiptLines = useMemo(() => (mode === 'receipt' ? (form as CustomerReceiptFormValues).salesBillLines ?? [] : []), [form, mode])
+  const customerAdvanceReceiptLines = useMemo(() => (mode === 'receipt' ? (form as CustomerReceiptFormValues).customerAdvanceLines ?? [] : []), [form, mode])
+  const receiptSourceType = mode === 'receipt' ? (form as CustomerReceiptFormValues).sourceType : 'SB'
   const selectedBill = form.billId ? billMap.get(form.billId) : null
   const selectedBillBalance = selectedBill ? (mode === 'payment' ? selectedBill.payableBalance ?? 0 : selectedBill.receivableBalance ?? 0) : 0
   const paymentLineBalanceTotal = paymentLines.reduce((sum, line) => sum + (billMap.get(line.billId)?.payableBalance ?? 0), 0)
   const formNetAmount = mode === 'payment'
     ? form.amount + form.fee
-    : form.amount - form.fee - form.withholdingTax
+    : form.amount - form.fee - (receiptSourceType === 'SB' ? form.withholdingTax : 0)
   const paymentSplits = mode === 'payment' ? (form as SupplierPaymentFormValues).splits ?? [] : []
   const receiptSplits = mode === 'receipt' ? (form as CustomerReceiptFormValues).splits ?? [] : []
   const paymentSplitTotal = paymentSplits.reduce((sum, split) => sum + (Number(split.amount) || 0), 0)
@@ -1049,11 +1075,17 @@ export function MoneyMovementPageClient({
   }, [mode, outstandingBills, paymentDestinationFilter, paymentMethodFilter, paymentSupplierId])
   const selectedPaymentBillIds = useMemo(() => new Set(paymentLines.map((line) => line.approvalId || line.billId).filter(Boolean)), [paymentLines])
   const selectedReceiptBillDocNos = useMemo(() => new Set(receiptLines.map((line) => line.salesBillDocNo).filter(Boolean)), [receiptLines])
+  const selectedCustomerAdvanceDocNos = useMemo(() => new Set(customerAdvanceReceiptLines.map((line) => line.customerAdvanceDocNo).filter(Boolean)), [customerAdvanceReceiptLines])
   const receiptSelectableBills = useMemo(() => {
     if (mode !== 'receipt') return []
     const customerId = (form as CustomerReceiptFormValues).customerId
     return data.bills.filter((bill) => !customerId || bill.customerId === customerId)
   }, [data.bills, form, mode])
+  const receiptSelectableCustomerAdvances = useMemo(() => {
+    if (mode !== 'receipt') return []
+    const customerId = (form as CustomerReceiptFormValues).customerId
+    return (data.customerAdvances ?? []).filter((advance) => !customerId || advance.customerId === customerId)
+  }, [data.customerAdvances, form, mode])
   const supplierBills = useMemo(() => {
     if (mode !== 'payment') return []
     const query = billSearch.trim().toLowerCase()
@@ -1326,7 +1358,7 @@ export function MoneyMovementPageClient({
         billId: bill.id,
         customerId: bill.customerId ?? '',
         docNo: bill.activeReceiptDocNos?.[0] ?? null,
-        lines: [{
+        salesBillLines: [{
           ...newReceiptLine(),
           receiptAmount: amount,
           salesBillDocNo: bill.docNo,
@@ -1391,7 +1423,14 @@ export function MoneyMovementPageClient({
       discount: roundMoney(lines.reduce((sum, line) => sum + line.discountAmount, 0)),
       fee: row.fee ?? 0,
       id: row.docNo,
-      lines,
+      sourceType: row.sourceType ?? 'SB',
+      salesBillLines: row.sourceType === 'CADV' ? [] : lines,
+      customerAdvanceLines: row.customerAdvanceLines?.map((line) => ({
+        ...newCustomerAdvanceReceiptLine(),
+        customerAdvanceDocNo: line.customerAdvanceDocNo,
+        receiptAmount: line.receiptAmount,
+        id: `${row.docNo}-cadv-${line.lineNo}`,
+      })) ?? [],
       method: row.method ?? '',
       notes: row.notes ?? null,
       splits: row.accountSplits?.length
@@ -1724,7 +1763,7 @@ export function MoneyMovementPageClient({
     const nextDiscount = roundMoney(normalizedLines.reduce((sum, line) => sum + line.discountAmount, 0))
     const nextWithholdingTax = roundMoney(normalizedLines.reduce((sum, line) => sum + line.withholdingTaxAmount, 0))
     const nextFee = Number((form as CustomerReceiptFormValues).fee) || 0
-    const nextNetAmount = roundMoney(nextAmount - nextFee - nextWithholdingTax)
+    const nextNetAmount = roundMoney(nextAmount - nextFee - (receiptSourceType === 'SB' ? nextWithholdingTax : 0))
     const nextSplits = ((form as CustomerReceiptFormValues).splits ?? []).map((split, splitIndex, splits) => (
       splitIndex === 0 && splits.length === 1 ? { ...split, amount: nextNetAmount } : split
     ))
@@ -1736,7 +1775,7 @@ export function MoneyMovementPageClient({
       billId: normalizedLines.find((line) => line.salesBillDocNo)?.salesBillDocNo ?? null,
       customerId: nextCustomerId,
       discount: nextDiscount,
-      lines: normalizedLines,
+      salesBillLines: normalizedLines,
       splits: nextSplits,
       withholdingTax: nextWithholdingTax,
     } as MoneyForm)
@@ -1747,7 +1786,7 @@ export function MoneyMovementPageClient({
     const nextAmount = Number(form.amount) || 0
     const nextWithholdingTax = Number(form.withholdingTax) || 0
     const nextFee = 'fee' in patch ? Number(patch.fee) || 0 : Number(form.fee) || 0
-    const nextNetAmount = roundMoney(nextAmount - nextFee - nextWithholdingTax)
+    const nextNetAmount = roundMoney(nextAmount - nextFee - (receiptSourceType === 'SB' ? nextWithholdingTax : 0))
     const nextSplits = receiptSplits.map((split, splitIndex, splits) => (
       splitIndex === 0 && splits.length === 1 ? { ...split, amount: nextNetAmount } : split
     ))
@@ -1757,6 +1796,76 @@ export function MoneyMovementPageClient({
       fee: nextFee,
       splits: nextSplits,
     } as MoneyForm)
+  }
+
+  function syncCustomerAdvanceReceiptLines(nextLines: CustomerAdvanceReceiptLine[], patch: Partial<CustomerReceiptFormValues> = {}) {
+    const normalizedLines = nextLines.length > 0 ? nextLines.map((line) => ({
+      ...line,
+      customerAdvanceDocNo: line.customerAdvanceDocNo,
+      receiptAmount: roundMoney(Number(line.receiptAmount) || 0),
+    })) : [newCustomerAdvanceReceiptLine()]
+    const firstAdvance = customerAdvanceMap.get(normalizedLines.find((line) => line.customerAdvanceDocNo)?.customerAdvanceDocNo ?? '')
+    const nextAmount = roundMoney(normalizedLines.reduce((sum, line) => sum + line.receiptAmount, 0))
+    const nextFee = Number((form as CustomerReceiptFormValues).fee) || 0
+    const nextSplits = ((form as CustomerReceiptFormValues).splits ?? []).map((split, splitIndex, splits) => (
+      splitIndex === 0 && splits.length === 1 ? { ...split, amount: roundMoney(nextAmount - nextFee) } : split
+    ))
+    setForm({
+      ...form,
+      ...patch,
+      amount: nextAmount,
+      billId: null,
+      customerId: patch.customerId ?? ((form as CustomerReceiptFormValues).customerId || firstAdvance?.customerId || ''),
+      customerAdvanceLines: normalizedLines,
+      salesBillLines: [],
+      discount: 0,
+      sourceType: 'CADV',
+      splits: nextSplits,
+      withholdingTax: 0,
+    } as MoneyForm)
+  }
+
+  function selectCustomerAdvanceLine(index: number, docNo: string) {
+    const advance = customerAdvanceMap.get(docNo)
+    const nextLines = customerAdvanceReceiptLines.map((line, lineIndex) => {
+      if (lineIndex !== index) return line
+      return {
+        ...line,
+        customerAdvanceDocNo: docNo,
+        receiptAmount: advance?.availableAmount ?? 0,
+      }
+    })
+    syncCustomerAdvanceReceiptLines(nextLines, { customerId: advance?.customerId ?? (form as CustomerReceiptFormValues).customerId })
+  }
+
+  function updateCustomerAdvanceReceiptLine(index: number, patch: Partial<CustomerAdvanceReceiptLine>) {
+    setError(null)
+    syncCustomerAdvanceReceiptLines(customerAdvanceReceiptLines.map((line, lineIndex) => lineIndex === index ? { ...line, ...patch } : line))
+  }
+
+  function addCustomerAdvanceReceiptLine() {
+    syncCustomerAdvanceReceiptLines([...customerAdvanceReceiptLines, newCustomerAdvanceReceiptLine()])
+  }
+
+  function removeCustomerAdvanceReceiptLine(index: number) {
+    if (customerAdvanceReceiptLines.length <= 1) return
+    syncCustomerAdvanceReceiptLines(customerAdvanceReceiptLines.filter((_, lineIndex) => lineIndex !== index))
+  }
+
+  function changeReceiptSourceType(sourceType: 'SB' | 'CADV') {
+    const receiptForm = form as CustomerReceiptFormValues
+    setError(null)
+    setForm({
+      ...receiptForm,
+      amount: 0,
+      billId: null,
+      customerAdvanceLines: sourceType === 'CADV' ? [newCustomerAdvanceReceiptLine()] : [],
+      discount: 0,
+      salesBillLines: sourceType === 'SB' ? [newReceiptLine()] : [],
+      sourceType,
+      splits: [{ ...newReceiptSplit(), accountId: receiptForm.accountId, method: receiptForm.method, amount: 0 }],
+      withholdingTax: 0,
+    })
   }
 
   function receiptSelectableBillsForLine(index: number) {
@@ -1796,6 +1905,14 @@ export function MoneyMovementPageClient({
   }
 
   function changeReceiptCustomer(customerId: string) {
+    if (receiptSourceType === 'CADV') {
+      const nextLines = customerAdvanceReceiptLines.map((line) => {
+        const advance = customerAdvanceMap.get(line.customerAdvanceDocNo)
+        return advance && advance.customerId !== customerId ? newCustomerAdvanceReceiptLine() : line
+      })
+      syncCustomerAdvanceReceiptLines(nextLines, { customerId })
+      return
+    }
     const nextLines = receiptLines.map((line) => {
       const bill = billMap.get(line.salesBillDocNo)
       return bill && bill.customerId !== customerId ? newReceiptLine() : line
@@ -2026,7 +2143,7 @@ export function MoneyMovementPageClient({
   function normalizedReceiptForm() {
     const receiptForm = form as CustomerReceiptFormValues
     const normalizedSplits = (receiptForm.splits ?? []).map((split) => ({ ...split }))
-    const payloadLines = (receiptForm.lines ?? [])
+    const payloadLines = (receiptForm.salesBillLines ?? [])
       .filter((line) => line.salesBillDocNo && Number(line.receiptAmount) > 0)
       .map((line) => ({
         ...line,
@@ -2041,7 +2158,14 @@ export function MoneyMovementPageClient({
       discount: roundMoney(payloadLines.reduce((sum, line) => sum + line.discountAmount, 0)),
       accountId: normalizedSplits[0]?.accountId ?? receiptForm.accountId,
       method: normalizedSplits[0]?.method ?? receiptForm.method ?? '',
-      lines: payloadLines,
+      sourceType: receiptForm.sourceType,
+      salesBillLines: receiptForm.sourceType === 'SB' ? payloadLines : [],
+      customerAdvanceLines: receiptForm.sourceType === 'CADV'
+        ? (receiptForm.customerAdvanceLines ?? []).filter((line) => line.customerAdvanceDocNo && Number(line.receiptAmount) > 0).map((line) => ({
+          ...line,
+          receiptAmount: roundMoney(Number(line.receiptAmount) || 0),
+        }))
+        : [],
       splits: normalizedSplits,
       withholdingTax: roundMoney(payloadLines.reduce((sum, line) => sum + line.withholdingTaxAmount, 0)),
     }
@@ -2778,7 +2902,7 @@ export function MoneyMovementPageClient({
                     <div className="border-b border-slate-100 px-4 py-3">
                       <h3 className="text-sm font-bold text-slate-900">ข้อมูลใบรับเงิน</h3>
                     </div>
-                    <div className="grid gap-4 p-4 md:grid-cols-2">
+                    <div className="grid gap-4 p-4 md:grid-cols-3">
                       <label className="block">
                         <span className="mb-1 block text-xs font-medium text-slate-600">วันที่</span>
                         <DatePickerInput
@@ -2798,10 +2922,22 @@ export function MoneyMovementPageClient({
                         value={partyValue}
                         onChange={changeReceiptCustomer}
                       />
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-slate-600">ประเภทเอกสารรับเงิน *</span>
+                        <UiSelect
+                          className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                          disabled={Boolean(form.id)}
+                          value={receiptSourceType}
+                          onChange={(event) => changeReceiptSourceType(event.target.value as 'SB' | 'CADV')}
+                        >
+                          <option value="SB">บิลขาย (SB)</option>
+                          <option value="CADV">รับเงินล่วงหน้า (CADV)</option>
+                        </UiSelect>
+                      </label>
                     </div>
                   </section>
 
-                  <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+                  {receiptSourceType === 'SB' ? <section className="rounded-md border border-slate-200 bg-white shadow-sm">
                     <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
                       <h3 className="text-sm font-bold text-slate-900">บิลขายที่รับเงิน</h3>
                       <UiButton className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={addReceiptLine}>
@@ -2986,7 +3122,78 @@ export function MoneyMovementPageClient({
                         )
                       })}
                     </div>
-                  </section>
+                  </section> : (
+                    <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">รับเงินล่วงหน้า Customer (CADV)</h3>
+                          <p className="mt-1 text-xs text-slate-500">เลือก CADV ได้หลายรายการ แต่ต้องเป็นลูกค้ารายเดียวกัน</p>
+                        </div>
+                        <UiButton className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={addCustomerAdvanceReceiptLine}>
+                          <Plus aria-hidden="true" className="mr-1 h-4 w-4" />
+                          เพิ่ม CADV
+                        </UiButton>
+                      </div>
+                      <div className="overflow-x-auto p-4">
+                        <table className="ns-table w-full min-w-[760px] table-fixed text-xs">
+                          <thead className="bg-slate-50 text-slate-600">
+                            <tr>
+                              <th className="w-[320px] p-2 text-left">CADV</th>
+                              <th className="w-[130px] p-2 text-right">ยอดเอกสาร</th>
+                              <th className="w-[130px] p-2 text-right">รับแล้ว</th>
+                              <th className="w-[130px] p-2 text-right">คงเหลือรับ</th>
+                              <th className="w-[140px] p-2 text-right">ยอดรับ</th>
+                              <th className="w-[70px] p-2 text-center">ลบ</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {customerAdvanceReceiptLines.map((line, index) => {
+                              const advance = customerAdvanceMap.get(line.customerAdvanceDocNo)
+                              const amountKey = `customer-advance-receipt:${line.id ?? index}:amount`
+                              return (
+                                <tr key={line.id ?? `${index}-${line.customerAdvanceDocNo}`} className="border-t border-slate-100">
+                                  <td className="p-2">
+                                    <UiSelect
+                                      className="h-9 w-full rounded-md border border-slate-300 px-2 text-xs"
+                                      value={line.customerAdvanceDocNo}
+                                      onChange={(event) => selectCustomerAdvanceLine(index, event.target.value)}
+                                    >
+                                      <option value="">เลือก CADV</option>
+                                      {receiptSelectableCustomerAdvances.filter((option) => option.docNo === line.customerAdvanceDocNo || !selectedCustomerAdvanceDocNos.has(option.docNo)).map((option) => (
+                                        <option key={option.docNo} value={option.docNo}>
+                                          {option.docNo} - {formatMoney(option.availableAmount)} คงเหลือรับ
+                                        </option>
+                                      ))}
+                                    </UiSelect>
+                                  </td>
+                                  <td className="p-2 text-right font-semibold tabular-nums text-slate-700">{formatMoney(advance?.targetAmount ?? 0)}</td>
+                                  <td className="p-2 text-right font-semibold tabular-nums text-slate-700">{formatMoney(advance?.receivedAmount ?? 0)}</td>
+                                  <td className="p-2 text-right font-semibold tabular-nums text-amber-700">{formatMoney(advance?.availableAmount ?? 0)}</td>
+                                  <td className="p-2">
+                                    <UiInput
+                                      className="h-9 text-right tabular-nums"
+                                      disabled={Boolean(form.id)}
+                                      inputMode="decimal"
+                                      type="text"
+                                      value={moneyInputValue(amountKey, line.receiptAmount)}
+                                      onBlur={() => finishMoneyInput(amountKey)}
+                                      onChange={(event) => changeMoneyInput(amountKey, event.target.value, (value) => updateCustomerAdvanceReceiptLine(index, { receiptAmount: value }))}
+                                      onFocus={() => startMoneyInput(amountKey, line.receiptAmount)}
+                                    />
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <UiButton className="h-8 w-8 px-0" disabled={customerAdvanceReceiptLines.length <= 1} size="icon" type="button" variant="ghost" onClick={() => removeCustomerAdvanceReceiptLine(index)}>
+                                      <X aria-hidden="true" className="h-4 w-4" />
+                                    </UiButton>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  )}
 
                   <div className="rounded-md border border-slate-200 bg-slate-50/50 p-4">
                     <div className="grid grid-cols-2 gap-4 md:grid-cols-5 text-xs">
@@ -2995,12 +3202,12 @@ export function MoneyMovementPageClient({
                         <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(form.amount)}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block mb-1 font-semibold">ภาษีหัก ณ ที่จ่าย</span>
+                        <span className="text-slate-500 block mb-1 font-semibold">{receiptSourceType === 'SB' ? 'ภาษีหัก ณ ที่จ่าย' : 'รับเข้า CADV'}</span>
                         <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(form.withholdingTax)}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block mb-1 font-semibold">ตัดหนี้ AR</span>
-                        <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(form.amount + form.withholdingTax + form.discount)}</span>
+                        <span className="text-slate-500 block mb-1 font-semibold">{receiptSourceType === 'SB' ? 'ตัดหนี้ AR' : 'ยอดรับ CADV'}</span>
+                        <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(receiptSourceType === 'SB' ? form.amount + form.withholdingTax + form.discount : form.amount)}</span>
                       </div>
                       <div>
                         <span className="text-slate-500 block mb-1 font-semibold">Fee / Discount</span>
