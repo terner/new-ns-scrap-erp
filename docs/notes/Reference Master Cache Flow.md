@@ -88,6 +88,7 @@
 - Why it has to be like this: การ cache WTO/PO Sell/advance/cost อาจทำให้ผู้ใช้เห็นยอดคงเหลือเก่าและส่ง transaction ที่ไม่ตรง source of truth; browser cache จึงจำกัดเฉพาะ master reference ที่ไม่ sensitive และไม่ใช้ persistent storage
 - `daily/weight-tickets` client reference checkpoint: WTI/WTO form ใช้ browser memory cache แบบ user-scoped TTL 5 นาทีสำหรับ `/api/daily/weight-tickets/options` และ `/api/daily/weight-tickets/products`; หน้า list ใช้ cache เดียวกันสำหรับ `/api/branches`
 - WTI/WTO product cache เก็บเฉพาะ product reference และ thumbnail URL metadata; ไม่เก็บ binary image, stock, warehouse availability หรือ pending_out
+- Thumbnail URL ใช้ versioned storage key และ `Cache-Control: 31536000` จาก object storage; product grid ใช้ native browser HTTP cache พร้อม `loading="lazy"` ส่วนสินค้าที่เลือกใช้ `loading="eager"` เพื่อไม่โหลดรูปทุกสินค้าพร้อมกัน
 - `/api/daily/weight-tickets/stock-options`, `/api/daily/weight-tickets`, detail, save และ attachment upload ยังคง `no-store`/อ่าน source ปัจจุบัน เพราะเป็น stock, transaction หรือ private document fact
 - WTI/WTO attachment URL ยังใช้ versioned storage key และโหลด original เฉพาะ preview; thumbnail/original split และ signed URL สำหรับ bucket private ยังเป็นงาน image-delivery แยก ไม่รวมใน reference cache
 - What is what: options/products เป็น master reference สำหรับ selector ส่วน stock-options เป็นยอดคงเหลือจริงของ WTO และรูปแนบเป็นหลักฐานเอกสาร
@@ -331,6 +332,7 @@ Frontend
 - `reference_cache_read` คือ server-side cache evidence แยกตาม key family และ tier (`server`, `redis`, `database`) พร้อม `durationMs`; `reference_cache_error` ใช้บันทึก Redis read/write error โดยไม่เปิดเผย query, user id หรือ scope value
 - `client_reference_cache_read` คือ browser memory-cache evidence สำหรับ allowlisted reference API แยก `hit`, `miss` และ `deduped`; ไม่เก็บข้อมูลลง `localStorage`/`sessionStorage`
 - Product image source of truth คือ `products.image_storage_key` และ `products.image_thumbnail_storage_key`; binary อยู่ใน Storage bucket `product-images`, ไม่อยู่ใน Redis หรือ reference API payload
+- Product/impurity product upload รับไฟล์ภาพที่ browser อ่านได้ แต่ต้องไม่เกิน `20 MB` และ `25 MP` ก่อน resize; จากนั้นจึงสร้าง WebP รูปหลัก `1600px` และ thumbnail `320px`
 
 ### Why It Has To Be Like This
 

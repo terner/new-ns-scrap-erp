@@ -2448,7 +2448,13 @@ function ProductImagePicker({
           <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-slate-100 border border-slate-100">
             {selectedProduct.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={selectedProduct.imageUrl} alt={selectedProduct.name ?? selectedProduct.label} className="h-full w-full object-cover" />
+              <img
+                src={selectedProduct.imageUrl}
+                alt={selectedProduct.name ?? selectedProduct.label}
+                className="h-full w-full object-cover"
+                decoding="async"
+                loading="eager"
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-slate-400">
                 <ImagePlus className="h-4 w-4" />
@@ -2536,7 +2542,13 @@ function ProductImagePicker({
                       <div className="aspect-square w-full bg-slate-50 overflow-hidden border-b border-slate-100 relative">
                         {product.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt={product.name ?? product.label} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" src={product.imageUrl} />
+                          <img
+                            alt={product.name ?? product.label}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            decoding="async"
+                            loading="lazy"
+                            src={product.imageUrl}
+                          />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-slate-300 bg-slate-50">
                             <ImagePlus className="h-5 w-5" />

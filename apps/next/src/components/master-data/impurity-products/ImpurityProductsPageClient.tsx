@@ -19,6 +19,7 @@ import {
   buildProductThumbnailStorageKey,
   prepareProductImageUploadAssets,
   PRODUCT_IMAGE_BUCKET,
+  validateProductImageUpload,
 } from '@/lib/product-images'
 import {
   exportProducts,
@@ -776,8 +777,9 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
   async function replacePrimaryImage(fileList: FileList | null) {
     const selectedFile = Array.from(fileList ?? [])[0]
     if (!selectedFile) return
-    if (!selectedFile.type.startsWith('image/')) {
-      setErrors((current) => ({ ...current, imageStorageKey: 'อัปโหลดได้เฉพาะไฟล์รูปภาพ' }))
+    const validationError = await validateProductImageUpload(selectedFile)
+    if (validationError) {
+      setErrors((current) => ({ ...current, imageStorageKey: validationError }))
       return
     }
 
