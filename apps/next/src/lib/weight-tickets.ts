@@ -5,6 +5,20 @@ export type WeightTicketType = 'WTI' | 'WTO'
 export type DeductionMode = 'none' | 'kg' | 'percent'
 export type WeightTicketStatus = 'draft' | 'received' | 'delivered' | 'partially_billed' | 'billed' | 'cancelled'
 
+export const WEIGHT_TICKET_TYPE = {
+  WTI: 'WTI',
+  WTO: 'WTO',
+} as const satisfies Record<string, WeightTicketType>
+
+export const WEIGHT_TICKET_STATUS = {
+  BILLED: 'billed',
+  CANCELLED: 'cancelled',
+  DELIVERED: 'delivered',
+  DRAFT: 'draft',
+  PARTIALLY_BILLED: 'partially_billed',
+  RECEIVED: 'received',
+} as const satisfies Record<string, WeightTicketStatus>
+
 export type WeightTicketLine = {
   containerDeductionWeight: string
   deductionMode: DeductionMode

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, ChevronDown, ImagePlus, Plus, Search, Trash2, Scale, Box, AlertTriangle, Check } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronDown, Clock, ImagePlus, Plus, Search, Trash2, Scale, Box, AlertTriangle, Check } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Card } from '@/components/ui/Card'
@@ -32,6 +32,8 @@ import {
   OTHER_PRODUCT_IMPURITY_ID,
   OTHER_PRODUCT_IMPURITY_LABEL,
   saveWeightTicket,
+  WEIGHT_TICKET_STATUS,
+  WEIGHT_TICKET_TYPE,
   type DeductionMode,
   type OptionItem,
   type WeightTicketRecord,
@@ -482,6 +484,39 @@ function optionsWithCurrentValue(options: OptionItem[], id: string | null | unde
   ]
 }
 
+function parseTime(value: string | null | undefined) {
+  if (!value) return null
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
+function formatElapsedTime(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const time = [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':')
+  return days > 0 ? `${days} วัน ${time}` : time
+}
+
+function formatTimerDateTime(value: string | null | undefined) {
+  const timestamp = parseTime(value)
+  if (timestamp === null) return '-'
+  return new Intl.DateTimeFormat('th-TH', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(timestamp))
+}
+
+function weightTicketReceivedAt(ticket: WeightTicketRecord | null) {
+  if (!ticket || ticket.type !== WEIGHT_TICKET_TYPE.WTI) return null
+  const receivedEvents = ticket.timeline
+    .filter((event) => event.metadata.toStatus === WEIGHT_TICKET_STATUS.RECEIVED)
+    .sort((left, right) => (parseTime(left.occurredAt) ?? 0) - (parseTime(right.occurredAt) ?? 0))
+  return receivedEvents[0]?.occurredAt ?? null
+}
+
 export type WeightTicketFormCoreProps = {
   initialType?: WeightTicketType
   hideTypeHeader?: boolean
@@ -522,6 +557,8 @@ export function WeightTicketFormCore({
   const [activeLineId, setActiveLineId] = useState('')
   const [collapsedLotIds, setCollapsedLotIds] = useState<Record<string, boolean>>({})
   const [pendingFocusField, setPendingFocusField] = useState<string | null>(null)
+  const [draftStartedAt] = useState(() => new Date().toISOString())
+  const [timerNow, setTimerNow] = useState(() => Date.now())
 
   useEffect(() => {
     onDirtyChange?.(hasEnteredTicketData(form))
@@ -568,6 +605,13 @@ export function WeightTicketFormCore({
     : form.type === 'WTI'
       ? 'สร้างใบรับของ WTI'
       : 'สร้างใบส่งของ WTO'
+  const isWeightTicketIn = form.type === WEIGHT_TICKET_TYPE.WTI
+  const canShowWeightTicketTimer = isWeightTicketIn && (!editingTicketId || Boolean(loadedTicket))
+  const timerStartAt = editingTicketId ? loadedTicket?.createdAt ?? null : draftStartedAt
+  const timerStopAt = weightTicketReceivedAt(loadedTicket)
+  const timerStartMs = parseTime(timerStartAt)
+  const timerStopMs = parseTime(timerStopAt)
+  const timerElapsedMs = timerStartMs === null ? 0 : (timerStopMs ?? timerNow) - timerStartMs
   const activeLine = useMemo(
     () => {
       const parentLines = getMainParentLines(form.lines)
@@ -576,6 +620,13 @@ export function WeightTicketFormCore({
     },
     [activeLineId, form.lines],
   )
+
+  useEffect(() => {
+    if (!isEmbeddedModal || !isWeightTicketIn || !canShowWeightTicketTimer || timerStopMs !== null) return
+    const intervalId = window.setInterval(() => setTimerNow(Date.now()), 1000)
+    return () => window.clearInterval(intervalId)
+  }, [canShowWeightTicketTimer, isEmbeddedModal, isWeightTicketIn, timerStopMs])
+
   const loadProducts = useCallback(async (signal?: AbortSignal) => {
     setIsLoadingProducts(true)
     try {
@@ -1290,6 +1341,38 @@ export function WeightTicketFormCore({
             </div>
           </div>
         </DialogHeader>
+      ) : null}
+      {isEmbeddedModal && canShowWeightTicketTimer ? (
+        <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
+          <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className={cn(
+                'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full border',
+                timerStopMs === null ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700',
+              )}>
+                <Clock className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-500">เวลาตั้งแต่เริ่มสร้างรายการ</div>
+                <div className="mt-0.5 font-mono text-xl font-bold leading-tight text-slate-900 sm:text-2xl">
+                  {formatElapsedTime(timerElapsedMs)}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs sm:min-w-[18rem]">
+              <div className="rounded-md bg-white px-3 py-2">
+                <div className="font-semibold text-slate-500">เริ่มสร้าง</div>
+                <div className="mt-0.5 truncate font-medium text-slate-800">{formatTimerDateTime(timerStartAt)}</div>
+              </div>
+              <div className="rounded-md bg-white px-3 py-2">
+                <div className="font-semibold text-slate-500">สถานะเวลา</div>
+                <div className={cn('mt-0.5 truncate font-semibold', timerStopMs === null ? 'text-amber-700' : 'text-emerald-700')}>
+                  {timerStopMs === null ? 'รอยืนยันรับของ' : 'รับของแล้ว'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
       <div className={cn("min-w-0", isEmbeddedModal ? "flex-1 overflow-y-auto p-4 sm:p-5 space-y-5" : "space-y-5 pb-32")}>
         {!isEmbeddedModal && (
