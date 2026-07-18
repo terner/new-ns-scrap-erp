@@ -119,21 +119,22 @@ Validation completed:
 
 ## Current Cache Batch Queue
 
-การ audit และแตกงาน cache ถูกจัดเป็น batch ใน `docs/migration/09-implementation-tasklist.md` แล้ว และกำลังทำตามลำดับนี้:
+การ audit และ code migration ของ reference cache ปิดแล้วใน CACHE-M1 ถึง CACHE-M4; งานที่เหลือถูกแตกไว้เป็น `CACHE-M5-A` และ `CACHE-M5-B` ใน `docs/migration/09-implementation-tasklist.md`:
 
-1. ปิด consumer product/branch/warehouse/account/customer/supplier ที่เข้า read-only reference contract
-2. ปิด remaining lookup masters: sales channel, salesperson, impurity, production machine/line และ option master ที่มี repeated-read evidence
-3. ตรวจ search cache และ browser memory-cache boundary โดยไม่เปิด persistent business-data cache
-4. รัน full validation ครั้งเดียวหลังทุก batch เสร็จ แล้วค่อยสรุป deploy/push
+1. `CACHE-M5-A` เก็บหลักฐาน runtime จาก SIT/UAT, ตรวจ invalidation, scope isolation, request reduction และ retire key ที่ไม่มีหลักฐานใช้งาน
+2. `CACHE-M5-B` ตรวจ image delivery, thumbnail/original loading, Storage/CDN metrics และ cleanup legacy `products.image_names`
+3. บันทึกผล TTL, key, image policy และ blocker ใน `docs/notes/Reference Master Cache Flow.md`
 
 สถานะปัจจุบัน: shared readers และ invalidation ของชุดหลักถูกเพิ่มแล้ว; direct reads ที่เหลือถูกแยกเป็น CRUD, import/export, write-time validation, historical inactive label, tax effective-date lookup หรือ transaction/business fact จึงยังคงอ่าน DB ตรงตาม contract.
 
-Validation checkpoint 2026-07-18: cache tests ผ่าน `37/37`, workspace type-check ผ่าน, production build ผ่านและ generate static pages `307/307`, ESLint ผ่าน `0 errors` โดยมี warning เดิม 1 จุดใน `scripts/qa-thai-font.tsx`, และ `git diff --check` ผ่าน. ยังไม่ได้ทำ browser/UAT หรือ deploy ตามขอบเขตคำสั่งนี้.
+M5 checkpoint 2026-07-18: เพิ่ม server/client cache duration telemetry และ audit script `apps/next/scripts/audit-product-image-assets.mjs`. Dev/SIT/UAT ตรวจพบสินค้า 236 รายการ: 62 รายการมี original+thumbnail ครบ 124 objects, 174 รายการไม่มีรูปโดยตั้งใจ, และไม่มี missing/orphan asset. Migrations `20260718140000_clear_legacy_product_image_names.sql` และ `20260718143000_drop_legacy_product_image_names.sql` ล้างข้อมูลและ drop legacy column ในทั้งสาม environment หลัง Prisma/schema consumer audit ผ่าน.
+
+Validation checkpoint 2026-07-18: targeted cache tests ผ่าน `37/37`; full workspace type-check/lint/build baseline ก่อน M5 ยังผ่านตาม checkpoint เดิม. หลัง M5 ยังต้องรัน type-check/lint/build และเก็บ runtime logs จาก SIT/UAT; ยังไม่ได้ทำ browser/DOM UAT.
 
 ### Explicitly Out Of Scope
 
 - write-time validation ของ stock/WTO/production และ transactional reads ที่ต้องเห็น state ปัจจุบันทันที
-- product price/cost/stock/WAC และ binary image delivery ยังไม่อยู่ใน cache scope
+- product price/cost/stock/WAC ไม่อยู่ใน reference-cache scope; binary image ไม่เก็บใน Redis หรือ browser memory และติดตาม delivery แยกใน `CACHE-M5-B`
 - browser UAT และ deploy: ทำเมื่อ user สั่ง
 
 ## Validation Baseline For Next Batch
@@ -146,12 +147,12 @@ git diff --check -- <batch-files>
 
 ## Immediate Next Steps
 
-1. ตรวจ consumer search/autocomplete ที่เหลือและกำหนด scope key ให้ครบ.
-2. ตรวจ cache invalidation และ key ที่ไม่มี consumer หลังการย้ายครบ.
-3. รัน Vitest, lint, type-check, build และ `git diff --check` ครั้งเดียวหลังปิด queue.
-4. หลัง validation ค่อยตรวจ runtime logs จาก SIT/UAT และตัดสินใจเรื่อง TTL/request reduction; ยังไม่เปิด persistent browser cache.
+1. เก็บ `CACHE-M5-A` runtime evidence จาก SIT/UAT โดยอ่าน structured logs และตรวจ scope/invalidation.
+2. ปิด privacy/bucket policy audit และเก็บ metrics ของ image delivery แยกจาก Redis.
+3. วัด image request/bytes/latency/broken-image แยกจาก Redis metrics แล้วอัปเดต flow note.
+4. รัน validation ของ M5 แล้วค่อยสรุป deploy/push; ยังไม่เปิด persistent browser cache.
 
 ## Working Tree Boundary
 
-- worktree currently contains broad cache work and unrelated edits; do not commit, push, or promote without first separating the intended batch.
+- current uncommitted work is the cache policy/task documentation for CACHE-M5; do not commit, push, or promote without an explicit user request.
 - current branch: `dev` against `new-origin/dev`; follow `docs/agent-rules/git-communication.md` before any mutation.

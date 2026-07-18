@@ -820,9 +820,10 @@ function referenceCacheKeyFamily(key: string) {
   return key
 }
 
-function recordReferenceCacheRead({ outcome, tier, key }: { key: string; outcome: 'hit' | 'miss'; tier: ReferenceCacheReadTier }) {
+function recordReferenceCacheRead({ durationMs, outcome, tier, key }: { durationMs: number; key: string; outcome: 'hit' | 'miss'; tier: ReferenceCacheReadTier }) {
   if (!referenceCacheObservabilityEnabled()) return
   console.info(JSON.stringify({
+    durationMs: Math.max(0, Math.round(durationMs)),
     event: 'reference_cache_read',
     keyFamily: referenceCacheKeyFamily(key),
     outcome,
@@ -830,12 +831,23 @@ function recordReferenceCacheRead({ outcome, tier, key }: { key: string; outcome
   }))
 }
 
-function recordReferenceCacheError({ key, stage }: { key: string; stage: 'redis_read' | 'redis_write' }) {
+function recordReferenceCacheError({ durationMs, key, stage }: { durationMs: number; key: string; stage: 'redis_read' | 'redis_write' }) {
   if (!referenceCacheObservabilityEnabled()) return
   console.warn(JSON.stringify({
+    durationMs: Math.max(0, Math.round(durationMs)),
     event: 'reference_cache_error',
     keyFamily: referenceCacheKeyFamily(key),
     stage,
+  }))
+}
+
+function recordReferenceCacheInvalidation(keys: string[], durationMs: number) {
+  if (!referenceCacheObservabilityEnabled()) return
+  console.info(JSON.stringify({
+    durationMs: Math.max(0, Math.round(durationMs)),
+    event: 'reference_cache_invalidation',
+    keyFamilies: [...new Set(keys.map(referenceCacheKeyFamily))],
+    keyCount: keys.length,
   }))
 }
 
@@ -875,14 +887,17 @@ async function redisGetJson<T>(key: string): Promise<RedisReadResult<T>> {
 }
 
 async function redisSetJson(key: string, value: unknown, ttlSeconds = REDIS_CACHE_TTL_SECONDS) {
+  const startedAt = performance.now()
   const result = await runRedisPipeline([['SET', key, JSON.stringify(value), 'EX', String(ttlSeconds)]])
-  if (!result && redisConfig()) recordReferenceCacheError({ key, stage: 'redis_write' })
+  if (!result && redisConfig()) recordReferenceCacheError({ durationMs: performance.now() - startedAt, key, stage: 'redis_write' })
 }
 
 async function redisDeleteKeys(keys: string[]) {
   const normalizedKeys = [...new Set(keys.filter(Boolean))]
   if (!normalizedKeys.length) return
+  const startedAt = performance.now()
   await runRedisPipeline(normalizedKeys.map((key) => ['DEL', key]))
+  recordReferenceCacheInvalidation(normalizedKeys, performance.now() - startedAt)
 }
 
 async function redisScanKeysByPrefix(prefix: string) {
@@ -1488,9 +1503,10 @@ async function readThroughCache<T>({
   dbReader: () => Promise<T>
   ttlSeconds?: number
 }) {
+  const startedAt = performance.now()
   const serverValue = getServerCache<T>(key)
   if (serverValue) {
-    recordReferenceCacheRead({ key, outcome: 'hit', tier: 'server' })
+    recordReferenceCacheRead({ durationMs: performance.now() - startedAt, key, outcome: 'hit', tier: 'server' })
     return serverValue
   }
 
@@ -1498,18 +1514,18 @@ async function readThroughCache<T>({
   if (redisValue.state === 'hit') {
     const hydrated = fromCache(redisValue.value)
     setServerCache(key, hydrated)
-    recordReferenceCacheRead({ key, outcome: 'hit', tier: 'redis' })
+    recordReferenceCacheRead({ durationMs: performance.now() - startedAt, key, outcome: 'hit', tier: 'redis' })
     return hydrated
   }
 
   if (redisValue.state === 'error' || redisValue.state === 'invalid') {
-    recordReferenceCacheError({ key, stage: 'redis_read' })
+    recordReferenceCacheError({ durationMs: performance.now() - startedAt, key, stage: 'redis_read' })
   }
 
   const dbValue = await dbReader()
   setServerCache(key, dbValue)
   await redisSetJson(key, toCache(dbValue), ttlSeconds)
-  recordReferenceCacheRead({ key, outcome: 'miss', tier: 'database' })
+  recordReferenceCacheRead({ durationMs: performance.now() - startedAt, key, outcome: 'miss', tier: 'database' })
   return dbValue
 }
 

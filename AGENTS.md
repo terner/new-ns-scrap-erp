@@ -48,6 +48,61 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 - Do not change application code outside the intended business flow just to tolerate bad, legacy, or malformed data. If data violates the target contract, fix the data, migration, seed, or source-of-truth process instead of adding compatibility branches, fallback logic, skip-row handling, or silent coercion in runtime code.
 - After a batch is validated, committed, and pushed, immediately start the next batch from `docs/migration/00-current-work.md` and the relevant tracker unless the user pauses, redirects, or the next step requires explicit approval for high-risk work.
 
+## Cache And Image Delivery Rules
+
+ใช้กฎชุดนี้กับทุกหน้าหรือ API ที่เพิ่มใหม่ ห้ามเพิ่ม cache จากความรู้สึกว่าเป็นข้อมูลที่เปลี่ยนไม่บ่อย ต้องระบุ contract และ source of truth ก่อนเสมอ
+
+### 1. Classify The Data First
+
+- **L0 static asset:** JavaScript, CSS, font และ asset ที่มี content hash ใช้ framework/CDN cache ได้
+- **L1 global lookup:** currency, unit, type, payment method และ lookup master ที่ไม่มี user/branch scope ใช้ shared server/Redis cache ได้เมื่อมี repeated-read evidence
+- **L2 scoped reference:** branch, warehouse, customer/supplier branch option, account ตาม scope ใช้ key ที่มี scope ครบ ห้ามใช้ global key ปนกัน
+- **L3 search result:** autocomplete/search ใช้ normalized query key, TTL สั้นกว่า full list และจำกัดผลลัพธ์
+- **L4 historical label:** แยก reader all-record หรือ snapshot ตามความต้องการของเอกสาร ห้ามใช้ active-only cache เพื่อแสดงข้อมูลเก่า
+- **L5 business fact:** price, cost, WAC, stock, balance, ledger, permission, session, transaction status และ report fact ต้องอ่าน source ปัจจุบัน ไม่ cache เป็น reference option
+
+### 2. Server And Redis Cache Contract
+
+- Database เป็น source of truth; cache เป็น read-through เท่านั้น ห้ามเขียน master ลง Redis โดยตรง
+- ใช้ `short-lived server cache -> Redis -> DB` ผ่าน `reference-master-cache` หรือ service กลางเดียวกัน ห้ามสร้าง memory/Redis cache เฉพาะหน้าใหม่เอง
+- ทุก key ต้องระบุ entity, active/all, search/scoped mode และทุก dimension ที่มีผลต่อผลลัพธ์ เช่น branch, tenant หรือ permission scope
+- ห้ามใช้ fallback, hardcode, skip-row หรือ silent coercion เมื่อ cache miss, data malformed หรือ scope หาไม่เจอ; cache miss ต้องอ่าน DB และข้อมูลผิดต้องแก้ที่ source/migration
+- หลัง DB write สำเร็จเท่านั้นจึง invalidate key ที่เกี่ยวข้อง ครอบคลุม create, update, deactivate, delete, import และ image metadata update
+- ห้ามใช้ active-only cache เพื่อ map historical/inactive records และห้ามย้าย write-time validation หรือ transactional stock/finance calculation เข้า cache
+- Search cache ต้อง normalize query, จำกัดขนาดผลลัพธ์, ไม่ใส่ PII/raw query ใน log และใช้ TTL สั้น
+- เพิ่ม cache key ใหม่ต้องมี consumer จริง, invalidation path, TTL, scope, owner และ focused test; key ที่ไม่มี repeated-read evidence ให้คง DB ตรงหรือ retire
+
+### 3. Browser Cache Boundary
+
+- API ที่มี auth, permission, financial, stock, transaction หรือ business data ใช้ `private, no-store` เว้นแต่มี policy ที่อนุมัติชัดเจน
+- Browser memory cache ใช้ได้เฉพาะ allowlisted reference options ที่ไม่ sensitive, มี user scope เมื่อจำเป็น, TTL สั้น, bounded size และ pending-request deduplication
+- ห้ามเก็บ auth/session/permission/financial/stock/ledger/transaction/report response หรือข้อมูลส่วนบุคคลลง `localStorage`, `sessionStorage` หรือ persistent browser cache
+- หลัง master write ต้อง invalidate client cache ที่เกี่ยวข้อง และต้องไม่แชร์ข้อมูลข้าม user หรือ branch scope
+
+### 4. Image Storage And Loading
+
+- ห้ามเก็บ binary image หรือ base64 ใน Redis, browser memory หรือ response ของ option API; Database เก็บเฉพาะ storage key/metadata ที่จำเป็น
+- เก็บรูปใน object storage/CDN แยกอย่างน้อย `original` และ `thumbnail`; list/picker ใช้ thumbnail เท่านั้น และโหลด original เมื่อเปิด preview/detail
+- ย่อและบีบรูปก่อน upload; ใช้ format และขนาดตามหน้าที่ต้องแสดง ห้ามส่ง original ทุกแถวของ list
+- ใช้ versioned/immutable storage key เมื่อ replace รูป เพื่อให้ตั้ง `Cache-Control` ระยะยาวได้ เช่น `31536000`; ห้ามใช้ long-lived cache กับ URL ที่ content เปลี่ยนใต้ key เดิม
+- รูปที่เป็นข้อมูลภายในต้องใช้ bucket/policy และ signed URL ตาม privacy contract ห้ามทำ public URL เพียงเพื่อให้โหลดง่าย
+- ใช้ `next/image` หรือ equivalent ที่กำหนด `sizes`, lazy loading และ stable dimensions สำหรับ UI; ห้าม preload รูปทุกแถวโดยไม่มีเหตุผลจาก flow
+- Image upload ต้องอัปโหลด asset ใหม่, บันทึก metadata ผ่าน DB, invalidate reference/thumbnail metadata หลัง DB สำเร็จ และลบ asset เก่าหลังยืนยันว่าไม่มีการใช้งานแล้ว
+- ห้ามทำ runtime fallback กลับไปอ่าน legacy base64/image field; การย้ายข้อมูลเก่าต้องทำเป็น migration/backfill ที่ตรวจครบและมีรายงาน orphan/missing asset ก่อน cleanup
+- ก่อนเพิ่ม image cache ให้ตรวจขนาดไฟล์, จำนวน request, cache hit, CDN/Storage latency และ broken-image rate แยกจาก Redis reference-cache metrics
+
+### 5. Required Design Note For New Work
+
+ทุกงานใหม่ที่เพิ่ม cache หรือ image loading ต้องบันทึกสั้น ๆ ว่า:
+
+1. ข้อมูลอยู่ระดับ L0-L5 ใด และ source of truth คืออะไร
+2. key/URL scope, TTL, cache headers และ invalidation อยู่ตรงไหน
+3. ข้อมูลใดห้าม cache และเหตุผลทางธุรกิจ
+4. รูปใช้ original/thumbnail อย่างไร และข้อมูลมี privacy ระดับใด
+5. test ที่ครอบ cache hit/miss, stale data, scope isolation, invalidation และ broken/missing image
+
+ต้องอัปเดต `docs/notes/Reference Master Cache Flow.md` หรือ flow note ที่เกี่ยวข้องก่อนปิด batch และรัน validation ตาม `Validation Baseline`.
+
 ## User Reporting Preference
 
 For user-facing task reports, default to Thai and use the user's preferred combined table format:

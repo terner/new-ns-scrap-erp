@@ -313,6 +313,34 @@ Frontend
 
 สรุปคือ batch นี้ไม่ได้ค้างที่ design แล้ว แต่ขยับมาสู่ execution/migration ทีละ consumer จริงแล้ว
 
+## CACHE-M5 Checkpoint: Runtime Evidence And Image Delivery
+
+### What Is What
+
+- `reference_cache_read` คือ server-side cache evidence แยกตาม key family และ tier (`server`, `redis`, `database`) พร้อม `durationMs`; `reference_cache_error` ใช้บันทึก Redis read/write error โดยไม่เปิดเผย query, user id หรือ scope value
+- `client_reference_cache_read` คือ browser memory-cache evidence สำหรับ allowlisted reference API แยก `hit`, `miss` และ `deduped`; ไม่เก็บข้อมูลลง `localStorage`/`sessionStorage`
+- Product image source of truth คือ `products.image_storage_key` และ `products.image_thumbnail_storage_key`; binary อยู่ใน Storage bucket `product-images`, ไม่อยู่ใน Redis หรือ reference API payload
+
+### Why It Has To Be Like This
+
+Runtime telemetry ต้องวัด tier, latency, error และ request reduction ได้โดยไม่ทำให้ PII หรือ search query เข้า log. รูป list/picker ต้องใช้ thumbnail เพื่อลด bytes; original ใช้เฉพาะ detail/edit preview และใช้ versioned key จึงตั้ง `Cache-Control: 31536000` ได้โดยไม่เสี่ยง content เก่าค้างใต้ URL เดิม.
+
+### 2026-07-18 Evidence
+
+- `reference-master-cache.test.ts` และ `client-reference-cache.test.ts` ผ่านรวม `37/37`
+- `audit-product-image-assets.mjs` ตรวจ dev/SIT/UAT: สินค้า 236 รายการ, มีรูปครบ 62 รายการ, ไม่มีรูป 174 รายการ, Storage objects 124 รายการ, missing original/thumbnail `0`, orphan objects `0`
+- Migrations `20260718140000_clear_legacy_product_image_names.sql` และ `20260718143000_drop_legacy_product_image_names.sql` ล้างข้อมูลและ drop legacy `products.image_names` ใน dev/SIT/UAT โดยมี guard หยุดทันทีถ้า Storage key ไม่ครบหรือยังมี legacy value
+- Product และ impurity product upload ใช้ `Cache-Control: 31536000`; attachment WTI/WTO ใช้ policy เดิม `31536000` และยังต้องปิด privacy/bucket audit แยก
+- `/api/daily/weight-tickets/products` ส่งเฉพาะ `thumbnailUrl`; product/impurity list และ WTI/WTO persisted image surfaces กำหนด `sizes`/stable dimensions ผ่าน `next/image`, ส่วน local upload preview ไม่ถูกส่งผ่าน cache layer
+
+### Remaining M5 Work
+
+- [ ] เก็บ structured runtime logs จาก SIT/UAT และคำนวณ hit/miss, Redis latency/error, invalidation และ request reduction
+- [x] audit loading/sizes/stable dimensions ของ persisted product/impurity/WTI/WTO image surface; local preview ถูกแยกออกจาก CDN/cache contract
+- [ ] ตรวจ bucket/privacy และ signed/public URL policy ของ WTI/WTO attachments
+- [ ] วัด image request/bytes/Storage-CDN latency/broken-image rate แยกจาก Redis
+- [x] drop `products.image_names` หลัง Prisma schema และ all consumer audit ปิดแล้ว; ห้ามเพิ่ม runtime fallback กลับไปยัง legacy field
+
 ## Write / Invalidation Flow
 
 ```text

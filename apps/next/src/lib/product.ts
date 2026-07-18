@@ -22,6 +22,7 @@ export const productSchema = z.object({
   imageNames: z.array(z.string()).default([]),
   imageStorageKey: z.string().nullable().default(null),
   imageThumbnailStorageKey: z.string().nullable().default(null),
+  originalUrl: z.string().nullable().default(null),
   thumbnailUrl: z.string().nullable().default(null),
   type: z.string().nullable().default(null),
   unit: z.string().nullable().default(null),

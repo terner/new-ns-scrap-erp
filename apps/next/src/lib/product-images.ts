@@ -54,7 +54,7 @@ export function getProductImageFileName(storageKey: string) {
   return segments[segments.length - 1] ?? trimmed
 }
 
-function getProductImagePublicUrl(storageKey: string | null | undefined) {
+export function getProductImagePublicUrl(storageKey: string | null | undefined) {
   const trimmed = typeof storageKey === 'string' ? storageKey.trim() : ''
   if (!trimmed) return null
 
@@ -74,6 +74,7 @@ export function getProductImageDisplay(imageStorageKey: string | null | undefine
       imageNames: trimmedOriginalKey ? [getProductImageFileName(trimmedOriginalKey)] : [],
       imageStorageKey: trimmedOriginalKey || null,
       imageThumbnailStorageKey: trimmedThumbKey || null,
+      originalUrl: getProductImagePublicUrl(trimmedOriginalKey),
       thumbnailUrl: getProductImagePublicUrl(trimmedThumbKey),
     }
   }
@@ -82,6 +83,7 @@ export function getProductImageDisplay(imageStorageKey: string | null | undefine
     imageNames: [],
     imageStorageKey: null,
     imageThumbnailStorageKey: null,
+    originalUrl: null,
     thumbnailUrl: null,
   }
 }

@@ -36,6 +36,17 @@ function isCacheableReferencePath(apiPath: string) {
   return CACHEABLE_REFERENCE_PATHS.has(apiPath)
 }
 
+function recordClientReferenceCacheRead(apiPath: string, outcome: 'hit' | 'miss' | 'deduped', startedAt: number) {
+  if (process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_REFERENCE_CACHE_OBSERVABILITY === 'true') {
+    console.info(JSON.stringify({
+      durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      event: 'client_reference_cache_read',
+      outcome,
+      path: apiPath,
+    }))
+  }
+}
+
 async function fetchReferenceRecords(apiPath: string) {
   const response = await fetch(apiPath, { cache: 'no-store' })
   const payload = await response.json().catch(() => null)
@@ -46,20 +57,28 @@ async function fetchReferenceRecords(apiPath: string) {
 export async function listClientReferenceRecords(apiPath: string): Promise<MasterDataRecord[]> {
   if (!isCacheableReferencePath(apiPath)) return fetchReferenceRecords(apiPath)
 
+  const startedAt = performance.now()
   const userScope = await getUserScope()
   if (!userScope) return fetchReferenceRecords(apiPath)
 
   const key = `${userScope}:${apiPath}`
   const cached = cache.get(key)
-  if (cached && cached.expiresAt > Date.now()) return cached.value
+  if (cached && cached.expiresAt > Date.now()) {
+    recordClientReferenceCacheRead(apiPath, 'hit', startedAt)
+    return cached.value
+  }
   if (cached) cache.delete(key)
 
   const existingRequest = pending.get(key)
-  if (existingRequest) return existingRequest
+  if (existingRequest) {
+    recordClientReferenceCacheRead(apiPath, 'deduped', startedAt)
+    return existingRequest
+  }
 
   const request = fetchReferenceRecords(apiPath)
     .then((value) => {
       cache.set(key, { expiresAt: Date.now() + CLIENT_REFERENCE_CACHE_TTL_MS, value })
+      recordClientReferenceCacheRead(apiPath, 'miss', startedAt)
       return value
     })
     .finally(() => {

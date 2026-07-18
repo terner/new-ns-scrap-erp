@@ -226,7 +226,7 @@ export function ProductsPageClient() {
 
         try {
           const { error: originalUploadError } = await storage.upload(nextImageKey, assets.original, {
-            cacheControl: '3600',
+            cacheControl: '31536000',
             contentType: assets.original.type || undefined,
             upsert: true,
           })
@@ -237,7 +237,7 @@ export function ProductsPageClient() {
           uploadedKeys.push(nextImageKey)
 
           const { error: thumbUploadError } = await storage.upload(nextThumbKey, assets.thumbnail, {
-            cacheControl: '3600',
+            cacheControl: '31536000',
             contentType: assets.thumbnail.type || undefined,
             upsert: true,
           })
@@ -790,13 +790,13 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
   const [form, setForm] = useState<ProductFormValues>(() => (product ? productToForm(product) : emptyProductForm))
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null)
   const [previewImageName, setPreviewImageName] = useState('')
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(product?.thumbnailUrl ?? null)
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(product?.originalUrl ?? product?.thumbnailUrl ?? null)
 
   useEffect(() => {
     setForm(product ? productToForm(product) : emptyProductForm)
     setPendingImageFile(null)
     setPreviewImageName(product?.imageNames[0] ?? '')
-    setPreviewImageUrl(product?.thumbnailUrl ?? null)
+    setPreviewImageUrl(product?.originalUrl ?? product?.thumbnailUrl ?? null)
     setErrors({})
   }, [product])
 

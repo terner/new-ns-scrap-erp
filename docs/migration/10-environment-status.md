@@ -6,6 +6,13 @@ Development database and auth testing should use a separate Supabase dev/target 
 
 The customer's old production Supabase remains the legacy source system for read-only audit and migration-source dumps.
 
+### Cache/Image Checkpoint 2026-07-18
+
+- Dev-target, SIT และ customer UAT ตรวจ `products` 236 รายการเท่ากัน: 62 รายการมี original+thumbnail ครบ 124 Storage objects, 174 รายการไม่มีรูป, missing/orphan asset `0`
+- Applied and recorded migrations `20260718140000_clear_legacy_product_image_names` and `20260718143000_drop_legacy_product_image_names` in all three environments; `products.image_names` no longer exists
+- Product/impurity product upload now uses versioned Storage keys with `Cache-Control: 31536000`; WTI/WTO attachment upload already uses the same max-age policy
+- Runtime Redis/browser hit/miss/latency/request-reduction evidence still requires traffic from the deployed SIT/UAT code with observability enabled; no browser UAT was run in this coding batch
+
 Important account boundary:
 - `legacy-prod-source`, `dev-target`, and future `staging-uat` should be separate Supabase account/project contexts where practical.
 - Do not assume access tokens, Auth users, API keys, Storage buckets, or project settings are shared between them.

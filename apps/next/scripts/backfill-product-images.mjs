@@ -156,7 +156,7 @@ async function main() {
 
         if (!row.image_storage_key) {
           const { error } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(originalKey, derived.originalBuffer, {
-            cacheControl: '3600',
+            cacheControl: '31536000',
             contentType: DERIVED_IMAGE_CONTENT_TYPE,
             upsert: true,
           })
@@ -166,7 +166,7 @@ async function main() {
 
         if (!row.image_thumbnail_storage_key) {
           const { error } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(thumbKey, derived.thumbBuffer, {
-            cacheControl: '3600',
+            cacheControl: '31536000',
             contentType: DERIVED_IMAGE_CONTENT_TYPE,
             upsert: true,
           })
