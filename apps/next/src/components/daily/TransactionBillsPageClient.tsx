@@ -3243,7 +3243,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               {mode === 'purchase' ? <ResizableTableHead align="center" label="เลขที่ใบรับของ" resizeProps={columnResize.getResizeHandleProps('receiptDocs', 'เลขที่ใบรับของ')} /> : null}
               {mode === 'sales' ? <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="เลขที่อ้างอิง" resizeProps={columnResize.getResizeHandleProps('refNo', 'เลขที่อ้างอิง')} sortKey="refNo" onSort={changeSort} /> : null}
               <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="วันที่สร้าง" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่สร้าง')} sortKey="date" onSort={changeSort} />
-              <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} resizeProps={columnResize.getResizeHandleProps('partyName', mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า')} sortKey="name" onSort={changeSort} />
+              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} resizeProps={columnResize.getResizeHandleProps('partyName', mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า')} sortKey="name" onSort={changeSort} />
               {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="สาขา / คลัง" resizeProps={columnResize.getResizeHandleProps('warehouse', 'สาขา / คลัง')} sortKey="warehouse" onSort={changeSort} /> : null}
               <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="ประเภท" resizeProps={columnResize.getResizeHandleProps('transactionMode', 'ประเภท')} sortKey="transactionMode" onSort={changeSort} />
               <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label={mode === 'purchase' ? 'สถานะเอกสาร' : 'สถานะรับเงิน'} resizeProps={columnResize.getResizeHandleProps('status', mode === 'purchase' ? 'สถานะเอกสาร' : 'สถานะรับเงิน')} sortKey="status" onSort={changeSort} />
@@ -5076,7 +5076,7 @@ function SalesBillDetailModal({
                 </div>
               ) : null}
               <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
-                <table className="ns-table w-full min-w-[1100px] text-sm">
+                <table className="ns-table w-full min-w-[1240px] text-sm">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
                       <th className="px-3 py-2 text-left font-medium">สินค้า</th>
@@ -5085,6 +5085,7 @@ function SalesBillDetailModal({
                       <th className="px-3 py-2 text-right font-medium">Gross</th>
                       <th className="px-3 py-2 text-right font-medium">หัก</th>
                       <th className="px-3 py-2 text-right font-medium">จำนวนสุทธิ</th>
+                      <th className="px-3 py-2 text-right font-medium">ต้นทุน/หน่วย</th>
                       <th className="px-3 py-2 text-right font-medium">ราคาขาย/หน่วย</th>
                       <th className="px-3 py-2 text-right font-medium">ส่วนลด</th>
                       <th className="px-3 py-2 text-right font-medium">ยอดรวม</th>
@@ -5119,13 +5120,14 @@ function SalesBillDetailModal({
                           <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.grossWeight)}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.deductWeight)}</td>
                           <td className="px-3 py-2 text-right font-medium tabular-nums">{formatMoney(item.qty || item.netWeight)} {item.unit}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{item.unitCostSnapshot == null ? '-' : formatMoney(item.unitCostSnapshot)}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.price)}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.discount)}</td>
                           <td className="px-3 py-2 text-right font-semibold text-blue-700 tabular-nums">{formatMoney(item.amount)}</td>
                         </tr>
                       )
                     })}
-                    {detail.items.length === 0 ? <tr><td className="px-6 py-6 text-center text-slate-500" colSpan={9}>ไม่มีรายการสินค้าในบิล</td></tr> : null}
+                    {detail.items.length === 0 ? <tr><td className="px-6 py-6 text-center text-slate-500" colSpan={10}>ไม่มีรายการสินค้าในบิล</td></tr> : null}
                   </tbody>
                 </table>
               </div>
