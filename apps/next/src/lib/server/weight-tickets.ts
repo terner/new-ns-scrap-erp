@@ -2,7 +2,7 @@ import { Prisma } from '../../../generated/prisma/client'
 import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import {
   appendImpurityProductMeta,
-  calculateLineTotals,
+  calculateWeightTicketLineTotals,
   isOtherProductImpurityId,
   isOtherProductImpurityLabel,
   OTHER_PRODUCT_IMPURITY_ID,
@@ -448,53 +448,8 @@ export function buildWeightTicketLineRows(
   impurityById: Map<bigint, { id: bigint; name: string }>,
   warehouseByCode: Map<string, { id: bigint }> = new Map(),
 ) {
-  const lineTotalsList = values.lines.map((line) => calculateLineTotals({
-    deductionMode: line.deductionMode,
-    deductionValue: String(line.deductionValue),
-    grossWeight: String(line.grossWeight),
-    containerDeductionWeight: String(line.containerDeductionWeight),
-  }))
-
-  const totalsById = new Map(values.lines.map((line, i) => [line.id, lineTotalsList[i]!]))
+  const totalsById = calculateWeightTicketLineTotals(values.lines).lineTotalsById
   const lineNoById = new Map(values.lines.map((line, index) => [line.id, index + 1] as const))
-
-  values.lines.forEach((line) => {
-    if (line.parentId) {
-      const isImpurity = toNumber(line.grossWeight) === 0 && !!line.impurityId && line.deductionMode !== 'none';
-      if (isImpurity) {
-        const parent = values.lines.find(l => l.id === line.parentId)
-        const parentTotals = totalsById.get(line.parentId)
-        const childTotals = totalsById.get(line.id)
-        if (parent && parentTotals && childTotals) {
-          const siblingLotTotals = values.lines
-            .filter((entry) => entry.parentId === line.parentId && !entry.impuritySourceLineId && (toNumber(entry.grossWeight) > 0 || !entry.impurityId))
-            .reduce((summary, lot) => {
-              const grossWeight = Math.max(0, toNumber(lot.grossWeight))
-              const containerDeductionWeight = Math.min(Math.max(0, toNumber(lot.containerDeductionWeight)), grossWeight)
-              return {
-                containerDeductionWeight: summary.containerDeductionWeight + containerDeductionWeight,
-                grossWeight: summary.grossWeight + grossWeight,
-              }
-            }, { containerDeductionWeight: 0, grossWeight: 0 })
-          const productNetBeforeImpurity = Math.max(0, parentTotals.grossWeight + siblingLotTotals.grossWeight - parentTotals.containerDeductionWeight - siblingLotTotals.containerDeductionWeight)
-          const rawDeduction = line.deductionMode === 'percent'
-            ? productNetBeforeImpurity * Math.max(0, toNumber(line.deductionValue)) / 100
-            : line.deductionMode === 'kg'
-              ? Math.max(0, toNumber(line.deductionValue))
-              : 0
-          childTotals.deductionWeight = rawDeduction
-          childTotals.netWeight = 0
-          parentTotals.netWeight = Math.max(0, parentTotals.netWeight - childTotals.deductionWeight)
-        }
-      } else {
-        const childTotals = totalsById.get(line.id)
-        if (childTotals) {
-          childTotals.deductionWeight = 0
-          childTotals.netWeight = Math.max(0, childTotals.grossWeight - childTotals.containerDeductionWeight)
-        }
-      }
-    }
-  })
 
   return values.lines.map((line, index) => {
     const lineTotals = totalsById.get(line.id)!
@@ -561,7 +516,6 @@ export function buildWeightTicketProductSummaryRows(
     lineCount: number
     lineIds: bigint[]
     mixedProfiles: Set<string>
-    netWeight: number
     productId: bigint
     productName: string
   }>()
@@ -576,7 +530,6 @@ export function buildWeightTicketProductSummaryRows(
       existing.lineCount += 1
       existing.lineIds.push(line.id)
       existing.mixedProfiles.add(profileKey)
-      existing.netWeight += toNumber(line.net_weight)
       return
     }
 
@@ -588,28 +541,33 @@ export function buildWeightTicketProductSummaryRows(
       lineCount: 1,
       lineIds: [line.id],
       mixedProfiles: new Set([profileKey]),
-      netWeight: toNumber(line.net_weight),
       productId: line.product_id,
       productName: line.product_name,
     })
   })
 
-  const summaryRows = [...grouped.values()].map((summary) => ({
-    billed_weight: roundWeight(summary.billedWeight),
-    container_deduction_weight: roundWeight(summary.containerDeductionWeight),
-    created_at: new Date(),
-    deduct_weight: roundWeight(summary.deductWeight),
-    gross_weight: roundWeight(summary.grossWeight),
-    has_mixed_deduction_profiles: summary.mixedProfiles.size > 1,
-    line_count: summary.lineCount,
-    lineIds: summary.lineIds,
-    net_weight: roundWeight(summary.netWeight),
-    product_id: summary.productId,
-    product_name: summary.productName,
-    remaining_weight: roundWeight(summary.netWeight),
-    updated_at: new Date(),
-    weight_ticket_id: ticketId,
-  }))
+  const summaryRows = [...grouped.values()].map((summary) => {
+    const netWeight = roundWeight(Math.max(
+      0,
+      summary.grossWeight - summary.containerDeductionWeight - summary.deductWeight,
+    ))
+    return {
+      billed_weight: roundWeight(summary.billedWeight),
+      container_deduction_weight: roundWeight(summary.containerDeductionWeight),
+      created_at: new Date(),
+      deduct_weight: roundWeight(summary.deductWeight),
+      gross_weight: roundWeight(summary.grossWeight),
+      has_mixed_deduction_profiles: summary.mixedProfiles.size > 1,
+      line_count: summary.lineCount,
+      lineIds: summary.lineIds,
+      net_weight: netWeight,
+      product_id: summary.productId,
+      product_name: summary.productName,
+      remaining_weight: netWeight,
+      updated_at: new Date(),
+      weight_ticket_id: ticketId,
+    }
+  })
   return { summaryRows }
 }
 

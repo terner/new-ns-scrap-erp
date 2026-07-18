@@ -140,19 +140,6 @@ function formatImpuritySummaryDetail(
   return ['หักสิ่งเจือปน:', ...details].join('\n')
 }
 
-function sumPrintLines(lines: WeightTicketRecord['lines']) {
-  return lines.reduce(
-    (summary, line) => ({
-      containerDeductionWeight: summary.containerDeductionWeight + line.containerDeductionWeightValue,
-      deductionWeight: summary.deductionWeight + line.deductionWeight,
-      grossWeight: summary.grossWeight + line.grossWeightValue,
-      netBeforeImpurityWeight: summary.netBeforeImpurityWeight + Math.max(0, line.grossWeightValue - line.containerDeductionWeightValue),
-      netWeight: summary.netWeight + line.netWeight,
-    }),
-    { containerDeductionWeight: 0, deductionWeight: 0, grossWeight: 0, netBeforeImpurityWeight: 0, netWeight: 0 },
-  )
-}
-
 export function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: boolean): PrintWeightRow[] {
   if (!isReceipt) {
     const rows: PrintWeightRow[] = []
@@ -198,21 +185,19 @@ export function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: bool
     const realLotLines = productLines.filter((line) => !isImpurityLine(line) && !isPurchaseFromImpurityLine(line))
     const impurityLines = productLines.filter(isImpurityLine)
     const purchaseLines = productLines.filter(isPurchaseFromImpurityLine)
-    const realLotTotals = sumPrintLines(realLotLines)
-    const impurityTotals = sumPrintLines(impurityLines)
-    const realLotNetAfterImpurity = Math.max(0, realLotTotals.netBeforeImpurityWeight - impurityTotals.deductionWeight)
+    const canCollapseToProductSummary = realLotLines.length === 1 && purchaseLines.length === 0
 
-    if (realLotLines.length === 1) {
+    if (canCollapseToProductSummary) {
       const line = realLotLines[0]
       rows.push({
         className: 'product-total',
-        containerDeductionWeight: line.containerDeductionWeightValue,
+        containerDeductionWeight: summary.containerDeductionWeight,
         deductionWeight: summary.deductWeight,
         detail: [
           cleanNote(line.note),
           formatImpuritySummaryDetail(impurityLines, summary.productName, allPurchaseLines),
         ].filter((val) => val && val !== '-').join('\n') || '-',
-        grossWeight: line.grossWeightValue,
+        grossWeight: summary.grossWeight,
         label: '',
         netWeight: summary.netWeight,
         productName: summary.productName,
@@ -231,36 +216,18 @@ export function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: bool
         rank: String(groupIndex + 1),
       })
 
-      if (realLotLines.length > 0) {
-        realLotLines.forEach((line, lotIndex) => {
-          const childImpurities = impurityLines.filter((i) => i.parentLineNo === line.lineNo)
-          const childImpurityDeduction = childImpurities.reduce((sum, i) => sum + i.deductionWeight, 0)
-          rows.push({
-            className: 'lot-row',
-            containerDeductionWeight: line.containerDeductionWeightValue,
-            deductionWeight: line.deductionWeight + childImpurityDeduction,
-            detail: cleanNote(line.note),
-            grossWeight: line.grossWeightValue,
-            label: `เต๋าที่ ${lotIndex + 1}`,
-            netWeight: line.netWeight,
-            productName: summary.productName,
-          })
-        })
-
+      realLotLines.forEach((line, lotIndex) => {
         rows.push({
-          className: 'source-row',
-          containerDeductionWeight: realLotTotals.containerDeductionWeight,
-          deductionWeight: realLotTotals.deductionWeight + impurityTotals.deductionWeight,
-          detail: [
-            `${realLotLines.length.toLocaleString('th-TH')} เต๋า`,
-            formatImpuritySummaryDetail(impurityLines, summary.productName, allPurchaseLines),
-          ].join('\n'),
-          grossWeight: realLotTotals.grossWeight,
-          label: '',
-          netWeight: realLotNetAfterImpurity,
-          productName: 'สรุปรวมจากเต๋า',
+          className: 'lot-row',
+          containerDeductionWeight: line.containerDeductionWeightValue,
+          deductionWeight: line.deductionWeight,
+          detail: cleanNote(line.note),
+          grossWeight: line.grossWeightValue,
+          label: `เต๋าที่ ${lotIndex + 1}`,
+          netWeight: line.netWeight,
+          productName: summary.productName,
         })
-      }
+      })
     }
 
     purchaseLines.forEach((line) => {
@@ -276,12 +243,15 @@ export function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: bool
       })
     })
 
-    if (realLotLines.length !== 1) {
+    if (!canCollapseToProductSummary) {
       rows.push({
         className: 'product-total',
         containerDeductionWeight: summary.containerDeductionWeight,
         deductionWeight: summary.deductWeight,
-        detail: `รวมจากเต๋าหลังหักสิ่งเจือปน${purchaseLines.length > 0 ? ' และรายการซื้อเพิ่มจากสิ่งเจือปน' : ''}`,
+        detail: [
+          formatImpuritySummaryDetail(impurityLines, summary.productName, allPurchaseLines),
+          purchaseLines.length > 0 ? 'รวมรายการซื้อเพิ่มจากสิ่งเจือปนแล้ว' : '',
+        ].filter(Boolean).join('\n'),
         grossWeight: summary.grossWeight,
         label: 'รวมสินค้า',
         netWeight: summary.netWeight,

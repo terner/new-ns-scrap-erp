@@ -617,7 +617,7 @@ export function weightTicketImpurityDisplayName(line: Pick<WeightTicketRecordLin
   return line.impurityName?.trim() || 'สิ่งเจือปน'
 }
 
-export function toNumber(value: string) {
+export function toNumber(value: number | string) {
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : 0
 }
@@ -735,66 +735,136 @@ export function roundWeight(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
-export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'containerDeductionWeight' | 'deductionMode' | 'deductionValue' | 'grossWeight' | 'id'> & { parentId?: string; impurityId?: string; impuritySourceLineId?: string }>) {
-  const totalsMap = new Map(lines.map(line => [line.id, calculateLineTotals(line)]))
-  
+type WeightTicketCalculationLine = Pick<WeightTicketLine, 'deductionMode' | 'id'> & {
+  containerDeductionWeight: number | string
+  deductionValue: number | string
+  grossWeight: number | string
+  impurityId?: string
+  impuritySourceLineId?: string
+  parentId?: string
+}
+
+function isChildImpurityLine(line: WeightTicketCalculationLine) {
+  return Boolean(
+    line.parentId
+    && toNumber(line.grossWeight) === 0
+    && line.impurityId
+    && line.deductionMode !== 'none',
+  )
+}
+
+export function calculateWeightTicketLineTotals(lines: WeightTicketCalculationLine[]) {
+  const lineTotalsById = new Map(lines.map((line) => [line.id, calculateLineTotals({
+    containerDeductionWeight: String(line.containerDeductionWeight),
+    deductionMode: line.deductionMode,
+    deductionValue: String(line.deductionValue),
+    grossWeight: String(line.grossWeight),
+  })]))
+  const lineById = new Map(lines.map((line) => [line.id, line]))
+  const childrenByParentId = new Map<string, WeightTicketCalculationLine[]>()
+
   lines.forEach((line) => {
-    if (line.parentId) {
-      const isImpurity = toNumber(line.grossWeight) === 0 && !!line.impurityId && line.deductionMode !== 'none';
-      if (isImpurity) {
-        const parent = lines.find(l => l.id === line.parentId)
-        const parentTotals = totalsMap.get(line.parentId)
-        const childTotals = totalsMap.get(line.id)
-        if (parent && parentTotals && childTotals) {
-          const siblingLotTotals = lines
-            .filter(l => l.parentId === line.parentId && !l.impuritySourceLineId && (toNumber(l.grossWeight) > 0 || !l.impurityId))
-            .reduce((summary, lot) => {
-              const grossWeight = Math.max(0, toNumber(lot.grossWeight))
-              const containerDeductionWeight = Math.min(Math.max(0, toNumber(lot.containerDeductionWeight)), grossWeight)
-              return {
-                containerDeductionWeight: summary.containerDeductionWeight + containerDeductionWeight,
-                grossWeight: summary.grossWeight + grossWeight,
-              }
-            }, { containerDeductionWeight: 0, grossWeight: 0 })
-          const productNetBeforeImpurity = Math.max(0, parentTotals.grossWeight + siblingLotTotals.grossWeight - parentTotals.containerDeductionWeight - siblingLotTotals.containerDeductionWeight)
-          const rawDeduction = line.deductionMode === 'percent'
-            ? productNetBeforeImpurity * Math.max(0, toNumber(line.deductionValue)) / 100
-            : line.deductionMode === 'kg'
-              ? Math.max(0, toNumber(line.deductionValue))
-              : 0
-          childTotals.deductionWeight = rawDeduction
-          childTotals.netWeight = 0
-          parentTotals.netWeight = Math.max(0, parentTotals.netWeight - childTotals.deductionWeight)
-          parentTotals.deductionWeight += childTotals.deductionWeight
-        }
-      } else {
-        // Secondary lot: has its own gross weight and container deduction weight, net weight is computed normally
-        const childTotals = totalsMap.get(line.id)
-        if (childTotals) {
-          childTotals.deductionWeight = 0
-          childTotals.netWeight = Math.max(0, childTotals.grossWeight - childTotals.containerDeductionWeight)
-        }
-      }
-    }
+    if (!line.parentId) return
+    const children = childrenByParentId.get(line.parentId) ?? []
+    children.push(line)
+    childrenByParentId.set(line.parentId, children)
   })
 
-  const totals = lines.reduce((summary, line) => {
-    const isImpurity = !!line.parentId && toNumber(line.grossWeight) === 0 && !!line.impurityId && line.deductionMode !== 'none';
-    if (isImpurity) return summary
-    
-    const totals = totalsMap.get(line.id)!
-    summary.containerDeductionWeight += totals.containerDeductionWeight
-    summary.grossWeight += totals.grossWeight
-    summary.deductionWeight += totals.deductionWeight
-    summary.netWeight += totals.netWeight
-    return summary
-  }, { containerDeductionWeight: 0, deductionWeight: 0, grossWeight: 0, netWeight: 0 })
+  childrenByParentId.forEach((children, parentId) => {
+    const parent = lineById.get(parentId)
+    const impurityLines = children.filter(isChildImpurityLine)
+    if (!parent || impurityLines.length === 0) return
+
+    const sourceLots = [
+      parent,
+      ...children.filter((line) => !isChildImpurityLine(line) && !line.impuritySourceLineId),
+    ]
+    const netBeforeImpurityWeight = sourceLots.reduce((sum, line) => {
+      const grossWeight = Math.max(0, toNumber(line.grossWeight))
+      const containerDeductionWeight = Math.min(
+        Math.max(0, toNumber(line.containerDeductionWeight)),
+        grossWeight,
+      )
+      return sum + Math.max(0, grossWeight - containerDeductionWeight)
+    }, 0)
+    let availableNetWeight = sourceLots.reduce(
+      (sum, line) => sum + (lineTotalsById.get(line.id)?.netWeight ?? 0),
+      0,
+    )
+
+    impurityLines.forEach((line) => {
+      const childTotals = lineTotalsById.get(line.id)
+      if (!childTotals) return
+      const rawDeduction = line.deductionMode === 'percent'
+        ? netBeforeImpurityWeight * Math.max(0, toNumber(line.deductionValue)) / 100
+        : Math.max(0, toNumber(line.deductionValue))
+      const deductionWeight = roundWeight(Math.min(rawDeduction, availableNetWeight))
+
+      childTotals.deductionWeight = deductionWeight
+      childTotals.netWeight = 0
+
+      let remainingDeduction = deductionWeight
+      sourceLots.forEach((sourceLot) => {
+        if (remainingDeduction <= 0) return
+        const sourceTotals = lineTotalsById.get(sourceLot.id)
+        if (!sourceTotals) return
+        const appliedDeduction = Math.min(sourceTotals.netWeight, remainingDeduction)
+        sourceTotals.netWeight = roundWeight(sourceTotals.netWeight - appliedDeduction)
+        remainingDeduction = roundWeight(remainingDeduction - appliedDeduction)
+      })
+      availableNetWeight = roundWeight(availableNetWeight - deductionWeight)
+    })
+  })
+
+  const sourceTotalsByLineId = new Map<string, ReturnType<typeof calculateLineTotals>>()
+  lines.forEach((line) => {
+    if (line.parentId) return
+    const children = childrenByParentId.get(line.id) ?? []
+    const groupedLines = [line, ...children]
+    const sourceTotals = groupedLines.reduce(
+      (totals, groupedLine) => {
+        const lineTotals = lineTotalsById.get(groupedLine.id)
+        if (!lineTotals) return totals
+        totals.containerDeductionWeight += lineTotals.containerDeductionWeight
+        totals.deductionWeight += lineTotals.deductionWeight
+        totals.grossWeight += lineTotals.grossWeight
+        totals.netWeight += lineTotals.netWeight
+        return totals
+      },
+      { containerDeductionWeight: 0, deductionWeight: 0, grossWeight: 0, netWeight: 0 },
+    )
+    sourceTotalsByLineId.set(line.id, {
+      containerDeductionWeight: roundWeight(sourceTotals.containerDeductionWeight),
+      deductionWeight: roundWeight(sourceTotals.deductionWeight),
+      grossWeight: roundWeight(sourceTotals.grossWeight),
+      netWeight: roundWeight(sourceTotals.netWeight),
+    })
+  })
+
+  const totals = [...lineTotalsById.values()].reduce(
+    (summary, lineTotals) => ({
+      containerDeductionWeight: summary.containerDeductionWeight + lineTotals.containerDeductionWeight,
+      deductionWeight: summary.deductionWeight + lineTotals.deductionWeight,
+      grossWeight: summary.grossWeight + lineTotals.grossWeight,
+      netWeight: summary.netWeight + lineTotals.netWeight,
+    }),
+    { containerDeductionWeight: 0, deductionWeight: 0, grossWeight: 0, netWeight: 0 },
+  )
+
   return {
-    containerDeductionWeight: roundWeight(totals.containerDeductionWeight),
-    deductionWeight: roundWeight(totals.deductionWeight),
-    grossWeight: roundWeight(totals.grossWeight),
-    netWeight: roundWeight(totals.netWeight),
+    lineTotalsById,
+    sourceTotalsByLineId,
+    totals: {
+      containerDeductionWeight: roundWeight(totals.containerDeductionWeight),
+      deductionWeight: roundWeight(totals.deductionWeight),
+      grossWeight: roundWeight(totals.grossWeight),
+      netWeight: roundWeight(totals.netWeight),
+    },
   }
+}
+
+export function calculateTicketTotals(lines: WeightTicketCalculationLine[]) {
+  return calculateWeightTicketLineTotals(lines).totals
 }
 
 export function findOptionLabel(options: OptionItem[], id: string) {

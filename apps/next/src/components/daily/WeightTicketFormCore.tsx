@@ -19,8 +19,8 @@ import { ApiError, getErrorMessage } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { cachedWeightTicketReferences } from '@/lib/weight-ticket-reference-cache'
 import {
-  calculateLineTotals,
   calculateTicketTotals,
+  calculateWeightTicketLineTotals,
   createWeightTicketLine,
   decodeStoredImageAsset,
   encodeStoredImageReference,
@@ -241,70 +241,10 @@ async function createAttachmentPreviewFromFile(file: File): Promise<AttachmentPr
 }
 
 function calculateAdjustedLineTotals(line: FormWeightTicketLine, allLines: FormWeightTicketLine[]) {
-  const isImpurity = !!line.parentId && line.deductionMode !== 'none';
-  const isSecondaryLot = !!line.parentId && line.deductionMode === 'none';
-
-  if (isImpurity) {
-    const parentLine = allLines.find(l => l.id === line.parentId)
-    const realLotSummary = parentLine
-      ? calculateRealLotSummary(parentLine, allLines)
-      : { netBeforeImpurityWeight: 0 }
-    const deductionWeight = line.deductionMode === 'percent'
-      ? realLotSummary.netBeforeImpurityWeight * Math.max(0, Number(line.deductionValue || 0)) / 100
-      : line.deductionMode === 'kg'
-        ? Math.max(0, Number(line.deductionValue || 0))
-        : 0
-    return {
-      containerDeductionWeight: 0,
-      deductionWeight,
-      grossWeight: 0,
-      netWeight: 0,
-    }
-  }
-
-  if (isSecondaryLot) {
-    const childTotals = calculateLineTotals(line)
-    return {
-      containerDeductionWeight: childTotals.containerDeductionWeight,
-      deductionWeight: 0,
-      grossWeight: childTotals.grossWeight,
-      netWeight: childTotals.netWeight,
-    }
-  }
-
-  // Parent line: sum up parent totals + secondary lots' totals - impurities
-  const parentTotals = calculateLineTotals(line)
-  const children = allLines.filter(l => l.parentId === line.id)
-
-  const secondaryLots = children.filter(l => l.deductionMode === 'none')
-  const impurities = children.filter(l => l.deductionMode !== 'none')
-
-  let totalGross = parentTotals.grossWeight
-  let totalContainer = parentTotals.containerDeductionWeight
-
-  secondaryLots.forEach(lot => {
-    const lotTotals = calculateLineTotals(lot)
-    totalGross += lotTotals.grossWeight
-    totalContainer += lotTotals.containerDeductionWeight
-  })
-
-  const realLotSummary = calculateRealLotSummary(line, allLines)
-  let childrenDeduction = 0
-  impurities.forEach(child => {
-    const childDeduction = child.deductionMode === 'percent'
-      ? realLotSummary.netBeforeImpurityWeight * Math.max(0, Number(child.deductionValue || 0)) / 100
-      : child.deductionMode === 'kg'
-        ? Math.max(0, Number(child.deductionValue || 0))
-        : 0
-    childrenDeduction += childDeduction
-  })
-
-  return {
-    containerDeductionWeight: totalContainer,
-    deductionWeight: parentTotals.deductionWeight + childrenDeduction,
-    grossWeight: totalGross,
-    netWeight: Math.max(0, totalGross - totalContainer - (parentTotals.deductionWeight + childrenDeduction)),
-  }
+  const calculation = calculateWeightTicketLineTotals(allLines)
+  return line.parentId
+    ? calculation.lineTotalsById.get(line.id)!
+    : calculation.sourceTotalsByLineId.get(line.id)!
 }
 
 function calculateRealLotSummary(line: FormWeightTicketLine, allLines: FormWeightTicketLine[]) {

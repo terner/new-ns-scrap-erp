@@ -542,7 +542,12 @@ export function WeightTicketProductBreakdownTable({
                     <td className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">จากเต๋าจริง</td>
                     <td className="px-3 py-2 text-xs text-emerald-800">{group.realLotLines.length} เต๋า</td>
                     {ticket.type === 'WTO' ? <td className="px-3 py-2 text-xs text-emerald-800">-</td> : null}
-                    <WeightCells container={lotTotals.container} deduction={0} gross={lotTotals.gross} net={lotTotals.net} />
+                    <WeightCells
+                      container={lotTotals.container}
+                      deduction={lotTotals.deduction + impurityTotals.deduction}
+                      gross={lotTotals.gross}
+                      net={lotTotals.net}
+                    />
                     {ticket.type === 'WTO' ? <td colSpan={2} className="px-3 py-2" /> : null}
                     {showBillingColumns ? <td colSpan={3} className="px-3 py-2" /> : null}
                     <td className="px-3 py-2" />
