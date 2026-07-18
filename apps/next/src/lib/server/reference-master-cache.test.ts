@@ -848,6 +848,39 @@ describe('reference-master-cache', () => {
     expect(customersFindMany).toHaveBeenCalledTimes(2)
   })
 
+  it('scans all Redis prefix pages before invalidating searched customer keys', async () => {
+    process.env.KV_REST_API_URL = 'https://redis.example.com'
+    process.env.KV_REST_API_TOKEN = 'token'
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const commands = JSON.parse(String(init?.body)) as string[][]
+      const command = commands[0]
+      if (command?.[0] === 'SCAN' && command[1] === '0') {
+        return new Response(JSON.stringify([{ result: ['17', ['reference:customers:search:one']] }]), { status: 200 })
+      }
+      if (command?.[0] === 'SCAN' && command[1] === '17') {
+        return new Response(JSON.stringify([{ result: ['0', ['reference:customers:search:two']] }]), { status: 200 })
+      }
+      return new Response(JSON.stringify(commands[0]?.[0] === 'DEL' ? [{ result: 2 }] : []), { status: 200 })
+    })
+    global.fetch = fetchMock as typeof fetch
+
+    const cache = await import('./reference-master-cache')
+    await cache.invalidateCustomerReferenceCache()
+
+    const commandBatches = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)) as string[][])
+    const scanCommands = commandBatches.flat().filter((command) => command[0] === 'SCAN')
+    const deleteCommands = commandBatches.flat().filter((command) => command[0] === 'DEL')
+
+    expect(scanCommands).toEqual([
+      ['SCAN', '0', 'MATCH', 'reference:customers:search:*', 'COUNT', '100'],
+      ['SCAN', '17', 'MATCH', 'reference:customers:search:*', 'COUNT', '100'],
+    ])
+    expect(deleteCommands).toEqual(expect.arrayContaining([
+      ['DEL', 'reference:customers:search:one'],
+      ['DEL', 'reference:customers:search:two'],
+    ]))
+  })
+
   it('clears active account cache after invalidation', async () => {
     accountsFindMany
       .mockResolvedValueOnce([

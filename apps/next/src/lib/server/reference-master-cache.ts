@@ -611,6 +611,7 @@ export type PaymentMethodReferenceRecord = {
 }
 
 const SERVER_CACHE_TTL_MS = 15_000
+const SERVER_CACHE_MAX_ENTRIES = 256
 const REDIS_CACHE_TTL_SECONDS = 300
 const REDIS_SEARCH_CACHE_TTL_SECONDS = 120
 const KEY_ACCOUNTS_ACTIVE = 'reference:accounts:active'
@@ -655,6 +656,10 @@ function getServerCache<T>(key: string) {
 }
 
 function setServerCache(key: string, value: unknown, ttlMs = SERVER_CACHE_TTL_MS) {
+  if (!serverCache.has(key) && serverCache.size >= SERVER_CACHE_MAX_ENTRIES) {
+    const oldestKey = serverCache.keys().next().value
+    if (typeof oldestKey === 'string') serverCache.delete(oldestKey)
+  }
   serverCache.set(key, { expiresAt: Date.now() + ttlMs, value })
 }
 
@@ -769,14 +774,31 @@ async function redisDeleteKeys(keys: string[]) {
   await runRedisPipeline(normalizedKeys.map((key) => ['DEL', key]))
 }
 
+async function redisScanKeysByPrefix(prefix: string) {
+  const keys: string[] = []
+  let cursor = '0'
+
+  do {
+    const responses = await runRedisPipeline([['SCAN', cursor, 'MATCH', `${prefix}*`, 'COUNT', '100']])
+    const result = responses?.[0]?.result
+    if (!Array.isArray(result) || result.length < 2) break
+
+    const nextCursor = result[0]
+    const pageKeys = result[1]
+    if (Array.isArray(pageKeys)) {
+      keys.push(...pageKeys.filter((key): key is string => typeof key === 'string'))
+    }
+    cursor = typeof nextCursor === 'string' ? nextCursor : String(nextCursor ?? '0')
+  } while (cursor !== '0')
+
+  return [...new Set(keys)]
+}
+
 async function redisDeleteByPrefixes(prefixes: string[]) {
   const normalizedPrefixes = [...new Set(prefixes.filter(Boolean))]
   if (!normalizedPrefixes.length) return
 
-  const scanResponses = await runRedisPipeline(normalizedPrefixes.map((prefix) => ['KEYS', `${prefix}*`]))
-  const keys = scanResponses
-    ?.flatMap((entry) => (Array.isArray(entry?.result) ? entry.result : []))
-    .filter((value): value is string => typeof value === 'string')
+  const keys = (await Promise.all(normalizedPrefixes.map(redisScanKeysByPrefix))).flat()
 
   if (keys?.length) await redisDeleteKeys(keys)
 }

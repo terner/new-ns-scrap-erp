@@ -136,6 +136,13 @@ const nextConfig = {
         source: '/:path*',
         headers: securityHeaders,
       },
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'private, no-store, max-age=0, must-revalidate' },
+          { key: 'Vary', value: 'Cookie, Authorization' },
+        ],
+      },
     ]
   },
   // Externalize PDF/canvas packages so Turbopack ไม่ bundle Node-native internals

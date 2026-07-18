@@ -162,6 +162,15 @@
 
 **Exit criteria:** มีข้อมูลเพียงพอตัดสินใจว่าจะขยาย/ลด cache scope ได้ ไม่ใช้ assumption.
 
+#### CACHE-M2: Browser cache boundary and Redis invalidation hardening
+
+- [x] กำหนด API response เป็น `private, no-store` เพื่อป้องกัน browser/shared proxy cache ข้อมูล runtime โดยไม่ได้ตั้งใจ
+- [x] จำกัด short-lived server cache ไม่เกิน 256 entries
+- [x] เปลี่ยน Redis prefix invalidation จาก `KEYS` เป็น cursor-based `SCAN`
+- [ ] ตรวจ runtime logs และ Redis latency/error rate หลัง deploy ก่อนพิจารณาเปิด browser cache สำหรับ reference options
+
+**Exit criteria:** API ที่มี auth/business data ไม่ถูก browser cache โดยไม่ได้ตั้งใจ, prefix invalidation ไม่ใช้ blocking `KEYS`, และการตัดสินใจเรื่อง browser cache อ้างอิง runtime evidence.
+
 ### Deferred, Not An Active Task
 
 - transactional validation, stock availability, WAC/cost, ledger, price snapshots, document detail และ report facts ยังอ่าน DB ตาม business transaction
