@@ -1325,7 +1325,7 @@ async function validateManualStockSelection(
   return { manualStockCostByItemIndex }
 }
 
-async function salesOptionsPayload(scope: Awaited<ReturnType<typeof salesBranchScope>>) {
+export async function salesOptionsPayload(scope: Awaited<ReturnType<typeof salesBranchScope>>) {
   const allowedBranchCodes = scope.codes
   const allowedBranchIds = scope.ids
   const [branchRefs, customerBranchOptions, warehouseRefs, products, salesChannels, vatRatePercent, deliveryTickets, poSellRows, tradingPurchaseBills, tradingManualCostSources, tradingAllocationFacts, customerAdvanceRows] = await Promise.all([
