@@ -1,5 +1,7 @@
 # 00 Current Work
 
+Purchase bills options performance checkpoint on 2026-07-18: `/api/purchase/bills` now returns list rows and totals without modal options; `/api/purchase/bills/options?scope=reference` serves branch/warehouse references separately, while the full options endpoint is loaded only when the purchase form is opened and cached per authenticated browser user for five minutes. What is what: list data follows table filters, reference options follow branch permission scope, and full form options follow the modal lifecycle. Why it has to be like this: the previous combined request took about 4.7 seconds and blocked the branch dropdown behind ADV, PO Buy, WTI and approval work. Validation target: type-check, lint, build, and a repeat SIT waterfall measurement. Remaining risk: the full modal options query still loads up to 500 ADV, 500 PO Buy and 300 WTI records and needs a second profiling batch after this split.
+
 ## Purpose
 
 ไฟล์นี้เป็น handoff สั้นสำหรับงานที่กำลัง active เท่านั้น ไม่ใช่ changelog

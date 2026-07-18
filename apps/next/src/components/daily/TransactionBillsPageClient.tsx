@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { SELECTED_BRANCH_KEY } from '@/lib/branch-selection'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { cachedPurchaseBillOptions, invalidatePurchaseBillOptionsCache } from '@/lib/purchase-bill-options-cache'
 import { firstErrorKeyFromZodIssues, focusFieldError, issueMapFromZodIssues } from '@/lib/form-errors'
 import { formatDateDisplay, formatDecimalDisplay, formatDecimalDraft, sanitizeDecimalInput } from '@/lib/format'
 import { purchaseBillCancelSchema, purchaseBillFormSchema, type PurchaseBillCancelValues, type PurchaseBillFormValues } from '@/lib/purchase-bill'
@@ -768,6 +769,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const latestLoadRequestRef = useRef(0)
   const latestDetailRequestRef = useRef(0)
   const handledAutoOpenRef = useRef<string | null>(null)
+  const purchaseOptionsRequestRef = useRef<Promise<PurchasePayload> | null>(null)
   const tableColumns = useMemo(() => {
     if (mode === 'purchase') return purchaseBillColumns
     return salesBillColumns
@@ -816,23 +818,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         setRows(payload.rows)
         setTotalAmount(payload.totalAmount ?? 0)
         setTotalRows(payload.totalRows ?? payload.rows.length)
-        setVatRatePercent(payload.vatRatePercent ?? 7)
-        setOptions({
-          advancePayments: payload.advancePayments,
-          branches: payload.branches,
-          customers: [],
-          customerAdvancePayments: [],
-          deliveries: [],
-          poBuys: payload.poBuys,
-          poSells: [],
-          products: payload.products,
-          receipts: payload.receipts,
-          salesChannels: [],
-          salespersons: payload.salespersons,
-          suppliers: payload.suppliers,
-          tradingCostSources: [],
-          warehouses: payload.warehouses,
-        })
       } else if (mode === 'sales') {
         const payload = await dailyFetchJson<SalesPayload>(requestPath)
         if (latestLoadRequestRef.current !== requestId) return
@@ -865,6 +850,33 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  const loadPurchaseOptions = useCallback(async () => {
+    if (mode !== 'purchase') return null
+    if (!purchaseOptionsRequestRef.current) {
+      purchaseOptionsRequestRef.current = cachedPurchaseBillOptions<PurchasePayload>('/api/purchase/bills/options')
+    }
+    const payload = await purchaseOptionsRequestRef.current
+    setVatRatePercent(payload.vatRatePercent ?? 7)
+    setOptions((current) => ({
+      ...current,
+      advancePayments: payload.advancePayments,
+      branches: payload.branches,
+      poBuys: payload.poBuys,
+      products: payload.products,
+      receipts: payload.receipts,
+      salespersons: payload.salespersons,
+      suppliers: payload.suppliers,
+      warehouses: payload.warehouses,
+    }))
+    return payload
+  }, [mode])
+
+  useEffect(() => {
+    if (mode !== 'purchase') return
+    void cachedPurchaseBillOptions<Pick<PurchasePayload, 'branches' | 'warehouses'>>('/api/purchase/bills/options?scope=reference')
+      .then((payload) => setOptions((current) => ({ ...current, branches: payload.branches, warehouses: payload.warehouses })))
+  }, [mode])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1282,7 +1294,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     router.replace(nextQuery ? `?${nextQuery}` : mode === 'purchase' ? '/purchase/bills' : '/sales/bills')
   }, [searchParams, router, mode])
 
-  const openPurchaseFormFromReceipt = useCallback((receipt: ReceiptOption) => {
+  const openPurchaseFormFromReceipt = useCallback(async (receipt: ReceiptOption) => {
+    await loadPurchaseOptions()
     const branchId = receipt.branchId ?? resolvedPreferredBranchId ?? ''
     const supplierId = receipt.supplierId ?? ''
     const supplier = options.suppliers.find((option) => option.id === supplierId) ?? null
@@ -1302,7 +1315,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     setFieldErrors({})
     setError(null)
     setShowForm(true)
-  }, [resolvedPreferredBranchId, options.suppliers, defaultPurchaseWarehouseId])
+  }, [defaultPurchaseWarehouseId, loadPurchaseOptions, options.suppliers, resolvedPreferredBranchId])
 
   const openSalesFormFromDelivery = useCallback((delivery: DeliveryOption) => {
     const branchId = delivery.branchId ?? resolvedPreferredBranchId ?? ''
@@ -1695,7 +1708,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     }
   }
 
-  function openPurchaseForm() {
+  async function openPurchaseForm() {
     setEditingBillId(null)
     setSupplierSwapMode(false)
     setSupplierSwapSupplierId('')
@@ -1704,6 +1717,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     setFieldErrors({})
     setError(null)
     setShowForm(true)
+    void loadPurchaseOptions()
   }
 
   function openSalesForm() {
@@ -2731,6 +2745,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         body: JSON.stringify(payload),
         method: editingBillId ? 'PATCH' : 'POST',
       })
+      invalidatePurchaseBillOptionsCache()
+      purchaseOptionsRequestRef.current = null
       setEditingBillId(null)
       setSupplierSwapMode(false)
       setSupplierSwapSupplierId('')
