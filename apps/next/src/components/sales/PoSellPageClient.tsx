@@ -165,7 +165,7 @@ const poSellColumns: ResizableColumnDefinition<string>[] = [
   { key: 'documentStatus', minWidth: 120, defaultWidth: 140 },
   { key: 'matchStatus', minWidth: 150, defaultWidth: 170 },
   { key: 'updatedAt', minWidth: 150, defaultWidth: 180 },
-  { key: 'action', minWidth: 180, defaultWidth: 200 },
+  { key: 'action', minWidth: 320, defaultWidth: 320 },
 ]
 
 export function PoSellPageClient() {
@@ -881,9 +881,9 @@ export function PoSellPageClient() {
               <TableCell className={`text-right pr-4 tabular-nums ${row.marginPct < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatPercent(row.marginPct)}</TableCell>
               <TableCell className="text-center"><StatusPill label={row.documentStatusLabel} tone={documentStatusPillTone(row.documentStatus)} /></TableCell>
               <TableCell className="text-center"><StatusPill label={row.matchStatusLabel} tone="match" /></TableCell>
-              <TableCell className="w-32 whitespace-nowrap text-xs text-slate-600">
-                <div className="truncate font-semibold text-slate-700">{row.updatedBy || '-'}</div>
-                <div className="font-mono text-xs text-slate-400">{formatTimestampDisplay(row.updatedAt)}</div>
+              <TableCell className="overflow-hidden whitespace-nowrap text-xs text-slate-600">
+                <div className="truncate font-semibold text-slate-700" title={row.updatedBy || '-'}>{row.updatedBy || '-'}</div>
+                <div className="truncate font-mono text-xs text-slate-400" title={formatTimestampDisplay(row.updatedAt)}>{formatTimestampDisplay(row.updatedAt)}</div>
               </TableCell>
               <TableCell className="whitespace-nowrap text-right">
                 <div className="flex justify-end gap-1">
