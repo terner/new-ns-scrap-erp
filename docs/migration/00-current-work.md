@@ -127,7 +127,7 @@ Validation completed:
 
 สถานะปัจจุบัน: shared readers และ invalidation ของชุดหลักถูกเพิ่มแล้ว; direct reads ที่เหลือถูกแยกเป็น CRUD, import/export, write-time validation, historical inactive label, tax effective-date lookup หรือ transaction/business fact จึงยังคงอ่าน DB ตรงตาม contract.
 
-M5 checkpoint 2026-07-18: เพิ่ม server/client cache duration telemetry และ audit script `apps/next/scripts/audit-product-image-assets.mjs`. Dev/SIT/UAT ตรวจพบสินค้า 236 รายการ: 62 รายการมี original+thumbnail ครบ 124 objects, 174 รายการไม่มีรูปโดยตั้งใจ, และไม่มี missing/orphan asset. Migrations `20260718140000_clear_legacy_product_image_names.sql` และ `20260718143000_drop_legacy_product_image_names.sql` ล้างข้อมูลและ drop legacy column ในทั้งสาม environment หลัง Prisma/schema consumer audit ผ่าน. เพิ่ม `image_delivery` telemetry สำหรับ WTI/WTO attachment load/error โดยไม่ส่ง URL/เลขเอกสาร/scope และถอด placeholder รูป hardcode จาก LINE notification แล้ว.
+M5 checkpoint 2026-07-18: เพิ่ม server/client cache duration telemetry และ audit script `apps/next/scripts/audit-product-image-assets.mjs`. Dev/SIT/UAT ตรวจพบสินค้า 236 รายการ: 62 รายการมี original+thumbnail ครบ 124 objects, 174 รายการไม่มีรูปโดยตั้งใจ, และไม่มี missing/orphan asset. Migrations `20260718140000_clear_legacy_product_image_names.sql` และ `20260718143000_drop_legacy_product_image_names.sql` ล้างข้อมูลและ drop legacy column ในทั้งสาม environment หลัง Prisma/schema consumer audit ผ่าน. เพิ่ม `image_delivery` telemetry สำหรับ WTI/WTO attachment load/error โดยไม่ส่ง URL/เลขเอกสาร/scope และถอด placeholder รูป hardcode จาก LINE notification แล้ว. เพิ่ม `audit:weight-ticket-image-assets`; audit dev/SIT/UAT พบไม่มี data URL, invalid URL หรือ missing storage key, แต่ `weight-ticket-pdfs` ยังเป็น public และมี legacy filename-only references จึงยังไม่เปลี่ยนเป็น private.
 
 Validation checkpoint 2026-07-18: targeted cache tests ผ่าน `37/37`; หลัง M5 lint และ workspace type-check ผ่าน. ยังต้องเก็บ runtime logs/telemetry จาก SIT/UAT และทำ browser/DOM UAT เมื่อผู้ใช้สั่ง.
 
@@ -149,7 +149,7 @@ git diff --check -- <batch-files>
 
 1. เก็บ `CACHE-M5-A` runtime evidence จาก SIT/UAT โดยอ่าน structured logs และตรวจ scope/invalidation.
 2. ตั้งค่า/ตรวจการรับ `image_delivery` telemetry จาก deployment และวัด request/bytes/latency/broken-image.
-3. ออกแบบ signed URL สำหรับ WTI/WTO attachments ก่อนเปลี่ยน bucket จาก public เป็น private; ต้องทดสอบ LINE URL lifecycle แยก.
+3. ออกแบบ mapping ของ legacy filename-only references และ signed URL สำหรับ WTI/WTO attachments ก่อนเปลี่ยน bucket จาก public เป็น private; ต้องทดสอบ LINE URL lifecycle แยก.
 4. อัปเดต TTL/key decision จากหลักฐานจริง; ยังไม่เปิด persistent browser cache.
 
 ## Working Tree Boundary
