@@ -2,6 +2,7 @@ import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { errorJson, masterDataJson, type MasterDataRouteProps, updateMasterDataStatusSchema, toIso } from '@/lib/server/master-data'
+import { invalidateSalespersonReferenceCache } from '@/lib/server/reference-master-cache'
 
 export const runtime = 'nodejs'
 
@@ -20,6 +21,7 @@ export async function PATCH(request: Request, { params }: MasterDataRouteProps) 
     })
     if (!resolved) throw new Error('ไม่พบพนักงานขายที่ต้องการอัปเดต')
     const row = await prisma.salespersons.update({ where: { id: resolved.id }, data: { active: values.active } })
+    await invalidateSalespersonReferenceCache()
     const outwardId = requireBusinessCode(row.code, `พนักงานขาย ${row.id}`)
     return masterDataJson({
       id: outwardId,

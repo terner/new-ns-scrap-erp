@@ -2,6 +2,7 @@ import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { buildDualCostingMatchIdMap } from '@/lib/server/dual-costing-match-id'
 import { getDualCostingBranch } from '@/lib/server/dual-costing-branch'
 import { prisma } from '@/lib/server/prisma'
+import { listProductReferences } from '@/lib/server/reference-master-cache'
 
 type JsonItem = Record<string, unknown>
 type ProductRef = { code: string; id: bigint; metal_group: string | null; name: string }
@@ -149,7 +150,7 @@ export async function buildDualCostingManagement() {
       orderBy: [{ date: 'desc' }, { deal_no: 'desc' }],
       take: 10000,
     }),
-    prisma.products.findMany({ select: { code: true, id: true, metal_group: true, name: true } }),
+    listProductReferences().then((rows) => rows.map((row) => ({ ...row, metal_group: row.metalGroup }))),
     prisma.po_sells.findMany({
       include: { customers: true },
       orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],

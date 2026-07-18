@@ -13,7 +13,7 @@ import { currentActor, listDailyAccounts, normalizeDate, toDateOnly, toNumber } 
 import { isSupplierEligibleForBranch } from '@/lib/server/party-branch-eligibility'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
-import { listActiveBranches, listActivePaymentMethods, listActiveSupplierBranchOptions } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActivePaymentMethods, listActiveSupplierBranchOptions, listProductReferences } from '@/lib/server/reference-master-cache'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import type { Prisma } from '../../../../../generated/prisma/client'
@@ -258,11 +258,7 @@ export async function GET(request: Request) {
       listActiveBranches(),
       listActivePaymentMethods(),
       listActiveSupplierBranchOptions(),
-      prisma.products.findMany({
-        orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }],
-        select: { active: true, code: true, id: true, name: true, unit: true },
-        take: 5000,
-      }),
+      listProductReferences(),
       prisma.supplier_advance_payments.findMany({
         include: {
           accounts: true,

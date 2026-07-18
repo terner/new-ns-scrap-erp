@@ -197,6 +197,41 @@ type PaymentMethodDbRow = {
   type: string
 }
 
+type SalesChannelDbRow = {
+  active: boolean | null
+  code: string | null
+  id: bigint
+  name: string
+}
+
+type SalespersonDbRow = {
+  active: boolean | null
+  commission_eligible: boolean | null
+  code: string | null
+  id: bigint
+  name: string
+  phone: string | null
+}
+
+type ImpurityDbRow = {
+  active: boolean | null
+  id: bigint
+  name: string
+}
+
+type ProductionMachineDbRow = {
+  active: boolean | null
+  id: bigint
+  name: string
+  type: string | null
+}
+
+type ProductionLineDbRow = {
+  active: boolean | null
+  id: bigint
+  name: string
+}
+
 type CachedBranchRecord = {
   active: boolean
   address: string | null
@@ -348,6 +383,41 @@ type CachedPaymentMethodRecord = {
   id: string
   name: string
   type: string
+}
+
+type CachedSalesChannelRecord = {
+  active: boolean
+  code: string
+  id: string
+  name: string
+}
+
+type CachedSalespersonRecord = {
+  active: boolean
+  commissionEligible: boolean
+  code: string
+  id: string
+  name: string
+  phone: string | null
+}
+
+type CachedImpurityRecord = {
+  active: boolean
+  id: string
+  name: string
+}
+
+type CachedProductionMachineRecord = {
+  active: boolean
+  id: string
+  name: string
+  type: string | null
+}
+
+type CachedProductionLineRecord = {
+  active: boolean
+  id: string
+  name: string
 }
 
 type CachedSupplierRecord = {
@@ -610,6 +680,41 @@ export type PaymentMethodReferenceRecord = {
   type: string
 }
 
+export type SalesChannelReferenceRecord = {
+  active: boolean
+  code: string
+  id: bigint
+  name: string
+}
+
+export type SalespersonReferenceRecord = {
+  active: boolean
+  commissionEligible: boolean
+  code: string
+  id: bigint
+  name: string
+  phone: string | null
+}
+
+export type ImpurityReferenceRecord = {
+  active: boolean
+  id: bigint
+  name: string
+}
+
+export type ProductionMachineReferenceRecord = {
+  active: boolean
+  id: bigint
+  name: string
+  type: string | null
+}
+
+export type ProductionLineReferenceRecord = {
+  active: boolean
+  id: bigint
+  name: string
+}
+
 const SERVER_CACHE_TTL_MS = 15_000
 const SERVER_CACHE_MAX_ENTRIES = 256
 const REDIS_CACHE_TTL_SECONDS = 300
@@ -628,9 +733,15 @@ const KEY_MACHINE_TYPES_ALL = 'reference:machine-types:all'
 const KEY_OVERSEAS_RECIPIENTS_ACTIVE = 'reference:overseas-recipients:active'
 const KEY_OVERSEAS_REMITTANCE_PURPOSES_ACTIVE = 'reference:overseas-remittance-purposes:active'
 const KEY_PAYMENT_METHODS_ACTIVE = 'reference:payment-methods:active'
+const KEY_SALES_CHANNELS_ACTIVE = 'reference:sales-channels:active'
+const KEY_SALESPERSONS_ACTIVE = 'reference:salespersons:active'
+const KEY_IMPURITIES_ACTIVE = 'reference:impurities:active'
+const KEY_PRODUCTION_MACHINES_ACTIVE = 'reference:production-machines:active'
+const KEY_PRODUCTION_LINES_ACTIVE = 'reference:production-lines:active'
 const KEY_PRODUCT_TYPES_ALL = 'reference:product-types:all'
 const KEY_PRODUCT_UNITS_ALL = 'reference:product-units:all'
 const KEY_PRODUCTS_ACTIVE = 'reference:products:active'
+const KEY_PRODUCTS_ALL = 'reference:products:all'
 const KEY_PRODUCTS_SEARCH_PREFIX = 'reference:products:search:'
 const KEY_PRODUCTS_THUMBNAILS_ACTIVE = 'reference:products:thumbnails:active'
 const KEY_SUPPLIERS_ACTIVE = 'reference:suppliers:active'
@@ -1314,6 +1425,26 @@ function hydratePaymentMethodRecord(row: CachedPaymentMethodRecord): PaymentMeth
   }
 }
 
+function hydrateSalesChannelRecord(row: CachedSalesChannelRecord): SalesChannelReferenceRecord {
+  return { active: row.active, code: row.code, id: BigInt(row.id), name: row.name }
+}
+
+function hydrateSalespersonRecord(row: CachedSalespersonRecord): SalespersonReferenceRecord {
+  return { active: row.active, code: row.code, commissionEligible: row.commissionEligible, id: BigInt(row.id), name: row.name, phone: row.phone ?? null }
+}
+
+function hydrateImpurityRecord(row: CachedImpurityRecord): ImpurityReferenceRecord {
+  return { active: row.active, id: BigInt(row.id), name: row.name }
+}
+
+function hydrateProductionMachineRecord(row: CachedProductionMachineRecord): ProductionMachineReferenceRecord {
+  return { active: row.active, id: BigInt(row.id), name: row.name, type: row.type ?? null }
+}
+
+function hydrateProductionLineRecord(row: CachedProductionLineRecord): ProductionLineReferenceRecord {
+  return { active: row.active, id: BigInt(row.id), name: row.name }
+}
+
 function dehydratePaymentMethodRecord(row: PaymentMethodReferenceRecord): CachedPaymentMethodRecord {
   return {
     active: row.active,
@@ -1322,6 +1453,26 @@ function dehydratePaymentMethodRecord(row: PaymentMethodReferenceRecord): Cached
     name: row.name,
     type: row.type,
   }
+}
+
+function dehydrateSalesChannelRecord(row: SalesChannelReferenceRecord): CachedSalesChannelRecord {
+  return { active: row.active, code: row.code, id: row.id.toString(), name: row.name }
+}
+
+function dehydrateSalespersonRecord(row: SalespersonReferenceRecord): CachedSalespersonRecord {
+  return { active: row.active, commissionEligible: row.commissionEligible, code: row.code, id: row.id.toString(), name: row.name, phone: row.phone ?? null }
+}
+
+function dehydrateImpurityRecord(row: ImpurityReferenceRecord): CachedImpurityRecord {
+  return { active: row.active, id: row.id.toString(), name: row.name }
+}
+
+function dehydrateProductionMachineRecord(row: ProductionMachineReferenceRecord): CachedProductionMachineRecord {
+  return { active: row.active, id: row.id.toString(), name: row.name, type: row.type ?? null }
+}
+
+function dehydrateProductionLineRecord(row: ProductionLineReferenceRecord): CachedProductionLineRecord {
+  return { active: row.active, id: row.id.toString(), name: row.name }
 }
 
 async function readThroughCache<T>({
@@ -1623,6 +1774,29 @@ export async function listActiveProductReferences() {
         orderBy: [{ code: 'asc' }, { name: 'asc' }, { id: 'asc' }],
         select: { active: true, code: true, id: true, metal_group: true, name: true, type: true, unit: true },
         where: { active: true },
+      })
+      return rows.map((row) => ({
+        active: row.active === true,
+        code: requireBusinessCode(row.code, `สินค้า ${row.id}`),
+        id: row.id,
+        metalGroup: row.metal_group ?? null,
+        name: row.name,
+        type: row.type ?? null,
+        unit: row.unit ?? null,
+      }))
+    },
+  })
+}
+
+export async function listProductReferences() {
+  return readThroughCache<ProductReferenceRecord[]>({
+    key: KEY_PRODUCTS_ALL,
+    fromCache: (value) => (value as CachedProductReferenceRecord[]).map(hydrateProductReferenceRecord),
+    toCache: (value) => value.map(dehydrateProductReferenceRecord),
+    dbReader: async () => {
+      const rows: ProductReferenceDbRow[] = await prisma.products.findMany({
+        orderBy: [{ code: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+        select: { active: true, code: true, id: true, metal_group: true, name: true, type: true, unit: true },
       })
       return rows.map((row) => ({
         active: row.active === true,
@@ -2046,6 +2220,116 @@ export async function findActivePaymentMethodReferenceByName(name: string | null
   return rows.find((row) => row.name === normalized) ?? null
 }
 
+export async function listActiveSalesChannels() {
+  return readThroughCache<SalesChannelReferenceRecord[]>({
+    key: KEY_SALES_CHANNELS_ACTIVE,
+    fromCache: (value) => (value as CachedSalesChannelRecord[]).map(hydrateSalesChannelRecord),
+    toCache: (value) => value.map(dehydrateSalesChannelRecord),
+    dbReader: async () => {
+      const rows: SalesChannelDbRow[] = await prisma.sales_channels.findMany({
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        select: { active: true, code: true, id: true, name: true },
+        where: { active: true },
+      })
+      return rows.map((row) => ({
+        active: row.active ?? true,
+        code: requireBusinessCode(row.code, `ช่องทางขาย ${row.id}`),
+        id: row.id,
+        name: row.name,
+      }))
+    },
+  })
+}
+
+export async function findActiveSalesChannelReferenceByCode(code: string | null | undefined) {
+  const normalized = String(code ?? '').trim().toUpperCase()
+  if (!normalized) return null
+  return (await listActiveSalesChannels()).find((row) => row.code === normalized) ?? null
+}
+
+export async function listActiveSalespersons() {
+  return readThroughCache<SalespersonReferenceRecord[]>({
+    key: KEY_SALESPERSONS_ACTIVE,
+    fromCache: (value) => (value as CachedSalespersonRecord[]).map(hydrateSalespersonRecord),
+    toCache: (value) => value.map(dehydrateSalespersonRecord),
+    dbReader: async () => {
+      const rows: SalespersonDbRow[] = await prisma.salespersons.findMany({
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        select: { active: true, commission_eligible: true, code: true, id: true, name: true, phone: true },
+        where: { active: true },
+      })
+      return rows.map((row) => ({
+        active: row.active ?? true,
+        commissionEligible: row.commission_eligible ?? false,
+        code: requireBusinessCode(row.code, `พนักงานขาย ${row.id}`),
+        id: row.id,
+        name: row.name,
+        phone: row.phone ?? null,
+      }))
+    },
+  })
+}
+
+export async function findActiveSalespersonReferenceByCodeOrId(value: string | bigint | null | undefined) {
+  const normalized = String(value ?? '').trim()
+  if (!normalized) return null
+  const numericId = /^\d+$/.test(normalized) ? BigInt(normalized) : null
+  return (await listActiveSalespersons()).find((row) => row.code === normalized.toUpperCase() || (numericId != null && row.id === numericId)) ?? null
+}
+
+export async function listSalespersonReferencesByIds(ids: Array<string | bigint | null | undefined>) {
+  const normalizedIds = new Set(ids.map((value) => String(value ?? '').trim()).filter((value) => /^\d+$/.test(value)))
+  return (await listActiveSalespersons()).filter((row) => normalizedIds.has(row.id.toString()))
+}
+
+export async function listActiveImpurities() {
+  return readThroughCache<ImpurityReferenceRecord[]>({
+    key: KEY_IMPURITIES_ACTIVE,
+    fromCache: (value) => (value as CachedImpurityRecord[]).map(hydrateImpurityRecord),
+    toCache: (value) => value.map(dehydrateImpurityRecord),
+    dbReader: async () => {
+      const rows: ImpurityDbRow[] = await prisma.impurities.findMany({
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        select: { active: true, id: true, name: true },
+        where: { active: true },
+      })
+      return rows.map((row) => ({ active: row.active ?? true, id: row.id, name: row.name }))
+    },
+  })
+}
+
+export async function listActiveProductionMachines() {
+  return readThroughCache<ProductionMachineReferenceRecord[]>({
+    key: KEY_PRODUCTION_MACHINES_ACTIVE,
+    fromCache: (value) => (value as CachedProductionMachineRecord[]).map(hydrateProductionMachineRecord),
+    toCache: (value) => value.map(dehydrateProductionMachineRecord),
+    dbReader: async () => {
+      const rows: ProductionMachineDbRow[] = await prisma.production_machines.findMany({
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        select: { active: true, id: true, name: true, type: true },
+        where: { active: true },
+      })
+      return rows.map((row) => ({ active: row.active ?? true, id: row.id, name: row.name, type: row.type ?? null }))
+    },
+  })
+}
+
+export async function listActiveProductionLines() {
+  return readThroughCache<ProductionLineReferenceRecord[]>({
+    key: KEY_PRODUCTION_LINES_ACTIVE,
+    fromCache: (value) => (value as CachedProductionLineRecord[]).map(hydrateProductionLineRecord),
+    toCache: (value) => value.map(dehydrateProductionLineRecord),
+    dbReader: async () => {
+      const rows: ProductionLineDbRow[] = await prisma.production_lines.findMany({
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        select: { active: true, id: true, name: true },
+        where: { active: true },
+      })
+      return rows.map((row) => ({ active: row.active ?? true, id: row.id, name: row.name }))
+    },
+  })
+}
+
 export async function findActiveBranchReferenceByCodeOrId(value: string | bigint | null | undefined) {
   const normalized = String(value ?? '').trim()
   if (!normalized) return null
@@ -2228,10 +2512,11 @@ export async function invalidateProductUnitReferenceCache() {
 
 export async function invalidateProductReferenceCache() {
   deleteServerCache(KEY_PRODUCTS_ACTIVE)
+  deleteServerCache(KEY_PRODUCTS_ALL)
   deleteServerCache(KEY_PRODUCTS_THUMBNAILS_ACTIVE)
   deleteServerCacheByPrefix(KEY_PRODUCTS_SEARCH_PREFIX)
   await Promise.all([
-    redisDeleteKeys([KEY_PRODUCTS_ACTIVE, KEY_PRODUCTS_THUMBNAILS_ACTIVE]),
+    redisDeleteKeys([KEY_PRODUCTS_ACTIVE, KEY_PRODUCTS_ALL, KEY_PRODUCTS_THUMBNAILS_ACTIVE]),
     redisDeleteByPrefixes([KEY_PRODUCTS_SEARCH_PREFIX]),
   ])
 }
@@ -2252,6 +2537,31 @@ export async function invalidateSupplierReferenceCache() {
 export async function invalidatePaymentMethodReferenceCache() {
   deleteServerCache(KEY_PAYMENT_METHODS_ACTIVE)
   await redisDeleteKeys([KEY_PAYMENT_METHODS_ACTIVE])
+}
+
+export async function invalidateSalesChannelReferenceCache() {
+  deleteServerCache(KEY_SALES_CHANNELS_ACTIVE)
+  await redisDeleteKeys([KEY_SALES_CHANNELS_ACTIVE])
+}
+
+export async function invalidateSalespersonReferenceCache() {
+  deleteServerCache(KEY_SALESPERSONS_ACTIVE)
+  await redisDeleteKeys([KEY_SALESPERSONS_ACTIVE])
+}
+
+export async function invalidateImpurityReferenceCache() {
+  deleteServerCache(KEY_IMPURITIES_ACTIVE)
+  await redisDeleteKeys([KEY_IMPURITIES_ACTIVE])
+}
+
+export async function invalidateProductionMachineReferenceCache() {
+  deleteServerCache(KEY_PRODUCTION_MACHINES_ACTIVE)
+  await redisDeleteKeys([KEY_PRODUCTION_MACHINES_ACTIVE])
+}
+
+export async function invalidateProductionLineReferenceCache() {
+  deleteServerCache(KEY_PRODUCTION_LINES_ACTIVE)
+  await redisDeleteKeys([KEY_PRODUCTION_LINES_ACTIVE])
 }
 
 export async function invalidateWarehouseReferenceCache(branchCodes: string[] = []) {

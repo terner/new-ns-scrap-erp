@@ -1,6 +1,7 @@
 import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import type { Prisma } from '../../../generated/prisma/client'
+import { findActiveSalespersonReferenceByCodeOrId as findCachedSalespersonReferenceByCodeOrId } from '@/lib/server/reference-master-cache'
 
 type SalespersonReference = {
   code: string
@@ -13,26 +14,7 @@ export async function findActiveSalespersonReferenceByCodeOrId(
 ): Promise<SalespersonReference | null> {
   const normalized = String(value ?? '').trim()
   if (!normalized) return null
-  const internalId = parseInternalBigIntId(normalized)
-
-  const salesperson = await prisma.salespersons.findFirst({
-    select: { code: true, id: true, name: true },
-    where: {
-      active: true,
-      OR: [
-        { code: normalized.toUpperCase() },
-        ...(internalId != null ? [{ id: internalId }] : []),
-      ],
-    } as Prisma.salespersonsWhereInput,
-  })
-
-  if (!salesperson) return null
-
-  return {
-    code: requireBusinessCode(salesperson.code, `พนักงานขาย ${salesperson.id}`),
-    id: salesperson.id as bigint,
-    name: salesperson.name,
-  }
+  return findCachedSalespersonReferenceByCodeOrId(normalized)
 }
 
 export async function listSalespersonReferencesByIds(ids: Array<string | bigint | null | undefined>) {

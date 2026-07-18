@@ -68,12 +68,14 @@ Advance payment modal checkpoint on 2026-07-15: Supplier `ADV` create/edit and C
 
 ## Active Objective
 
-ทำ reference master cache ให้เป็น execution ที่ชัดเจนและย้าย consumer จริงทีละ batch:
+ทำ reference master cache ให้เป็น execution ที่ชัดเจนและย้าย consumer จริงทีละ batch โดยไม่ cache business fact:
 
 - read path ใช้ `short-lived server cache -> Redis -> DB`
 - DB ยังคงเป็น source of truth
 - write path invalidate key ที่เกี่ยวข้องหลัง DB สำเร็จ
 - ไม่ใช้ runtime fallback เพื่อกลบข้อมูลหรือ contract ที่ผิด
+- browser memory cache เปิดเฉพาะ branch, warehouse และ L1 global lookup ที่ allowlist แล้ว; API runtime ยังคง `private, no-store`
+- รายงาน, document detail, stock, balance, price, cost, WAC, permission และ transaction ยังคงอ่าน source ปัจจุบัน
 
 ## Canonical References
 
@@ -115,18 +117,18 @@ Validation completed:
 - `REFERENCE_CACHE_OBSERVABILITY_ENABLED=false` ปิด production logging ได้ชั่วคราว; local ต้อง opt-in ด้วย `true`
 - `reference-master-cache.test.ts`: 33 tests passed รวม telemetry redaction และ full master branch/warehouse contract
 
-## Next Batch Selection
+## Current Cache Batch Queue
 
-เลือก batch ถัดไปจาก canonical queue ใน `docs/migration/09-implementation-tasklist.md` เท่านั้น:
+การ audit และแตกงาน cache ถูกจัดเป็น batch ใน `docs/migration/09-implementation-tasklist.md` แล้ว และกำลังทำตามลำดับนี้:
 
-1. `CACHE-P2`: วัด bottleneck ของการส่งภาพก่อนตัดสินใจปรับ image delivery
-2. รอดู `CACHE-M1` runtime logs จาก production ก่อนปรับ TTL, ประเมิน error rate หรือ retire cache key
+1. ปิด consumer product/branch/warehouse/account/customer/supplier ที่เข้า read-only reference contract
+2. ปิด remaining lookup masters: sales channel, salesperson, impurity, production machine/line และ option master ที่มี repeated-read evidence
+3. ตรวจ search cache และ browser memory-cache boundary โดยไม่เปิด persistent business-data cache
+4. รัน full validation ครั้งเดียวหลังทุก batch เสร็จ แล้วค่อยสรุป deploy/push
 
-P2 code-path assessment เสร็จแล้ว: `GET /api/daily/weight-tickets/products` ไม่ fetch binary หรือ call Storage ต่อสินค้า; route อ่าน thumbnail storage key จาก cache แล้วประกอบ public URL ใน process เท่านั้น ส่วน browser โหลด thumbnail ผ่าน Storage/CDN ภายหลัง จึงยังไม่มีเหตุผลให้เพิ่ม image cache หรือเปลี่ยน image delivery โดยไม่มี runtime latency/transfer evidence.
+สถานะปัจจุบัน: shared readers และ invalidation ของชุดหลักถูกเพิ่มแล้ว; direct reads ที่เหลือถูกแยกเป็น CRUD, import/export, write-time validation, historical inactive label, tax effective-date lookup หรือ transaction/business fact จึงยังคงอ่าน DB ตรงตาม contract.
 
-`CACHE-A1` audit ปิดแล้ว: consumer account ที่เป็น option/label read-only ใช้ shared reader ครบใน scope; direct account query ที่เหลือเป็น master list/write resolution หรือ statement calculation จึงไม่เข้า cache contract.
-
-ยังไม่มี batch ถัดไปที่เปิด active; ห้าม scan หรือย้าย consumer ทั้งระบบโดยไม่มีการเลือก batch
+Validation checkpoint 2026-07-18: cache tests ผ่าน `37/37`, workspace type-check ผ่าน, production build ผ่านและ generate static pages `307/307`, ESLint ผ่าน `0 errors` โดยมี warning เดิม 1 จุดใน `scripts/qa-thai-font.tsx`, และ `git diff --check` ผ่าน. ยังไม่ได้ทำ browser/UAT หรือ deploy ตามขอบเขตคำสั่งนี้.
 
 ### Explicitly Out Of Scope
 
@@ -144,9 +146,10 @@ git diff --check -- <batch-files>
 
 ## Immediate Next Steps
 
-1. ตรวจ Vercel logs ของ `reference_cache_read`/`reference_cache_error` หลัง deploy เพื่อวัด `CACHE-M1`.
-2. เปิด `CACHE-P2` เฉพาะเมื่อพบว่า product thumbnail delivery เป็น bottleneck จริง.
-3. Keep direct master reads in transactional write validation, detail, import, and master-write routes out of cache migration unless their contract is separately designed.
+1. ตรวจ consumer search/autocomplete ที่เหลือและกำหนด scope key ให้ครบ.
+2. ตรวจ cache invalidation และ key ที่ไม่มี consumer หลังการย้ายครบ.
+3. รัน Vitest, lint, type-check, build และ `git diff --check` ครั้งเดียวหลังปิด queue.
+4. หลัง validation ค่อยตรวจ runtime logs จาก SIT/UAT และตัดสินใจเรื่อง TTL/request reduction; ยังไม่เปิด persistent browser cache.
 
 ## Working Tree Boundary
 

@@ -10,7 +10,7 @@ import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-ref
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { isCustomerEligibleForBranch } from '@/lib/server/party-branch-eligibility'
 import { prisma } from '@/lib/server/prisma'
-import { listActiveBranches, listActiveBranchesByCodes, listActiveCustomerBranchOptions, type BranchReferenceRecord, type CustomerBranchOptionRecord } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActiveBranchesByCodes, listActiveCustomerBranchOptions, listActiveSalesChannels, listBranchMasterRecords, listProductReferences, type BranchReferenceRecord, type CustomerBranchOptionRecord } from '@/lib/server/reference-master-cache'
 import { findActiveSalesChannelReferenceByCode } from '@/lib/server/sales-channel-reference'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
@@ -658,8 +658,8 @@ async function optionsPayload(scope: { codes: string[] | null }) {
   ] = await Promise.all([
     scope.codes === null ? listActiveBranches() : listActiveBranchesByCodes(scope.codes),
     listActiveCustomerBranchOptions(),
-    prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
-    prisma.sales_channels.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    listProductReferences(),
+    listActiveSalesChannels(),
   ])
   const branches = branchRefs.map((branch: BranchReferenceRecord) => ({
     active: true,
@@ -725,9 +725,9 @@ export async function GET(request: Request) {
         take: 5000,
         where: poSellWhere,
       }),
-      prisma.branches.findMany({ select: { code: true, id: true, name: true } }),
+      listBranchMasterRecords(),
       prisma.sales_channels.findMany({ select: { code: true, id: true, name: true } }),
-      prisma.products.findMany({ select: { code: true, id: true, name: true, unit: true } }),
+      listProductReferences(),
       prisma.sales_bills.findMany({
         orderBy: [{ date: 'desc' }],
         take: 10000,

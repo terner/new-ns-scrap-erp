@@ -2,6 +2,7 @@ import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { errorJson, masterDataJson, masterDataListJson, parseMasterDataForm, toIso } from '@/lib/server/master-data'
+import { invalidateSalespersonReferenceCache } from '@/lib/server/reference-master-cache'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
@@ -112,6 +113,7 @@ export async function POST(request: Request) {
       : await prisma.salespersons.create({
         data: data as Parameters<typeof prisma.salespersons.create>[0]['data'],
       })
+    await invalidateSalespersonReferenceCache()
     return masterDataJson(mapSalesperson(row))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)

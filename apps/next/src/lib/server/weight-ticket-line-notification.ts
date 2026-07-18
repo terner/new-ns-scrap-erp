@@ -6,6 +6,7 @@ import { type CompanyProfilePrintValues } from '@/lib/company-profile'
 import type { Prisma } from '../../../generated/prisma/client'
 import { decodeStoredImageAsset, formatDateDisplay, formatWeight, type WeightTicketRecord, typeLabels, type StoredImageAsset } from '@/lib/weight-tickets'
 import { prisma } from '@/lib/server/prisma'
+import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/reference-master-cache'
 import { getSupabaseAdminClient } from '@/lib/server/supabase-admin'
 import {
   findScopedWeightTicket,
@@ -89,10 +90,7 @@ function imageFromDataUrl(value: string) {
 }
 
 async function loadCompanyPrintProfile(branchId: string): Promise<CompanyProfilePrintValues | null> {
-  const branch = await prisma.branches.findFirst({
-    select: { id: true },
-    where: { code: branchId },
-  })
+  const branch = await findActiveBranchReferenceByCodeOrId(branchId)
   const profile = await prisma.company_profiles.findFirst({
     orderBy: { id: 'desc' },
     where: branch?.id ? { OR: [{ branch_id: branch.id }, { branch_id: null }] } : { branch_id: null },

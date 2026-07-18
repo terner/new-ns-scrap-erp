@@ -4,6 +4,7 @@ import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
+import { listProductReferences } from '@/lib/server/reference-master-cache'
 
 export const runtime = 'nodejs'
 
@@ -76,7 +77,9 @@ export async function GET() {
     ])
 
     const productIds = [...new Set([...poBuys.map((row) => row.product_id), ...poSells.map((row) => row.product_id)].filter((value): value is bigint => value != null))]
-    const products = productIds.length ? await prisma.products.findMany({ select: { code: true, id: true, name: true }, where: { id: { in: productIds } } }) : []
+    const products = productIds.length
+      ? (await listProductReferences()).filter((product) => productIds.some((id) => id === product.id))
+      : []
     const productById = new Map(products.map((product) => [product.id, product]))
 
     const buyRows = poBuys.flatMap((po) => {

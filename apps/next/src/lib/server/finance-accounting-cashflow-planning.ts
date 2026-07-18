@@ -123,18 +123,13 @@ function branchIdsWhere(branchIds: bigint[] | null) {
 }
 
 async function loadBranchRefs(allowedBranchCodes: string[] | null): Promise<BranchRef[]> {
-  const branches = allowedBranchCodes === null
-    ? await listActiveBranches()
-    : await prisma.branches.findMany({
-        orderBy: [{ code: 'asc' }, { name: 'asc' }],
-        select: { code: true, id: true, name: true },
-        where: { active: true, code: { in: allowedBranchCodes } },
-      })
+  const branches = await listActiveBranches()
+  const allowed = allowedBranchCodes === null ? null : new Set(allowedBranchCodes)
   return branches.map((branch) => ({
     code: requireBusinessCode(branch.code, `สาขา ${branch.id}`),
     id: branch.id,
     name: branch.name,
-  }))
+  })).filter((branch) => allowed === null || allowed.has(branch.code))
 }
 
 function outwardBranches(branches: BranchRef[]) {

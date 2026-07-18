@@ -6,7 +6,7 @@ import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { getSalesPlanLmeConfigAutoRefresh, type SalesPlanLmeConfig } from './sales-plan-lme'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
-import { listActiveBranches, listActiveCustomers, listActiveSuppliers, listActiveWarehousesByBranch } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActiveCustomers, listActiveSalesChannels, listActiveSalespersons, listActiveSuppliers, listActiveWarehousesByBranch } from '@/lib/server/reference-master-cache'
 import { listSalesPlans } from './sales-plans'
 
 type JsonItem = Prisma.JsonObject
@@ -207,7 +207,7 @@ async function buildSalesPlanningSnapshot() {
     prisma.po_buys.findMany({ orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000 }),
     prisma.stock_ledger.findMany({ orderBy: [{ date: 'desc' }], take: 50000 }),
     listActiveCustomers(),
-    prisma.sales_channels.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, code: true, id: true, name: true }, where: { active: true } }),
+    listActiveSalesChannels(),
     prisma.trading_deals.findMany({ orderBy: [{ date: 'desc' }], take: 10000, where: { NOT: { status: { in: ['Cancelled', 'cancelled'] } } } }),
     prisma.purchase_bills.findMany({ include: { purchase_bill_items: { orderBy: { line_no: 'asc' }, where: { item_status: 'active' } } }, orderBy: [{ date: 'desc' }], take: 10000, where: { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] } } }),
     listActiveWarehousesByBranch(SALES_PLAN_SAMUT_SAKHON_BRANCH_CODE),
@@ -585,7 +585,7 @@ export async function buildSalesCommission(filters?: { dateFrom?: string; dateTo
   }
 
   const [salespersons, suppliers, currentBills, annualBills, branches] = await Promise.all([
-    prisma.salespersons.findMany({ orderBy: [{ name: 'asc' }], where: { active: { not: false } } }),
+    listActiveSalespersons(),
     listActiveSuppliers(),
     prisma.purchase_bills.findMany({
       include: {
@@ -662,7 +662,7 @@ export async function buildSalesCommission(filters?: { dateFrom?: string; dateTo
         name: salesId === '_UNASSIGNED_' ? '(ไม่ได้กำหนด Sales)' : sales?.name ?? '-',
         code: salesId === '_UNASSIGNED_' ? '-' : salesId,
         phone: salesId === '_UNASSIGNED_' ? '' : sales?.phone ?? '',
-        commissionEligible: salesId === '_UNASSIGNED_' ? false : sales?.commission_eligible ?? false,
+        commissionEligible: salesId === '_UNASSIGNED_' ? false : sales?.commissionEligible ?? false,
         qty: 0,
         amount: 0,
         commissionableQty: 0,

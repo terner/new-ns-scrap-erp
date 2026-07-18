@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { requireBusinessCode } from '@/lib/business-code'
 import { normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
-import { listActiveBranches, listActiveWarehouses } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActiveProductReferences, listActiveProductionLines, listActiveProductionMachines, listActiveWarehouses, listActiveWarehousesByBranch } from '@/lib/server/reference-master-cache'
 
 type DbClient = Prisma.TransactionClient | typeof prisma
 
@@ -846,9 +846,9 @@ export async function productionOrderOptions() {
   const [branches, warehouses, products, machines, lines] = await Promise.all([
     listActiveBranches(),
     listActiveWarehouses(),
-    prisma.products.findMany({ orderBy: [{ code: 'asc' }], select: { active: true, code: true, id: true, name: true }, where: { active: true } }),
-    prisma.production_machines.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, id: true, name: true, type: true }, where: { active: true } }),
-    prisma.production_lines.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, id: true, name: true }, where: { active: true } }),
+    listActiveProductReferences(),
+    listActiveProductionMachines(),
+    listActiveProductionLines(),
   ])
   return {
     branches: branches.map((row: (typeof branches)[number]) => ({ code: requireBusinessCode(row.code, `สาขา ${row.id}`), id: requireBusinessCode(row.code, `สาขา ${row.id}`), name: row.name })),
@@ -864,11 +864,7 @@ export async function productionProductStock(input: { branchCode: string; produc
   const branch = await findActiveBranchByCode(prisma, input.branchCode.trim().toUpperCase())
   const product = await findActiveProductByCode(prisma, input.productCode.trim().toUpperCase())
 
-  const warehouses = await prisma.warehouses.findMany({
-    select: { id: true, code: true, name: true, type: true },
-    where: { branch_id: branch.id, active: true },
-    orderBy: { code: 'asc' },
-  })
+  const warehouses = await listActiveWarehousesByBranch(branch.code)
 
   const rows: Array<{
     avgCost: number

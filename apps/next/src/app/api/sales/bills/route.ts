@@ -29,7 +29,9 @@ import {
   listActiveBranches,
   listActiveBranchesByCodes,
   listActiveCustomerBranchOptions,
+  listActiveSalesChannels,
   listActiveWarehouses,
+  listProductReferences,
   type WarehouseReferenceRecord,
 } from '@/lib/server/reference-master-cache'
 import { Prisma } from '../../../../../generated/prisma/client'
@@ -1046,8 +1048,8 @@ async function salesOptionsPayload(scope: Awaited<ReturnType<typeof salesBranchS
     allowedBranchCodes ? listActiveBranchesByCodes(allowedBranchCodes) : listActiveBranches(),
     listActiveCustomerBranchOptions(),
     listActiveWarehouses(),
-    prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
-    prisma.sales_channels.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    listProductReferences(),
+    listActiveSalesChannels(),
     activeVatRatePercent(new Date()),
     prisma.weight_tickets.findMany({
       select: deliveryTicketOptionSelect,

@@ -8,7 +8,7 @@ import { normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { isCustomerEligibleForBranch } from '@/lib/server/party-branch-eligibility'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { prisma } from '@/lib/server/prisma'
-import { listActiveBranches, listActiveCustomerBranchOptions } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActiveCustomerBranchOptions, listProductReferences } from '@/lib/server/reference-master-cache'
 import { requiredActiveVatRatePercent } from '@/lib/server/tax-settings'
 
 export const runtime = 'nodejs'
@@ -175,11 +175,7 @@ export async function GET(request: Request) {
       }),
       prisma.customer_advances.count({ where }),
       listActiveCustomerBranchOptions(),
-      prisma.products.findMany({
-        orderBy: [{ code: 'asc' }, { name: 'asc' }],
-        select: { code: true, id: true, name: true, unit: true },
-        where: { active: true },
-      }),
+      listProductReferences(),
       prisma.customer_advance_statuses.findMany({
         orderBy: { sort_order: 'asc' },
         select: { code: true, name: true },

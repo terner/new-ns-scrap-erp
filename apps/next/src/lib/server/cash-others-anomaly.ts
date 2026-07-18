@@ -1,7 +1,7 @@
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { prisma } from '@/lib/server/prisma'
-import { listActiveAccounts, type AccountReferenceRecord } from '@/lib/server/reference-master-cache'
+import { listActiveAccounts, listActiveBranches, type AccountReferenceRecord } from '@/lib/server/reference-master-cache'
 
 function endOfDay(date: Date) {
   return new Date(`${toDateOnly(date)}T23:59:59.999Z`)
@@ -36,21 +36,10 @@ function cachedMoney(value: string | null) {
 type CashAccountReference = Pick<AccountReferenceRecord, 'accountNo' | 'code' | 'currency' | 'id' | 'name' | 'openingBalance' | 'type'>
 
 async function loadCashAccounts(branchIds: bigint[] | null): Promise<CashAccountReference[]> {
-  if (branchIds === null) return listActiveAccounts()
-  const rows = await prisma.accounts.findMany({
-    orderBy: [{ type: 'asc' }, { name: 'asc' }, { account_no: 'asc' }],
-    select: { account_no: true, code: true, currency: true, id: true, name: true, opening_balance: true, type: true },
-    where: { active: { not: false }, ...branchWhere(branchIds) },
-  })
-  return rows.map((row) => ({
-    accountNo: row.account_no ?? null,
-    code: row.code,
-    currency: row.currency ?? null,
-    id: row.id,
-    name: row.name,
-    openingBalance: row.opening_balance?.toString() ?? null,
-    type: row.type,
-  }))
+  const accounts = await listActiveAccounts()
+  if (branchIds === null) return accounts
+  const allowed = new Set(branchIds.map((id) => id.toString()))
+  return accounts.filter((account) => account.branchId != null && allowed.has(account.branchId.toString()))
 }
 
 async function accountBalances(asOf: Date, branchIds: bigint[] | null) {
@@ -110,11 +99,8 @@ async function resolveBranchIds(branchIdValue?: string | null, allowedBranchCode
   }
   if (allowedCodes === null) return null
   if (allowedCodes.length === 0) return []
-  const branches = await prisma.branches.findMany({
-    select: { id: true },
-    where: { active: true, code: { in: allowedCodes } },
-  })
-  return branches.map((branch) => branch.id)
+  const allowed = new Set(allowedCodes)
+  return (await listActiveBranches()).filter((branch) => allowed.has(branch.code.toUpperCase())).map((branch) => branch.id)
 }
 
 export async function buildCashOthersSummary(

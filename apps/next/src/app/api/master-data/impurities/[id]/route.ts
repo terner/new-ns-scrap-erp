@@ -5,6 +5,7 @@ import { mapPrismaImpurity, type PrismaImpurityRow } from '@/lib/domain/impurity
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
+import { invalidateImpurityReferenceCache } from '@/lib/server/reference-master-cache'
 
 export const runtime = 'nodejs'
 
@@ -44,6 +45,7 @@ export async function PATCH(request: Request, { params }: ImpurityRouteProps) {
       return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบข้อมูลสิ่งเจือปนที่ต้องการแก้ไข' }, { status: 404 })
     }
 
+    await invalidateImpurityReferenceCache()
     return NextResponse.json(mapPrismaImpurity(row))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)

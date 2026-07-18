@@ -71,6 +71,9 @@
   - `git diff --check` ของไฟล์ batch นี้ผ่าน
 - consumer ชุดถัดไปของ supplier branch/payment-option cache คือ `purchase/bills`
 - `purchase/bills` ใช้ `listActiveSupplierPaymentOptions()` + `listActiveSupplierBranchOptions()` + `listActiveSuppliers()` สำหรับ supplier options payload แทน direct `suppliers.findMany(...)` และ query `supplier_branches` ตรง
+- product reference cache มีทั้ง active-only และ all-reference reader แล้ว; consumer ของ production/trading options, purchase/sales documents, stock/tracking/report และ historical label ที่ใช้ข้อมูลอ้างอิงคงที่ย้ายมาใช้ shared reader โดยไม่รวม price, cost, WAC, stock หรือ binary image
+- sales channel, salesperson, impurity และ production machine/line มี shared active reader และ invalidation แล้ว; ใช้เฉพาะ option/filter/read-only reference ที่ไม่ต้องรักษา historical inactive label
+- direct master reads ที่เหลือเป็น CRUD, import/export, write-time validation, transaction fact, tax effective-date lookup หรือ historical relation ที่ต้องอ่าน source ปัจจุบัน/รายการ inactive โดยตั้งใจไม่ย้ายเข้า cache
 - รอบนี้ยก contract `SupplierPaymentBankAccountReferenceRecord` เพิ่ม `accountName`, `branchCode`, และ `code` เพื่อให้ route ที่ต้องแสดง receiving account รายตัว ใช้ cache กลางได้ครบโดยไม่ยิง DB เพิ่ม
 - targeted validation ของ batch `purchase/bills` ปิดได้บางส่วน:
   - `reference-master-cache.test.ts` ผ่าน
@@ -701,5 +704,23 @@ server cache ของ reference data จำกัดไว้ที่ 256 entr
 
 1. ตรวจ runtime evidence ของ CACHE-M2 หลัง deploy: hit/miss, Redis latency, error rate และ invalidation behavior.
 2. branch/warehouse และ L1 global lookup เปิด client memory cache แล้วแบบ user-scoped และ TTL สั้น; ต้องทดสอบการเปลี่ยน scope และ master write ต่อ.
-3. ยังไม่เปิด L3 search และ party/product/account option cache จนกว่าจะมี consumer-level evidence.
-4. พิจารณา customer/supplier/product/account เป็นรายหน้า; คง L4-L5 เป็น server/DB path ต่อไป.
+3. L3 search เปิดเฉพาะ server-side shared search cache ที่มี consumer และ normalized query contract แล้ว; ยังไม่เปิด browser cache ของ search result โดยรวม.
+4. พิจารณา customer/supplier/product/account option เป็นราย consumer ตาม scope และ payload; คง L4-L5 เป็น server/DB path ต่อไป.
+
+### Current system-wide coverage (2026-07-18)
+
+Cache ถูกทำเป็น shared infrastructure สำหรับหลายเมนู ไม่ได้ผูกกับใบรับ-ส่งของหน้าเดียว:
+
+- **Server/Redis:** consumer ที่อ่าน branch, warehouse, customer, supplier, account และ lookup masters แบบ option/filter/label/historical reference ตาม batches ด้านบนใช้ shared reader แล้วเป็นส่วนใหญ่.
+- **Browser memory:** `MasterDataPageClient` ใช้ cache เฉพาะ allowlisted master-data APIs: branch, warehouse, currency, product type, product unit, machine type, payment method, bank name และ expense type. Cache อยู่ใน memory ของ tab, user-scoped และ TTL สั้น.
+- **ยังไม่ cache response ธุรกิจ:** รายงาน tracking, รายการเอกสาร, document detail, stock, balance, ledger, price, cost, WAC, permission, session และ transaction write/read ที่ต้องเห็น state ปัจจุบัน.
+- **Tracking clarification:** `tracking/customer` และ `tracking/supplier` ใช้ shared search/reference reader เฉพาะข้อมูลอ้างอิงที่ route ต้องใช้; ไม่ cache ผลรายงานเต็ม response ใน browser.
+
+### Remaining work and completion rule
+
+1. ไล่ route ที่ยังอ่าน master ตรงจาก Prisma เฉพาะกรณีเป็น read-only option/label/filter และมี repeated-read evidence.
+2. ย้าย autocomplete/search ที่เหลือเข้า normalized server search cache; ยังไม่เปิด persistent browser cache.
+3. ตรวจ product/account/beneficiary/remittance-purpose consumers ที่เหลือ โดยไม่รวมข้อมูลราคา ต้นทุน stock ยอดเงิน หรือ transaction fact.
+4. ตรวจ runtime hit/miss, Redis latency/error และ invalidation หลัง deploy; retire key ที่ไม่มี consumer หรือไม่มีประโยชน์.
+
+ระบบถือว่าครบตามเป้าหมายเมื่อ reference consumers ที่เข้า contract ใช้ shared cache และ invalidate ครบ โดยไม่ cache runtime/business fact ทุกเมนู.

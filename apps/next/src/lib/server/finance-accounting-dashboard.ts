@@ -6,6 +6,7 @@ import { buildCashFlowAnalysis } from '@/lib/server/finance-accounting-cashflow-
 import { buildBalanceSheet, buildPlStatement, FinancialStatementInputError } from '@/lib/server/finance-accounting-statements'
 import { buildStockFinance } from '@/lib/server/finance-accounting-working-capital'
 import { prisma } from '@/lib/server/prisma'
+import { listActiveBranches } from '@/lib/server/reference-master-cache'
 
 export type FinancialDashboardFilter = {
   allowedBranchCodes?: string[] | null
@@ -24,11 +25,7 @@ export async function resolveDashboardBranchScope(filter: FinancialDashboardFilt
   if (selected && allowedCodes !== null && !allowedCodes.includes(selected.code.toUpperCase())) {
     throw new Error('ไม่มีสิทธิ์ดูข้อมูลของสาขาที่ระบุ')
   }
-  const visibleBranches = await prisma.branches.findMany({
-    orderBy: [{ code: 'asc' }, { name: 'asc' }],
-    select: { code: true, id: true, name: true },
-    where: { active: true, ...(allowedCodes !== null ? { code: { in: allowedCodes } } : {}) },
-  }) as DashboardBranchRef[]
+  const visibleBranches = (await listActiveBranches()).filter((branch) => allowedCodes === null || allowedCodes.includes(branch.code.toUpperCase())) as DashboardBranchRef[]
   const queryBranches = selected ? [selected] : allowedCodes === null ? null : visibleBranches
   return {
     branchCodes: queryBranches?.map((branch) => branch.code) ?? null,

@@ -3,11 +3,11 @@ import { requireBusinessCode } from '@/lib/business-code'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { branchScopeIds } from '@/lib/server/weight-tickets'
-import { prisma } from '@/lib/server/prisma'
 import {
   listActiveBranches,
   listActiveBranchesByCodes,
   listActiveCustomerBranchOptionsByBranchCodes,
+  listActiveImpurities,
   listActiveSupplierBranchOptionsByBranchCodes,
 } from '@/lib/server/reference-master-cache'
 
@@ -24,11 +24,7 @@ export async function GET() {
     const [suppliers, customers, impurities] = await Promise.all([
       listActiveSupplierBranchOptionsByBranchCodes(branchCodes),
       listActiveCustomerBranchOptionsByBranchCodes(branchCodes),
-      prisma.impurities.findMany({
-        orderBy: [{ name: 'asc' }, { id: 'asc' }],
-        select: { active: true, id: true, name: true },
-        where: { active: true },
-      }),
+      listActiveImpurities(),
     ])
 
     return NextResponse.json({

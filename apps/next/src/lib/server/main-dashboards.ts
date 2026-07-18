@@ -7,7 +7,7 @@ import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-ref
 import { loadProductionMetrics, summarizeProductionMetrics } from '@/lib/server/production-reports'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemQty, purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
-import { listActiveAccounts, listActiveBranches, listActiveCustomers, listActiveSuppliers, type AccountReferenceRecord } from '@/lib/server/reference-master-cache'
+import { listActiveAccounts, listActiveBranches, listActiveCustomers, listActiveSalespersons, listActiveSuppliers, listProductReferences, type AccountReferenceRecord } from '@/lib/server/reference-master-cache'
 import { salesBillLineFactsByBillId, salesBillLineFactTotals, type SalesBillLineFactRow } from '@/lib/server/sales-bill-line-facts'
 import type { Prisma } from '../../../generated/prisma/client'
 
@@ -114,8 +114,18 @@ type StockLedgerRow = Prisma.stock_ledgerGetPayload<{
 type TradingDealRow = Prisma.trading_dealsGetPayload<Record<string, never>>
 type BankStatementRow = Prisma.bank_statementGetPayload<{ include: { accounts: true } }>
 type LoanScheduleRow = Prisma.loan_schedulesGetPayload<{ include: { loans: true } }>
-type ProductRow = Prisma.productsGetPayload<Record<string, never>>
-type SalespersonRow = Prisma.salespersonsGetPayload<Record<string, never>>
+type ProductRow = {
+  code: string | null
+  id: bigint
+  metal_group: string | null
+  name: string
+  unit: string | null
+}
+type SalespersonRow = {
+  code: string
+  id: bigint
+  name: string
+}
 type HistoricalMonthlyRow = Prisma.historical_monthlyGetPayload<Record<string, never>>
 type BranchReferenceRow = Awaited<ReturnType<typeof listActiveBranches>>[number]
 type SupplierReferenceRow = Awaited<ReturnType<typeof listActiveSuppliers>>[number]
@@ -259,8 +269,10 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
     () => prisma.bank_statement.findMany({ include: { accounts: true }, orderBy: [{ date: 'desc' }], where: { date: { gte: todayStart, lte: todayEnd } } }),
     () => prisma.bank_statement.findMany({ include: { accounts: true }, orderBy: [{ date: 'asc' }], take: 10000, where: { date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
     () => prisma.loan_schedules.findMany({ include: { loans: true }, orderBy: [{ due_date: 'asc' }], take: 1000, where: { due_date: { lte: todayEnd }, payment_status: { notIn: ['Paid', 'paid', 'PAID', 'cancelled', 'Cancelled'] } } }),
-    () => prisma.products.findMany({ where: { active: { not: false } } }),
-    () => prisma.salespersons.findMany({ where: { active: { not: false } } }),
+    async (): Promise<ProductRow[]> => (await listProductReferences())
+      .filter((row) => row.active)
+      .map((row) => ({ code: row.code, id: row.id, metal_group: row.metalGroup, name: row.name, unit: row.unit })),
+    () => listActiveSalespersons(),
     () => listActiveBranches(),
     () => listActiveSuppliers(),
     () => listActiveCustomers(),

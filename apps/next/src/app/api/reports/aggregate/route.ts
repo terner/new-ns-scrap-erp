@@ -5,6 +5,7 @@ import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requ
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
+import { listProductReferences } from '@/lib/server/reference-master-cache'
 
 export const runtime = 'nodejs'
 
@@ -179,7 +180,9 @@ export async function GET(request: NextRequest) {
     const activePurchases = purchases.filter((bill) => activeStatus(bill.status))
     const activeSales = sales.filter((bill) => activeStatus(bill.status))
     const productCodes = collectProductIds(activePurchases, activeSales)
-    const productRows = productCodes.length ? await prisma.products.findMany({ select: { code: true, id: true, name: true }, where: { code: { in: productCodes } } }) : []
+    const productRows = productCodes.length
+      ? (await listProductReferences()).filter((product) => productCodes.includes(product.code))
+      : []
     const productById = new Map(productRows.map((product) => [requireBusinessCode(product.code, `สินค้า ${product.id}`), product.name]))
 
     const purchaseChannel = new Map<string, AggregateRow>()

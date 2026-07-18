@@ -6,6 +6,8 @@ import {
   invalidateMachineTypeReferenceCache,
   invalidateOverseasRemittancePurposeReferenceCache,
   invalidatePaymentMethodReferenceCache,
+  invalidateProductionLineReferenceCache,
+  invalidateProductionMachineReferenceCache,
   invalidateProductTypeReferenceCache,
   invalidateProductUnitReferenceCache,
   findActiveMachineTypeReferenceByName,
@@ -601,6 +603,12 @@ export async function saveSimpleMasterData(request: Request, kind: SimpleMasterK
   if (kind === 'machineTypes') {
     await invalidateMachineTypeReferenceCache()
   }
+  if (kind === 'machines') {
+    await invalidateProductionMachineReferenceCache()
+  }
+  if (kind === 'productionLines') {
+    await invalidateProductionLineReferenceCache()
+  }
   if (kind === 'productUnits') {
     await invalidateProductUnitReferenceCache()
   }
@@ -635,6 +643,12 @@ export async function patchSimpleMasterData(request: Request, kind: SimpleMaster
   }
   if (kind === 'machineTypes') {
     await invalidateMachineTypeReferenceCache()
+  }
+  if (kind === 'machines') {
+    await invalidateProductionMachineReferenceCache()
+  }
+  if (kind === 'productionLines') {
+    await invalidateProductionLineReferenceCache()
   }
   if (kind === 'productUnits') {
     await invalidateProductUnitReferenceCache()

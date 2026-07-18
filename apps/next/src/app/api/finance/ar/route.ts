@@ -14,6 +14,7 @@ import {
   listActiveBranchesByCodes,
   listActiveCustomerBranchOptions,
   listActiveCustomerBranchOptionsByBranchCodes,
+  listActiveSalesChannels,
 } from '@/lib/server/reference-master-cache'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 
@@ -149,11 +150,7 @@ export async function GET(request: Request) {
         : allowedBranchCodes.length > 0
           ? listActiveBranchesByCodes(allowedBranchCodes)
           : Promise.resolve([]),
-      prisma.sales_channels.findMany({
-        orderBy: [{ name: 'asc' }],
-        select: { active: true, code: true, id: true, name: true },
-        where: { active: true },
-      }),
+      listActiveSalesChannels(),
     ])
     const branchOptions = branches.map((branch) => ({
       active: true,

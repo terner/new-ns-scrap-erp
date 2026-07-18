@@ -10,7 +10,7 @@ import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-referen
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
-import { listActiveCustomers, listActiveSuppliers } from '@/lib/server/reference-master-cache'
+import { listActiveCustomers, listActiveSuppliers, listProductReferences } from '@/lib/server/reference-master-cache'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
 import { salesBillLineFactsForBills, type SalesBillLineFactRow } from '@/lib/server/sales-bill-line-facts'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
@@ -254,36 +254,23 @@ export async function GET(request: Request) {
     const productionBranchWhere = branchScopedProductionOrderWhere(allowedBranchIds, branch?.id)
     const supplier = supplierId ? await findActiveSupplierReferenceByCodeOrId(supplierId) : null
     const customer = customerId ? await findActiveCustomerReferenceByCodeOrId(customerId) : null
-    const normalizedProductId = productId ? await prisma.products.findFirst({
-      select: { id: true },
-      where: {
-        OR: [
-          { code: productId.trim().toUpperCase() },
-          ...(parseInternalBigIntId(productId) != null ? [{ id: parseInternalBigIntId(productId) as bigint }] : []),
-        ],
-      },
-    }) : null
-    const detailProduct = detailId ? await prisma.products.findFirst({
-      select: { active: true, code: true, id: true, metal_group: true, name: true, type: true, unit: true },
-      where: {
-        active: { not: false },
-        OR: [
-          { code: detailId.trim().toUpperCase() },
-          ...(parseInternalBigIntId(detailId) != null ? [{ id: parseInternalBigIntId(detailId) as bigint }] : []),
-        ],
-      },
-    }) : null
+    const productRefs = await listProductReferences()
+    const normalizedProductId = productId
+      ? productRefs.find((product) => product.code === productId.trim().toUpperCase() || (parseInternalBigIntId(productId) != null && product.id === parseInternalBigIntId(productId))) ?? null
+      : null
+    const detailProductRef = detailId
+      ? productRefs.find((product) => product.active && (product.code === detailId.trim().toUpperCase() || (parseInternalBigIntId(detailId) != null && product.id === parseInternalBigIntId(detailId)))) ?? null
+      : null
+    const detailProduct = detailProductRef
+      ? { active: detailProductRef.active, code: detailProductRef.code, id: detailProductRef.id, metal_group: detailProductRef.metalGroup, name: detailProductRef.name, type: detailProductRef.type, unit: detailProductRef.unit }
+      : null
 
     const [products, purchaseBills, salesBills, suppliers, customers, productionOrders, allocationFacts] = await Promise.all([
-      prisma.products.findMany({
-        orderBy: [{ code: 'asc' }, { name: 'asc' }],
-        select: { active: true, code: true, id: true, metal_group: true, name: true, type: true, unit: true },
-        where: {
-          active: { not: false },
-          ...(normalizedProductId?.id != null ? { id: normalizedProductId.id } : {}),
-          ...(metalGroup ? { metal_group: metalGroup } : {}),
-        },
-      }),
+      productRefs
+        .filter((product) => product.active)
+        .filter((product) => normalizedProductId?.id == null || product.id === normalizedProductId.id)
+        .filter((product) => !metalGroup || product.metalGroup === metalGroup)
+        .map((product) => ({ active: product.active, code: product.code, id: product.id, metal_group: product.metalGroup, name: product.name, type: product.type, unit: product.unit })),
       prisma.purchase_bills.findMany({
         include: { purchase_bill_items: { orderBy: { line_no: 'asc' }, where: { item_status: 'active' } }, suppliers: { select: { code: true, name: true } } },
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],

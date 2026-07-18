@@ -276,13 +276,8 @@ function computeCashBalance(accounts: Array<{ id: bigint; opening_balance: Prism
 }
 
 async function loadActiveBranchRefs(allowedBranchCodes: string[] | null = null) {
-  if (allowedBranchCodes === null) return listActiveBranches()
-  const branches = await prisma.branches.findMany({
-    orderBy: [{ code: 'asc' }, { name: 'asc' }],
-    select: { code: true, id: true, name: true },
-    where: { active: true, ...(allowedBranchCodes !== null ? { code: { in: allowedBranchCodes } } : {}) },
-  })
-  return branches
+  const branches = await listActiveBranches()
+  return allowedBranchCodes === null ? branches : branches.filter((branch) => allowedBranchCodes.includes(branch.code.toUpperCase()))
 }
 
 async function listBranches() {
@@ -864,7 +859,9 @@ export async function buildCashFlowStatement(filter: PeriodFilter) {
   beginningDate.setDate(beginningDate.getDate() - 1)
   const beginningEnd = endOfDay(beginningDate)
   const [accountsRaw, beforeRowsRaw, periodRowsRaw, loanPaymentsRaw, historicalMonthly] = await Promise.all([
-    prisma.accounts.findMany({ include: { branches: { select: { code: true, name: true } } }, where: { active: true, ...directBranchWhere(scope.branchIds) } }),
+    listActiveAccounts().then((rows) => rows
+      .filter((row) => scope.branchIds === null || (row.branchId != null && scope.branchIds.includes(row.branchId)))
+      .map((row) => ({ id: row.id, opening_balance: row.openingBalance == null ? null : Number(row.openingBalance) }))),
     prisma.bank_statement.findMany({
       include: { accounts: { select: { account_no: true, bank_name: true, name: true, type: true } } },
       orderBy: [{ account_id: 'asc' }, { date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],

@@ -5,7 +5,7 @@ import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-ref
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
-import { listActiveBranches, listActiveCustomers, listActiveSuppliers } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActiveCustomers, listActiveSalesChannels, listActiveSuppliers, listProductReferences, type SalesChannelReferenceRecord } from '@/lib/server/reference-master-cache'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
 
 type JsonItem = Prisma.JsonObject
@@ -66,9 +66,7 @@ type StockLedgerRow = Prisma.stock_ledgerGetPayload<{
 type BranchReferenceRow = Awaited<ReturnType<typeof listActiveBranches>>[number]
 type SupplierReferenceRow = Awaited<ReturnType<typeof listActiveSuppliers>>[number]
 type CustomerReferenceRow = Awaited<ReturnType<typeof listActiveCustomers>>[number]
-type SalesChannelRow = Prisma.sales_channelsGetPayload<{
-  select: { active: true; code: true; id: true; name: true }
-}>
+type SalesChannelRow = SalesChannelReferenceRecord
 
 function startOfDay(date: string) {
   return new Date(`${date}T00:00:00.000Z`)
@@ -184,14 +182,10 @@ export async function buildProfitCostAnalysis(filter: ProfitCostFilter) {
     SupplierReferenceRow[],
     CustomerReferenceRow[],
   ] = await Promise.all([
-    prisma.products.findMany({
-      orderBy: [{ metal_group: 'asc' }, { code: 'asc' }, { name: 'asc' }],
-      select: { code: true, id: true, metal_group: true, name: true, unit: true },
-      where: {
-        active: { not: false },
-        ...(selectedMetalGroups.size ? { metal_group: { in: Array.from(selectedMetalGroups) } } : {}),
-      },
-    }),
+    listProductReferences().then((rows) => rows
+      .filter((row) => row.active)
+      .filter((row) => !selectedMetalGroups.size || selectedMetalGroups.has(row.metalGroup ?? ''))
+      .map((row) => ({ code: row.code, id: row.id, metal_group: row.metalGroup, name: row.name, unit: row.unit }))),
     prisma.purchase_bills.findMany({
       include: { branches: true, purchase_bill_items: { orderBy: { line_no: 'asc' }, where: { item_status: 'active' } }, suppliers: true },
       orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
@@ -223,7 +217,7 @@ export async function buildProfitCostAnalysis(filter: ProfitCostFilter) {
       },
     }),
     listActiveBranches(),
-    prisma.sales_channels.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    listActiveSalesChannels(),
     listActiveSuppliers(),
     listActiveCustomers(),
   ])

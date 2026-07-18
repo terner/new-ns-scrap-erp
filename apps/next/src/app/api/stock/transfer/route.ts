@@ -7,7 +7,7 @@ import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requ
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
-import { listActiveBranches, listActiveWarehouses } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActiveWarehouses, listProductReferences } from '@/lib/server/reference-master-cache'
 import { normalizeStockReferenceInput, stockBalanceSnapshot } from '@/lib/server/stock'
 import { findActiveWarehouseReferenceByCodeOrId } from '@/lib/server/warehouse-reference'
 
@@ -398,7 +398,7 @@ export async function GET(request: Request) {
     const [branchRefs, warehouseRefs, products, rows, totalRows, summary, sourceStock] = await Promise.all([
       listActiveBranches(),
       listActiveWarehouses(),
-      prisma.products.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+      listProductReferences(),
       prisma.stock_transfers.findMany({
         include: transferInclude,
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],

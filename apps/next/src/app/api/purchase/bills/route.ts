@@ -30,8 +30,10 @@ import {
   listActiveBranchesByCodes,
   listActiveSupplierBranchOptions,
   listActiveSupplierPaymentOptions,
+  listActiveSalespersons,
   listActiveSuppliers,
   listActiveWarehouses,
+  listProductReferences,
 } from '@/lib/server/reference-master-cache'
 import { enqueueAndExecuteNotification } from '@/lib/server/line-notification-jobs'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
@@ -1711,8 +1713,8 @@ async function optionsPayload(allowedBranchCodes?: string[] | null) {
         ...(allowedBranchCodes ? { branch_id: { in: allowedBranchIds } } : {}),
       },
     }),
-    prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
-    prisma.salespersons.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    listProductReferences(),
+    listActiveSalespersons(),
     activeVatRatePercent(new Date()),
     prisma.weight_tickets.findMany({
       select: weightTicketOptionSelect,

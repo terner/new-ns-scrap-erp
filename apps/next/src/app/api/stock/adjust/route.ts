@@ -4,7 +4,7 @@ import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
-import { listBranchMasterRecords, listWarehouseMasterRecords } from '@/lib/server/reference-master-cache'
+import { listBranchMasterRecords, listProductReferences, listWarehouseMasterRecords, searchActiveProducts } from '@/lib/server/reference-master-cache'
 import { normalizeStockReferenceInput, stockBalanceSnapshot, stockReferenceData } from '@/lib/server/stock'
 import { stockAdjustCorrectionSchema, stockAdjustFormSchema, stockAdjustReasonOptions } from '@/lib/stock'
 
@@ -157,16 +157,7 @@ async function buildListWhere(searchParams: URLSearchParams) {
   const dateTo = searchParams.get('dateTo')?.trim()
   const adjustType = searchParams.get('adjustType')?.trim()
   const productIdsBySearch = q
-    ? await prisma.products.findMany({
-        select: { id: true },
-        take: 100,
-        where: {
-          OR: [
-            { code: { contains: q, mode: 'insensitive' } },
-            { name: { contains: q, mode: 'insensitive' } },
-          ],
-        },
-      })
+    ? (await searchActiveProducts(q)).slice(0, 100).map((product) => ({ id: product.id }))
     : []
   const where: Prisma.stock_adjustmentsWhereInput = {
     ...(references.branchId ? { branch_id: references.branchId } : {}),
@@ -234,10 +225,9 @@ export async function GET(request: Request) {
     const [branchMaster, warehouseMaster, products] = await Promise.all([
       listBranchMasterRecords(),
       listWarehouseMasterRecords(),
-      prisma.products.findMany({
-        select: { code: true, id: true, name: true, metal_group: true },
-        where: { id: { in: [...new Set(adjustments.map((row) => row.product_id).filter((id): id is bigint => id !== null))] } },
-      }),
+      listProductReferences().then((rows) => rows
+        .filter((row) => adjustments.some((adjustment) => adjustment.product_id === row.id))
+        .map((row) => ({ code: row.code, id: row.id, name: row.name, metal_group: row.metalGroup }))),
     ])
     const branchIds = new Set(adjustments.map((row) => row.branch_id).filter((id): id is bigint => id !== null))
     const warehouseIds = new Set(adjustments.map((row) => row.warehouse_id).filter((id): id is bigint => id !== null))

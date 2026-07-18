@@ -9,7 +9,7 @@ import { appendPoBuyStatusLog, createInitialPoBuyStatusLog, PO_BUY_STATUS, recon
 import { prisma } from '@/lib/server/prisma'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { isSupplierEligibleForBranch } from '@/lib/server/party-branch-eligibility'
-import { listActiveBranches, listActiveBranchesByCodes, listActiveSupplierBranchOptions, type BranchReferenceRecord, type SupplierBranchOptionRecord } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActiveBranchesByCodes, listActiveSupplierBranchOptions, listBranchMasterRecords, listProductReferences, type BranchReferenceRecord, type SupplierBranchOptionRecord } from '@/lib/server/reference-master-cache'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
@@ -451,7 +451,7 @@ async function optionsPayload(allowedBranchCodes?: string[] | null) {
     SupplierBranchOptionRecord[],
   ] = await Promise.all([
     allowedBranchCodes ? listActiveBranchesByCodes(allowedBranchCodes) : listActiveBranches(),
-    prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
+    listProductReferences(),
     listActiveSupplierBranchOptions(),
   ])
   const branches = branchRefs.map((branch: BranchReferenceRecord) => ({
@@ -648,11 +648,9 @@ export async function GET(request: Request) {
     const productIds = [...new Set(poRows.map((row: PoBuyListRow) => row.product_id).filter((value): value is bigint => value != null))]
     const branchIds = [...new Set(poRows.map((row: PoBuyListRow) => row.branch_id).filter((id): id is bigint => id !== null))]
     const [branches, products]: [BranchLookupRow[], ProductRow[]] = await Promise.all([
-      branchIds.length
-        ? prisma.branches.findMany({ where: { id: { in: branchIds } }, select: { code: true, id: true, name: true } })
-        : Promise.resolve<BranchLookupRow[]>([]),
+      listBranchMasterRecords().then((rows) => rows.filter((row) => branchIds.some((id) => id === row.id))),
       productIds.length
-        ? prisma.products.findMany({ where: { id: { in: productIds } }, select: { active: true, code: true, id: true, name: true, unit: true } })
+        ? listProductReferences().then((rows) => rows.filter((row) => productIds.some((id) => id === row.id)))
         : Promise.resolve<ProductRow[]>([]),
     ])
     const branchById = new Map<bigint, BranchLookupRow>(branches.map((branch: BranchLookupRow) => [branch.id, branch] as const))

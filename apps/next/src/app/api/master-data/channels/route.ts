@@ -2,6 +2,7 @@ import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { errorJson, masterDataJson, masterDataListJson, parseMasterDataForm } from '@/lib/server/master-data'
+import { invalidateSalesChannelReferenceCache } from '@/lib/server/reference-master-cache'
 
 export const runtime = 'nodejs'
 
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
       : await prisma.sales_channels.create({
         data: { code, name: values.name, active: values.active },
       })
+    await invalidateSalesChannelReferenceCache()
     return masterDataJson(mapChannel(row))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)

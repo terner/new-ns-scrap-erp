@@ -6,6 +6,7 @@ import { getDualCostingBranch } from '@/lib/server/dual-costing-branch'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { formatDualCostingMatchId, getDualCostingMatchIdPrefix } from '@/lib/server/dual-costing-match-id'
 import { prisma } from '@/lib/server/prisma'
+import { listProductReferences } from '@/lib/server/reference-master-cache'
 import { getCostPoolRowsData } from '../cost-pool/route'
 
 export const runtime = 'nodejs'
@@ -213,7 +214,7 @@ export async function GET(request: Request) {
         take: 10000,
         where: { NOT: { status: { in: ['Cancelled', 'cancelled'] } } },
       }),
-      prisma.products.findMany({ select: { code: true, id: true, metal_group: true, name: true } }),
+      listProductReferences().then((rows) => rows.map((row) => ({ ...row, metal_group: row.metalGroup }))),
       prisma.production_orders.findMany({
         include: {
           products: true,

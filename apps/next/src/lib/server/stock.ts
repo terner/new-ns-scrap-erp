@@ -3,7 +3,7 @@ import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
-import { listActiveBranches, listActiveCustomers, listActiveWarehouses } from '@/lib/server/reference-master-cache'
+import { listActiveBranches, listActiveCustomers, listActiveWarehouses, listProductReferences } from '@/lib/server/reference-master-cache'
 import { findActiveWarehouseReferenceByCodeOrId } from '@/lib/server/warehouse-reference'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import { XLSX } from '@/lib/server/xlsx'
@@ -259,7 +259,7 @@ export async function stockReferenceData(input?: { includeCustomers?: boolean })
   const [branches, warehouses, products, customers] = await Promise.all([
     listActiveBranches(),
     listActiveWarehouses(),
-    prisma.products.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }], select: stockReferenceProductSelect }),
+    listProductReferences().then((rows) => rows.map((row) => ({ active: row.active, code: row.code, id: row.id, metal_group: row.metalGroup, name: row.name }))),
     input?.includeCustomers === false
       ? Promise.resolve([] as Awaited<ReturnType<typeof listActiveCustomers>>)
       : listActiveCustomers(),

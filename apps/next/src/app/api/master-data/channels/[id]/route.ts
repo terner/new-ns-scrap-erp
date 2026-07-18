@@ -2,6 +2,7 @@ import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { errorJson, masterDataJson, type MasterDataRouteProps, updateMasterDataStatusSchema } from '@/lib/server/master-data'
+import { invalidateSalesChannelReferenceCache } from '@/lib/server/reference-master-cache'
 
 export const runtime = 'nodejs'
 
@@ -20,6 +21,7 @@ export async function PATCH(request: Request, { params }: MasterDataRouteProps) 
     })
     if (!resolved) throw new Error('ไม่พบช่องทางขายที่ต้องการอัปเดต')
     const row = await prisma.sales_channels.update({ where: { id: resolved.id }, data: { active: values.active } })
+    await invalidateSalesChannelReferenceCache()
     const outwardId = requireBusinessCode(row.code, `ช่องทางขาย ${row.id}`)
     return masterDataJson({ id: outwardId, code: outwardId, name: row.name, active: row.active ?? true, type: null, phone: null, email: null, note: null, symbol: null, rateToThb: null, parentId: null, channelType: null, bankName: null, accountNo: null, currency: null, openingBalance: null, odLimit: null, branchId: null, branchName: null, address: null, commissionPct: null, baseSalary: null, createdAt: null, updatedAt: null })
   } catch (caught) {

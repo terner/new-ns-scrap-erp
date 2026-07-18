@@ -15,7 +15,7 @@ import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { getActivePaymentMethods } from '@/lib/server/payment-methods'
 import { prisma } from '@/lib/server/prisma'
-import { listActiveBankNames, listActiveBranches } from '@/lib/server/reference-master-cache'
+import { listActiveBankNames, listActiveBranches, listActiveSalespersons } from '@/lib/server/reference-master-cache'
 import type { Prisma } from '../../../../../../generated/prisma/client'
 
 export const runtime = 'nodejs'
@@ -379,10 +379,7 @@ export async function POST(request: Request) {
     }
 
     const [salespersons, paymentMethods, bankNameRows, activeBranches] = await Promise.all([
-      prisma.salespersons.findMany({
-        select: { code: true, id: true, name: true },
-        where: { active: { not: false } },
-      }),
+      listActiveSalespersons(),
       getActivePaymentMethods() as Promise<SupplierPaymentMethodRecord[]>,
       listActiveBankNames(),
       listActiveBranches(),

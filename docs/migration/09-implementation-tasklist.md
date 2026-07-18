@@ -182,6 +182,65 @@
 
 **Exit criteria:** ทุก cache candidate ระบุระดับ, scope, TTL, source of truth และ invalidation ได้ก่อน implement; L5 ยังคง `no-store`.
 
+#### CACHE-M3 Current Coverage Summary (2026-07-18)
+
+สถานะนี้เป็นขอบเขตของระบบปัจจุบัน ไม่ได้หมายความว่าทุกหน้าใช้ cache ทั้ง response:
+
+- **ย้ายเข้า shared server/Redis cache แล้ว:** branch, warehouse, customer, supplier, account, bank name, currency, expense type, product type, product unit, machine type, payment method, overseas recipient และ remittance purpose ใน consumer ที่เป็น option, active filter, label หรือ historical reference ตามรายการใน `docs/notes/Reference Master Cache Flow.md`
+- **Consumer หลักที่ย้ายแล้ว:** daily weight-ticket options, purchase payments/payment history/receipt vouchers/advance payments/PO Buy/bills, sales PO Sell/bills/receipts/customer advances, AR/AP, finance foreign, stock/stock-holds, production orders, dashboards, profit-cost, asset register/disposal, company profile, opening balance และ transaction ledger
+- **Browser client memory cache ที่เปิดแล้ว:** branch, warehouse และ L1 global lookup ได้แก่ currency, product unit/type, machine type, payment method, bank name และ expense type; ใช้เฉพาะ allowlisted master-data API, user scope, TTL สั้น และ invalidate หลัง write
+- **ยังไม่เปิด browser cache:** customer/supplier/product/account search หรือ option ที่มี scope ซับซ้อน, historical label, report response, document detail และ runtime/business fact
+- **ไม่ cache โดยตั้งใจ:** price, cost, WAC, stock, balance, ledger, permission, session, transaction และผลรายงานเต็มหน้า; API runtime ยังคง `private, no-store`
+
+#### CACHE-M3 Remaining Migration Queue
+
+- [~] audit route ที่ยัง query master ตรงจาก Prisma และย้ายเฉพาะ read-only option/label/filter ที่เข้า contract
+- [ ] ย้าย customer/supplier autocomplete ที่เหลือเข้า normalized search cache แบบ server-side ก่อนพิจารณา browser cache
+- [~] ย้าย product option/search ที่เหลือ โดยแยก product reference ออกจาก price/cost/stock/WAC/image binary
+- [x] ตรวจ consumer ที่เหลือของ beneficiary, remittance purpose และ account selector; จุดที่เข้า contract ถูกย้ายแล้ว ส่วน CRUD/transaction และ historical ที่ต้องการ source ปัจจุบันคง DB ตรง
+- [x] ตรวจ branch/warehouse detail และ branch-scope route ที่ยังอ่าน DB ตรง; current validation และ stock facts คง DB ตรงตาม contract
+- [ ] ตรวจ runtime hit/miss, Redis latency/error และ invalidation หลัง deploy ก่อนเพิ่ม TTL หรือเปิด cache ระดับใหม่
+- [ ] retire cache key ที่ไม่มี consumer หรือไม่มี repeated-read evidence
+
+**Completion rule:** ถือว่า cache coverage ครบเมื่อ read-only reference consumers ที่มี repeated-read evidence ใช้ shared contract ครบ, ทุก write มี invalidation, และ L5/runtime data ยังอ่าน source ปัจจุบัน ไม่ใช่เมื่อทุกเมนูถูก cache.
+
+#### CACHE-M4 Batch Execution Queue (2026-07-18)
+
+แบ่งการปิดงานเป็น batch เพื่อให้แต่ละชุดมี contract และ validation แยกชัดเจน:
+
+- [x] **Batch A: Product reference**
+  - [x] active product options ของ production orders และ trading dashboard
+  - [x] all product reference สำหรับ historical label/report option ที่เข้า contract
+  - [x] purchase/sales bills, PO Buy/PO Sell, advance payments, stock transfer/adjust และ customer advance product options
+  - [x] tracking product filter/detail ใช้ product reference cache
+  - [x] stock adjust product search ใช้ normalized product search cache
+  - [x] ตรวจ product search consumers ที่เหลือและแยก price/cost/WAC/stock/image binary ออกจาก reference contract; validation/detail ที่ต้องอ่าน source ปัจจุบันคง DB ตรง
+- [x] **Batch B: Branch/Warehouse scope and labels**
+  - [x] dashboard, statements, cashflow planning, dual costing, company profile และ notification print profile ชุดที่ใช้ active branch reference
+  - [x] ตรวจ branch/warehouse direct reads ใน route detail/action และ stock conversion ที่เป็น current validation; คง DB ตรงเพื่อ validate source ปัจจุบัน
+  - [x] ปิด audit ของ historical branch/warehouse label ที่เข้า contract แล้ว; historical transaction facts ที่เหลือคง DB ตรง
+- [x] **Batch C: Account and finance references**
+  - [x] cash position, cash others anomaly, statements, foreign finance, opening balance และ transaction ledger ตาม contract ที่เหมาะสม
+  - [x] ตรวจ account selector/read-only consumer ที่เข้า contract แล้ว; master CRUD, balance movement และ transaction facts คง DB ตรง
+  - [ ] ไม่ย้าย balance movement, ledger fact หรือ transaction validation เข้า cache
+- [x] **Batch D: Customer/Supplier option and search**
+  - [x] active option, branch option, payment option และ historical supplier label ชุดหลัก
+  - [x] server-side normalized search cache ชุดแรก
+  - [x] ตรวจ autocomplete/search consumer ที่เหลือ; route ที่ยัง query ตรงเป็น master CRUD/list ที่มี filter หลาย field หรือ write-time validation จึงไม่เข้า shared search contract
+- [x] **Batch E: Remaining lookup masters**
+  - [x] beneficiary/remittance-purpose consumers ที่เข้า contract แล้ว; CRUD และ write validation คง DB ตรง
+  - [x] production machine/line options และ sales channel/salesperson/impurity options ที่มี repeated-read evidence
+  - [x] ตรวจ bank/currency/expense/product type/unit/machine type consumers ที่เข้า contract แล้ว; remaining direct reads เป็น CRUD, import/export หรือ transaction validation
+- [x] **Batch F: Browser cache boundary**
+  - [x] client memory cache เฉพาะ allowlisted L1 + branch/warehouse
+  - [x] API runtime `private, no-store`; ไม่ใช้ persistent browser cache สำหรับ business data
+- [ ] ตรวจ request reduction, scope change และ client invalidation หลัง deploy
+- [x] **Batch G: Completion audit**
+  - [x] ตรวจทุก write path ของ cache-enabled master มี server/Redis invalidation
+  - [x] ตรวจ cache key ที่ไม่มี consumerหรือไม่มี repeated-read evidence แล้วไม่ถูกนำไปใช้ใน consumer ใหม่
+  - [x] อัปเดต flow summary และ current-work หลังปิดทุก batch
+  - [ ] runtime hit/miss, Redis latency/error และ request reduction หลัง deploy ยังรอข้อมูลจาก SIT/UAT
+
 ### Deferred, Not An Active Task
 
 - transactional validation, stock availability, WAC/cost, ledger, price snapshots, document detail และ report facts ยังอ่าน DB ตาม business transaction

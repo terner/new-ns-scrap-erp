@@ -1,5 +1,4 @@
-import { requireBusinessCode } from '@/lib/business-code'
-import { prisma } from '@/lib/server/prisma'
+import { findActiveSalesChannelReferenceByCode as findCachedSalesChannelReferenceByCode } from '@/lib/server/reference-master-cache'
 
 type SalesChannelReference = {
   code: string
@@ -13,19 +12,5 @@ export async function findActiveSalesChannelReferenceByCode(
   const normalized = String(value ?? '').trim().toUpperCase()
   if (!normalized) return null
 
-  const row = await prisma.sales_channels.findFirst({
-    select: { code: true, id: true, name: true },
-    where: {
-      active: true,
-      code: normalized,
-    },
-  })
-
-  if (!row) return null
-
-  return {
-    code: requireBusinessCode(row.code, `ช่องทางขาย ${row.id}`),
-    id: row.id,
-    name: row.name,
-  }
+  return findCachedSalesChannelReferenceByCode(normalized)
 }

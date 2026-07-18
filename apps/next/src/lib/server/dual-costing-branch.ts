@@ -1,15 +1,9 @@
-import { prisma } from '@/lib/server/prisma'
+import { listActiveBranches } from '@/lib/server/reference-master-cache'
 
 export const DUAL_COSTING_BRANCH_NAME = 'สมุทรสาคร'
 
 export async function getDualCostingBranch() {
-  const branch = await prisma.branches.findFirst({
-    select: { id: true, name: true },
-    where: {
-      active: { not: false },
-      name: DUAL_COSTING_BRANCH_NAME,
-    },
-  })
+  const branch = (await listActiveBranches()).find((row) => row.name === DUAL_COSTING_BRANCH_NAME)
 
   if (!branch) {
     throw new Error(`ไม่พบสาขา ${DUAL_COSTING_BRANCH_NAME} สำหรับ Dual Costing`)

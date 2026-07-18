@@ -1,5 +1,6 @@
 import { toBangkokEndOfDay, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
+import { listActiveAccounts } from '@/lib/server/reference-master-cache'
 
 type FinanceCashAccount = {
   balance: number
@@ -56,19 +57,20 @@ export function summarizeFinanceCashAccounts(accounts: FinanceCashAccount[]) {
 }
 
 export async function buildFinanceCashPosition(input: { asOf: Date; branchIds?: bigint[] | null }) {
-  const accounts = await prisma.accounts.findMany({
-    select: {
-      bank: true,
-      bank_name: true,
-      currency: true,
-      id: true,
-      name: true,
-      od_limit: true,
-      opening_balance: true,
-      type: true,
-    },
-    where: { active: true, ...(input.branchIds != null ? { branch_id: { in: input.branchIds } } : {}) },
-  })
+  const cachedAccounts = await listActiveAccounts()
+  const allowedBranchIds = input.branchIds == null ? null : new Set(input.branchIds.map((id) => id.toString()))
+  const accounts = cachedAccounts
+    .filter((account) => allowedBranchIds === null || (account.branchId != null && allowedBranchIds.has(account.branchId.toString())))
+    .map((account) => ({
+      bank: account.bank,
+      bank_name: account.bankName,
+      currency: account.currency,
+      id: account.id,
+      name: account.name,
+      od_limit: account.odLimit,
+      opening_balance: account.openingBalance,
+      type: account.type,
+    }))
   if (accounts.length === 0) return summarizeFinanceCashAccounts([])
 
   const movements = await prisma.bank_statement.groupBy({
@@ -90,10 +92,10 @@ export async function buildFinanceCashPosition(input: { asOf: Date; branchIds?: 
       bankName: account.bank_name,
       currency: account.currency,
       name: account.name,
-      odLimit: toNumber(account.od_limit),
+      odLimit: account.od_limit == null ? 0 : Number(account.od_limit),
       type: account.type,
     }
-    const opening = toNumber(account.opening_balance)
+    const opening = account.opening_balance == null ? 0 : Number(account.opening_balance)
     return {
       ...base,
       balance: opening + (accountKind({ ...base, balance: opening }) === 'FCD'

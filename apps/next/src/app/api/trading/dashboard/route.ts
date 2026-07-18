@@ -5,7 +5,7 @@ import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
-import { listActiveCustomers, listActiveSuppliers } from '@/lib/server/reference-master-cache'
+import { listActiveCustomers, listActiveProductReferences, listActiveSuppliers } from '@/lib/server/reference-master-cache'
 
 export const runtime = 'nodejs'
 
@@ -283,7 +283,7 @@ export async function GET(request: Request) {
       }),
       listActiveSuppliers(),
       listActiveCustomers(),
-      prisma.products.findMany({ orderBy: [{ code: 'asc' }], select: { code: true, id: true, name: true, unit: true }, where: { active: true } }),
+      listActiveProductReferences(),
       prisma.po_buys.findMany({
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         select: { cut_amount: true, date: true, doc_no: true, id: true, items: true, product_id: true, qty: true, remaining_amount: true, remaining_qty: true, status: true, suppliers: { select: { name: true } }, supplier_id: true, total_amount: true, unit_price: true },
