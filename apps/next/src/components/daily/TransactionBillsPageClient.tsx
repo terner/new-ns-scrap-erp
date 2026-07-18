@@ -394,7 +394,8 @@ type SalesPayload = TransactionPayload & {
   warehouses: Option[]
 }
 
-type SalesReferencePayload = Pick<SalesPayload, 'branches' | 'customers' | 'products' | 'salesChannels' | 'warehouses'>
+type SalesScopedReferencePayload = Pick<SalesPayload, 'branches' | 'customers' | 'warehouses'>
+type SalesGlobalReferencePayload = Pick<SalesPayload, 'products' | 'salesChannels'>
 
 type TransactionBillsPageClientProps = {
   mode: 'purchase' | 'sales'
@@ -823,9 +824,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         setTotalAmount(payload.totalAmount ?? 0)
         setTotalRows(payload.totalRows ?? payload.rows.length)
       } else if (mode === 'sales') {
-        const [payload, references] = await Promise.all([
+        const [payload, scopedReferences, globalReferences] = await Promise.all([
           dailyFetchJson<TransactionPayload>(requestPath),
-          cachedSalesBillReferences<SalesReferencePayload>('/api/sales/bills/options?scope=reference'),
+          dailyFetchJson<SalesScopedReferencePayload>('/api/sales/bills/options?scope=reference'),
+          cachedSalesBillReferences<SalesGlobalReferencePayload>('/api/sales/bills/options?scope=global-reference'),
         ])
         if (latestLoadRequestRef.current !== requestId) return
         setRows(payload.rows)
@@ -833,11 +835,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         setTotalRows(payload.totalRows ?? payload.rows.length)
         setOptions((current) => ({
           ...current,
-          branches: references.branches,
-          customers: references.customers,
-          products: references.products,
-          salesChannels: references.salesChannels,
-          warehouses: references.warehouses,
+          branches: scopedReferences.branches,
+          customers: scopedReferences.customers,
+          products: globalReferences.products,
+          salesChannels: globalReferences.salesChannels,
+          warehouses: scopedReferences.warehouses,
         }))
       }
     } catch (caught) {

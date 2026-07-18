@@ -29,6 +29,7 @@ import {
   listActiveBranches,
   listActiveBranchesByCodes,
   listActiveCustomerBranchOptions,
+  listActiveCustomerBranchOptionsByBranchCodes,
   listActiveSalesChannels,
   listActiveWarehouses,
   listProductReferences,
@@ -1046,7 +1047,7 @@ export async function salesReferenceOptionsPayload(scope: Awaited<ReturnType<typ
   const allowedBranchCodeSet = allowedBranchCodes ? new Set(allowedBranchCodes) : null
   const [branchRefs, customerBranchOptions, warehouseRefs, products, salesChannels] = await Promise.all([
     allowedBranchCodes ? listActiveBranchesByCodes(allowedBranchCodes) : listActiveBranches(),
-    listActiveCustomerBranchOptions(),
+    allowedBranchCodes ? listActiveCustomerBranchOptionsByBranchCodes(allowedBranchCodes) : listActiveCustomerBranchOptions(),
     listActiveWarehouses(),
     listProductReferences(),
     listActiveSalesChannels(),
@@ -1077,12 +1078,23 @@ export async function salesReferenceOptionsPayload(scope: Awaited<ReturnType<typ
   }
 }
 
+export async function salesGlobalReferenceOptionsPayload() {
+  const [products, salesChannels] = await Promise.all([
+    listProductReferences(),
+    listActiveSalesChannels(),
+  ])
+  return {
+    products: products.map((product) => ({ ...product, id: requireBusinessCode(product.code, `สินค้า ${product.id}`) })),
+    salesChannels: salesChannels.map((channel) => ({ ...channel, id: requireBusinessCode(channel.code, `ช่องทางขาย ${channel.id}`) })),
+  }
+}
+
 export async function salesOptionsPayload(scope: Awaited<ReturnType<typeof salesBranchScope>>) {
   const allowedBranchCodes = scope.codes
   const allowedBranchIds = scope.ids
   const [branchRefs, customerBranchOptions, warehouseRefs, products, salesChannels, vatRatePercent, deliveryTickets, poSellRows, tradingPurchaseBills, tradingManualCostSources, tradingAllocationFacts, customerAdvanceRows] = await Promise.all([
     allowedBranchCodes ? listActiveBranchesByCodes(allowedBranchCodes) : listActiveBranches(),
-    listActiveCustomerBranchOptions(),
+    allowedBranchCodes ? listActiveCustomerBranchOptionsByBranchCodes(allowedBranchCodes) : listActiveCustomerBranchOptions(),
     listActiveWarehouses(),
     listProductReferences(),
     listActiveSalesChannels(),
@@ -1502,13 +1514,14 @@ export async function GET(request: Request) {
 
       return new NextResponse(new Uint8Array(body), {
         headers: {
+          'Cache-Control': 'private, no-store',
           'Content-Disposition': `attachment; filename="${filename}"`,
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         },
       })
     }
 
-    return NextResponse.json({ rows: jsonRows, totalAmount: toNumber(totals._sum.total_amount), totalRows })
+    return NextResponse.json({ rows: jsonRows, totalAmount: toNumber(totals._sum.total_amount), totalRows }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'โหลดบิลขายไม่ได้', 500)

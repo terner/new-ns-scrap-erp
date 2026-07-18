@@ -32,6 +32,7 @@ import {
   type ProductFormValues,
 } from '@/lib/product'
 import { getSupabaseClient } from '@/lib/supabase'
+import { invalidateSalesBillReferencesCache } from '@/lib/sales-bill-options-cache'
 
 type SortKey = 'active' | 'code' | 'name' | 'type' | 'unit'
 type ProductColumnKey = SortKey | 'action'
@@ -281,6 +282,7 @@ export function ImpurityProductsPageClient() {
 
       setFormOpen(false)
       setSelectedProduct(null)
+      invalidateSalesBillReferencesCache()
       await loadData()
     } catch (caught) {
       setError(getErrorMessage(caught, 'บันทึกข้อมูลสินค้าไม่ได้'))
@@ -297,6 +299,7 @@ export function ImpurityProductsPageClient() {
 
     try {
       const updatedProduct = await setProductActive(product.id, active)
+      invalidateSalesBillReferencesCache()
       setProducts((current) => current.map((row) => row.id === updatedProduct.id ? updatedProduct : row))
       setSelectedProduct((current) => current?.id === updatedProduct.id ? updatedProduct : current)
     } catch (caught) {
@@ -344,6 +347,7 @@ export function ImpurityProductsPageClient() {
     setIsImporting(true)
     try {
       const result = await importProducts(file)
+      invalidateSalesBillReferencesCache()
       await loadData()
       window.alert(`Import สำเร็จ ${result.totalRows.toLocaleString('th-TH')} รายการ: เพิ่มใหม่ ${result.inserted.toLocaleString('th-TH')} / อัปเดต ${result.updated.toLocaleString('th-TH')}`)
     } catch (caught) {
