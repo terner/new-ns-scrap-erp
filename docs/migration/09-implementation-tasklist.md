@@ -171,6 +171,15 @@
 
 **Exit criteria:** API ที่มี auth/business data ไม่ถูก browser cache โดยไม่ได้ตั้งใจ, prefix invalidation ไม่ใช้ blocking `KEYS`, และการตัดสินใจเรื่อง browser cache อ้างอิง runtime evidence.
 
+#### CACHE-M3: Browser and server cache strategy matrix
+
+- [x] แบ่ง cache เป็น L0 static asset, L1 global lookup, L2 scoped master, L3 search result, L4 historical label และ L5 runtime/business fact
+- [x] กำหนด browser policy: HTTP cache เฉพาะ L0, client memory cache สำหรับ L1 และ branch/warehouse ใน L2/L3 แบบ TTL สั้น; ไม่ใช้ `localStorage` สำหรับ auth, permission, financial, stock หรือ transaction
+- [x] กำหนด Redis/server policy, key scope, TTL ตั้งต้น และ invalidate rule ใน `Reference Master Cache Flow`
+- [x] เปิด client memory cache ของ branch/warehouse เป็นชุดแรกแบบ user-scoped และ TTL สั้น; runtime evidence หลัง deploy ยังเป็นงานติดตามผล
+
+**Exit criteria:** ทุก cache candidate ระบุระดับ, scope, TTL, source of truth และ invalidation ได้ก่อน implement; L5 ยังคง `no-store`.
+
 ### Deferred, Not An Active Task
 
 - transactional validation, stock availability, WAC/cost, ledger, price snapshots, document detail และ report facts ยังอ่าน DB ตาม business transaction

@@ -6,7 +6,6 @@ import { paymentMethodGroupFromValue, resolvePaymentMethodValueForAccount } from
 import {
   accountMasterDataFormSchema,
   emptyMasterDataForm,
-  listMasterDataRecords,
   masterDataFormSchema,
   saveMasterDataRecord,
   setMasterDataRecordActive,
@@ -26,6 +25,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { formatDecimalDisplay, formatDecimalDraft, formatPhoneDisplay, sanitizeAccountNoInput, sanitizeDecimalInput } from '@/lib/format'
 import { Dialog, DialogContent } from '@/components/ui/Dialog'
+import { invalidateClientReferenceRecords, listClientReferenceRecords } from '@/lib/client-reference-cache'
 
 type SortKey = keyof MasterDataRecord
 type TableColumnKey = SortKey | '__action'
@@ -308,11 +308,12 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
     setIsLoading(true)
     try {
       const optionFields = config.fields.filter((field) => field.optionsApiPath)
+      const listRecords = (apiPath: string) => listClientReferenceRecords(apiPath)
       const [rows, optionResults] = await Promise.all([
-        listMasterDataRecords(config.apiPath),
+        listRecords(config.apiPath),
         Promise.all(optionFields.map(async (field) => ({
           key: field.key,
-          rows: await listMasterDataRecords(field.optionsApiPath as string),
+          rows: await listRecords(field.optionsApiPath as string),
           valueKey: field.optionValueKey ?? 'name',
         }))),
       ])
@@ -393,6 +394,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
     setError(null)
     try {
       await saveMasterDataRecord(config.apiPath, values)
+      invalidateClientReferenceRecords(['/api/master-data/branches', '/api/master-data/warehouses'])
       setFormOpen(false)
       setSelectedRecord(null)
       await loadData()
@@ -407,6 +409,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
     setError(null)
     try {
       await setMasterDataRecordActive(config.apiPath, record.id, !record.active)
+      invalidateClientReferenceRecords(['/api/master-data/branches', '/api/master-data/warehouses'])
       await loadData()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : `อัปเดตสถานะ${config.entityName}ไม่ได้`)

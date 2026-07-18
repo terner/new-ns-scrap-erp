@@ -672,3 +672,34 @@ API ของ active app ถูกกำหนดให้ตอบ `Cache-Contr
 server cache ของ reference data จำกัดไว้ที่ 256 entries เพื่อป้องกัน search key ที่มี query จำนวนมากสะสมใน process เดียว. Redis prefix invalidation เปลี่ยนจาก `KEYS` เป็น cursor-based `SCAN` เพื่อลดโอกาส block Redis เมื่อจำนวน key โตขึ้น. การเปลี่ยนนี้ไม่เปลี่ยน source of truth, TTL, business payload หรือ fallback rule.
 
 สิ่งที่ยังต้องตรวจจาก runtime จริง: cache hit/miss/error จาก Vercel logs, Redis latency/error rate และจำนวน search key ที่ถูกสร้างจริง ก่อนตัดสินใจเปิด browser cache สำหรับ reference option ใด ๆ.
+
+## Cache Strategy Matrix (Design Ready, 2026-07-18)
+
+ตารางนี้เป็นเกณฑ์กลางสำหรับตัดสินใจ cache รายข้อมูล. การเพิ่ม cache ใหม่ต้องระบุระดับ, key scope, TTL และจุด invalidate ให้ครบก่อนลง code.
+
+| ระดับ | ประเภทข้อมูล | ตัวอย่าง | Browser | Server/Redis | TTL ที่ตั้งต้น | เงื่อนไข |
+| --- | --- | --- | --- | --- | --- | --- |
+| L0 | Static immutable asset | Next build asset, font, icon, public image | `public, immutable` | CDN/browser | ตาม build hash | เปลี่ยน URL เมื่อไฟล์เปลี่ยน |
+| L1 | Global lookup ที่ไม่ sensitive | currency, unit, product type, machine type, payment method, bank name, expense type | client memory ได้ | server -> Redis -> DB | Redis 5 นาที, client 5 นาที | ไม่มี branch/user scope และ invalidate หลัง master write |
+| L2 | Active master ที่ผูกกับ scope | branch, warehouse, customer, supplier, product, account | client memory ได้; branch/warehouse ควรเปิดก่อน | server -> Redis -> DB | Redis 1-5 นาที, client 1-5 นาที | key ต้องมี tenant/branch/user scope ที่เกี่ยวข้อง; ห้าม `localStorage` ถาวร |
+| L3 | Search/autocomplete result | customer search, supplier search, product search | client memory ต่อ queryได้สั้น ๆ | server -> Redis -> DB | Redis 1-2 นาที, client 15-30 วินาที | normalize query, จำกัดผลลัพธ์, invalidate prefix หลัง write |
+| L4 | Historical label/reference | ชื่อ supplier/customer/account ในเอกสารเก่า | ไม่ cache ใน browser | server -> Redis -> DB | Redis 5 นาที | ใช้เพื่อแสดง label เท่านั้น ห้ามใช้ validate transaction ปัจจุบัน |
+| L5 | Runtime/business fact | stock, price, cost, WAC, balance, ledger, VAT, document detail, permission, session | `no-store` | DB หรือ transaction service | ไม่มี browser cache | ต้องอ่าน source ปัจจุบันทุกครั้งตาม business flow |
+
+### Browser cache layers and rules
+
+- **HTTP cache:** ใช้กับ L0 static assets เท่านั้น. API ของระบบยังคง `private, no-store` เป็นค่าเริ่มต้น.
+- **Client memory cache:** ใช้กับ L1, branch/warehouse ใน L2 และ L3 search result. ข้อมูลอยู่เฉพาะ tab/session และหมดอายุตาม TTL.
+- **Persistent browser cache:** ยังไม่เปิดเป็นค่าเริ่มต้น. เปิดได้เฉพาะข้อมูล public ที่มี revision/version และ invalidation contract ชัดเจน; ไม่ใช้ `localStorage` กับ master data ที่ผูกกับ user/branch.
+- ห้ามเก็บ token, password, permission, financial fact, stock หรือ transaction payload ใน `localStorage`/`IndexedDB`.
+- Branch/warehouse เหมาะกับ client memory cache เพราะเปลี่ยนไม่บ่อยและ payload เล็ก; แต่ key ต้องผูกกับผู้ใช้/สิทธิ์/branch scope และตอน save server ต้อง validate กับ source ปัจจุบันเสมอ.
+- Customer/supplier/product/account เปิด client memory cache ได้เฉพาะ option ที่มี scope ชัดเจน; search ใช้ cache ต่อ query เท่านั้น. ห้าม cache price, cost, stock หรือ balance ปนใน payload.
+- เมื่อมี create/update/deactivate หรือเปลี่ยนผู้ใช้/สาขา ให้ invalidate server/Redis และล้าง client cache scope นั้นก่อน revalidate; ห้ามแก้ด้วย hardcode หรือ fallback เป็นข้อมูลชุดอื่น.
+- ถ้าต้องการ persistent offline cache ในอนาคต ต้องมี version/revision และ explicit invalidation contract แยกเป็นงานใหม่ ไม่เปิดจาก cache matrix นี้โดยอัตโนมัติ.
+
+### Rollout order
+
+1. ตรวจ runtime evidence ของ CACHE-M2 หลัง deploy: hit/miss, Redis latency, error rate และ invalidation behavior.
+2. branch/warehouse เปิด client memory cache เป็นชุดแรกแล้ว เพราะ payload เล็กและเปลี่ยนแปลงต่ำ; ต้องทดสอบการเปลี่ยน scope และ master write ต่อ.
+3. เปิด L1 และ L3 ที่มี consumer ซ้ำจริง แล้วตรวจข้อมูลหลัง master write.
+4. พิจารณา customer/supplier/product/account เป็นรายหน้า; คง L4-L5 เป็น server/DB path ต่อไป.
