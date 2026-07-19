@@ -20,15 +20,18 @@ Write areas: `apps/next/src/components/main/MainSalesControlClients.tsx`, `apps/
 
 Completed locally: UI restructuring and Thai status wording; server analysis now uses only same-product Sales Plan price/% LME and returns no projected price/profit when no plan exists.
 
-Validation: workspace lint passed with one existing `qa-thai-font.tsx` warning, workspace type-check passed, the Webpack production build generated `312/312` pages, and staged diff-check passed.
+Validation pending: workspace lint, type-check, build, and diff-check.
 
 Completed locally: effective-permission helper/tests; action catalog and legacy-permission mapping migrations; User Admin/Security Admin split; multi-role user assignment; action checks for petty advance, payment approval, WTI open-bill buttons, purchase/sales bills, supplier payment, customer receipts, supplier ADV and daily expenses.
 
 Validation: targeted ESLint, workspace type-check, focused Vitest `17/17`, and scoped diff checks pass.
 
-Blocker/next: apply the four new migrations to `dev-target` using the controlled procedure because remote migration-history drift prevents a blanket `supabase db push`; then verify catalog/role assignments and continue the remaining broad finance-route audit documented in `docs/notes/access-control-broad-permission-audit-2026-07-19.md`.
+Completed: four access-control migrations are now applied to dev-target and SIT with controlled Supabase CLI workdirs; postflight confirmed the checked action catalog and admin/owner grants in both environments.
+Blocker/next: continue the remaining broad finance-route audit documented in `docs/notes/access-control-broad-permission-audit-2026-07-19.md`.
 
 # 00 Current Work
+
+Dashboard report query-slimming checkpoint 2026-07-19: Dashboard Overview และ Daily Report ใช้ lightweight sales-line reader เฉพาะ amount/product/qty และไม่เรียก allocation/trading/stock-cost pipeline ที่ไม่ใช่ consumer ของหน้านี้; สี่ report API เพิ่ม `Server-Timing` (`auth`, `service`, `total`) เพื่อแยกคอขวดจาก SIT. Type-check, lint (มี warning เดิมที่ `qa-thai-font.tsx`), production build `312/312` และ diff-check ผ่าน. Local re-measurement หลังแก้ยังติด `P1000` จาก database credential ใน env ปัจจุบัน; ต้องแก้ connection แล้ววัด parity/performance ซ้ำก่อน promotion. Browser/UAT ยังไม่ได้รันใน coding batch นี้.
 
 Dashboard API separation checkpoint 2026-07-18: `/api/owner-daily`, `/api/daily-report`, `/api/dashboard-overview`, and `/api/analytics-dashboard` now have separate route/service boundaries and `private, no-store` report responses. Owner Daily no longer invokes finance dashboard, historical, sales line analytics, or production detail queries; Dashboard summary now disables payment/receipt, daily bank movement, loan, trading and production-detail reads while retaining dashboard KPI/aging/stock/historical plus dashboard-used analytics. Analytics Dashboard now reads only the four sales-line fields needed for quantity/product analytics, builds trend labels from PB/SB, and no longer reads the full allocation/trading/stock-ledger fact pipeline or bank statements. Local warm Owner Daily requests measured about 0.2-0.4s application time and returned HTTP 200. Current validation after the analytics optimization: workspace type-check, workspace lint (one existing Thai-font warning), production build `311/311`, focused contract test, and scoped diff check passed. Browser/UAT was not run in this coding batch.
 

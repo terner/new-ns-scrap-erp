@@ -45,7 +45,7 @@ Dashboard Overview เป็น management KPI view จาก operational facts.
 - AR/AP overdue หรือยอดลูกหนี้/เจ้าหนี้คงค้างไม่ต้องแสดงเป็น alert strip/card แยก ถ้าข้อมูลเดียวกันอยู่ใน `Receivables & Payables Aging` แล้ว เพราะตาราง Aging เป็นพื้นที่หลักที่แยก Current/1-30/31-60/61-90/>90/Total ชัดกว่า
 - Chart/insight cards ต้องเพิ่มมุมมองบริหารที่ต่างจาก KPI และ detail tabs เท่านั้น ห้ามแสดง `Expense Breakdown`, `Channel Performance`, หรือ `Quick Insights` เป็นการ์ดแยก ถ้าค่าเหล่านั้นซ้ำกับ `Revenue vs Expense (Monthly)`, KPI cards, `Receivables & Payables Aging`, หรือแท็บ `Metrics` อยู่แล้ว
 - Ranked list ใน Dashboard Overview แสดง 5 อันดับแรกก่อน และให้กดขยายดูครบ 10 อันดับเมื่อจำเป็น
-- การเปลี่ยน UI นี้ไม่เปลี่ยนสูตรรายงาน, source tables, permissions, หรือ side effects ของ `GET /api/dashboard`
+- การเปลี่ยน UI นี้ไม่เปลี่ยนสูตรรายงาน, source tables, permissions, หรือ side effects ของ `GET /api/dashboard-overview`
 
 ## Page Responsibilities
 
@@ -64,7 +64,7 @@ Dashboard Overview เป็น management KPI view จาก operational facts.
 
 | Step | User action | System result |
 |---|---|---|
-| 1 | เปิดหน้า | `GET /api/dashboard` โหลด payload จาก `buildMainDashboards()` |
+| 1 | เปิดหน้า | `GET /api/dashboard-overview` โหลด payload จาก `buildMainDashboards()` |
 | 2 | เปลี่ยน filter | API resolve branch/supplier/customer จาก business code แล้วคำนวณใหม่ |
 | 3 | ดู KPI/section | UI อ่าน `dashboard`, `dailyReport`, `ownerDaily`, `production` จาก payload เดียวกัน |
 | 4 | Drilldown | ไป source report/document ที่เกี่ยวข้อง โดยไม่แก้ข้อมูลต้นทาง |
@@ -73,7 +73,7 @@ Dashboard Overview เป็น management KPI view จาก operational facts.
 
 ### Current API
 
-- `GET /api/dashboard`
+- `GET /api/dashboard-overview`
 - permission: `reports.reports.view`
 - query: `date`, `from`, `to`, `branchId`, `supplierId`, `customerId`, `productId`, `group`
 

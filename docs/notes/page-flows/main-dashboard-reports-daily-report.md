@@ -54,7 +54,7 @@ Daily Report เป็นรายงานประจำวัน/ช่วง
 ### Current API
 
 - `GET /api/daily-report`
-- implementation: re-export `GET` from `/api/dashboard`
+- implementation: dedicated `GET /api/daily-report` route and daily-report service; it does not re-export the dashboard overview handler
 - permission: `reports.reports.view`
 
 ### Current Response Sections

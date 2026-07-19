@@ -6,6 +6,12 @@ Development database and auth testing should use a separate Supabase dev/target 
 
 The customer's old production Supabase remains the legacy source system for read-only audit and migration-source dumps.
 
+### Access Control Migration Checkpoint 2026-07-19
+
+- Applied with Supabase CLI to dev-target `fhglqymcdmrgbsbadnwr` and SIT `vbjlkxbytccklhqvxjuu`: `20260719010334_access_control_finance_action_grants` and `20260719011602_access_control_advance_expense_actions`.
+- Postflight confirmed both environments contain the six required action catalog permissions and twelve admin/owner role grants for the checked action set.
+- Because both environments have pre-existing migration-history drift, the apply used temporary migration workdirs containing remote-history placeholders and only the two intended SQL migrations. No legacy migration was re-run.
+
 ### Cache/Image Checkpoint 2026-07-18
 
 - Dev-target, SIT และ customer UAT ตรวจ `products` 236 รายการเท่ากัน: 62 รายการมี original+thumbnail ครบ 124 Storage objects, 174 รายการไม่มีรูป, missing/orphan asset `0`
@@ -90,6 +96,10 @@ Status update on 2026-07-19:
 - Backfill projected 31 Purchase Bills, 20 Sales Bills, 266 fact rows, and 135 daily-rollup rows. Postflight found zero reconciliation issues, zero unmapped Purchase Bill channels, and zero incomplete active Sales Bill COGS lines.
 - Fact and daily totals match exactly: purchase `5,542,883.85`, revenue `629,499.67`, and COGS `453,344.86`. The stock-ledger projection trigger and validated Sales Bill line-profit constraint are present.
 - No browser/deployed SIT smoke was run in this migration batch.
+
+### Customer Receipt CADV Migration
+
+Migration `20260718100000_add_customer_receipt_advance_allocations.sql` was applied with Supabase CLI to both SIT project `vbjlkxbytccklhqvxjuu` and customer UAT project `ekeomeumqjvbhgwyaqwe` on 2026-07-18. The CLI migration history for both environments now contains `20260718100000`; the existing later history entries `20260718140000` and `20260718143000` remain intact. The apply was executed from temporary workdirs populated with each remote migration history, so only the CADV receipt allocation migration was pushed despite pre-existing migration-history drift.
 
 ### Staging / UAT
 
