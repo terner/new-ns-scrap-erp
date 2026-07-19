@@ -374,18 +374,23 @@ export const weightTicketFormSchema = z.object({
     }
   })
 
-  if (value.type === 'WTI') {
-    value.lines.forEach((line, index) => {
-      const parent = line.parentId ? lineById.get(line.parentId) : null
-      if (parent && parent.productId.trim().toUpperCase() !== line.productId.trim().toUpperCase()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'สินค้าของรายการย่อยต้องตรงกับสินค้าของรายการหลัก',
-          path: ['lines', index, 'productId'],
-        })
-      }
-    })
-  }
+  const calculation = calculateWeightTicketLineTotals(value.lines)
+  value.lines.forEach((line, index) => {
+    if (calculation.invalidChildProductLineIds.has(line.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'สินค้าของรายการย่อยต้องตรงกับสินค้าของรายการหลัก',
+        path: ['lines', index, 'productId'],
+      })
+    }
+    if (calculation.overflowingChildImpurityLineIds.has(line.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'ยอดหักรวมต้องไม่เกินน้ำหนักรวม',
+        path: ['lines', index, 'deductionValue'],
+      })
+    }
+  })
   if (value.type !== 'WTO') return
   const parentBucketByKey = new Map<string, number>()
   value.lines.forEach((line, index) => {
@@ -818,11 +823,17 @@ export function calculateWeightTicketLineTotals(lines: WeightTicketCalculationLi
   })]))
   const lineById = new Map(lines.map((line) => [line.id, line]))
   const childrenByParentId = new Map<string, WeightTicketCalculationLine[]>()
+  const invalidChildProductLineIds = new Set<string>()
+  const overflowingChildImpurityLineIds = new Set<string>()
 
   lines.forEach((line) => {
     if (!line.parentId) return
     const parent = lineById.get(line.parentId)
-    if (!parent || parent.productId.trim().toUpperCase() !== line.productId.trim().toUpperCase()) return
+    if (!parent) return
+    if (parent.productId.trim().toUpperCase() !== line.productId.trim().toUpperCase()) {
+      invalidChildProductLineIds.add(line.id)
+      return
+    }
     const children = childrenByParentId.get(line.parentId) ?? []
     children.push(line)
     childrenByParentId.set(line.parentId, children)
@@ -856,6 +867,9 @@ export function calculateWeightTicketLineTotals(lines: WeightTicketCalculationLi
       const rawDeduction = line.deductionMode === 'percent'
         ? netBeforeImpurityWeight * Math.max(0, toNumber(line.deductionValue)) / 100
         : Math.max(0, toNumber(line.deductionValue))
+      if (roundWeight(rawDeduction) > roundWeight(availableNetWeight)) {
+        overflowingChildImpurityLineIds.add(line.id)
+      }
       const deductionWeight = roundWeight(Math.min(rawDeduction, availableNetWeight))
 
       childTotals.deductionWeight = deductionWeight
@@ -910,7 +924,9 @@ export function calculateWeightTicketLineTotals(lines: WeightTicketCalculationLi
   )
 
   return {
+    invalidChildProductLineIds,
     lineTotalsById,
+    overflowingChildImpurityLineIds,
     sourceTotalsByLineId,
     totals: {
       containerDeductionWeight: roundWeight(totals.containerDeductionWeight),

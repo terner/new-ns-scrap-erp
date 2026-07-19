@@ -20,6 +20,10 @@ function isPurchaseFromImpurityLine(line: WeightTicketRecord['lines'][number]) {
   return line.grossWeightValue > 0 && line.note.includes('มาจากสิ่งเจือปน')
 }
 
+function rawLotNetWeight(line: WeightTicketRecord['lines'][number]) {
+  return Math.max(0, line.grossWeightValue - line.containerDeductionWeightValue - line.deductionWeight)
+}
+
 function sumLines(lines: WeightTicketRecord['lines']) {
   return lines.reduce(
     (summary, line) => ({
@@ -565,7 +569,7 @@ export function WeightTicketProductBreakdownTable({
                       container={line.containerDeductionWeightValue}
                       deduction={line.deductionWeight}
                       gross={line.grossWeightValue}
-                      net={line.netWeight}
+                      net={rawLotNetWeight(line)}
                     />
                     {ticket.type === 'WTO' ? <LineCostSnapshotCells cost={linePendingOutCost(costByLine, line.lineNo)} /> : null}
                     {showBillingColumns ? <td colSpan={3} className="px-3 py-3" /> : null}
@@ -714,7 +718,7 @@ export function WeightTicketProductBreakdownTable({
                         <div className="flex justify-between items-center">
                           <span className="font-bold text-slate-800">เตาที่ {idx + 1}</span>
                           <div className="text-right">
-                            <span className="font-bold text-slate-900 tabular-nums">{formatWeight(line.netWeight)} กก.</span>
+                            <span className="font-bold text-slate-900 tabular-nums">{formatWeight(rawLotNetWeight(line))} กก.</span>
                           </div>
                         </div>
                         {line.note && <div className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded mt-1">หมายเหตุ: {line.note}</div>}

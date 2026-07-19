@@ -15,7 +15,7 @@ import {
 
 const validWtiLine = (id: string, parentId?: string) => ({
   containerDeductionWeight: 0,
-  deductionMode: 'none',
+  deductionMode: 'none' as const,
   deductionValue: 0,
   grossWeight: 10,
   id,
@@ -26,7 +26,11 @@ const validWtiLine = (id: string, parentId?: string) => ({
   warehouseId: '',
 })
 
-const validWtiPayload = (lines: ReturnType<typeof validWtiLine>[]) => ({
+type TestWeightTicketLine = Omit<ReturnType<typeof validWtiLine>, 'deductionMode'> & {
+  deductionMode: WeightTicketFormValues['lines'][number]['deductionMode']
+}
+
+const validWtiPayload = (lines: TestWeightTicketLine[]) => ({
   branchId: 'BR10',
   godownName: 'โกดังทดสอบ',
   lines,
@@ -118,6 +122,43 @@ describe('weight ticket totals', () => {
     expect(calculation.sourceTotalsByLineId.get('product-b-lot')?.netWeight).toBe(100)
   })
 
+  it('rejects aggregate child impurity deduction before the calculator clamps it', () => {
+    const lines = [
+      {
+        ...validWtiLine('source-lot'),
+        containerDeductionWeight: 2,
+        grossWeight: 10,
+      },
+      {
+        ...validWtiLine('impurity-1', 'source-lot'),
+        deductionMode: 'kg' as const,
+        deductionValue: 5,
+        grossWeight: 0,
+        imageNames: [],
+        impurityId: 'impurity-1',
+      },
+      {
+        ...validWtiLine('impurity-2', 'source-lot'),
+        deductionMode: 'kg' as const,
+        deductionValue: 5,
+        grossWeight: 0,
+        imageNames: [],
+        impurityId: 'impurity-2',
+      },
+    ]
+    const calculation = calculateWeightTicketLineTotals(lines)
+    const result = weightTicketFormSchema.safeParse(validWtiPayload(lines))
+
+    expect(calculation.lineTotalsById.get('impurity-1')?.deductionWeight).toBe(5)
+    expect(calculation.lineTotalsById.get('impurity-2')?.deductionWeight).toBe(3)
+    expect(calculation.overflowingChildImpurityLineIds).toEqual(new Set(['impurity-2']))
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error('Expected aggregate child impurity deduction to fail validation')
+    expect(result.error.issues).toContainEqual(expect.objectContaining({
+      path: ['lines', 2, 'deductionValue'],
+    }))
+  })
+
   it('does not let a mismatched child product fund its parent product impurity', () => {
     const lines = [
       {
@@ -162,7 +203,8 @@ describe('weight ticket totals', () => {
     })
   })
 
-  it('rejects mismatched WTI child products at the shared create and update request schema', () => {
+  it.each(['WTI', 'WTO'] as const)('rejects mismatched %s child products at the shared create and update request schema', (type) => {
+    const warehouseId = type === 'WTO' ? 'WAREHOUSE-1' : ''
     const result = weightTicketFormSchema.safeParse({
       branchId: 'BR10',
       godownName: 'โกดังทดสอบ',
@@ -176,7 +218,7 @@ describe('weight ticket totals', () => {
           imageNames: ['lot-a.jpg'],
           impurityId: '',
           productId: 'PROD-A',
-          warehouseId: '',
+          warehouseId,
         },
         {
           containerDeductionWeight: 0,
@@ -188,18 +230,18 @@ describe('weight ticket totals', () => {
           impurityId: '',
           parentId: 'product-a-lot',
           productId: 'PROD-B',
-          warehouseId: '',
+          warehouseId,
         },
       ],
       partyId: 'SUP-1',
       remark: '',
-      type: 'WTI',
+      type,
       vehicleImageNames: [],
       vehicleNo: 'TEST-1',
     })
 
     expect(result.success).toBe(false)
-    if (result.success) throw new Error('Expected the WTI request to fail validation')
+    if (result.success) throw new Error(`Expected the ${type} request to fail validation`)
     expect(result.error.issues).toContainEqual(expect.objectContaining({
       message: 'สินค้าของรายการย่อยต้องตรงกับสินค้าของรายการหลัก',
       path: ['lines', 1, 'productId'],

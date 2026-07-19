@@ -614,8 +614,6 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
   }
   const lotLines = ticket.lines.filter(isLotLine)
   const lotCount = lotLines.length
-  const lotGrossWeight = lotLines.reduce((sum, line) => sum + line.grossWeightValue, 0)
-  const lotContainerWeight = lotLines.reduce((sum, line) => sum + line.containerDeductionWeightValue, 0)
 
   const ticketImages = ticket.imageNames || []
   const decodedImages = ticketImages
@@ -795,11 +793,11 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
                       </View>
                       <View style={[styles.bottomField, styles.weightInfoRightField]}>
                         <Text style={styles.fieldLabel}>{nt('น้ำหนักรวม')}</Text>
-                        <Text style={styles.fieldValue}>{formatPrintableNumber(lotGrossWeight)} kg</Text>
+                        <Text style={styles.fieldValue}>{formatPrintableNumber(ticket.totals.grossWeight)} kg</Text>
                       </View>
                       <View style={styles.bottomField}>
                         <Text style={styles.fieldLabel}>{nt('หักภาชนะ')}</Text>
-                        <Text style={styles.fieldValue}>{formatPrintableNumber(lotContainerWeight)} kg</Text>
+                        <Text style={styles.fieldValue}>{formatPrintableNumber(ticket.totals.containerDeductionWeight)} kg</Text>
                       </View>
                       <View style={[styles.bottomField, styles.weightInfoRightField]}>
                         <Text style={styles.fieldLabel}>{nt('หักสิ่งเจือปน')}</Text>

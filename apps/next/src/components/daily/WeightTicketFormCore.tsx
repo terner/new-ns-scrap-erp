@@ -804,6 +804,13 @@ export function WeightTicketFormCore({
       const isSecondaryLot = !!line.parentId && line.deductionMode === 'none';
       const isParent = !line.parentId;
 
+      if (lineCalculation.invalidChildProductLineIds.has(line.id)) {
+        next[`line-${line.parentId ?? line.id}-product`] = 'สินค้าของรายการย่อยต้องตรงกับสินค้าของรายการหลัก'
+      }
+      if (lineCalculation.overflowingChildImpurityLineIds.has(line.id)) {
+        next[`line-${line.id}-deduction`] = 'ยอดหักรวมต้องไม่เกินน้ำหนักรวม'
+      }
+
       if (!line.productId) {
         const parentIndex = line.parentId
           ? parentLines.findIndex((p) => p.id === line.parentId)
@@ -835,19 +842,6 @@ export function WeightTicketFormCore({
           next[`line-${line.id}-images`] = `แนบรูปภาพบรรทัดที่ ${parentIndex + 1} อย่างน้อย 1 รูป`
         }
 
-        if (isParent) {
-          const lineTotals = calculateAdjustedLineTotals(line, lineCalculation)
-          const children = form.lines.filter((l) => l.parentId === line.id)
-          const impurities = children.filter((l) => l.deductionMode !== 'none')
-          if (lineTotals.containerDeductionWeight + lineTotals.deductionWeight > lineTotals.grossWeight) {
-            if (impurities.length > 0) {
-              const lastChild = impurities[impurities.length - 1]
-              next[`line-${lastChild.id}-deduction`] = 'ยอดหักรวมต้องไม่เกินน้ำหนักรวม'
-            } else {
-              next[`line-${line.id}-container`] = 'ยอดหักรวมต้องไม่เกินน้ำหนักรวม'
-            }
-          }
-        }
       } else if (isImpurity) {
         if (line.deductionMode === 'none') {
           next[`line-${line.id}-impurity`] = 'เลือกสิ่งเจือปน'

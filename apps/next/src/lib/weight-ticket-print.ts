@@ -293,8 +293,6 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
   }
   const lotLines = ticket.lines.filter(isLotLine)
   const lotCount = lotLines.length
-  const lotGrossWeight = lotLines.reduce((sum, line) => sum + line.grossWeightValue, 0)
-  const lotContainerWeight = lotLines.reduce((sum, line) => sum + line.containerDeductionWeightValue, 0)
 
   function rowHtml(row: PrintWeightRow) {
     if (row.className === 'product-heading') {
@@ -458,8 +456,8 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
               <div class="panel-title">ข้อมูลน้ำหนัก / Weight Info</div>
               <div class="panel-body two-col weight-info-grid">
                 <div><div class="field-label">จำนวนรายการ</div><div class="field-value">${lotCount} รายการ</div></div>
-                <div><div class="field-label">น้ำหนักรวม</div><div class="field-value">${formatPrintableNumber(lotGrossWeight)} kg</div></div>
-                <div><div class="field-label">หักภาชนะ</div><div class="field-value">${formatPrintableNumber(lotContainerWeight)} kg</div></div>
+                <div><div class="field-label">น้ำหนักรวม</div><div class="field-value">${formatPrintableNumber(ticket.totals.grossWeight)} kg</div></div>
+                <div><div class="field-label">หักภาชนะ</div><div class="field-value">${formatPrintableNumber(ticket.totals.containerDeductionWeight)} kg</div></div>
                 <div><div class="field-label">หักสิ่งเจือปน</div><div class="field-value">${formatPrintableNumber(ticket.totals.deductionWeight)} kg</div></div>
                 <div class="weight-info-net"><div class="field-label">น้ำหนักสุทธิ</div><div class="field-value strong">${formatPrintableNumber(ticket.totals.netWeight)} kg</div></div>
               </div>
