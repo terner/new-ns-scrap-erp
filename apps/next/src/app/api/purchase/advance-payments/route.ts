@@ -204,7 +204,7 @@ async function nextAdvanceDocNo(branchValue: string | bigint, date: string) {
 export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'purchase.advance_payments.view')
 
     const url = new URL(request.url)
     const page = parsePositiveInt(url.searchParams.get('page'), 1, 10000)
@@ -409,7 +409,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'purchase.advance_payments.create')
 
     const values = supplierAdvancePaymentFormSchema.parse(await request.json())
     const [branch, supplier] = await Promise.all([
