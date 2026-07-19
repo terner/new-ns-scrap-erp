@@ -149,48 +149,48 @@ function WaitingAllocationsView() {
   const [productionPage, setProductionPage] = useState(1)
   const pageSize = 20
 
-  const poColumns = useMemo<Array<ResizableColumnDefinition<string> & { label: string; align?: 'left' | 'right' | 'center' }>>(() => [
-    { key: 'docNo', label: 'PO ขาย', defaultWidth: 140 },
-    { key: 'date', label: 'วันที่', defaultWidth: 100 },
-    { key: 'customerName', label: 'ลูกค้า', defaultWidth: 180 },
-    { key: 'productName', label: 'สินค้า', defaultWidth: 220 },
-    { key: 'metalGroup', label: 'หมวด', defaultWidth: 90, align: 'right' },
+  const poColumns = useMemo<Array<ResizableColumnDefinition<string> & { label: string; align?: 'left' | 'right' | 'center'; className?: string }>>(() => [
+    { key: 'docNo', label: 'PO ขาย', defaultWidth: 140, className: 'ns-table-textual-column' },
+    { key: 'date', label: 'วันที่', defaultWidth: 100, className: 'ns-table-textual-column' },
+    { key: 'customerName', label: 'ลูกค้า', defaultWidth: 180, className: 'ns-table-textual-column' },
+    { key: 'productName', label: 'สินค้า', defaultWidth: 220, className: 'ns-table-textual-column' },
+    { key: 'metalGroup', label: 'หมวด', defaultWidth: 90, className: 'ns-table-textual-column' },
     { key: 'qty', label: 'ขาย (กก.)', defaultWidth: 110, align: 'right' },
     { key: 'allocatedQty', label: 'จัดสรรแล้ว', defaultWidth: 110, align: 'right' },
     { key: 'remainingQty', label: 'รอจัดสรร (กก.)', defaultWidth: 115, align: 'right' },
     { key: 'unitPrice', label: 'ราคา/กก.', defaultWidth: 100, align: 'right' },
     { key: 'revenuePending', label: 'มูลค่ารอจัดสรร', defaultWidth: 120, align: 'right' },
-    { key: 'allocationStatus', label: 'สถานะ', defaultWidth: 90, align: 'right' },
+    { key: 'allocationStatus', label: 'สถานะ', defaultWidth: 90, className: 'ns-table-textual-column' },
     { key: 'action', label: 'จัดการ', defaultWidth: 90, align: 'right' },
   ], [])
 
-  const billColumns = useMemo<Array<ResizableColumnDefinition<string> & { label: string; align?: 'left' | 'right' | 'center' }>>(() => [
-    { key: 'docNo', label: 'บิลขาย', defaultWidth: 140 },
-    { key: 'date', label: 'วันที่', defaultWidth: 100 },
-    { key: 'customerName', label: 'ลูกค้า', defaultWidth: 180 },
-    { key: 'productName', label: 'สินค้า', defaultWidth: 220 },
-    { key: 'metalGroup', label: 'หมวด', defaultWidth: 90, align: 'right' },
+  const billColumns = useMemo<Array<ResizableColumnDefinition<string> & { label: string; align?: 'left' | 'right' | 'center'; className?: string }>>(() => [
+    { key: 'docNo', label: 'บิลขาย', defaultWidth: 140, className: 'ns-table-textual-column' },
+    { key: 'date', label: 'วันที่', defaultWidth: 100, className: 'ns-table-textual-column' },
+    { key: 'customerName', label: 'ลูกค้า', defaultWidth: 180, className: 'ns-table-textual-column' },
+    { key: 'productName', label: 'สินค้า', defaultWidth: 220, className: 'ns-table-textual-column' },
+    { key: 'metalGroup', label: 'หมวด', defaultWidth: 90, className: 'ns-table-textual-column' },
     { key: 'qty', label: 'ขาย (กก.)', defaultWidth: 110, align: 'right' },
     { key: 'allocatedQty', label: 'จัดสรรแล้ว', defaultWidth: 110, align: 'right' },
     { key: 'remainingQty', label: 'รอจัดสรร (กก.)', defaultWidth: 115, align: 'right' },
     { key: 'unitPrice', label: 'ราคา/กก.', defaultWidth: 100, align: 'right' },
     { key: 'revenuePending', label: 'มูลค่ารอจัดสรร', defaultWidth: 120, align: 'right' },
-    { key: 'allocationStatus', label: 'สถานะ', defaultWidth: 90, align: 'right' },
+    { key: 'allocationStatus', label: 'สถานะ', defaultWidth: 90, className: 'ns-table-textual-column' },
     { key: 'action', label: 'จัดการ', defaultWidth: 90, align: 'right' },
   ], [])
 
-  const productionColumns = useMemo<Array<ResizableColumnDefinition<string> & { label: string; align?: 'left' | 'right' | 'center' }>>(() => [
-    { key: 'docNo', label: 'ใบสั่งผลิต', defaultWidth: 140 },
-    { key: 'date', label: 'วันที่เบิกวัตถุดิบ', defaultWidth: 120 },
-    { key: 'customerName', label: 'ผู้ผลิต', defaultWidth: 180 },
-    { key: 'productName', label: 'สินค้า', defaultWidth: 220 },
-    { key: 'metalGroup', label: 'หมวด', defaultWidth: 90, align: 'right' },
+  const productionColumns = useMemo<Array<ResizableColumnDefinition<string> & { label: string; align?: 'left' | 'right' | 'center'; className?: string }>>(() => [
+    { key: 'docNo', label: 'ใบสั่งผลิต', defaultWidth: 140, className: 'ns-table-textual-column' },
+    { key: 'date', label: 'วันที่เบิกวัตถุดิบ', defaultWidth: 120, className: 'ns-table-textual-column' },
+    { key: 'customerName', label: 'ผู้ผลิต', defaultWidth: 180, className: 'ns-table-textual-column' },
+    { key: 'productName', label: 'สินค้า', defaultWidth: 220, className: 'ns-table-textual-column' },
+    { key: 'metalGroup', label: 'หมวด', defaultWidth: 90, className: 'ns-table-textual-column' },
     { key: 'qty', label: 'ผลิต (กก.)', defaultWidth: 110, align: 'right' },
     { key: 'allocatedQty', label: 'จัดสรรแล้ว', defaultWidth: 110, align: 'right' },
     { key: 'remainingQty', label: 'รอจัดสรร (กก.)', defaultWidth: 115, align: 'right' },
     { key: 'unitPrice', label: 'ต้นทุน/กก.', defaultWidth: 100, align: 'right' },
     { key: 'revenuePending', label: 'มูลค่ารอจัดสรร', defaultWidth: 120, align: 'right' },
-    { key: 'allocationStatus', label: 'สถานะ', defaultWidth: 90, align: 'right' },
+    { key: 'allocationStatus', label: 'สถานะ', defaultWidth: 90, className: 'ns-table-textual-column' },
     { key: 'action', label: 'จัดการ', defaultWidth: 90, align: 'right' },
   ], [])
 
@@ -505,6 +505,7 @@ function WaitingAllocationsView() {
                   direction={sortDirection}
                   label={col.label}
                   align={col.align}
+                  className={col.className}
                   resizeProps={columnResize.getResizeHandleProps(col.key, col.label)}
                   sortKey={col.key}
                   onSort={changeSort}
@@ -539,11 +540,11 @@ function WaitingAllocationsView() {
 
               return (
                 <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-3 pl-4 font-mono text-slate-700 whitespace-nowrap">{row.docNo}</td>
-                  <td className="p-3 whitespace-nowrap text-slate-600">{formatDateDisplay(row.date)}</td>
-                  <td className="p-3 text-slate-800 font-medium min-w-0 overflow-hidden"><div className="truncate" title={row.customerName === '-' ? 'ภายในโรงงาน' : row.customerName}>{row.customerName === '-' ? 'ภายในโรงงาน' : row.customerName}</div></td>
-                  <td className="p-3 text-xs text-slate-700 min-w-0 overflow-hidden"><div className="truncate" title={row.productName || ''}>{row.productName}</div></td>
-                  <td className="p-3 text-right whitespace-nowrap">
+                  <td className="ns-table-textual-column p-3 pl-4 font-mono text-slate-700 whitespace-nowrap">{row.docNo}</td>
+                  <td className="ns-table-textual-column p-3 whitespace-nowrap text-slate-600">{formatDateDisplay(row.date)}</td>
+                  <td className="ns-table-textual-column p-3 text-slate-800 font-medium min-w-0 overflow-hidden"><div className="truncate" title={row.customerName === '-' ? 'ภายในโรงงาน' : row.customerName}>{row.customerName === '-' ? 'ภายในโรงงาน' : row.customerName}</div></td>
+                  <td className="ns-table-textual-column p-3 text-xs text-slate-700 min-w-0 overflow-hidden"><div className="truncate" title={row.productName || ''}>{row.productName}</div></td>
+                  <td className="ns-table-textual-column p-3 text-left whitespace-nowrap">
                     <span className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
                       {row.metalGroup}
                     </span>
@@ -553,7 +554,7 @@ function WaitingAllocationsView() {
                   <td className="p-3 text-right font-mono font-bold text-amber-700 whitespace-nowrap tabular-nums pl-4">{formatMoney(row.remainingQty)}</td>
                   <td className="p-3 text-right font-mono text-slate-700 whitespace-nowrap tabular-nums pl-4">{formatMoney(row.unitPrice)}</td>
                   <td className="p-3 text-right font-mono text-emerald-700 font-medium whitespace-nowrap tabular-nums pl-4">{formatMoney(row.revenuePending)}</td>
-                  <td className="p-3 text-right">
+                  <td className="ns-table-textual-column p-3 text-left">
                     <StatusPill status={row.allocationStatus} />
                   </td>
                   <td className="p-3 pr-4 text-right">
@@ -658,7 +659,7 @@ function AllocationLedgerView() {
 
   const ledgerColumns = useMemo<Array<ResizableColumnDefinition<LedgerColumnKey> & { align?: 'center' | 'left' | 'right'; className?: string; label: string }>>(() => [
     { key: 'matchId', label: 'เลขที่การจับคู่', defaultWidth: 190, minWidth: 160, className: 'ns-table-textual-column' },
-    { key: 'targetType', label: 'ประเภท', defaultWidth: 88, minWidth: 78, align: 'right' },
+    { key: 'targetType', label: 'ประเภท', defaultWidth: 88, minWidth: 78, className: 'ns-table-textual-column' },
     { key: 'saleDocNo', label: 'เอกสารขาย', defaultWidth: 130, minWidth: 120, className: 'ns-table-textual-column' },
     { key: 'productName', label: 'สินค้า', defaultWidth: 230, minWidth: 180, className: 'ns-table-textual-column' },
     { key: 'productCategory', label: 'หมวด', defaultWidth: 110, minWidth: 95, className: 'ns-table-textual-column' },
@@ -671,7 +672,7 @@ function AllocationLedgerView() {
     { key: 'grossProfit', label: 'GP', defaultWidth: 115, minWidth: 100, align: 'right' },
     { key: 'gpPct', label: 'GP%', defaultWidth: 80, minWidth: 70, align: 'right' },
     { key: 'allocatedBy', label: 'ผู้จัดสรร', defaultWidth: 135, minWidth: 115, className: 'ns-table-textual-column' },
-    { key: 'status', label: 'สถานะ', defaultWidth: 115, minWidth: 100, align: 'right' },
+    { key: 'status', label: 'สถานะ', defaultWidth: 115, minWidth: 100, className: 'ns-table-textual-column' },
   ], [])
   const ledgerResize = useResizableColumns('dual-costing.allocation-ledger.v1', ledgerColumns)
 
@@ -886,7 +887,7 @@ function AllocationLedgerView() {
             {visibleRows.map((row) => (
               <TableRow key={row.id} className={`hover:bg-indigo-50/30 ${row.status === 'reversed' ? 'opacity-50' : ''}`}>
                 <TableCell className="ns-table-textual-column p-3 font-mono text-xs text-slate-700"><span className="block truncate" title={row.matchId}>{row.matchId}</span></TableCell>
-                <TableCell className="p-3 text-right"><TargetPill type={row.targetType} /></TableCell>
+                <TableCell className="ns-table-textual-column p-3 text-left"><TargetPill type={row.targetType} /></TableCell>
                 <TableCell className="ns-table-textual-column p-3 text-left font-mono text-xs text-slate-700"><span className="block truncate" title={row.saleDocNo}>{row.saleDocNo}</span></TableCell>
                 <TableCell className="ns-table-textual-column p-3 text-left text-sm text-slate-800"><span className="block truncate" title={row.productName}>{row.productName}</span></TableCell>
                 <TableCell className="ns-table-textual-column p-3 text-left"><span className="whitespace-nowrap text-xs font-semibold text-slate-600">{row.productCategory}</span></TableCell>
@@ -899,7 +900,7 @@ function AllocationLedgerView() {
                 <TableCell className={`p-3 text-right font-mono font-bold ${row.grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatMoney(row.grossProfit)}</TableCell>
                 <TableCell className="p-3 text-right font-mono text-xs text-slate-700">{row.gpPct.toFixed(2)}%</TableCell>
                 <TableCell className="ns-table-textual-column p-3 text-xs text-slate-700"><span className="block truncate" title={row.allocatedBy}>{row.allocatedBy}</span></TableCell>
-                <TableCell className="p-3 text-right"><LedgerStatusText status={row.status} /></TableCell>
+                <TableCell className="ns-table-textual-column p-3 text-left"><LedgerStatusText status={row.status} /></TableCell>
               </TableRow>
             ))}
           </TableBody>

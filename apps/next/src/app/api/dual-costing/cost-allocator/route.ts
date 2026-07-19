@@ -7,7 +7,7 @@ import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { formatDualCostingMatchId, getDualCostingMatchIdPrefix } from '@/lib/server/dual-costing-match-id'
 import { prisma } from '@/lib/server/prisma'
 import { listProductReferences } from '@/lib/server/reference-master-cache'
-import { getCostPoolRowsData } from '../cost-pool/route'
+import { getCostPoolRowsData } from '../cost-pool/handler'
 
 export const runtime = 'nodejs'
 

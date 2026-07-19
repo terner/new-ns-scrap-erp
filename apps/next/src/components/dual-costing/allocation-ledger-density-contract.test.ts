@@ -19,6 +19,48 @@ function openingTableCell(sourceText: string, marker: string) {
   return sourceText.slice(cellStart, cellEnd + 1)
 }
 
+function openingNativeCell(sourceText: string, marker: string) {
+  const markerIndex = sourceText.indexOf(marker)
+  const cellStart = sourceText.lastIndexOf('<td', markerIndex)
+  const cellEnd = sourceText.indexOf('>', cellStart)
+
+  expect(markerIndex, marker).toBeGreaterThan(-1)
+  expect(cellStart, marker).toBeGreaterThan(-1)
+  expect(cellEnd, marker).toBeGreaterThan(cellStart)
+  return sourceText.slice(cellStart, cellEnd + 1)
+}
+
+describe('Waiting Allocations semantic alignment', () => {
+  it('keeps text, date, category, and status columns left while numeric columns stay right', () => {
+    const viewStart = source.indexOf('function WaitingAllocationsView()')
+    const viewEnd = source.indexOf('\nfunction AllocationLedgerView', viewStart)
+    const view = source.slice(viewStart, viewEnd)
+    const textualKeys = ['docNo', 'date', 'customerName', 'productName', 'metalGroup', 'allocationStatus'] as const
+    const textualBodyMarkers = [
+      '{row.docNo}',
+      '{formatDateDisplay(row.date)}',
+      "title={row.customerName === '-' ? 'ภายในโรงงาน' : row.customerName}",
+      "title={row.productName || ''}",
+      '{row.metalGroup}',
+      '<StatusPill status={row.allocationStatus}',
+    ] as const
+    const numericKeys = ['qty', 'allocatedQty', 'remainingQty', 'unitPrice', 'revenuePending'] as const
+
+    expect(viewStart).toBeGreaterThan(-1)
+    expect(viewEnd).toBeGreaterThan(viewStart)
+    expect(view).toContain('className={col.className}')
+    textualKeys.forEach((key) => {
+      expect(view.match(new RegExp(`\\{ key: '${key}',[^\\n]*className: '${textualColumnClass}'`, 'g'))).toHaveLength(3)
+    })
+    textualBodyMarkers.forEach((marker) => {
+      expect(openingNativeCell(view, marker)).toContain(textualColumnClass)
+    })
+    numericKeys.forEach((key) => {
+      expect(view.match(new RegExp(`\\{ key: '${key}',[^\\n]*align: 'right'`, 'g'))).toHaveLength(3)
+    })
+  })
+})
+
 describe('Allocation Ledger table density', () => {
   it('uses the shared p-3 body density while keeping loading and empty rows at p-8', () => {
     const viewStart = source.indexOf('function AllocationLedgerView()')
@@ -47,11 +89,13 @@ describe('Allocation Ledger table density', () => {
     const view = source.slice(viewStart, viewEnd)
     const textualColumns = [
       ['matchId', 'title={row.matchId}'],
+      ['targetType', '<TargetPill type={row.targetType}'],
       ['saleDocNo', 'title={row.saleDocNo}'],
       ['productName', 'title={row.productName}'],
       ['productCategory', '{row.productCategory}'],
       ['costPoolNo', 'title={row.costPoolNo}'],
       ['allocatedBy', 'title={row.allocatedBy}'],
+      ['status', '<LedgerStatusText status={row.status}'],
     ] as const
 
     expect(view).toContain('className={column.className}')
