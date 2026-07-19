@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('server-only', () => ({}))
+
 const mocks = vi.hoisted(() => ({
   consumeForgotPasswordRateLimit: vi.fn(),
   findFirst: vi.fn(),
@@ -53,6 +55,7 @@ describe('POST /api/auth/forgot-password', () => {
     }))
 
     expect(response.status).toBe(202)
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
     await expect(response.json()).resolves.toEqual({ accepted: true })
     expect(mocks.resetPasswordForEmail).not.toHaveBeenCalled()
     expect(JSON.stringify(mocks.executeRaw.mock.calls)).not.toContain('nobody@example.com')

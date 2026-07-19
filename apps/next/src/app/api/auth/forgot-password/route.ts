@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server'
 import { forgotPasswordSchema } from '@/lib/auth'
 import { requestIp } from '@/lib/server/app-logging'
 import { consumeForgotPasswordRateLimit } from '@/lib/server/auth-rate-limit'
+import { authJson } from '@/lib/server/auth-response'
 import { prisma } from '@/lib/server/prisma'
 import { getSupabasePublicServerClient } from '@/lib/server/supabase-admin'
 
@@ -79,11 +79,11 @@ export async function POST(request: Request) {
   const redirectTo = resolveRedirectTo(request, body.redirectTo)
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' }, { status: 400 })
+    return authJson({ error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' }, { status: 400 })
   }
 
   if (!redirectTo) {
-    return NextResponse.json({ error: 'ลิงก์สำหรับ reset password ไม่ถูกต้อง' }, { status: 400 })
+    return authJson({ error: 'ลิงก์สำหรับ reset password ไม่ถูกต้อง' }, { status: 400 })
   }
 
   const email = parsed.data.email
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   })
 
   if (limiter.outcome === 'unavailable') {
-    return NextResponse.json({ error: 'ระบบป้องกันคำขอ reset password ยังไม่พร้อมใช้งาน' }, { status: 503 })
+    return authJson({ error: 'ระบบป้องกันคำขอ reset password ยังไม่พร้อมใช้งาน' }, { status: 503 })
   }
 
   if (limiter.outcome === 'throttled') {
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
       outcome: 'throttled',
       source: 'self_service',
     })
-    return NextResponse.json({ accepted: true }, { status: 202 })
+    return authJson({ accepted: true }, { status: 202 })
   }
 
   const appUser = await prisma.app_users.findFirst({
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
   })
 
   if (!appUser?.email) {
-    return NextResponse.json({ accepted: true }, { status: 202 })
+    return authJson({ accepted: true }, { status: 202 })
   }
 
   const supabase = getSupabasePublicServerClient()
@@ -132,7 +132,7 @@ export async function POST(request: Request) {
       source: 'self_service',
     })
     console.warn('Password reset delivery unavailable', { category: 'supabase_public_client_unavailable' })
-    return NextResponse.json({ accepted: true }, { status: 202 })
+    return authJson({ accepted: true }, { status: 202 })
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(appUser.email, {
@@ -146,8 +146,8 @@ export async function POST(request: Request) {
       source: 'self_service',
     })
     console.warn('Password reset delivery failed', { category: 'supabase_reset_password_failed' })
-    return NextResponse.json({ accepted: true }, { status: 202 })
+    return authJson({ accepted: true }, { status: 202 })
   }
 
-  return NextResponse.json({ accepted: true }, { status: 202 })
+  return authJson({ accepted: true }, { status: 202 })
 }
