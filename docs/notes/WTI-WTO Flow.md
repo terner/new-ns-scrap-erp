@@ -495,7 +495,8 @@ WTI/WTO มีรูป 2 ระดับ:
 - backfill เป็น dry-run โดย default; `--apply` ต้องระบุ rollback manifest แบบ absolute path นอก repo และตรวจว่า project ref ของ Database ตรงกับ Supabase URL ก่อนเสมอ
 - รูปที่ย้ายต้องเป็น JPEG/PNG/WebP จริง ขนาด decoded ไม่เกิน 10 MB และใช้ immutable key ที่มี SHA-256 โดย hash document token แทนเลขเอกสารใน public path; Storage upload ใช้ `cacheControl=31536000`, `upsert=false` จากนั้นจึง compare-and-swap ค่า array ใน DB ภายใน transaction โดยไม่เปลี่ยน business `updated_at`/audit timeline
 - ถ้า upload ผ่านแต่ DB เปลี่ยนระหว่างทาง ระบบไม่ลบ object หรือ reference เดิม แต่รายงาน CAS conflict/orphan แบบ sanitized เพื่อให้ operator ตรวจและตัดสินใจเอง
-- dry-run วันที่ 2026-07-19 พบ dev/SIT อย่างละ 214 JSON data URL ที่ผ่าน validation, 2 รายการเป็น exact 15-byte `mock image data` ที่ประกาศ MIME เป็น PNG และ 23 filename-only; mock ลบได้เฉพาะ `--apply --remove-invalid-mocks` พร้อม external manifest แบบ CAS โดยไม่ upload/สร้าง placeholder และ checkpoint นี้ยังไม่มีการ upload หรือแก้ Database/Storage
+- วันที่ 2026-07-19 apply สำเร็จทั้ง dev/SIT: ย้าย JSON data URL 214 รูปไป `weight-ticket-pdfs` และ CAS-remove exact 15-byte `mock image data` 2 รายการต่อ environment โดยไม่มี failure, CAS conflict, missing key หรือ orphan; rollback manifest แยกอยู่นอก repo และไม่เปลี่ยน business `updated_at`/audit timeline
+- post-apply audit ยืนยัน data URL, invalid reference และ known mock เป็น `0`; canonical storage-key เป็น dev `219` / SIT `218`, Storage objects เป็น dev `625` / SIT `631`, ส่วน filename-only ยังคง 23 รายการต่อ environment เพราะไม่มี binary/source mapping ให้ย้าย จึงแสดง unavailable ตาม contract โดยไม่เดา path
 - WTI/WTO attachment ใน #151 เป็น L5 original ที่โหลดเฉพาะ detail/preview ไม่มี list/picker consumer จึงไม่สร้าง thumbnail ใน backfill นี้; thumbnail/compression เป็น migration แยกเมื่อมี consumer และ quality contract ที่ยืนยันแล้ว
 
 ### รูปสินค้าใน product picker
