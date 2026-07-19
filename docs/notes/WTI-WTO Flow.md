@@ -489,6 +489,15 @@ WTI/WTO มีรูป 2 ระดับ:
 - หน้า detail โหลด stored/original asset เมื่อผู้ใช้เปิดดู ส่วน list/picker ยังคงใช้ thumbnail; รอบนี้ไม่เพิ่ม browser/Redis cache และอายุ signed URL/cache headers เป็น contract ของ Storage
 - รูป legacy ต้องย้ายด้วย migration/backfill ไป object storage ไม่อ่าน base64 ย้อนกลับใน runtime; focused test ครอบ 0/1/many, signed HTTPS และ payload legacy ที่ unavailable
 
+### Legacy attachment backfill checkpoint (2026-07-19)
+
+- `audit:weight-ticket-image-assets` และ `backfill:weight-ticket-image-assets` ใช้ parser เดียวกันเพื่อแยก raw, pipe และ JSON `data:image` ออกจาก storage/public URL โดยไม่พิมพ์ base64, token หรือ connection string ลง report
+- backfill เป็น dry-run โดย default; `--apply` ต้องระบุ rollback manifest แบบ absolute path นอก repo และตรวจว่า project ref ของ Database ตรงกับ Supabase URL ก่อนเสมอ
+- รูปที่ย้ายต้องเป็น JPEG/PNG/WebP จริง ขนาด decoded ไม่เกิน 10 MB และใช้ immutable key ที่มี SHA-256 โดย hash document token แทนเลขเอกสารใน public path; Storage upload ใช้ `cacheControl=31536000`, `upsert=false` จากนั้นจึง compare-and-swap ค่า array ใน DB ภายใน transaction โดยไม่เปลี่ยน business `updated_at`/audit timeline
+- ถ้า upload ผ่านแต่ DB เปลี่ยนระหว่างทาง ระบบไม่ลบ object หรือ reference เดิม แต่รายงาน CAS conflict/orphan แบบ sanitized เพื่อให้ operator ตรวจและตัดสินใจเอง
+- dry-run วันที่ 2026-07-19 พบ dev/SIT อย่างละ 214 JSON data URL ที่ผ่าน validation, 2 รายการเป็น exact 15-byte `mock image data` ที่ประกาศ MIME เป็น PNG และ 23 filename-only; mock ลบได้เฉพาะ `--apply --remove-invalid-mocks` พร้อม external manifest แบบ CAS โดยไม่ upload/สร้าง placeholder และ checkpoint นี้ยังไม่มีการ upload หรือแก้ Database/Storage
+- WTI/WTO attachment ใน #151 เป็น L5 original ที่โหลดเฉพาะ detail/preview ไม่มี list/picker consumer จึงไม่สร้าง thumbnail ใน backfill นี้; thumbnail/compression เป็น migration แยกเมื่อมี consumer และ quality contract ที่ยืนยันแล้ว
+
 ### รูปสินค้าใน product picker
 
 - มาจาก `products.image_storage_key` และ `products.image_thumbnail_storage_key`
