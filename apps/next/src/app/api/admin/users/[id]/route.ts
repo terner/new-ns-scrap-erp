@@ -26,7 +26,7 @@ const adminUserFormSchema = z.object({
   namePrefix: z.enum(['', 'นาย', 'นาง', 'นางสาว', 'คุณ'], { message: 'คำนำหน้าชื่อไม่ถูกต้อง' }).optional().default(''),
   profileImageUrl: z.string().trim().max(500, 'URL รูป profile ยาวเกินไป').optional().default('')
     .refine((value) => !value || /^https?:\/\//i.test(value), 'URL รูป profile ต้องขึ้นต้นด้วย http:// หรือ https://'),
-  roleIds: z.array(z.string().trim().regex(/^\d+$/, 'หน้าที่งานไม่ถูกต้อง')).length(1, 'เลือกหน้าที่งาน 1 รายการ'),
+  roleIds: z.array(z.string().trim().regex(/^\d+$/, 'หน้าที่งานไม่ถูกต้อง')).min(1, 'เลือกหน้าที่งานอย่างน้อย 1 รายการ'),
 })
 
 type AdminUserRouteProps = {
@@ -56,7 +56,7 @@ function displayNameFromProfile(values: { email: string; firstName: string; last
 function parseRoleIds(roleIds: string[]) {
   const parsed = roleIds.map((roleId) => parseInternalBigIntId(roleId))
 
-  if (parsed.some((roleId) => roleId == null)) {
+  if (parsed.some((roleId) => roleId == null) || new Set(parsed.filter((roleId): roleId is bigint => roleId != null)).size !== parsed.length) {
     throw new Error('Role ที่เลือกไม่ถูกต้อง')
   }
 
