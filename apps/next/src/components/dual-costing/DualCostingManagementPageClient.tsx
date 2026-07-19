@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { Select } from '@/components/ui/Select'
 import { SegmentedFilterButton } from '@/components/ui/SegmentedFilterButton'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
@@ -89,8 +90,47 @@ type LedgerPayload = {
 }
 
 type ReportPayload = {
+  filters: {
+    dateFrom: string
+    dateTo: string
+  }
   report: {
-    byCategory: { allocatedQty: number; category: string; cost: number; gp: number; gpPct: number; pendingQty: number; pendingRevenue: number; revenue: number; rows: number }[]
+    byCategory: {
+      allocatedQty: number
+      category: string
+      cost: number
+      detail: {
+        allocatedRows: {
+          allocatedQty: number
+          cost: number
+          costPoolNo: string
+          date: string
+          gp: number
+          gpPct: number
+          matchId: string
+          productName: string
+          revenue: number
+          saleDocNo: string
+          sourceNo: string
+          targetType: string
+        }[]
+        pendingRows: {
+          customerName: string
+          date: string
+          docNo: string
+          pendingQty: number
+          pendingRevenue: number
+          productName: string
+          unitPrice: number
+        }[]
+      }
+      gp: number
+      gpPct: number
+      pendingQty: number
+      pendingRevenue: number
+      revenue: number
+      rows: number
+    }[]
     po: ReportMetric
     spotAllocated: ReportMetric
     total: ReportMetric
@@ -122,6 +162,16 @@ const reportColumns: Array<ResizableColumnDefinition<ReportColumnKey> & { align?
   { key: 'pendingQty', label: 'น้ำหนักรอจัดสรร', defaultWidth: 135, minWidth: 120, align: 'right' },
   { key: 'pendingRevenue', label: 'มูลค่าขายรอจัดสรร', defaultWidth: 150, minWidth: 130, align: 'right' },
 ]
+
+function today() {
+  const date = new Date()
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function monthStart() {
+  const date = new Date()
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
+}
 
 export function DualCostingManagementPageClient({ mode }: { mode: Mode }) {
   if (mode === 'waiting') return <WaitingAllocationsView />
@@ -990,10 +1040,16 @@ function getReportSortValue(row: ReportCategoryRow, key: ReportColumnKey): strin
 function DualCostingReportView() {
   const [data, setData] = useState<ReportPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [fromDate, setFromDate] = useState(monthStart())
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedCategory, setSelectedCategory] = useState<ReportCategoryRow | null>(null)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [sortKey, setSortKey] = useState<ReportColumnKey | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [toDate, setToDate] = useState(today())
   const reportResize = useResizableColumns('dual-costing.report.by-category.v1', reportColumns)
+  const queryString = useMemo(() => new URLSearchParams({ from: fromDate, to: toDate }).toString(), [fromDate, toDate])
+  const hasActiveFilters = fromDate !== monthStart() || toDate !== today()
 
   useEffect(() => {
     let mounted = true
@@ -1001,7 +1057,7 @@ function DualCostingReportView() {
       setError(null)
       setIsLoading(true)
       try {
-        const payload = await dailyFetchJson<ReportPayload>('/api/dual-costing/report')
+        const payload = await dailyFetchJson<ReportPayload>(`/api/dual-costing/report?${queryString}`)
         if (mounted) setData(payload)
       } catch (caught) {
         if (mounted) setError(caught instanceof Error ? caught.message : 'โหลด Dual Costing Report ไม่ได้')
@@ -1011,7 +1067,7 @@ function DualCostingReportView() {
     }
     void loadData()
     return () => { mounted = false }
-  }, [])
+  }, [queryString])
 
   const report = data?.report
   const reportRows = useMemo(() => report?.byCategory ?? [], [report?.byCategory])
@@ -1034,13 +1090,176 @@ function DualCostingReportView() {
     setSortDirection('asc')
   }
 
+  function clearFilters() {
+    setFromDate(monthStart())
+    setToDate(today())
+  }
+
   return (
     <DualCostingPageSection>
       <DualCostingErrorBox error={error} />
+      <Dialog open={selectedCategory != null} onOpenChange={(open) => { if (!open) setSelectedCategory(null) }}>
+        <DialogContent className="max-h-[85vh] max-w-6xl overflow-hidden border border-slate-200 bg-white p-0">
+          {selectedCategory ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>รายละเอียดหมวดสินค้า: {selectedCategory.category}</DialogTitle>
+                <DialogDescription>
+                  ดูที่มาของกำไร/ขาดทุนและรายการค้างจัดสรรในช่วงวันที่ {fromDate} → {toDate}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 overflow-y-auto bg-slate-50 p-4">
+                <div className="grid gap-3 md:grid-cols-4">
+                  <DualCostingStatCard icon="💰" label="รายได้" tone="emerald" value={formatMoney(selectedCategory.revenue)} />
+                  <DualCostingStatCard icon="💳" label="ต้นทุน" tone="red" value={formatMoney(selectedCategory.cost)} />
+                  <DualCostingStatCard icon="📈" label="กำไรขั้นต้น" tone={selectedCategory.gp >= 0 ? 'emerald' : 'red'} value={formatMoney(selectedCategory.gp)} />
+                  <DualCostingStatCard icon="%" label="GP%" tone={selectedCategory.gp >= 0 ? 'emerald' : 'red'} value={`${selectedCategory.gpPct.toFixed(2)}%`} />
+                </div>
+
+                <DualCostingPanel title={`ชุดที่สร้างกำไร/ขาดทุน (${selectedCategory.detail.allocatedRows.length} รายการ)`}>
+                  <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                    <Table className="min-w-[980px] text-sm">
+                      <TableHeader className="bg-slate-100">
+                        <tr>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">วันที่</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">Match ID</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">ประเภท</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">เอกสารขาย</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">ชุดต้นทุน</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">สินค้า</TableCell>
+                          <TableCell className="px-3 py-2 text-right font-semibold text-slate-700">น้ำหนัก</TableCell>
+                          <TableCell className="px-3 py-2 text-right font-semibold text-slate-700">รายได้</TableCell>
+                          <TableCell className="px-3 py-2 text-right font-semibold text-slate-700">ต้นทุน</TableCell>
+                          <TableCell className="px-3 py-2 text-right font-semibold text-slate-700">GP</TableCell>
+                          <TableCell className="px-3 py-2 text-right font-semibold text-slate-700">GP%</TableCell>
+                        </tr>
+                      </TableHeader>
+                      <TableBody className="divide-y divide-slate-100">
+                        {selectedCategory.detail.allocatedRows.length === 0 ? (
+                          <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={11}>ไม่มีรายการจัดสรรในหมวดนี้ตามช่วงวันที่</TableCell></TableRow>
+                        ) : null}
+                        {selectedCategory.detail.allocatedRows.map((row) => (
+                          <TableRow key={`${row.matchId}-${row.saleDocNo}-${row.sourceNo}`}>
+                            <TableCell className="px-3 py-2 whitespace-nowrap text-slate-600">{formatDateDisplay(row.date)}</TableCell>
+                            <TableCell className="px-3 py-2 font-mono text-xs text-slate-700">{row.matchId}</TableCell>
+                            <TableCell className="px-3 py-2 text-slate-700">{row.targetType}</TableCell>
+                            <TableCell className="px-3 py-2 font-mono text-xs text-slate-700">{row.saleDocNo}</TableCell>
+                            <TableCell className="px-3 py-2">
+                              <div className="font-mono text-xs text-slate-700">{row.costPoolNo}</div>
+                              <div className="text-xs text-slate-500">{row.sourceNo}</div>
+                            </TableCell>
+                            <TableCell className="px-3 py-2 text-slate-700">{row.productName}</TableCell>
+                            <TableCell className="px-3 py-2 text-right font-mono text-slate-700">{formatMoney(row.allocatedQty)}</TableCell>
+                            <TableCell className="px-3 py-2 text-right font-mono text-emerald-700">{formatMoney(row.revenue)}</TableCell>
+                            <TableCell className="px-3 py-2 text-right font-mono text-red-600">{formatMoney(row.cost)}</TableCell>
+                            <TableCell className={`px-3 py-2 text-right font-mono font-bold ${row.gp >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatMoney(row.gp)}</TableCell>
+                            <TableCell className="px-3 py-2 text-right font-mono text-slate-700">{row.gpPct.toFixed(2)}%</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </DualCostingPanel>
+
+                <DualCostingPanel title={`รายการค้างจัดสรร (${selectedCategory.detail.pendingRows.length} รายการ)`}>
+                  <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                    <Table className="min-w-[760px] text-sm">
+                      <TableHeader className="bg-slate-100">
+                        <tr>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">วันที่</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">เอกสาร</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">ลูกค้า</TableCell>
+                          <TableCell className="px-3 py-2 font-semibold text-slate-700">สินค้า</TableCell>
+                          <TableCell className="px-3 py-2 text-right font-semibold text-slate-700">ค้างจัดสรร</TableCell>
+                          <TableCell className="px-3 py-2 text-right font-semibold text-slate-700">ราคา/กก.</TableCell>
+                          <TableCell className="px-3 py-2 text-right font-semibold text-slate-700">มูลค่าค้าง</TableCell>
+                        </tr>
+                      </TableHeader>
+                      <TableBody className="divide-y divide-slate-100">
+                        {selectedCategory.detail.pendingRows.length === 0 ? (
+                          <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={7}>ไม่มีรายการค้างจัดสรรในหมวดนี้ตามช่วงวันที่</TableCell></TableRow>
+                        ) : null}
+                        {selectedCategory.detail.pendingRows.map((row) => (
+                          <TableRow key={`${row.docNo}-${row.productName}-${row.date}`}>
+                            <TableCell className="px-3 py-2 whitespace-nowrap text-slate-600">{formatDateDisplay(row.date)}</TableCell>
+                            <TableCell className="px-3 py-2 font-mono text-xs text-slate-700">{row.docNo}</TableCell>
+                            <TableCell className="px-3 py-2 text-slate-700">{row.customerName}</TableCell>
+                            <TableCell className="px-3 py-2 text-slate-700">{row.productName}</TableCell>
+                            <TableCell className="px-3 py-2 text-right font-mono text-amber-700">{formatMoney(row.pendingQty)}</TableCell>
+                            <TableCell className="px-3 py-2 text-right font-mono text-slate-700">{formatMoney(row.unitPrice)}</TableCell>
+                            <TableCell className="px-3 py-2 text-right font-mono font-semibold text-amber-700">{formatMoney(row.pendingRevenue)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </DualCostingPanel>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">กำลังโหลดข้อมูล...</div> : null}
       
       {!isLoading && report ? (
         <>
+          <DualCostingFilterCard>
+            <div className="hidden lg:block">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-[320px]">
+                  <div className="mb-1 text-xs font-semibold text-slate-500">ช่วงวันที่</div>
+                  <div className="grid grid-cols-[minmax(135px,1fr)_auto_minmax(135px,1fr)] items-center gap-2">
+                    <DatePickerInput className="h-9 w-full" id="dual-costing-report-from" value={fromDate} onChange={setFromDate} />
+                    <span className="text-xs text-slate-400">→</span>
+                    <DatePickerInput className="h-9 w-full" id="dual-costing-report-to" value={toDate} onChange={setToDate} />
+                  </div>
+                </div>
+                {hasActiveFilters ? (
+                  <Button className="h-9 rounded-md px-3 text-sm font-normal focus-visible:ring-slate-100" size="sm" type="button" variant="outline" onClick={clearFilters}>
+                    ล้างตัวกรอง
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="block lg:hidden space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-slate-500">ช่วงวันที่</div>
+                  <div className="truncate text-sm font-semibold text-slate-900">{fromDate || '-'} → {toDate || '-'}</div>
+                </div>
+                <button
+                  className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors ${
+                    showMobileFilters ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                  type="button"
+                  onClick={() => setShowMobileFilters((current) => !current)}
+                >
+                  ตัวกรอง{hasActiveFilters ? ' (มี)' : ''}
+                </button>
+              </div>
+
+              {showMobileFilters ? (
+                <div className="grid grid-cols-1 gap-2.5 border-t border-slate-100 pt-2 animate-in slide-in-from-top-2 duration-100">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs font-semibold text-slate-500">
+                      จากวันที่
+                      <DatePickerInput className="mt-1 w-full" value={fromDate} onChange={setFromDate} />
+                    </label>
+                    <label className="text-xs font-semibold text-slate-500">
+                      ถึงวันที่
+                      <DatePickerInput className="mt-1 w-full" value={toDate} onChange={setToDate} />
+                    </label>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <Button className="rounded-md bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200 focus-visible:outline-none" size="sm" type="button" variant="secondary" onClick={clearFilters}>
+                      ล้างตัวกรอง
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </DualCostingFilterCard>
           <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
             <DualCostingStatCard icon="💰" label="รายได้รวม (จัดสรรแล้ว)" tone="emerald" value={formatMoney((report?.po.revenue ?? 0) + (report?.spotAllocated.revenue ?? 0))} />
             <DualCostingStatCard icon="💳" label="ต้นทุนรวม (Deal Cost)" tone="red" value={formatMoney(report?.total.cost ?? 0)} />
@@ -1087,8 +1306,12 @@ function DualCostingReportView() {
                 <TableBody className="divide-y divide-slate-100">
                   {sortedReportRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={reportColumns.length}>ยังไม่มีข้อมูลสรุปตามหมวดสินค้า</TableCell></TableRow> : null}
                   {sortedReportRows.map((row) => (
-                    <TableRow key={row.category} className="transition-colors hover:bg-slate-50">
-                      <TableCell className="px-3 py-3"><span className="block truncate rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800" title={row.category}>{row.category}</span></TableCell>
+                    <TableRow key={row.category} className="cursor-pointer transition-colors hover:bg-slate-50" onClick={() => setSelectedCategory(row)}>
+                      <TableCell className="px-3 py-3">
+                        <button className="block w-full text-left" type="button" onClick={() => setSelectedCategory(row)}>
+                          <span className="block truncate rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800" title={row.category}>{row.category}</span>
+                        </button>
+                      </TableCell>
                       <TableCell className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{formatMoney(row.allocatedQty)}</TableCell>
                       <TableCell className="whitespace-nowrap px-3 py-3 text-right font-mono font-semibold tabular-nums text-blue-700">{formatMoney(row.revenue)}</TableCell>
                       <TableCell className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-red-600">{formatMoney(row.cost)}</TableCell>
@@ -1108,7 +1331,7 @@ function DualCostingReportView() {
                 <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-slate-400 shadow-sm">ยังไม่มีข้อมูลสรุปตามหมวดสินค้า</div>
               ) : null}
               {sortedReportRows.map((row) => (
-                <div key={row.category} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-2.5">
+                <button key={row.category} className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm space-y-2.5" type="button" onClick={() => setSelectedCategory(row)}>
                   <div className="flex justify-between items-center">
                     <span className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">{row.category}</span>
                     <span className="text-xs text-slate-500 font-semibold">พบ {row.rows} รายการ</span>
@@ -1141,7 +1364,7 @@ function DualCostingReportView() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </DualCostingPanel>
