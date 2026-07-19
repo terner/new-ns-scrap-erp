@@ -26,7 +26,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
   let branchCodes: string[] | null = null
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'sales.bills.view')
     branchCodes = getBranchCodeIntersection(context)
   } catch (caught) {
     if (caught instanceof AuthContextError && caught.status === 404) notFound()

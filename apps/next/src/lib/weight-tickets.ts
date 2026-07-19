@@ -592,6 +592,8 @@ export const weightTicketRecordSchema = z.object({
 })
 
 const weightTicketListResultSchema = z.object({
+  canOpenPurchaseBill: z.boolean(),
+  canOpenSalesBill: z.boolean(),
   rows: z.array(weightTicketRecordSchema),
   totalRows: z.number().int().nonnegative(),
 })

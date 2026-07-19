@@ -61,7 +61,7 @@ async function findAdvancePayment(docNo: string) {
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await getCurrentAuthContext()
-    requirePermission(auth, 'finance.cash.view')
+    requirePermission(auth, 'purchase.advance_payments.view')
 
     const { id } = await context.params
     const advancePayment = await findAdvancePayment(id)
@@ -82,7 +82,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await getCurrentAuthContext()
-    requirePermission(auth, 'finance.cash.view')
+    requirePermission(auth, 'purchase.advance_payments.update')
 
     const { id } = await context.params
     const values = supplierAdvancePaymentFormSchema.parse(await request.json())
@@ -222,7 +222,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await getCurrentAuthContext()
-    requirePermission(auth, 'finance.cash.view')
+    requirePermission(auth, 'purchase.advance_payments.cancel')
 
     const { id } = await context.params
     const values = supplierAdvancePaymentCancelSchema.parse(await request.json())

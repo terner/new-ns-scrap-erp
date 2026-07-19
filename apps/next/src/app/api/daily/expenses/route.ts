@@ -292,7 +292,7 @@ function xlsxResponse(body: Buffer, filename: string) {
 export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'daily.expenses.view')
 
     const url = new URL(request.url)
     const search = (url.searchParams.get('q') ?? '').trim().toLowerCase()
@@ -401,7 +401,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'daily.expenses.create')
 
     const values = expenseFormSchema.parse(await request.json())
     const actor = currentActor(context)

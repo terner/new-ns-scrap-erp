@@ -19,7 +19,7 @@ updated: 2026-07-18
 
 | Route | Page | Current API | Permission | Source of truth |
 |---|---|---|---|---|
-| `/dashboard-overview` | Dashboard Overview | `GET /api/dashboard` | `reports.reports.view` | dashboard summary plus dashboard-used analytics, finance, stock, historical sources |
+| `/dashboard-overview` | Dashboard Overview | `GET /api/dashboard-overview` | `reports.reports.view` | dashboard summary plus dashboard-used analytics, finance, stock, historical sources |
 | `/owner-daily` | Owner Daily Control | `GET /api/owner-daily` | `reports.reports.view` | daily cash, AR/AP due, expense, loan, pending, FG and WIP sources only |
 | `/daily-report` | Daily Report | `GET /api/daily-report` | `reports.reports.view` | range PB/SB/expense/cash and required line/reference sources only |
 | `/analytics-dashboard` | Analytics Dashboard | `GET /api/analytics-dashboard` | `reports.reports.view` | range trend, group, ranking and top entity sources only |
@@ -41,17 +41,19 @@ updated: 2026-07-18
 - หน้า anomaly สามารถแนะนำ action/link ได้ แต่ไม่มี auto-fix/write action
 - รายเดือน/รายปีต้อง roll up จาก daily snapshot/facts ที่ตรวจแล้ว: movement metric ใช้ผลรวมรายวัน ส่วน balance metric ใช้ ending balance ณ วันสุดท้ายของช่วง
 - `/dashboard-overview` ต้องให้ผู้ใช้เห็น global filter scope ก่อน overview เสมอ: desktop ใช้ white/neutral filter card, mobile ใช้ compact strip + `MobileFilterSheet` เพื่อไม่ให้ filter stack ดัน KPI ลงล่าง และรายละเอียดที่เป็น table-heavy ต้องเปิดทีละบริบทผ่าน detail tabs แทนการกองหลายตารางยาวลงหน้าเดียว
-- `/api/dashboard` ต้องเคารพ low-pool Supabase runtime (`DATABASE_POOL_MAX=1` ได้): อ่านหลายชุดผ่าน bounded concurrency ไม่เกิน 4 งานพร้อมกัน ห้ามใช้ `Promise.all` ก้อนใหญ่กับ Prisma read หลายสิบคำสั่ง เพราะจะทำให้ pg pool acquisition timeout และหน้า Dashboard ได้ 500 แม้สูตรรายงานถูกต้อง
-- `/api/dashboard` ใช้ `buildMainDashboards(..., { includeAnalytics: true, includeDaily: false, includeOwner: false })`: คงเฉพาะ dashboard KPI/aging/stock/historical และ analytics ที่หน้า overview ใช้ ส่วน payment/receipt, bank movement รายวัน, loan, trading และ production detail ไม่ถูกอ่านในโหมดนี้
+- `/api/dashboard-overview` ต้องเคารพ low-pool Supabase runtime (`DATABASE_POOL_MAX=1` ได้): อ่านหลายชุดผ่าน bounded concurrency ไม่เกิน 4 งานพร้อมกัน ห้ามใช้ `Promise.all` ก้อนใหญ่กับ Prisma read หลายสิบคำสั่ง เพราะจะทำให้ pg pool acquisition timeout และหน้า Dashboard ได้ 500 แม้สูตรรายงานถูกต้อง
+- `/api/dashboard-overview` ใช้ `buildMainDashboards(..., { includeAnalytics: true, includeDaily: false, includeOwner: false })`: คงเฉพาะ dashboard KPI/aging/stock/historical และ analytics ที่หน้า overview ใช้ ส่วน payment/receipt, bank movement รายวัน, loan, trading และ production detail ไม่ถูกอ่านในโหมดนี้
 - `/api/analytics-dashboard` ใช้ line reader แบบ lightweight ที่ select เฉพาะ `sales_bill_id`, `product_id`, `product_name_snapshot`, `qty` และ `line_amount` และสร้าง daily trend จาก PB/SB โดยตรง; ห้ามเรียก `salesBillLineFactsByBillId` หรืออ่าน `bank_statement` เพราะ analytics ใช้ COGS จาก bill header และไม่ต้องใช้ allocation/trading/stock-ledger cost detail
 - report API ต้องแยก payload ตาม consumer และตอบ `Cache-Control: private, no-store`; reference options เท่านั้นที่ใช้ shared reference cache ได้
 - `/api/owner-daily`, `/api/daily-report` และ `/api/analytics-dashboard` ห้ามเรียก dashboard finance/stock/historical service ที่หน้าไม่ได้ใช้
+- Performance checkpoint 2026-07-19: Dashboard Overview เคยเรียก `buildFinancialDashboard()` ซ้ำสองรอบเพื่อใช้เฉพาะ AR/AP ทำให้ service ใช้ประมาณ 5.5 วินาทีบน dev database; ปัจจุบันอ่าน AR/AP snapshot ด้วย select เฉพาะ field และคงสูตร as-of เดิม ผลวัดลดเหลือประมาณ 1.6 วินาทีและ parity กับ `buildBalanceSheet()` ผ่านแล้ว. อีกสามหน้าอยู่ประมาณ 0.3-0.9 วินาทีที่ service layer ใน local measurement; browser/client bundle waterfall ของ SIT ยังต้องวัดแยกเพราะยังไม่ได้เปิด browser UAT ใน batch นี้.
+- Performance checkpoint 2026-07-19 (query slimming): Dashboard Overview และ Daily Report เปลี่ยนจาก `salesBillLineFactsByBillId` เป็น lightweight line reader ที่อ่านเฉพาะ `line_amount`, `product_id`, `product_name_snapshot`, `qty`, `sales_bill_id`; ไม่อ่าน allocation, trading facts, stock ledger หรือ relation ที่ไม่ใช้. ทั้งสี่ report API ส่ง `Server-Timing` แยก `auth`, `service`, `total` เพื่อวัดคอขวดบน SIT โดยไม่เปิด cache ให้ business facts. Local re-measurement รอบนี้ทำไม่ได้เพราะ credential ใน env ปัจจุบัน authenticate กับ database ไม่ผ่าน (`P1000`); ต้องวัดซ้ำหลังแก้ environment connection ก่อนสรุปตัวเลขใหม่.
 
 ## Current Query Patterns
 
 | API | Query params currently used |
 |---|---|
-| `/api/dashboard` | `date`, `from`, `to`, `branchId`, `supplierId`, `customerId`, `productId`, `group` |
+| `/api/dashboard-overview` | `date`, `from`, `to`, `branchId`, `supplierId`, `customerId`, `productId`, `group` |
 | `/api/owner-daily` | `date`, optional `from`, `to`, `branchId` |
 | `/api/daily-report` | `date`, `from`, `to`, `branchId`, `supplierId`, `customerId`, `productId`, `group` |
 | `/api/analytics-dashboard` | `date`, `from`, `to`, `branchId`, `supplierId`, `customerId` |

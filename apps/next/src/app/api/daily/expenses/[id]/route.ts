@@ -22,7 +22,7 @@ async function findExpenseByDocNo(id: string) {
 export async function PATCH(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await getCurrentAuthContext()
-    requirePermission(auth, 'finance.cash.view')
+    requirePermission(auth, 'daily.expenses.cancel')
 
     const { id } = await context.params
     const actor = currentActor(auth)

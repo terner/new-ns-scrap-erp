@@ -163,12 +163,12 @@ function SegmentMulti({
   )
 }
 
-function canOpenPurchaseBillFromTicket(ticket: WeightTicketRecord) {
-  return ticket.type === 'WTI' && ticket.status === 'received' && ticket.usedInPurchaseBillCount === 0
+function canOpenPurchaseBillFromTicket(ticket: WeightTicketRecord, canOpenBill: boolean) {
+  return canOpenBill && ticket.type === 'WTI' && ticket.status === 'received' && ticket.usedInPurchaseBillCount === 0
 }
 
-function canOpenSalesBillFromTicket(ticket: WeightTicketRecord) {
-  return ticket.type === 'WTO' && ticket.status === 'delivered' && ticket.usedInSalesBillCount === 0
+function canOpenSalesBillFromTicket(ticket: WeightTicketRecord, canOpenBill: boolean) {
+  return canOpenBill && ticket.type === 'WTO' && ticket.status === 'delivered' && ticket.usedInSalesBillCount === 0
 }
 
 function canConfirmTicket(ticket: WeightTicketRecord) {
@@ -190,6 +190,8 @@ function canReturnWtoStock(ticket: WeightTicketRecord) {
 export function WeightTicketListPageClient() {
   const router = useRouter()
   const [tickets, setTickets] = useState<WeightTicketRecord[]>([])
+  const [canOpenPurchaseBill, setCanOpenPurchaseBill] = useState(false)
+  const [canOpenSalesBill, setCanOpenSalesBill] = useState(false)
   const [activeDetailId, setActiveDetailId] = useState<string | null>(null)
   const [activeForm, setActiveForm] = useState<{ id?: string; type: WeightTicketType } | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -298,6 +300,8 @@ export function WeightTicketListPageClient() {
         if (cancelled) return
         setTickets(result.rows)
         setTotalRows(result.totalRows)
+        setCanOpenPurchaseBill(result.canOpenPurchaseBill)
+        setCanOpenSalesBill(result.canOpenSalesBill)
       } catch (caught) {
         if (cancelled) return
         setTickets([])
@@ -410,11 +414,11 @@ export function WeightTicketListPageClient() {
   }
 
   function openBillFromTicket(ticket: WeightTicketRecord) {
-    if (canOpenPurchaseBillFromTicket(ticket)) {
+    if (canOpenPurchaseBillFromTicket(ticket, canOpenPurchaseBill)) {
       router.push(`/purchase/bills?new=1&wti=${encodeURIComponent(ticket.documentNo)}`)
       return
     }
-    if (canOpenSalesBillFromTicket(ticket)) {
+    if (canOpenSalesBillFromTicket(ticket, canOpenSalesBill)) {
       router.push(`/sales/bills?new=1&wto=${encodeURIComponent(ticket.documentNo)}`)
     }
   }
@@ -713,7 +717,7 @@ export function WeightTicketListPageClient() {
                 'mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-2.5',
                 isCancelled ? 'border-red-200' : 'border-slate-100/50',
               )} onClick={(e) => e.stopPropagation()}>
-                {canOpenPurchaseBillFromTicket(ticket) ? (
+                {canOpenPurchaseBillFromTicket(ticket, canOpenPurchaseBill) ? (
                   <button
                     className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50"
                     type="button"
@@ -722,7 +726,7 @@ export function WeightTicketListPageClient() {
                     เปิดบิลซื้อ
                   </button>
                 ) : null}
-                {canOpenSalesBillFromTicket(ticket) ? (
+                {canOpenSalesBillFromTicket(ticket, canOpenSalesBill) ? (
                   <button
                     className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50"
                     type="button"
@@ -882,7 +886,7 @@ export function WeightTicketListPageClient() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        {canOpenPurchaseBillFromTicket(ticket) ? (
+                        {canOpenPurchaseBillFromTicket(ticket, canOpenPurchaseBill) ? (
                           <button
                             className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                             type="button"
@@ -894,7 +898,7 @@ export function WeightTicketListPageClient() {
                             เปิดบิลซื้อ
                           </button>
                         ) : null}
-                        {canOpenSalesBillFromTicket(ticket) ? (
+                        {canOpenSalesBillFromTicket(ticket, canOpenSalesBill) ? (
                           <button
                             className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                             type="button"

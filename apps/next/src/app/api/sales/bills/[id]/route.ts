@@ -37,7 +37,7 @@ function scopedSalesBillWhere(allowedBranchIds: bigint[] | null) {
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await getCurrentAuthContext()
-    requirePermission(auth, 'finance.cash.view')
+    requirePermission(auth, 'sales.bills.view')
 
     const { id } = await context.params
     const detail = await getSalesBillDetail(decodeURIComponent(id), {
@@ -60,11 +60,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await getCurrentAuthContext()
-    requirePermission(auth, 'finance.cash.view')
-
     const { id } = await context.params
     const payload = await request.json()
     const action = typeof payload?.action === 'string' ? payload.action : 'cancel'
+    requirePermission(auth, action === 'cancel' ? 'sales.bills.cancel' : 'sales.bills.update')
     if (action === 'correct_trading_allocations') {
       const values = tradingCorrectionSchema.parse(payload)
       const actor = currentActor(auth)

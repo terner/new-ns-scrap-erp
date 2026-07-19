@@ -1711,7 +1711,7 @@ async function buildWorkbook(summaryRows: any[], lineRows: SalesBillLineFactRow[
 export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'sales.bills.view')
     const url = new URL(request.url)
     const includePaging = url.searchParams.get('format') !== 'xlsx'
     const query = parseBillQuery(url, includePaging)
@@ -1767,7 +1767,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'sales.bills.create')
 
     const rawPayload = await request.json()
     const values = salesBillFormSchema.parse(rawPayload)
@@ -2668,9 +2668,8 @@ function poSellAllocationLogEntries(input: {
 export async function PATCH(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
-
     const raw = await request.json()
+    requirePermission(context, raw?.action === 'cancel' ? 'sales.bills.cancel' : 'sales.bills.update')
     const actor = currentActor(context)
     const branchScope = await salesBranchScope(context)
 

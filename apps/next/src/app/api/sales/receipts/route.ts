@@ -167,7 +167,7 @@ async function ensurePendingCustomerReceipts(context: Awaited<ReturnType<typeof 
 export async function GET() {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'sales.bills.view')
     try {
       await ensurePendingCustomerReceipts(context)
     } catch (caught) {
@@ -419,7 +419,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'sales.bills.receive')
 
     const values = customerReceiptFormSchema.parse(await request.json())
     const result = await createCustomerReceipt(values, context)
@@ -435,9 +435,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
-
     const payload = await request.json() as { action?: string; docNo?: string; reason?: string; values?: unknown }
+    requirePermission(context, payload.action === 'cancel' ? 'sales.bills.cancel' : 'sales.bills.update')
     if (payload.action === 'cancel') {
       const result = await cancelCustomerReceipt(payload.docNo ?? '', payload.reason ?? '', context)
       return NextResponse.json(result)
