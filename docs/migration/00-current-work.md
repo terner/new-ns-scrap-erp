@@ -2,11 +2,11 @@
 
 Objective: implement the approved Access Control Module design across User Admin, Security Admin, multiple roles, action permissions, and branch-scoped finance flows.
 
-Completed locally: effective-permission helper/tests; action catalog and legacy-permission mapping migrations; User Admin/Security Admin split; multi-role user assignment; action checks for petty advance, payment approval, WTI open-bill buttons, purchase/sales bills, supplier payment, and customer receipts.
+Completed locally: effective-permission helper/tests; action catalog and legacy-permission mapping migrations; User Admin/Security Admin split; multi-role user assignment; action checks for petty advance, payment approval, WTI open-bill buttons, purchase/sales bills, supplier payment, customer receipts, supplier ADV and daily expenses.
 
 Validation: targeted ESLint, workspace type-check, focused Vitest `17/17`, and scoped diff checks pass.
 
-Blocker/next: apply the three new migrations to `dev-target` using the controlled procedure because remote migration-history drift prevents a blanket `supabase db push`; then verify catalog/role assignments and continue the remaining broad finance-route audit.
+Blocker/next: apply the four new migrations to `dev-target` using the controlled procedure because remote migration-history drift prevents a blanket `supabase db push`; then verify catalog/role assignments and continue the remaining broad finance-route audit documented in `docs/notes/access-control-broad-permission-audit-2026-07-19.md`.
 
 # 00 Current Work
 
