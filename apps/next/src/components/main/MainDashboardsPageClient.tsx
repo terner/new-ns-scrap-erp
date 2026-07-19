@@ -224,7 +224,7 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const endpoint = mode === 'dashboard'
-    ? '/api/dashboard'
+    ? '/api/dashboard-overview'
     : mode === 'owner-daily'
       ? '/api/owner-daily'
       : mode === 'analytics-dashboard'
