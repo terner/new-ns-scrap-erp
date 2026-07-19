@@ -48,7 +48,7 @@ function toneDotClass(tone: PurchaseBillDetailTimelineEvent['tone']) {
 export default async function PurchaseBillDetailPage({ params }: PageProps) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'purchase.bills.view')
   } catch (caught) {
     if (caught instanceof AuthContextError && caught.status === 404) notFound()
     throw caught

@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await getCurrentAuthContext()
-    requirePermission(auth, 'finance.cash.view')
+    requirePermission(auth, 'purchase.bills.view')
 
     const { id } = await context.params
     const detail = await getPurchaseBillDetail(decodeURIComponent(id))

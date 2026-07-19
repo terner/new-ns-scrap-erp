@@ -219,7 +219,7 @@ function advanceJson(row: PettyAdvanceWithRelations, pendingReturn = 0) {
 export async function GET() {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'daily.petty_advances.view')
 
     const [accounts, rows, recipientOptions, pendingReturns] = await Promise.all([
       listDailyAccounts(),
@@ -262,7 +262,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'daily.petty_advances.create')
 
     const values = pettyAdvanceFormSchema.parse(await request.json())
     const actor = currentActor(context)

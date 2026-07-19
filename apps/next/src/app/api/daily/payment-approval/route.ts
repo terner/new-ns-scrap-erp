@@ -78,7 +78,7 @@ function pettyReturnDisplayDocNo(entry: { date: Date; doc_no: string | null; id:
 export async function GET() {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'daily.payment_approval.view')
 
     const [purchaseBills, advancePayments, expenses, approvals, pettyReturns, paymentMethods, dailyAccounts] = await Promise.all([
       prisma.purchase_bills.findMany({
@@ -563,7 +563,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'daily.payment_approval.approve')
 
     const values = approvalRequestSchema.parse(await request.json())
     const actor = context.appUser?.email ?? context.authUser.email ?? context.authUser.id

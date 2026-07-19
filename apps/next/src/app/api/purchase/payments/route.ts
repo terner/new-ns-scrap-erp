@@ -251,7 +251,7 @@ export async function GET() {
       }
     }
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'purchase.bills.view')
 
     const allowedBranchCodes = getBranchCodeIntersection(context)
     let allowedBranchIds: bigint[] | undefined = undefined
@@ -627,7 +627,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'purchase.bills.pay')
 
     const values = supplierPaymentFormSchema.parse(await request.json())
     assertPaymentVoucherCreateOnly(values.id)

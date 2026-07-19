@@ -2253,7 +2253,7 @@ async function buildWorkbook(rows: Array<any>) {
 export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'purchase.bills.view')
 
     const allowedBranchCodes = getBranchCodeIntersection(context)
     const url = new URL(request.url)
@@ -2286,7 +2286,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'purchase.bills.create')
 
     const values = purchaseBillFormSchema.parse(await request.json())
     const actor = currentActor(context)
@@ -2528,9 +2528,8 @@ export async function PATCH(request: Request) {
       }
     }
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
-
     const raw = await request.json()
+    requirePermission(context, raw?.action === 'cancel' ? 'purchase.bills.cancel' : 'purchase.bills.update')
     const id = typeof raw?.id === 'string' ? raw.id.trim() : ''
     if (!id) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ไม่พบบิลที่ต้องการแก้ไข' }, { status: 400 })
     const existingBillRef = await resolvePurchaseBillByDocNoOrId(id)

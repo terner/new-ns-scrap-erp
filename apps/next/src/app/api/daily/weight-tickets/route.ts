@@ -3,7 +3,7 @@ import { parseInternalBigIntId } from '@/lib/business-code'
 import { calculateTicketTotals, displayWeightTicketStatus, type WeightTicketStatus, type WeightTicketType, weightTicketFormSchema } from '@/lib/weight-tickets'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { recordAuditLog } from '@/lib/server/app-logging'
-import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, hasPermission, requirePermission } from '@/lib/server/auth-context'
 import { currentActor } from '@/lib/server/daily'
 import { findActiveBranchReferenceByCodeOrId, findActiveBranchReferencesByCodes } from '@/lib/server/branch-reference'
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
@@ -116,7 +116,12 @@ export async function GET(request: Request) {
       return xlsxResponse(await buildWeightTicketWorkbook(mappedRows), `weight_tickets_${new Date().toISOString().slice(0, 10)}.xlsx`)
     }
 
-    return NextResponse.json({ rows: mappedRows, totalRows })
+    return NextResponse.json({
+      canOpenPurchaseBill: hasPermission(context, 'daily.weight_tickets.open_bill'),
+      canOpenSalesBill: hasPermission(context, 'daily.weight_tickets.open_bill'),
+      rows: mappedRows,
+      totalRows,
+    })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'โหลดรายการใบรับ-ส่งของไม่ได้', 500)

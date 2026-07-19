@@ -19,7 +19,7 @@ async function findPettyAdvanceByDocNo(client: Prisma.TransactionClient | typeof
 export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
-    requirePermission(context, 'finance.cash.view')
+    requirePermission(context, 'daily.petty_advances.return')
 
     const values = pettyAdvanceReturnFormSchema.parse(await request.json())
     const actor = currentActor(context)
