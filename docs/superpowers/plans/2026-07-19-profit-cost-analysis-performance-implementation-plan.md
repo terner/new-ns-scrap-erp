@@ -8,6 +8,16 @@
 
 **Tech Stack:** Next.js 16 App Router, TypeScript, Prisma, PostgreSQL/Supabase migrations, Zod, Vitest, Tailwind CSS
 
+## Execution Status 2026-07-19
+
+- Tasks 1-7 are implemented on isolated branch `codex/profit-cost-performance` and the migration/backfill is applied to dev-target only.
+- Source normalization, fact ledger, daily rollup, reconciliation, split APIs, applied filters, independent summary/rankings/table request lifecycles, branch scope and server pagination/sort are implemented. Alerts evaluate the complete scoped daily read model before limiting the result set.
+- The page remains one component instead of the optional hook/section file split in the original file map; request lifecycles are independent and validated without adding an abstraction used only once.
+- Backfill/verify scripts use TypeScript (`.ts`) rather than the provisional `.mjs` filenames in this plan.
+- Dev-target reconciliation for 2026-01-01 through 2026-07-31 reports zero issues and exact fact/daily parity. Warm reader measurement for summary + products + rankings averaged 88.6 ms across three warm runs.
+- Focused tests, full lint, source type-check and diff check pass. The full Next build remains blocked by the pre-existing invalid route export `getCostPoolRowsData` in `dual-costing/cost-pool/route.ts`, which is outside this batch and unchanged.
+- Browser/UAT was not run because it was not requested. SIT/UAT migration and promotion remain pending explicit instruction.
+
 ## Global Constraints
 
 - Active app คือ `apps/next/`; legacy/Vue ใช้อ้างอิงเท่านั้น
@@ -160,14 +170,14 @@ alter table public.purchase_bills
 
 alter table public.sales_bill_lines
   add constraint sales_bill_lines_profit_equation_check
-  check (gross_profit is null or gross_profit = line_amount - coalesce(discount_amount, 0) - cogs_amount);
+  check (gross_profit is null or gross_profit = line_amount - cogs_amount);
 ```
 
 Do not set defaults that would turn missing data into zero. Backfill must stop and report rows that cannot be derived from recorded line allocation facts.
 
 - [ ] **Step 4: Populate line COGS in create/edit transactions**
 
-For TRADING, write `tradingMatchedCogsByLineIndex.get(index)` to the matching normalized line. For STOCK, aggregate `consumeActiveWtoPendingOut()` results by product/source allocation and update the exact `sales_bill_line_id`. Set `gross_profit = line_amount - discount_amount - cogs_amount` in the same transaction. Reject the transaction if active sales lines cannot be matched one-to-one with recorded cost sources.
+For TRADING, write `tradingMatchedCogsByLineIndex.get(index)` to the matching normalized line. For STOCK, aggregate `consumeActiveWtoPendingOut()` results by product/source allocation and update the exact `sales_bill_line_id`. Set `gross_profit = line_amount - cogs_amount` in the same transaction because `line_amount` is already net of the line discount. Reject the transaction if active sales lines cannot be matched one-to-one with recorded cost sources.
 
 - [ ] **Step 5: Require purchase channel at PB write boundary**
 

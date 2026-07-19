@@ -1,7 +1,7 @@
 # Profit & Cost Analysis Performance Design
 
 Date: 2026-07-19
-Status: Approved direction, pending written-spec review
+Status: Implemented locally and applied to dev-target; pending promotion
 Route: `/profit-cost-analysis`
 
 ## 1. Objective
