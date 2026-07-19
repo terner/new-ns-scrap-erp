@@ -7,7 +7,6 @@ import type { MainDashboardFilter } from '@/lib/server/main-dashboards'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemQty, purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
 import { listActiveSalespersons, listProductReferences } from '@/lib/server/reference-master-cache'
-import { salesBillLineFactsByBillId, salesBillLineFactTotals, type SalesBillLineFactRow } from '@/lib/server/sales-bill-line-facts'
 
 function activeStatus(status?: string | null) { return !['cancelled', 'void', 'reversed'].includes((status ?? '').toLowerCase()) }
 function itemRows(items: unknown) {
@@ -25,7 +24,26 @@ function itemRows(items: unknown) {
     return [{ amount, productId, qty }]
   })
 }
-function salesLineRows(lines: SalesBillLineFactRow[] | undefined) { return (lines ?? []).map((line) => ({ amount: line.lineAmount, productId: line.productId == null ? '' : String(line.productId), qty: line.qty })) }
+type AnalyticsSalesLineRow = {
+  line_amount: number | { toNumber: () => number } | null
+  product_id: bigint | null
+  product_name_snapshot: string
+  qty: number | { toNumber: () => number } | null
+  sales_bill_id: bigint
+}
+
+function salesLineRows(lines: AnalyticsSalesLineRow[] | undefined) {
+  return (lines ?? []).map((line) => ({
+    amount: toNumber(line.line_amount),
+    productId: line.product_id == null ? '' : String(line.product_id),
+    productName: line.product_name_snapshot,
+    qty: toNumber(line.qty),
+  }))
+}
+
+function salesLineQty(lines: AnalyticsSalesLineRow[] | undefined) {
+  return (lines ?? []).reduce((sum, line) => sum + toNumber(line.qty), 0)
+}
 async function runBounded<const T extends readonly (() => Promise<unknown>)[]>(tasks: T): Promise<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }> {
   const results = new Array<unknown>(tasks.length)
   let next = 0
@@ -53,7 +71,19 @@ export async function buildAnalyticsDashboard(filter: MainDashboardFilter): Prom
   ])
   const activePurchases = purchases.filter((row) => activeStatus(row.status))
   const activeSales = sales.filter((row) => activeStatus(row.status))
-  const linesByBill = await salesBillLineFactsByBillId(activeSales.map((row) => row.id))
+  const salesLines = activeSales.length
+    ? await prisma.sales_bill_lines.findMany({
+      select: { line_amount: true, product_id: true, product_name_snapshot: true, qty: true, sales_bill_id: true },
+      where: { sales_bill_id: { in: activeSales.map((row) => row.id) }, status: 'active' },
+      orderBy: [{ sales_bill_id: 'asc' }, { line_no: 'asc' }],
+    })
+    : []
+  const linesByBill = new Map<bigint, AnalyticsSalesLineRow[]>()
+  for (const line of salesLines) {
+    const current = linesByBill.get(line.sales_bill_id) ?? []
+    current.push(line)
+    linesByBill.set(line.sales_bill_id, current)
+  }
   const productById = new Map(products.map((row) => [String(row.id), row]))
   const purchaseAmount = activePurchases.reduce((sum, row) => sum + toNumber(row.total_amount), 0)
   const salesAmount = activeSales.reduce((sum, row) => sum + toNumber(row.total_amount), 0)
@@ -67,7 +97,7 @@ export async function buildAnalyticsDashboard(filter: MainDashboardFilter): Prom
   const topSuppliers = new Map<string, { amount: number; bills: number; id: string; name: string; qty: number }>()
   for (const bill of activePurchases) { const key = bill.suppliers?.code ?? bill.suppliers?.name ?? ''; const current = topSuppliers.get(key) ?? { amount: 0, bills: 0, id: bill.suppliers?.code ?? '', name: bill.suppliers?.name ?? '-', qty: 0 }; current.amount += toNumber(bill.total_amount); current.qty += purchaseBillItemQty(bill); current.bills += 1; topSuppliers.set(key, current) }
   const topCustomers = new Map<string, { amount: number; bills: number; gp: number; id: string; name: string; qty: number }>()
-  for (const bill of activeSales) { const key = bill.customers?.code ?? bill.customers?.name ?? ''; const current = topCustomers.get(key) ?? { amount: 0, bills: 0, gp: 0, id: bill.customers?.code ?? '', name: bill.customers?.name ?? '-', qty: 0 }; current.amount += toNumber(bill.total_amount); current.gp += toNumber(bill.gross_profit); current.qty += salesBillLineFactTotals(linesByBill.get(bill.id)).qty; current.bills += 1; topCustomers.set(key, current) }
+  for (const bill of activeSales) { const key = bill.customers?.code ?? bill.customers?.name ?? ''; const current = topCustomers.get(key) ?? { amount: 0, bills: 0, gp: 0, id: bill.customers?.code ?? '', name: bill.customers?.name ?? '-', qty: 0 }; current.amount += toNumber(bill.total_amount); current.gp += toNumber(bill.gross_profit); current.qty += salesLineQty(linesByBill.get(bill.id)); current.bills += 1; topCustomers.set(key, current) }
   const salespersonById = new Map(salespersons.map((row) => [row.id, row]))
   const bySalesperson = new Map<string, { amount: number; bills: number; id: string; name: string; qty: number; suppliers: Set<string> }>()
   for (const bill of activePurchases) { const person = bill.sales_id == null ? null : salespersonById.get(bill.sales_id); const key = person?.code ?? '__no_sales__'; const current = bySalesperson.get(key) ?? { amount: 0, bills: 0, id: person?.code ?? '', name: person?.name ?? '(ไม่ระบุเซล)', qty: 0, suppliers: new Set<string>() }; if (bill.suppliers?.code) current.suppliers.add(bill.suppliers.code); current.amount += toNumber(bill.total_amount); current.qty += purchaseBillItemQty(bill); current.bills += 1; bySalesperson.set(key, current) }
@@ -81,6 +111,6 @@ export async function buildAnalyticsDashboard(filter: MainDashboardFilter): Prom
   return {
     filters: { date: dateLabel, from, to },
     sourceState: { limitations: ['No write, approval, posting, planning save, anomaly fix, or legacy localStorage action is enabled.', 'Analytics figures are management reports, not statutory accounting reports.'], writeActionsEnabled: false },
-    analytics: { bySalesperson: Array.from(bySalesperson.values()).map((row) => ({ ...row, suppliers: row.suppliers.size })).sort((a, b) => b.amount - a.amount).slice(0, 10), dailyTrend: Array.from(dailyTrend.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(-30), groupSummary: Array.from(groupSummary.values()).sort((a, b) => b.amount - a.amount), rangeKpi: { cogs, expenseAmount, gp: grossProfit, gpPct: salesAmount > 0 ? grossProfit / salesAmount * 100 : 0, netProfit: salesAmount - cogs - expenseAmount, purchaseAmount, purchaseCount: activePurchases.length, purchaseQty: activePurchases.reduce((sum, row) => sum + purchaseBillItemQty(row), 0), salesAmount, salesCount: activeSales.length, salesQty: activeSales.reduce((sum, row) => sum + salesBillLineFactTotals(linesByBill.get(row.id)).qty, 0) }, topCustomers: Array.from(topCustomers.values()).map((row) => ({ ...row, gpPct: row.amount > 0 ? row.gp / row.amount * 100 : 0 })).sort((a, b) => b.amount - a.amount).slice(0, 10), topProductsIn: Array.from(productIn.values()).sort((a, b) => b.amount - a.amount).slice(0, 5), topProductsOut: Array.from(productOut.values()).sort((a, b) => b.amount - a.amount).slice(0, 5), topSuppliers: Array.from(topSuppliers.values()).sort((a, b) => b.amount - a.amount).slice(0, 10) },
+    analytics: { bySalesperson: Array.from(bySalesperson.values()).map((row) => ({ ...row, suppliers: row.suppliers.size })).sort((a, b) => b.amount - a.amount).slice(0, 10), dailyTrend: Array.from(dailyTrend.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(-30), groupSummary: Array.from(groupSummary.values()).sort((a, b) => b.amount - a.amount), rangeKpi: { cogs, expenseAmount, gp: grossProfit, gpPct: salesAmount > 0 ? grossProfit / salesAmount * 100 : 0, netProfit: salesAmount - cogs - expenseAmount, purchaseAmount, purchaseCount: activePurchases.length, purchaseQty: activePurchases.reduce((sum, row) => sum + purchaseBillItemQty(row), 0), salesAmount, salesCount: activeSales.length, salesQty: activeSales.reduce((sum, row) => sum + salesLineQty(linesByBill.get(row.id)), 0) }, topCustomers: Array.from(topCustomers.values()).map((row) => ({ ...row, gpPct: row.amount > 0 ? row.gp / row.amount * 100 : 0 })).sort((a, b) => b.amount - a.amount).slice(0, 10), topProductsIn: Array.from(productIn.values()).sort((a, b) => b.amount - a.amount).slice(0, 5), topProductsOut: Array.from(productOut.values()).sort((a, b) => b.amount - a.amount).slice(0, 5), topSuppliers: Array.from(topSuppliers.values()).sort((a, b) => b.amount - a.amount).slice(0, 10) },
   }
 }
