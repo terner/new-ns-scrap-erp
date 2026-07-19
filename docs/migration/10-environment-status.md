@@ -13,6 +13,12 @@ The customer's old production Supabase remains the legacy source system for read
 - Product/impurity product upload now uses versioned Storage keys with `Cache-Control: 31536000`; WTI/WTO attachment upload already uses the same max-age policy
 - Runtime Redis/browser hit/miss/latency/request-reduction evidence still requires traffic from the deployed SIT/UAT code with observability enabled; no browser UAT was run in this coding batch
 
+### Access-Control Checkpoint 2026-07-19
+
+- Applied and recorded `20260719005346_access_control_action_permissions` and `20260719005635_access_control_split_admin_permissions` transactionally in dev-target and SIT only; customer UAT was not changed.
+- Dry-run and postflight checks found all 34 permission codes from the catalog batch and both new view grants (`system.users.view`, `system.roles.view`) for the existing `admin`, `owner`, and `system_admin` roles in both environments.
+- A fresh authenticated dev probe confirmed `/admin/users` and `/admin/roles-permissions` returned HTTP 200 after the migrations. The legacy manage grants remain in place for compatibility while route checks move to the split permissions.
+
 Important account boundary:
 - `legacy-prod-source`, `dev-target`, and future `staging-uat` should be separate Supabase account/project contexts where practical.
 - Do not assume access tokens, Auth users, API keys, Storage buckets, or project settings are shared between them.
