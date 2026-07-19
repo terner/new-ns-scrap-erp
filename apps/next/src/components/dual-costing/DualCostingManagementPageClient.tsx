@@ -656,21 +656,21 @@ function AllocationLedgerView() {
   const [sortKey, setSortKey] = useState<LedgerColumnKey | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-  const ledgerColumns = useMemo<Array<ResizableColumnDefinition<LedgerColumnKey> & { align?: 'center' | 'left' | 'right'; label: string }>>(() => [
-    { key: 'matchId', label: 'เลขที่การจับคู่', defaultWidth: 190, minWidth: 160 },
+  const ledgerColumns = useMemo<Array<ResizableColumnDefinition<LedgerColumnKey> & { align?: 'center' | 'left' | 'right'; className?: string; label: string }>>(() => [
+    { key: 'matchId', label: 'เลขที่การจับคู่', defaultWidth: 190, minWidth: 160, className: 'ns-table-textual-column' },
     { key: 'targetType', label: 'ประเภท', defaultWidth: 88, minWidth: 78, align: 'right' },
-    { key: 'saleDocNo', label: 'เอกสารขาย', defaultWidth: 130, minWidth: 120 },
-    { key: 'productName', label: 'สินค้า', defaultWidth: 230, minWidth: 180 },
-    { key: 'productCategory', label: 'หมวด', defaultWidth: 110, minWidth: 95 },
+    { key: 'saleDocNo', label: 'เอกสารขาย', defaultWidth: 130, minWidth: 120, className: 'ns-table-textual-column' },
+    { key: 'productName', label: 'สินค้า', defaultWidth: 230, minWidth: 180, className: 'ns-table-textual-column' },
+    { key: 'productCategory', label: 'หมวด', defaultWidth: 110, minWidth: 95, className: 'ns-table-textual-column' },
     { key: 'saleQty', label: 'จำนวนขาย', defaultWidth: 115, minWidth: 105, align: 'right' },
     { key: 'allocatedQty', label: 'จัดสรรแล้ว', defaultWidth: 115, minWidth: 105, align: 'right' },
-    { key: 'costPoolNo', label: 'กลุ่มต้นทุน', defaultWidth: 145, minWidth: 130 },
+    { key: 'costPoolNo', label: 'กลุ่มต้นทุน', defaultWidth: 145, minWidth: 130, className: 'ns-table-textual-column' },
     { key: 'costPerKg', label: 'ต้นทุน บาท/กก.', defaultWidth: 130, minWidth: 120, align: 'right' },
     { key: 'totalCost', label: 'ต้นทุนรวม', defaultWidth: 125, minWidth: 110, align: 'right' },
     { key: 'allocatedRevenue', label: 'รายได้', defaultWidth: 125, minWidth: 110, align: 'right' },
     { key: 'grossProfit', label: 'GP', defaultWidth: 115, minWidth: 100, align: 'right' },
     { key: 'gpPct', label: 'GP%', defaultWidth: 80, minWidth: 70, align: 'right' },
-    { key: 'allocatedBy', label: 'ผู้จัดสรร', defaultWidth: 135, minWidth: 115 },
+    { key: 'allocatedBy', label: 'ผู้จัดสรร', defaultWidth: 135, minWidth: 115, className: 'ns-table-textual-column' },
     { key: 'status', label: 'สถานะ', defaultWidth: 115, minWidth: 100, align: 'right' },
   ], [])
   const ledgerResize = useResizableColumns('dual-costing.allocation-ledger.v1', ledgerColumns)
@@ -870,6 +870,7 @@ function AllocationLedgerView() {
                   key={column.key}
                   activeSortKey={sortKey ?? undefined}
                   align={column.align}
+                  className={column.className}
                   direction={sortDirection}
                   label={column.label}
                   sortKey={column.key}
@@ -884,20 +885,20 @@ function AllocationLedgerView() {
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={ledgerColumns.length}>ยังไม่มีรายการ</TableCell></TableRow> : null}
             {visibleRows.map((row) => (
               <TableRow key={row.id} className={`hover:bg-indigo-50/30 ${row.status === 'reversed' ? 'opacity-50' : ''}`}>
-                <TableCell className="p-3 font-mono text-xs text-slate-700"><span className="block truncate" title={row.matchId}>{row.matchId}</span></TableCell>
+                <TableCell className="ns-table-textual-column p-3 font-mono text-xs text-slate-700"><span className="block truncate" title={row.matchId}>{row.matchId}</span></TableCell>
                 <TableCell className="p-3 text-right"><TargetPill type={row.targetType} /></TableCell>
-                <TableCell className="p-3 text-left font-mono text-xs text-slate-700"><span className="block truncate" title={row.saleDocNo}>{row.saleDocNo}</span></TableCell>
-                <TableCell className="p-3 text-left text-sm text-slate-800"><span className="block truncate" title={row.productName}>{row.productName}</span></TableCell>
-                <TableCell className="p-3 text-left"><span className="whitespace-nowrap text-xs font-semibold text-slate-600">{row.productCategory}</span></TableCell>
+                <TableCell className="ns-table-textual-column p-3 text-left font-mono text-xs text-slate-700"><span className="block truncate" title={row.saleDocNo}>{row.saleDocNo}</span></TableCell>
+                <TableCell className="ns-table-textual-column p-3 text-left text-sm text-slate-800"><span className="block truncate" title={row.productName}>{row.productName}</span></TableCell>
+                <TableCell className="ns-table-textual-column p-3 text-left"><span className="whitespace-nowrap text-xs font-semibold text-slate-600">{row.productCategory}</span></TableCell>
                 <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.saleQty)}</TableCell>
                 <TableCell className="p-3 text-right font-mono font-medium text-blue-700">{formatMoney(row.allocatedQty)}</TableCell>
-                <TableCell className="p-3 text-left font-mono text-xs text-slate-600"><span className="block truncate" title={row.costPoolNo}>{row.costPoolNo}</span></TableCell>
+                <TableCell className="ns-table-textual-column p-3 text-left font-mono text-xs text-slate-600"><span className="block truncate" title={row.costPoolNo}>{row.costPoolNo}</span></TableCell>
                 <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.costPerKg)}</TableCell>
                 <TableCell className="p-3 text-right font-mono text-red-700">{formatMoney(row.totalCost)}</TableCell>
                 <TableCell className="p-3 text-right font-mono text-emerald-700">{formatMoney(row.allocatedRevenue)}</TableCell>
                 <TableCell className={`p-3 text-right font-mono font-bold ${row.grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatMoney(row.grossProfit)}</TableCell>
                 <TableCell className="p-3 text-right font-mono text-xs text-slate-700">{row.gpPct.toFixed(2)}%</TableCell>
-                <TableCell className="p-3 text-xs text-slate-700"><span className="block truncate" title={row.allocatedBy}>{row.allocatedBy}</span></TableCell>
+                <TableCell className="ns-table-textual-column p-3 text-xs text-slate-700"><span className="block truncate" title={row.allocatedBy}>{row.allocatedBy}</span></TableCell>
                 <TableCell className="p-3 text-right"><LedgerStatusText status={row.status} /></TableCell>
               </TableRow>
             ))}
