@@ -14,3 +14,15 @@ export function reportFilters(date: Date, from?: string | null, to?: string | nu
 export function noStoreHeaders() {
   return { 'Cache-Control': 'private, no-store' }
 }
+
+export function reportTimingHeaders(startedAt: number, authStartedAt: number, authFinishedAt: number) {
+  const now = performance.now()
+  return {
+    ...noStoreHeaders(),
+    'Server-Timing': [
+      `auth;dur=${Math.round(authFinishedAt - authStartedAt)}`,
+      `service;dur=${Math.round(now - authFinishedAt)}`,
+      `total;dur=${Math.round(now - startedAt)}`,
+    ].join(', '),
+  }
+}
