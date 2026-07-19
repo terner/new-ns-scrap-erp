@@ -89,6 +89,12 @@ function costTypeFromSourceType(sourceType: CostPoolRow['sourceType']): CostPool
   return 'Production'
 }
 
+function defaultCounterparty(sourceType: CostPoolRow['sourceType']) {
+  if (sourceType === 'Production') return 'Production Output'
+  if (sourceType === 'Grade Adjustment') return 'Regrade / Conversion'
+  return 'Purchase Receipt'
+}
+
 function sortRows(rows: CostPoolRow[], sort: string | null) {
   const nextRows = [...rows]
   const incomingAsc = (left: CostPoolRow, right: CostPoolRow) =>
@@ -163,7 +169,35 @@ export async function getCostPoolRowsData(options: {
 
   const [stockPoolEntries] = await Promise.all([
     prisma.stock_cost_pool_entries.findMany({
-      include: { branches: true, products: true },
+      select: {
+        allocated_qty: true,
+        branch_id: true,
+        branches: {
+          select: {
+            name: true,
+          },
+        },
+        date: true,
+        id: true,
+        original_qty: true,
+        original_value: true,
+        pool_key: true,
+        products: {
+          select: {
+            code: true,
+            id: true,
+            metal_group: true,
+            name: true,
+          },
+        },
+        source_line_id: true,
+        source_ref_id: true,
+        source_ref_no: true,
+        source_ref_type: true,
+        source_type: true,
+        status: true,
+        unit_cost: true,
+      },
       orderBy: [{ date: 'desc' }, { id: 'desc' }],
       take: 5000,
       where: {
@@ -193,11 +227,57 @@ export async function getCostPoolRowsData(options: {
       },
     })
     : []
+  const purchaseLineMetas = purchaseBillItems.map((item) => ({
+    key: `${item.purchase_bill_id.toString()}:${String(item.line_no ?? '')}`,
+    meta: purchaseSourceMeta(item.source_snapshot, ''),
+  }))
   const purchaseMetaByKey = new Map(
-    purchaseBillItems.map((item) => {
-      const meta = purchaseSourceMeta(item.source_snapshot, '')
-      return [`${item.purchase_bill_id.toString()}:${String(item.line_no ?? '')}`, meta] as const
-    }),
+    purchaseLineMetas.map((item) => [item.key, item.meta] as const),
+  )
+  const poBuyDocNos = [...new Set(
+    [
+      ...purchaseLineMetas.map((item) => item.meta.sourceNo.trim()),
+      ...stockPoolEntries.map((entry) => entry.source_ref_no?.trim() ?? ''),
+    ]
+      .filter((docNo) => /^POB/i.test(docNo))
+      .filter(Boolean),
+  )]
+  const purchaseBillDocNos = [...new Set(
+    stockPoolEntries
+      .filter((entry) => entry.source_ref_type === 'PB' && entry.source_ref_no?.trim())
+      .map((entry) => entry.source_ref_no!.trim()),
+  )]
+  const purchaseBillRows = purchaseBillDocNos.length > 0
+    ? await prisma.purchase_bills.findMany({
+      select: {
+        doc_no: true,
+        suppliers: {
+          select: { name: true },
+        },
+      },
+      where: {
+        doc_no: { in: purchaseBillDocNos },
+      },
+    })
+    : []
+  const poBuyRows = poBuyDocNos.length > 0
+    ? await prisma.po_buys.findMany({
+      select: {
+        doc_no: true,
+        suppliers: {
+          select: { name: true },
+        },
+      },
+      where: {
+        doc_no: { in: poBuyDocNos },
+      },
+    })
+    : []
+  const purchaseBillSupplierByDocNo = new Map(
+    purchaseBillRows.map((row) => [row.doc_no?.trim() || '', row.suppliers?.name?.trim() || ''] as const),
+  )
+  const poBuySupplierByDocNo = new Map(
+    poBuyRows.map((row) => [row.doc_no?.trim() || '', row.suppliers?.name?.trim() || ''] as const),
   )
 
   stockPoolEntries.forEach((entry) => {
@@ -214,24 +294,27 @@ export async function getCostPoolRowsData(options: {
     const productCode = requireBusinessCode(entry.products.code, `สินค้า ${entry.products.id}`)
     const availableQty = Math.max(0, qty - usedQty)
     const costTypeValue = costTypeFromSourceType(sourceTypeValue)
+    const resolvedSourceNo = purchaseMeta?.sourceNo || entry.source_ref_no || entry.pool_key
+    const purchaseBillSupplier = (entry.source_ref_no ? purchaseBillSupplierByDocNo.get(entry.source_ref_no.trim()) : '')
+      || ''
+    const poBuySupplier = resolvedSourceNo ? poBuySupplierByDocNo.get(resolvedSourceNo.trim()) || '' : ''
+    const counterparty = sourceTypeValue === 'PO_Buy' || sourceTypeValue === 'Spot_Buy'
+      ? poBuySupplier || purchaseBillSupplier || defaultCounterparty(sourceTypeValue)
+      : defaultCounterparty(sourceTypeValue)
     rows.push({
       availableQty,
       availableValue: availableQty * unitCost,
       branchName: entry.branches?.name ?? '-',
       costPoolId: entry.pool_key,
       costType: costTypeValue,
-      counterparty: sourceTypeValue === 'Production'
-        ? 'Production Output'
-        : sourceTypeValue === 'Grade Adjustment'
-          ? 'Regrade / Conversion'
-          : 'Purchase Receipt',
+      counterparty,
       date: toDateOnly(entry.date),
       productId: productCode,
       productName: entry.products.name,
       qty,
       sourceId: entry.source_ref_id ?? stringifyBusinessValue(entry.id),
       sourceLineId: entry.source_line_id ?? stringifyBusinessValue(entry.id),
-      sourceNo: purchaseMeta?.sourceNo || entry.source_ref_no || entry.pool_key,
+      sourceNo: resolvedSourceNo,
       sourceType: sourceTypeValue,
       status: statusFromQty(qty, usedQty),
       totalCost: jsonNumber(entry.original_value) || qty * unitCost,
