@@ -17,8 +17,10 @@ export async function completeBrowserLoginSession(input: {
   fetchImpl: typeof fetch
   signOut: () => Promise<unknown>
 }): Promise<LoginContractResult> {
+  const fetchImpl = input.fetchImpl
+
   try {
-    const response = await input.fetchImpl('/api/auth/login-complete', {
+    const response = await fetchImpl('/api/auth/login-complete', {
       cache: 'no-store',
       credentials: 'include',
       method: 'POST',
@@ -40,8 +42,10 @@ export async function completeBrowserLoginSession(input: {
 export async function acknowledgePasswordChanged(input: {
   fetchImpl: typeof fetch
 }): Promise<PasswordChangedAcknowledgementResult> {
+  const fetchImpl = input.fetchImpl
+
   try {
-    const response = await input.fetchImpl('/api/auth/password-changed', {
+    const response = await fetchImpl('/api/auth/password-changed', {
       cache: 'no-store',
       credentials: 'include',
       method: 'POST',

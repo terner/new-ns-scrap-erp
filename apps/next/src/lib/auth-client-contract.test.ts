@@ -20,6 +20,20 @@ describe('browser login completion contract', () => {
     expect(signOut).not.toHaveBeenCalled()
   })
 
+  it('does not rebind the browser fetch receiver during login completion', async () => {
+    let receiver: unknown = 'not called'
+    const fetchImpl = function (this: unknown) {
+      receiver = this
+      return Promise.resolve(Response.json({ lastLoginAt: '2026-07-19T00:00:00.000Z' }))
+    } as typeof fetch
+
+    await expect(completeBrowserLoginSession({
+      fetchImpl,
+      signOut: vi.fn().mockResolvedValue(undefined),
+    })).resolves.toEqual({ ok: true })
+    expect(receiver).toBeUndefined()
+  })
+
   it.each([
     ['an auth failure', new Response(JSON.stringify({ error: 'provider detail' }), { status: 401 }), 'Session เข้าสู่ระบบไม่ถูกต้อง กรุณาลองใหม่'],
     ['a forbidden response', new Response(JSON.stringify({ error: 'provider detail' }), { status: 403 }), 'ตรวจสอบบัญชีผู้ใช้งานไม่สำเร็จ กรุณาลองใหม่'],
@@ -55,6 +69,17 @@ describe('password-changed acknowledgement contract', () => {
       credentials: 'include',
       method: 'POST',
     })
+  })
+
+  it('does not rebind the browser fetch receiver during password acknowledgement', async () => {
+    let receiver: unknown = 'not called'
+    const fetchImpl = function (this: unknown) {
+      receiver = this
+      return Promise.resolve(Response.json({ cleared: true }))
+    } as typeof fetch
+
+    await expect(acknowledgePasswordChanged({ fetchImpl })).resolves.toEqual({ ok: true })
+    expect(receiver).toBeUndefined()
   })
 
   it.each([

@@ -23,6 +23,8 @@
 - Implemented commits: `27a7795e`, `bcc73466`, `599134de`, and `2a66879e`.
 - `POST /api/auth/forgot-password` now requires Redis (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) and the server-only `AUTH_RATE_LIMIT_SECRET`. The route fails closed with HTTP 503 before Supabase delivery when this configuration or Redis is unavailable; valid public requests remain generic `202` to avoid account enumeration.
 - All four auth entry/session routes now return `Cache-Control: private, no-store`; reset/login clients validate the expected server response contracts and do not render raw Supabase/provider text.
+- Browser verification exposed a receiver-binding regression in the new client contracts: calling native `fetch` as `input.fetchImpl(...)` rebound `this` to the input object, so Supabase authentication succeeded but `/api/auth/login-complete` was never requested. Both login completion and password-change acknowledgement now detach the injected fetch function before calling it, and receiver-sensitive regression tests lock the real browser behavior.
+- Corrective validation passed: focused auth Vitest `31/31`, full ESLint with zero errors and the existing `qa-thai-font.tsx` warning, workspace type-check, Webpack production build `312/312`, real browser login with `POST /api/auth/login-complete = 200` and landing at `/owner-daily`, dev `/login` CSP without `upgrade-insecure-requests`, and the full production-build navigation guard `213/213` with zero target failures.
 - No database migration or schema change was introduced by this batch.
 - The P0 above remains open: client acknowledgement after a successful password update is only an operational safeguard, not server-verifiable evidence of the password mutation.
 
