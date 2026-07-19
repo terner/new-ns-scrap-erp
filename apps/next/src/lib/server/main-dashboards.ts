@@ -1,6 +1,5 @@
 import { requireBusinessCode } from '@/lib/business-code'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
-import { buildFinancialDashboard } from '@/lib/server/finance-accounting-dashboard'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
@@ -8,7 +7,7 @@ import { loadProductionMetrics, summarizeProductionMetrics } from '@/lib/server/
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemQty, purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
 import { listActiveAccounts, listActiveBranches, listActiveCustomers, listActiveSalespersons, listActiveSuppliers, listProductReferences, type AccountReferenceRecord } from '@/lib/server/reference-master-cache'
-import { salesBillLineFactsByBillId, salesBillLineFactTotals, type SalesBillLineFactRow } from '@/lib/server/sales-bill-line-facts'
+import { salesBillAnalyticsLineTotals, salesBillAnalyticsLinesByBillId, type SalesBillAnalyticsLine } from '@/lib/server/sales-bill-analytics-lines'
 import type { Prisma } from '../../../generated/prisma/client'
 
 export type MainDashboardFilter = {
@@ -130,6 +129,7 @@ type HistoricalMonthlyRow = Prisma.historical_monthlyGetPayload<Record<string, n
 type BranchReferenceRow = Awaited<ReturnType<typeof listActiveBranches>>[number]
 type SupplierReferenceRow = Awaited<ReturnType<typeof listActiveSuppliers>>[number]
 type CustomerReferenceRow = Awaited<ReturnType<typeof listActiveCustomers>>[number]
+type ReceivablePayableSnapshot = { ap: number; ar: number }
 
 async function runReadBatch<const T extends readonly (() => Promise<unknown>)[]>(tasks: T): Promise<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }> {
   const results = new Array<unknown>(tasks.length)
@@ -171,17 +171,17 @@ function billHasProductOrGroup(items: unknown, productById: Map<string, { metal_
   })
 }
 
-function salesBillHasProductOrGroup(lines: SalesBillLineFactRow[] | undefined, productById: Map<string, { code: string | null; metal_group: string | null }>, productId?: string, group?: string) {
+function salesBillHasProductOrGroup(lines: SalesBillAnalyticsLine[] | undefined, productById: Map<string, { code: string | null; metal_group: string | null }>, productId?: string, group?: string) {
   if (!productId && !group) return true
   return (lines ?? []).some((line) => {
     const product = line.productId == null ? undefined : productById.get(String(line.productId))
-    if (productId && line.productCode !== productId && String(line.productId ?? '') !== productId) return false
+    if (productId && product?.code !== productId && String(line.productId ?? '') !== productId) return false
     if (group && (product?.metal_group ?? 'อื่นๆ') !== group) return false
     return true
   })
 }
 
-function salesLineRows(lines: SalesBillLineFactRow[] | undefined) {
+function salesLineRows(lines: SalesBillAnalyticsLine[] | undefined) {
   return (lines ?? []).map((line) => ({
     amount: line.lineAmount,
     productId: line.productId == null ? '' : String(line.productId),
@@ -228,6 +228,26 @@ async function cashBalancesForDates(asOfDates: readonly [Date, Date]) {
   }) as [CashBalanceSnapshot, CashBalanceSnapshot]
 }
 
+async function receivablePayableForDates(asOfDates: readonly [Date, Date], branchId?: bigint) {
+  const latestDate = asOfDates.reduce((latest, value) => value > latest ? value : latest, asOfDates[0])
+  const branchWhere = branchId == null ? {} : { branch_id: branchId }
+  const [sales, purchases] = await Promise.all([
+    prisma.sales_bills.findMany({
+      select: { date: true, received_amount: true, receivable_balance: true, total_amount: true },
+      where: { NOT: { status: { in: ['cancelled', 'void', 'ยกเลิก'] } }, ...branchWhere, date: { lte: endOfDay(latestDate) } },
+    }),
+    prisma.purchase_bills.findMany({
+      select: { date: true, paid_amount: true, payable_balance: true, total_amount: true },
+      where: { NOT: { status: { in: ['cancelled', 'void', 'ยกเลิก'] } }, ...branchWhere, date: { lte: endOfDay(latestDate) } },
+    }),
+  ])
+
+  return asOfDates.map((asOf) => ({
+    ap: purchases.filter((row) => row.date <= endOfDay(asOf)).reduce((sum, row) => sum + Math.max(0, toNumber(row.payable_balance) || toNumber(row.total_amount) - toNumber(row.paid_amount)), 0),
+    ar: sales.filter((row) => row.date <= endOfDay(asOf)).reduce((sum, row) => sum + Math.max(0, toNumber(row.receivable_balance) || toNumber(row.total_amount) - toNumber(row.received_amount)), 0),
+  })) as [ReceivablePayableSnapshot, ReceivablePayableSnapshot]
+}
+
 export async function buildMainDashboards(filter: MainDashboardFilter, options: { includeAnalytics?: boolean; includeDaily?: boolean; includeOwner?: boolean } = {}) {
   const includeAnalytics = options.includeAnalytics ?? true
   const includeDaily = options.includeDaily ?? true
@@ -244,7 +264,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
   const todayStart = startOfDay(selectedDate)
   const todayEnd = endOfDay(selectedDate)
 
-  const [purchases, sales, expenses, previousSales, previousExpenses, payments, receipts, stockRows, deals, finance, previousFinance, productionRows, cashBalanceSnapshots, bankToday, bankRange, loanSchedules, products, salespersons, branches, suppliers, customers, historicalRows]: readonly [
+  const [purchases, sales, expenses, previousSales, previousExpenses, payments, receipts, stockRows, deals, receivablePayableSnapshots, productionRows, cashBalanceSnapshots, bankToday, bankRange, loanSchedules, products, salespersons, branches, suppliers, customers, historicalRows]: readonly [
     PurchaseBillRow[],
     SalesBillRow[],
     ExpenseRow[],
@@ -254,8 +274,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
     Prisma.receiptsGetPayload<Record<string, never>>[],
     StockLedgerRow[],
     TradingDealRow[],
-    Awaited<ReturnType<typeof buildFinancialDashboard>>,
-    Awaited<ReturnType<typeof buildFinancialDashboard>>,
+    [ReceivablePayableSnapshot, ReceivablePayableSnapshot],
     Awaited<ReturnType<typeof loadProductionMetrics>>,
     [CashBalanceSnapshot, CashBalanceSnapshot],
     BankStatementRow[],
@@ -277,8 +296,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
     () => includeDaily ? prisma.receipts.findMany({ orderBy: [{ date: 'desc' }], take: 3000, where: { date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }) : Promise.resolve([]),
     () => prisma.stock_ledger.findMany({ include: { branches: true, products: true }, orderBy: [{ date: 'desc' }], take: 20000 }),
     () => includeOwner ? prisma.trading_deals.findMany({ orderBy: [{ date: 'desc' }], take: 3000 }) : Promise.resolve([]),
-    () => buildFinancialDashboard({ asOf: selectedDate, branchId: filter.branchId }),
-    () => buildFinancialDashboard({ asOf: previousRange.toDate, branchId: filter.branchId }),
+    () => receivablePayableForDates([selectedDate, previousRange.toDate], branch?.id),
     () => includeOwner ? loadProductionMetrics({ branchId: filter.branchId, dateFrom: from, dateTo: to }) : Promise.resolve([]),
     () => cashBalancesForDates([selectedDate, previousRange.toDate]),
     () => includeBankToday ? prisma.bank_statement.findMany({ include: { accounts: true }, orderBy: [{ date: 'desc' }], where: { date: { gte: todayStart, lte: todayEnd } } }) : Promise.resolve([]),
@@ -295,8 +313,9 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
   ] as const)
 
   const [currentCash, previousCash] = cashBalanceSnapshots
+  const [currentReceivables, previousReceivables] = receivablePayableSnapshots
   const productById = new Map(products.map((row) => [String(row.id), row]))
-  const activeSalesLineFactsByBillId = await salesBillLineFactsByBillId([
+  const activeSalesLineFactsByBillId = await salesBillAnalyticsLinesByBillId([
     ...sales.filter((row) => activeStatus(row.status)).map((row) => row.id),
     ...previousSales.filter((row) => activeStatus(row.status)).map((row) => row.id),
   ])
@@ -420,7 +439,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
     const current = topCustomers.get(key) ?? { amount: 0, bills: 0, gp: 0, id: key === '__unknown_customer__' ? '' : key, name: bill.customers?.name ?? '-', qty: 0 }
     current.amount += toNumber(bill.total_amount)
     current.gp += toNumber(bill.gross_profit)
-    current.qty += salesBillLineFactTotals(activeSalesLineFactsByBillId.get(bill.id)).qty
+    current.qty += salesBillAnalyticsLineTotals(activeSalesLineFactsByBillId.get(bill.id)).qty
     current.bills += 1
     topCustomers.set(key, current)
   }
@@ -577,22 +596,22 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
     },
     dashboard: {
       aging: [
-        { label: 'AR', value: finance.summary.ar },
-        { label: 'AP', value: finance.summary.ap },
+        { label: 'AR', value: currentReceivables.ar },
+        { label: 'AP', value: currentReceivables.ap },
       ],
       agingBuckets: { ap: apAgingBuckets, ar: arAgingBuckets },
       cashComposition: [
         { label: '💵 เงินสด', value: currentCash.cash },
         { label: '🏦 ธนาคาร', value: currentCash.bank },
         { label: '💱 FCD', value: currentCash.fcd },
-        { label: '📥 AR', value: finance.summary.ar },
-        { label: '📤 AP', value: -finance.summary.ap },
+        { label: '📥 AR', value: currentReceivables.ar },
+        { label: '📤 AP', value: -currentReceivables.ap },
         { label: '⚠ OD Used', value: currentCash.odUsed },
-        { label: '💎 Net Cash', value: currentCash.cash + currentCash.bank + currentCash.fcd + finance.summary.ar - finance.summary.ap - currentCash.odUsed },
+        { label: '💎 Net Cash', value: currentCash.cash + currentCash.bank + currentCash.fcd + currentReceivables.ar - currentReceivables.ap - currentCash.odUsed },
       ].filter((row) => row.value !== 0),
       kpi: {
-        ar: finance.summary.ar,
-        ap: finance.summary.ap,
+        ar: currentReceivables.ar,
+        ap: currentReceivables.ap,
         cashBalance,
         expenses: kpiExpenses,
         grossProfit,
@@ -600,8 +619,8 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
         revenue: salesAmount,
       },
       kpiDelta: {
-        ar: deltaValue(finance.summary.ar, previousFinance.summary.ar),
-        ap: deltaValue(finance.summary.ap, previousFinance.summary.ap),
+        ar: deltaValue(currentReceivables.ar, previousReceivables.ar),
+        ap: deltaValue(currentReceivables.ap, previousReceivables.ap),
         cashBalance: deltaValue(cashBalance, previousCashBalance),
         expenses: deltaValue(kpiExpenses, previousKpiExpenses),
         netProfit: deltaValue(netProfit, previousNetProfit),
@@ -615,9 +634,9 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
       },
       monthlyTrend: Array.from(monthlyTrendMap.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(-6),
       sections: {
-        cash: { ...currentCash, netCash: currentCash.cash + currentCash.bank + currentCash.fcd + finance.summary.ar - finance.summary.ap - currentCash.odUsed },
+        cash: { ...currentCash, netCash: currentCash.cash + currentCash.bank + currentCash.fcd + currentReceivables.ar - currentReceivables.ap - currentCash.odUsed },
         purchase: { amount: purchaseAmount, count: activePurchases.length, qty: activePurchases.reduce((sum, row) => sum + purchaseBillItemQty(row), 0), today: todayPurchases.reduce((sum, row) => sum + toNumber(row.total_amount), 0) },
-        sales: { amount: salesAmount, count: activeSales.length, gp: grossProfit, qty: activeSales.reduce((sum, row) => sum + salesBillLineFactTotals(activeSalesLineFactsByBillId.get(row.id)).qty, 0), today: todaySales.reduce((sum, row) => sum + toNumber(row.total_amount), 0) },
+        sales: { amount: salesAmount, count: activeSales.length, gp: grossProfit, qty: activeSales.reduce((sum, row) => sum + salesBillAnalyticsLineTotals(activeSalesLineFactsByBillId.get(row.id)).qty, 0), today: todaySales.reduce((sum, row) => sum + toNumber(row.total_amount), 0) },
         stock: { qty: stockQty, value: stockValue },
       },
       stockByBranch: Array.from(stockByBranchMap.values()).filter((row) => row.qty !== 0 || row.value !== 0).sort((a, b) => b.value - a.value),
@@ -645,7 +664,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
           purchaseQty: activePurchases.reduce((sum, row) => sum + purchaseBillItemQty(row), 0),
           salesAmount,
           salesCount: activeSales.length,
-          salesQty: activeSales.reduce((sum, row) => sum + salesBillLineFactTotals(activeSalesLineFactsByBillId.get(row.id)).qty, 0),
+          salesQty: activeSales.reduce((sum, row) => sum + salesBillAnalyticsLineTotals(activeSalesLineFactsByBillId.get(row.id)).qty, 0),
         },
         topCustomers: Array.from(topCustomers.values()).map((row) => ({ ...row, gpPct: row.amount > 0 ? row.gp / row.amount * 100 : 0 })).sort((a, b) => b.amount - a.amount).slice(0, 10),
         topProductsIn: Array.from(productIn.values()).sort((a, b) => b.amount - a.amount).slice(0, 5),
@@ -670,13 +689,13 @@ export async function buildMainDashboards(filter: MainDashboardFilter, options: 
         sellQty: row.sellQty,
       })).sort((a, b) => (b.buyAmt + b.sellAmt) - (a.buyAmt + a.sellAmt)),
       purchaseBills: todayPurchases.slice(0, 12).map((row) => ({ amount: toNumber(row.total_amount), docNo: row.doc_no, name: row.suppliers?.name ?? '-', qty: purchaseBillItemQty(row) })),
-      salesBills: todaySales.slice(0, 12).map((row) => ({ amount: toNumber(row.total_amount), docNo: row.doc_no, name: row.customers?.name ?? '-', qty: salesBillLineFactTotals(activeSalesLineFactsByBillId.get(row.id)).qty })),
+      salesBills: todaySales.slice(0, 12).map((row) => ({ amount: toNumber(row.total_amount), docNo: row.doc_no, name: row.customers?.name ?? '-', qty: salesBillAnalyticsLineTotals(activeSalesLineFactsByBillId.get(row.id)).qty })),
       summary: {
         expenseAmount: todayExpenses.reduce((sum, row) => sum + toNumber(row.amount), 0),
         purchaseAmount: todayPurchases.reduce((sum, row) => sum + toNumber(row.total_amount), 0),
         purchaseQty: todayPurchases.reduce((sum, row) => sum + purchaseBillItemQty(row), 0),
         salesAmount: todaySales.reduce((sum, row) => sum + toNumber(row.total_amount), 0),
-        salesQty: todaySales.reduce((sum, row) => sum + salesBillLineFactTotals(activeSalesLineFactsByBillId.get(row.id)).qty, 0),
+        salesQty: todaySales.reduce((sum, row) => sum + salesBillAnalyticsLineTotals(activeSalesLineFactsByBillId.get(row.id)).qty, 0),
       },
     },
     ownerDaily: {
