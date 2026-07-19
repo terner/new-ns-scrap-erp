@@ -21,6 +21,8 @@
     "audit:weight-ticket-image-assets": "node scripts/audit-weight-ticket-image-assets.mjs",
     "backfill:weight-ticket-image-assets": "node scripts/backfill-weight-ticket-image-assets.mjs",
     "backfill:purchase-cost-pool": "node scripts/backfill-purchase-cost-pool.mjs",
+    "backfill:profit-cost-report": "npx tsx scripts/backfill-profit-cost-report.ts",
+    "verify:profit-cost-report": "npx tsx scripts/verify-profit-cost-report.ts",
     "verify:production-report": "npx tsx scripts/verify-production-report-formulas.ts",
     "verify:stock-transfer": "npx tsx scripts/verify-stock-transfer-contract.ts",
     "verify:stock-ledger": "npx tsx scripts/verify-stock-ledger-contract.ts",

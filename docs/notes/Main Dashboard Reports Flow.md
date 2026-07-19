@@ -23,7 +23,7 @@ updated: 2026-07-18
 | `/owner-daily` | Owner Daily Control | `GET /api/owner-daily` | `reports.reports.view` | daily cash, AR/AP due, expense, loan, pending, FG and WIP sources only |
 | `/daily-report` | Daily Report | `GET /api/daily-report` | `reports.reports.view` | range PB/SB/expense/cash and required line/reference sources only |
 | `/analytics-dashboard` | Analytics Dashboard | `GET /api/analytics-dashboard` | `reports.reports.view` | range trend, group, ranking and top entity sources only |
-| `/profit-cost-analysis` | Profit & Cost Analysis | `GET /api/profit-cost-analysis` | `reports.reports.view` | PB/SB items, stock ledger, branch/supplier/customer/channel/product masters |
+| `/profit-cost-analysis` | Profit & Cost Analysis | split `/api/profit-cost-analysis/*` endpoints | `reports.reports.view` | incremental fact ledger, daily rollup, PB/SB balances, scoped reference masters |
 | `/sales-commission` | Sales Tracking Dashboard | `GET /api/sales-commission` | `reports.reports.view` | salesperson/supplier/sales control read model |
 | `/cash-flow-calendar` | Cash Flow Calendar | `GET /api/cash-flow-calendar` | `reports.reports.view` | accounts + bank statement by month |
 | `/business-calendar` | Business Calendar | `GET /api/business-calendar` | `reports.reports.view` | PB, SB, expenses, receipts, payments by month |

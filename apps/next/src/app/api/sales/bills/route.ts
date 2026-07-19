@@ -25,6 +25,12 @@ import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/
 import { appendWeightTicketUsageLogs, WEIGHT_TICKET_USAGE_ACTION } from '@/lib/server/weight-ticket-usage-history'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import { refreshCustomerAdvanceAllocation } from '@/lib/server/customer-advance-settlement'
+import { normalizeSalesBillProfitCostSource } from '@/lib/server/sales-bill-profit-cost-source'
+import {
+  allocateStockCogsToSalesLines,
+  calculateSalesLineProfit,
+  requireSalesLineCosts,
+} from '@/lib/server/profit-cost-source-lines'
 import { validateDeliveryItemProductMatch } from '@/lib/server/sales-bill-delivery-validation'
 import { averageCostForStock, quantityForStock } from '@/lib/server/stock'
 import {
@@ -40,6 +46,10 @@ import {
 import { Prisma } from '../../../../../generated/prisma/client'
 
 export const runtime = 'nodejs'
+
+async function projectProfitCostSalesBill(tx: Prisma.TransactionClient, salesBillId: bigint) {
+  await tx.$executeRaw`select public.project_profit_cost_sales_bill(${salesBillId})`
+}
 
 type BillQuery = {
   dateFrom?: string
@@ -2125,6 +2135,17 @@ export async function POST(request: Request) {
     const selectedHeaderPoSell = poSells.length === 1 ? poSells[0] : null
 
     const created = await prisma.$transaction(async (tx) => {
+      const lineCogsByLineNo = new Map<number, string>()
+      tradingMatchedCogsByLineIndex.forEach((amount, index) => {
+        const item = items[index]
+        if (item) lineCogsByLineNo.set(item.lineNo, roundMoney(amount).toFixed(2))
+      })
+      manualStockCostByItemIndex.forEach((stockCost, index) => {
+        const item = items[index]
+        if (item) lineCogsByLineNo.set(item.lineNo, roundMoney(stockCost.lineCost).toFixed(2))
+      })
+      const manualStockCogs = roundMoney([...manualStockCostByItemIndex.values()].reduce((sum, line) => sum + line.lineCost, 0))
+      let normalizedHeaderCogsAmount = roundMoney(totalCost + manualStockCogs).toFixed(2)
       const createdBill = await tx.sales_bills.create({
         data: {
           branch_id: branch?.id ?? null,
@@ -2385,8 +2406,28 @@ export async function POST(request: Request) {
           weightTicketId: stockDeliveryTicket.id,
         })
         const stockCogs = roundMoney(consumedStockLines.reduce((sum, line) => sum + line.valueOut, 0))
-        const manualStockCogs = roundMoney([...manualStockCostByItemIndex.values()].reduce((sum, line) => sum + line.lineCost, 0))
         const combinedCogs = roundMoney(totalCost + stockCogs + manualStockCogs)
+        const stockLineCosts = allocateStockCogsToSalesLines({
+          consumed: consumedStockLines.map((line) => ({
+            productId: line.productId,
+            qty: line.qty.toFixed(3),
+            valueOut: roundMoney(line.valueOut).toFixed(2),
+          })),
+          lines: items.flatMap((item) => {
+            if (!isDeliveryBackedSalesItem(item)) return []
+            const summary = item.deliverySummaryId ? deliverySummarySourceMap.get(item.deliverySummaryId) : null
+            if (!summary || summary.product_id == null) {
+              throw new Error(`Sales Bill WTO COGS missing product summary for line ${item.lineNo}`)
+            }
+            return [{
+              lineNo: item.lineNo,
+              productId: summary.product_id,
+              qty: item.stockIssueQty.toFixed(3),
+            }]
+          }),
+        })
+        stockLineCosts.forEach((amount, lineNo) => lineCogsByLineNo.set(lineNo, amount))
+        normalizedHeaderCogsAmount = combinedCogs.toFixed(2)
         await tx.sales_bills.update({
           data: {
             cogs_amount: combinedCogs,
@@ -2479,7 +2520,6 @@ export async function POST(request: Request) {
           weightTicketId: stockDeliveryTicket.id,
         })
       } else if (values.transactionMode === 'STOCK') {
-        const manualStockCogs = roundMoney([...manualStockCostByItemIndex.values()].reduce((sum, line) => sum + line.lineCost, 0))
         await tx.sales_bills.update({
           data: {
             cogs_amount: manualStockCogs,
@@ -2491,6 +2531,35 @@ export async function POST(request: Request) {
           where: { id: createdBill.id },
         })
       }
+
+      const normalizedLineCosts = requireSalesLineCosts({
+        headerCogsAmount: normalizedHeaderCogsAmount,
+        lines: [...lineCogsByLineNo.entries()].map(([lineNo, cogsAmount]) => ({ cogsAmount, lineNo })),
+        salesLineNumbers: items.map((item) => item.lineNo),
+      })
+      for (const line of createdLines) {
+        const cogsAmount = normalizedLineCosts.get(line.line_no)
+        const item = items.find((candidate) => candidate.lineNo === line.line_no)
+        if (!cogsAmount || !item) {
+          throw new Error(`Sales Bill line COGS missing for line ${line.line_no}`)
+        }
+        await tx.sales_bill_lines.update({
+          data: {
+            cogs_amount: new Prisma.Decimal(cogsAmount),
+            gross_profit: new Prisma.Decimal(calculateSalesLineProfit({
+              cogsAmount,
+              lineAmount: roundMoney(item.amount).toFixed(2),
+            })),
+          },
+          where: { id: line.id },
+        })
+      }
+      await normalizeSalesBillProfitCostSource(tx, {
+        actor,
+        salesBillDocNo: createdBill.doc_no,
+        salesBillId: createdBill.id,
+      })
+      await projectProfitCostSalesBill(tx, createdBill.id)
 
       return createdBill
     })
@@ -3549,6 +3618,12 @@ export async function PATCH(request: Request) {
           salesBillId: bill.id,
           toStatus: salesBillStatus,
         })
+        await normalizeSalesBillProfitCostSource(tx, {
+          actor,
+          salesBillDocNo: bill.doc_no,
+          salesBillId: bill.id,
+        })
+        await projectProfitCostSalesBill(tx, bill.id)
       }, { timeout: 30000 })
 
       try {
@@ -3852,6 +3927,7 @@ export async function PATCH(request: Request) {
           }
         }
       }
+      await projectProfitCostSalesBill(tx, bill.id)
     })
 
     return NextResponse.json({ ok: true })

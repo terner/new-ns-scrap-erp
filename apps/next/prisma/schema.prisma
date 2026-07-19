@@ -2136,6 +2136,7 @@ model purchase_bills {
   supplier_id                       BigInt?
   branch_id                         BigInt?
   warehouse_id                      BigInt?
+  purchase_channel_id               BigInt?
   sales_id                          BigInt?
   id                                BigInt                              @id @default(autoincrement())
   po_buy_id                         BigInt?
@@ -2152,6 +2153,7 @@ model purchase_bills {
   branches                          branches?                           @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   suppliers                         suppliers?                          @relation(fields: [supplier_id], references: [id], onDelete: NoAction)
   warehouses                        warehouses?                         @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  purchase_channels                 purchase_channels?                  @relation(fields: [purchase_channel_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   supplier_advance_allocation_logs  supplier_advance_allocation_logs[]
   supplier_advance_allocations      supplier_advance_allocations[]
   trading_allocation_facts          trading_allocation_facts[]
@@ -2165,6 +2167,7 @@ model purchase_bills {
   @@index([transaction_mode], map: "idx_pb_mode")
   @@index([transaction_mode, date(sort: Desc), doc_no(sort: Desc)], map: "idx_purchase_bills_mode_created_doc_no", where: raw("(transaction_mode IS NOT NULL)"))
   @@index([purchase_source, date(sort: Desc), doc_no(sort: Desc)], map: "idx_purchase_bills_source_created_doc_no", where: raw("(purchase_source IS NOT NULL)"))
+  @@index([purchase_channel_id, date(sort: Desc), doc_no(sort: Desc)], map: "idx_purchase_bills_purchase_channel_created_doc_no", where: raw("(purchase_channel_id IS NOT NULL)"))
   @@index([status], map: "idx_pb_status")
   @@index([status, date(sort: Desc), doc_no(sort: Desc)], map: "idx_purchase_bills_status_created_doc_no", where: raw("(status IS NOT NULL)"))
   @@index([supplier_id], map: "idx_pb_supplier")
@@ -2292,10 +2295,11 @@ model purchase_bill_po_allocations {
 }
 
 model purchase_channels {
-  name   String
-  active Boolean? @default(true)
-  code   String   @unique
-  id     BigInt   @id @default(autoincrement())
+  name           String
+  active         Boolean?        @default(true)
+  code           String          @unique
+  id             BigInt          @id @default(autoincrement())
+  purchase_bills purchase_bills[]
 
   @@schema("public")
 }
@@ -2794,6 +2798,8 @@ model sales_bill_lines {
   unit_price                     Decimal                          @default(0) @db.Decimal
   discount_amount                Decimal                          @default(0) @db.Decimal
   line_amount                    Decimal                          @default(0) @db.Decimal
+  cogs_amount                    Decimal?                         @db.Decimal(18, 2)
+  gross_profit                   Decimal?                         @db.Decimal(18, 2)
   vat_amount                     Decimal                          @default(0) @db.Decimal
   status                         String                           @default("active")
   notes                          String?
@@ -4256,6 +4262,57 @@ model trading_cost_sources {
   @@index([date(sort: Desc), id(sort: Desc)], map: "idx_trading_cost_sources_date")
   @@index([product_id, status, date(sort: Desc)], map: "idx_trading_cost_sources_product_status")
   @@index([supplier_id, status, date(sort: Desc)], map: "idx_trading_cost_sources_supplier_status")
+  @@schema("public")
+}
+
+model report_profit_cost_facts {
+  id                     BigInt   @id @default(autoincrement())
+  source_type            String
+  source_doc_no          String
+  source_line_no         Int
+  source_event_key       String
+  event_date             DateTime @db.Date
+  branch_id              BigInt
+  product_id             BigInt
+  supplier_id            BigInt?
+  customer_id            BigInt?
+  purchase_channel_id    BigInt?
+  sales_channel_id       BigInt?
+  fact_type              String
+  quantity               Decimal  @default(0) @db.Decimal(18, 3)
+  purchase_amount        Decimal  @default(0) @db.Decimal(18, 2)
+  revenue_amount         Decimal  @default(0) @db.Decimal(18, 2)
+  cogs_amount            Decimal  @default(0) @db.Decimal(18, 2)
+  stock_quantity_delta   Decimal  @default(0) @db.Decimal(18, 3)
+  stock_value_delta      Decimal  @default(0) @db.Decimal(18, 2)
+  projected_at           DateTime @default(now()) @db.Timestamptz(6)
+  source_updated_at      DateTime @db.Timestamptz(6)
+
+  @@unique([source_type, source_doc_no, source_line_no, source_event_key, fact_type], map: "report_profit_cost_facts_source_key_unique")
+  @@index([event_date, branch_id, product_id], map: "idx_report_profit_cost_facts_date_branch_product")
+  @@index([source_type, source_doc_no], map: "idx_report_profit_cost_facts_source")
+  @@schema("public")
+}
+
+model report_profit_cost_daily {
+  id                     BigInt   @id @default(autoincrement())
+  event_date             DateTime @db.Date
+  branch_id              BigInt
+  product_id             BigInt
+  supplier_id            BigInt?
+  customer_id            BigInt?
+  purchase_channel_id    BigInt?
+  sales_channel_id       BigInt?
+  quantity               Decimal  @default(0) @db.Decimal(18, 3)
+  purchase_amount        Decimal  @default(0) @db.Decimal(18, 2)
+  revenue_amount         Decimal  @default(0) @db.Decimal(18, 2)
+  cogs_amount            Decimal  @default(0) @db.Decimal(18, 2)
+  stock_quantity_delta   Decimal  @default(0) @db.Decimal(18, 3)
+  stock_value_delta      Decimal  @default(0) @db.Decimal(18, 2)
+  refreshed_at           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([event_date, branch_id], map: "idx_report_profit_cost_daily_date_branch")
+  @@index([product_id, event_date], map: "idx_report_profit_cost_daily_product_date")
   @@schema("public")
 }
 
