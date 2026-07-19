@@ -76,6 +76,7 @@ type BillRow = {
   paymentDocNos?: string[]
   payableBalance?: number
   purchaseSource?: string
+  purchaseChannelId?: string
   receiptDocNos?: string[]
   receivableBalance?: number
   receivedAmount?: number
@@ -274,6 +275,7 @@ type PurchasePayload = {
   branches: Option[]
   poBuys: Option[]
   products: Option[]
+  purchaseChannels: Option[]
   receipts: ReceiptOption[]
   rows: BillRow[]
   salespersons: Option[]
@@ -653,6 +655,7 @@ const initialPurchaseForm = (): PurchaseBillFormValues => ({
   note: null,
   notes: null,
   poBuyId: null,
+  purchaseChannelId: '',
   purchaseSource: 'SPOT_BUY',
   receiptTicketId: null,
   refNo: null,
@@ -745,7 +748,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const [isExporting, setIsExporting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [options, setOptions] = useState<OptionsPayload>({ advancePayments: [], branches: [], customers: [], customerAdvancePayments: [], deliveries: [], poBuys: [], poSells: [], products: [], receipts: [], salesChannels: [], salespersons: [], suppliers: [], tradingCostSources: [], warehouses: [] })
+  const [options, setOptions] = useState<OptionsPayload>({ advancePayments: [], branches: [], customers: [], customerAdvancePayments: [], deliveries: [], poBuys: [], poSells: [], products: [], purchaseChannels: [], receipts: [], salesChannels: [], salespersons: [], suppliers: [], tradingCostSources: [], warehouses: [] })
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [preferredBranchId, setPreferredBranchId] = useState<string | null>(null)
@@ -1997,6 +2000,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       note: row.note || null,
       notes: row.note || null,
       poBuyId: row.poBuyId || null,
+      purchaseChannelId: row.purchaseChannelId ?? '',
       purchaseSource: (row.purchaseSource === 'PO_RECEIPT' || row.purchaseSource === 'MIXED') ? row.purchaseSource : 'SPOT_BUY',
       receiptTicketId: items[0]?.receiptTicketId ?? null,
       refNo: row.refNo || null,
@@ -3397,8 +3401,22 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
               <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
                 <h4 className="mb-2 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
-                <div className="grid gap-x-4 gap-y-2 md:grid-cols-[120px_170px_340px_320px] md:justify-start">
+                <div className="grid gap-x-4 gap-y-2 md:grid-cols-[120px_180px_170px_300px_300px] md:justify-start">
                   <BranchSelectCombobox branches={activeBranches} disabled={stockReceiptLocked} error={fieldErrors.branchId} errorKey="branchId" inputId="purchase-bill-branch-search" label="สาขา *" placeholder="เลือกสาขา" value={form.branchId} widthClassName="max-w-[120px]" onChange={(branchId) => updateForm('branchId', branchId ?? '')} />
+                  <SearchCombobox
+                    error={fieldErrors.purchaseChannelId}
+                    errorKey="purchaseChannelId"
+                    inputId="purchase-bill-purchase-channel-search"
+                    label="ช่องทางซื้อ *"
+                    options={options.purchaseChannels.map((channel) => ({
+                      id: channel.id,
+                      label: channel.label ?? channel.name,
+                      searchText: `${channel.code ?? ''} ${channel.name} ${channel.label ?? ''}`,
+                    }))}
+                    placeholder="เลือกช่องทางซื้อ"
+                    value={form.purchaseChannelId}
+                    onChange={(value) => updateForm('purchaseChannelId', value)}
+                  />
                   {form.transactionMode === 'STOCK' ? (
                     <label className="block text-xs font-medium text-slate-600">
                       คลัง <span className="ml-1 text-red-600">*</span>

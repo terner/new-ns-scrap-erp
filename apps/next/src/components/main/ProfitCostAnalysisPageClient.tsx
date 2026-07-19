@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Sarabun } from 'next/font/google'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
@@ -34,6 +34,11 @@ type ProductRow = {
   stockQty: number
   stockValue: number
 }
+type ProductApiRow = Omit<ProductRow, 'avgBuy' | 'avgSell' | 'buyAmount' | 'buyQty' | 'cogs' | 'gp' | 'gpPct' | 'profitPerKg' | 'revenue' | 'sellQty' | 'stockQty' | 'stockValue'> & {
+  avgBuy: string; avgSell: string; buyAmount: string; buyQty: string; cogs: string; gp: string; gpPct: string
+  profitPerKg: string; revenue: string; sellQty: string; stockQty: string; stockValue: string
+}
+type OptionsApiPayload = { branches: Option[]; customers: Option[]; metalGroups: string[]; purchaseChannels: Option[]; salesChannels: Option[]; suppliers: Option[] }
 type ProfitCostPayload = {
   alerts: { amount: number; label: string; severity: string; type: string }[]
   filters: {
@@ -62,6 +67,7 @@ type ProfitCostPayload = {
 type Tab = 'alerts' | 'channels' | 'customers' | 'products' | 'suppliers' | 'trend'
 type SortDirection = 'asc' | 'desc'
 type ProductColumnKey = 'avgBuy' | 'avgSell' | 'buyAmount' | 'buyQty' | 'code' | 'cogs' | 'gp' | 'gpPct' | 'metalGroup' | 'name' | 'profitPerKg' | 'revenue' | 'sellQty' | 'stockQty' | 'stockValue'
+type DimensionSortKey = 'amount' | 'billCount' | 'date' | 'gp' | 'group' | 'name' | 'paid' | 'payable' | 'qty' | 'receivable' | 'received'
 
 const productPageSizeOptions = [10, 25, 50, 100] as const
 const profitKpiCardClass = 'profit-kpi-card shadow-none'
@@ -79,6 +85,10 @@ const reportTabs: { key: Tab; label: string }[] = [
   { key: 'trend', label: 'แนวโน้ม' },
   { key: 'alerts', label: 'แจ้งเตือน' },
 ]
+
+const defaultDimensionSort: Record<Exclude<Tab, 'alerts' | 'products'>, DimensionSortKey> = {
+  channels: 'amount', customers: 'gp', suppliers: 'amount', trend: 'date',
+}
 
 const productColumns: Array<ResizableColumnDefinition<ProductColumnKey> & { align?: 'center' | 'left' | 'right'; label: string }> = [
   { key: 'code', label: 'รหัสสินค้า', defaultWidth: 120, minWidth: 100 },
@@ -108,8 +118,46 @@ function monthStart() {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
 }
 
+function reportNumber(value: string) {
+  if (!/^-?\d+(?:\.\d+)?$/.test(value)) throw new Error('รูปแบบตัวเลขรายงานไม่ถูกต้อง')
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) throw new Error('ตัวเลขรายงานอยู่นอกช่วงที่แสดงผลได้')
+  return parsed
+}
+
+function decodeProductRow(row: ProductApiRow): ProductRow {
+  return {
+    ...row,
+    avgBuy: reportNumber(row.avgBuy), avgSell: reportNumber(row.avgSell),
+    buyAmount: reportNumber(row.buyAmount), buyQty: reportNumber(row.buyQty),
+    cogs: reportNumber(row.cogs), gp: reportNumber(row.gp), gpPct: reportNumber(row.gpPct),
+    profitPerKg: reportNumber(row.profitPerKg), revenue: reportNumber(row.revenue),
+    sellQty: reportNumber(row.sellQty), stockQty: reportNumber(row.stockQty), stockValue: reportNumber(row.stockValue),
+  }
+}
+
+function decodeDimensionRow(row: Record<string, string | number | null>) {
+  const numeric = (key: string) => reportNumber(String(row[key]))
+  return {
+    amount: numeric('amount'), billCount: Number(row.billCount), buyAmount: numeric('buyAmount'), buyQty: numeric('buyQty'), cogs: numeric('cogs'),
+    date: typeof row.date === 'string' ? row.date : null, gp: numeric('gp'), gpPct: numeric('gpPct'),
+    group: typeof row.group === 'string' ? row.group : null, name: String(row.name), paid: numeric('paid'),
+    payable: numeric('payable'), qty: numeric('qty'), receivable: numeric('receivable'), received: numeric('received'),
+  }
+}
+
+function emptyProfitCostPayload(): ProfitCostPayload {
+  return {
+    alerts: [],
+    filters: { branches: [], customers: [], dateFrom: '', dateTo: '', metalGroups: [], purchaseChannels: [], salesChannels: [], selectedMetalGroups: [], suppliers: [] },
+    rows: { channels: [], customers: [], products: [], suppliers: [], trend: [] },
+    sourceState: { limitations: [], writeActionsEnabled: false },
+    summary: {},
+    top: { byGp: [], byRevenue: [], byStockValue: [] },
+  }
+}
+
 export function ProfitCostAnalysisPageClient() {
-  const latestLoadRequestRef = useRef(0)
   const [from, setFrom] = useState(monthStart())
   const [to, setTo] = useState(today())
   const [branchId, setBranchId] = useState('')
@@ -120,10 +168,24 @@ export function ProfitCostAnalysisPageClient() {
   const [selectedMetalGroup, setSelectedMetalGroup] = useState('')
   const [activeTab, setActiveTab] = useState<Tab>('products')
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null)
-  const [data, setData] = useState<ProfitCostPayload | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [data, setData] = useState<ProfitCostPayload>(emptyProfitCostPayload)
+  const [optionsError, setOptionsError] = useState<string | null>(null)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
+  const [rankingsError, setRankingsError] = useState<string | null>(null)
+  const [tableError, setTableError] = useState<string | null>(null)
+  const [isOptionsLoading, setIsOptionsLoading] = useState(true)
+  const [isSummaryLoading, setIsSummaryLoading] = useState(true)
+  const [isRankingsLoading, setIsRankingsLoading] = useState(true)
+  const [isTableLoading, setIsTableLoading] = useState(true)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [appliedQuery, setAppliedQuery] = useState(() => new URLSearchParams({ from: monthStart(), to: today() }).toString())
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<(typeof productPageSizeOptions)[number]>(25)
+  const [productSortKey, setProductSortKey] = useState<ProductColumnKey>('gp')
+  const [productSortDirection, setProductSortDirection] = useState<SortDirection>('desc')
+  const [dimensionSortKey, setDimensionSortKey] = useState<DimensionSortKey>('amount')
+  const [dimensionSortDirection, setDimensionSortDirection] = useState<SortDirection>('desc')
+  const [totalRows, setTotalRows] = useState(0)
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ from, to })
@@ -137,42 +199,114 @@ export function ProfitCostAnalysisPageClient() {
   }, [branchId, customerId, from, purchaseChannelId, salesChannelId, selectedMetalGroup, supplierId, to])
 
   useEffect(() => {
-    const requestId = latestLoadRequestRef.current + 1
-    latestLoadRequestRef.current = requestId
-    setError(null)
-    setIsLoading(true)
-    dailyFetchJson<ProfitCostPayload>(`/api/profit-cost-analysis?${query}`)
-      .then((payload) => {
-        if (latestLoadRequestRef.current !== requestId) return
-        setData(payload)
+    const controller = new AbortController()
+    setOptionsError(null)
+    setIsOptionsLoading(true)
+    dailyFetchJson<OptionsApiPayload>('/api/profit-cost-analysis/options', { signal: controller.signal })
+      .then((options) => setData((current) => ({ ...current, filters: { ...current.filters, ...options } })))
+      .catch((caught) => {
+        if (caught instanceof DOMException && caught.name === 'AbortError') return
+        setOptionsError(caught instanceof Error ? caught.message : 'โหลดตัวเลือกไม่ได้')
+      })
+      .finally(() => { if (!controller.signal.aborted) setIsOptionsLoading(false) })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setSummaryError(null)
+    setIsSummaryLoading(true)
+    dailyFetchJson<{ summary: Record<string, string | number> }>(`/api/profit-cost-analysis/summary?${appliedQuery}`, { signal: controller.signal })
+      .then((summaryPayload) => setData((current) => ({
+        ...current,
+        summary: Object.fromEntries(Object.entries(summaryPayload.summary).map(([key, value]) => [key, typeof value === 'string' ? reportNumber(value) : value])),
+      })))
+      .catch((caught) => {
+        if (caught instanceof DOMException && caught.name === 'AbortError') return
+        setSummaryError(caught instanceof Error ? caught.message : 'โหลดข้อมูลสรุปไม่ได้')
+      })
+      .finally(() => { if (!controller.signal.aborted) setIsSummaryLoading(false) })
+    return () => controller.abort()
+  }, [appliedQuery])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setRankingsError(null)
+    setIsRankingsLoading(true)
+    dailyFetchJson<{ top: { byGp: ProductApiRow[]; byRevenue: ProductApiRow[]; byStockValue: ProductApiRow[] } }>(`/api/profit-cost-analysis/rankings?${appliedQuery}`, { signal: controller.signal })
+      .then((rankings) => setData((current) => ({
+        ...current,
+        top: {
+          byGp: rankings.top.byGp.map(decodeProductRow),
+          byRevenue: rankings.top.byRevenue.map(decodeProductRow),
+          byStockValue: rankings.top.byStockValue.map(decodeProductRow),
+        },
+      })))
+      .catch((caught) => {
+        if (caught instanceof DOMException && caught.name === 'AbortError') return
+        setRankingsError(caught instanceof Error ? caught.message : 'โหลดข้อมูลอันดับไม่ได้')
+      })
+      .finally(() => { if (!controller.signal.aborted) setIsRankingsLoading(false) })
+    return () => controller.abort()
+  }, [appliedQuery])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setTableError(null)
+    setIsTableLoading(true)
+    const tableParams = new URLSearchParams(appliedQuery)
+    tableParams.set('page', String(page))
+    tableParams.set('pageSize', String(pageSize))
+    tableParams.set('sortBy', activeTab === 'products' ? productSortKey : activeTab === 'alerts' ? 'amount' : dimensionSortKey)
+    tableParams.set('sortDirection', activeTab === 'products' ? productSortDirection : dimensionSortDirection)
+    const tableEndpoint = activeTab === 'alerts' ? 'alerts' : activeTab
+    dailyFetchJson<{ alerts?: { amount: string; label: string; severity: string; type: string }[]; rows?: Array<Record<string, string | number | null>>; totalRows?: number }>(`/api/profit-cost-analysis/${tableEndpoint}?${tableParams}`, { signal: controller.signal })
+      .then((tablePayload) => {
+        const productRows = activeTab === 'products' ? (tablePayload.rows ?? []).map((row) => decodeProductRow(row as unknown as ProductApiRow)) : []
+        const dimensionRows = (tablePayload.rows ?? []).map(decodeDimensionRow)
+        setTotalRows(tablePayload.totalRows ?? tablePayload.alerts?.length ?? 0)
+        setData((current) => ({
+          ...current,
+          alerts: activeTab === 'alerts' ? (tablePayload.alerts ?? []).map((row) => ({ ...row, amount: reportNumber(row.amount) })) : current.alerts,
+          rows: {
+            ...current.rows,
+            ...(activeTab === 'channels' ? { channels: dimensionRows.map((row) => ({ amount: row.amount, billCount: row.billCount, gp: row.gp, gpPct: row.gpPct, group: row.group ?? '', name: row.name, qty: row.qty })) } : {}),
+            ...(activeTab === 'customers' ? { customers: dimensionRows.map((row) => ({ amount: row.amount, billCount: row.billCount, cogs: row.cogs, gp: row.gp, gpPct: row.gpPct, name: row.name, receivable: row.receivable, received: row.received, qty: row.qty })) } : {}),
+            ...(activeTab === 'products' ? { products: productRows } : {}),
+            ...(activeTab === 'suppliers' ? { suppliers: dimensionRows.map((row) => ({ amount: row.amount, billCount: row.billCount, name: row.name, paid: row.paid, payable: row.payable, qty: row.qty })) } : {}),
+            ...(activeTab === 'trend' ? { trend: dimensionRows.map((row) => ({ buyAmount: row.buyAmount, buyQty: row.buyQty, cogs: row.cogs, date: row.date ?? '', gp: row.gp, revenue: row.amount, sellQty: row.qty })) } : {}),
+          },
+        }))
       })
       .catch((caught) => {
-        if (latestLoadRequestRef.current !== requestId) return
-        setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้')
+        if (caught instanceof DOMException && caught.name === 'AbortError') return
+        setTableError(caught instanceof Error ? caught.message : 'โหลดตารางไม่ได้')
       })
-      .finally(() => {
-        if (latestLoadRequestRef.current !== requestId) return
-        setIsLoading(false)
-      })
-  }, [query])
+      .finally(() => { if (!controller.signal.aborted) setIsTableLoading(false) })
+    return () => controller.abort()
+  }, [activeTab, appliedQuery, dimensionSortDirection, dimensionSortKey, page, pageSize, productSortDirection, productSortKey])
+
+  useEffect(() => { setPage(1) }, [activeTab, appliedQuery])
 
   const supplierSearchOptions = useMemo<SearchComboboxOption[]>(() => {
-    return (data?.filters.suppliers ?? []).map((supplier) => ({
+    return data.filters.suppliers.map((supplier) => ({
       id: supplier.id,
       label: supplier.code ? `${supplier.code} - ${supplier.name}` : supplier.name,
     }))
-  }, [data?.filters.suppliers])
+  }, [data.filters.suppliers])
 
   const customerSearchOptions = useMemo<SearchComboboxOption[]>(() => {
-    return (data?.filters.customers ?? []).map((customer) => ({
+    return data.filters.customers.map((customer) => ({
       id: customer.id,
       label: customer.code ? `${customer.code} - ${customer.name}` : customer.name,
     }))
-  }, [data?.filters.customers])
+  }, [data.filters.customers])
 
-  const summary = data?.summary ?? {}
-  const metalGroups = data?.filters.metalGroups ?? []
-  const metalGroupSearchOptions = useMemo<SearchComboboxOption[]>(() => (data?.filters.metalGroups ?? []).map((group) => ({ id: group, label: group })), [data?.filters.metalGroups])
+  const error = optionsError ?? summaryError ?? rankingsError ?? tableError
+  const isLoading = isOptionsLoading || isSummaryLoading || isRankingsLoading || isTableLoading
+  const summary = data.summary
+  const metalGroups = data.filters.metalGroups
+  const metalGroupSearchOptions = useMemo<SearchComboboxOption[]>(() => data.filters.metalGroups.map((group) => ({ id: group, label: group })), [data.filters.metalGroups])
   const hasActiveFilters = from !== monthStart()
     || to !== today()
     || Boolean(branchId || purchaseChannelId || salesChannelId || supplierId || customerId)
@@ -187,6 +321,12 @@ export function ProfitCostAnalysisPageClient() {
     setSupplierId('')
     setCustomerId('')
     setSelectedMetalGroup('')
+  }
+
+  function applyFilters() {
+    setPage(1)
+    setAppliedQuery(query)
+    setShowMobileFilters(false)
   }
 
   return (
@@ -231,7 +371,14 @@ export function ProfitCostAnalysisPageClient() {
         </Panel>
       </div>
 
-      <Tabs className="gap-2" value={activeTab} onValueChange={(value) => setActiveTab(value as Tab)}>
+      <Tabs className="gap-2" value={activeTab} onValueChange={(value) => {
+        const nextTab = value as Tab
+        setActiveTab(nextTab)
+        if (nextTab !== 'alerts' && nextTab !== 'products') {
+          setDimensionSortKey(defaultDimensionSort[nextTab])
+          setDimensionSortDirection('desc')
+        }
+      }}>
         <TabsList className="w-full overflow-x-auto" variant="line">
           {reportTabs.map((tab) => (
             <TabsTrigger key={tab.key} value={tab.key} variant="line">
@@ -312,9 +459,12 @@ export function ProfitCostAnalysisPageClient() {
                 onChange={setSelectedMetalGroup}
               />
             </div>
-            {hasActiveFilters ? (
-              <button className="ml-auto h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200" type="button" onClick={clearFilters}>ล้างตัวกรอง</button>
-            ) : null}
+            <div className="ml-auto flex items-center gap-2">
+              {hasActiveFilters ? (
+                <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200" type="button" onClick={clearFilters}>ล้างตัวกรอง</button>
+              ) : null}
+              <button className="h-9 rounded-md bg-blue-600 px-4 text-xs font-semibold text-white transition hover:bg-blue-700" type="button" onClick={applyFilters}>แสดงผล</button>
+            </div>
           </div>
         </div>
       </div>
@@ -326,7 +476,7 @@ export function ProfitCostAnalysisPageClient() {
           footer={(
             <>
               <button className="h-10 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700" type="button" onClick={clearFilters}>ล้าง</button>
-              <button className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white" type="button" onClick={() => setShowMobileFilters(false)}>ปิด</button>
+              <button className="h-10 rounded-md bg-blue-600 text-sm font-semibold text-white" type="button" onClick={applyFilters}>แสดงผล</button>
             </>
           )}
         >
@@ -381,12 +531,13 @@ export function ProfitCostAnalysisPageClient() {
         </MobileFilterSheet>
       ) : null}
 
+      <TablePager page={page} pageSize={pageSize} totalRows={totalRows} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1) }} />
       <div>
-        {activeTab === 'products' ? <ProductTable rows={data?.rows.products ?? []} onSelect={setSelectedProduct} /> : null}
-        {activeTab === 'suppliers' ? <SimpleTable tableKey="suppliers" rows={(data?.rows.suppliers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.paid), money(row.payable), String(row.billCount)])} headers={['ผู้ขาย', 'กก.', 'ซื้อ', 'จ่ายแล้ว', 'ค้างจ่าย', 'บิล']} /> : null}
-        {activeTab === 'customers' ? <SimpleTable tableKey="customers" rows={(data?.rows.customers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.gp), `${pct(row.gpPct)}%`, money(row.receivable)])} headers={['ลูกค้า', 'กก.', 'ขาย', 'GP', 'GP %', 'ค้างรับ']} /> : null}
-        {activeTab === 'channels' ? <SimpleTable tableKey="channels" rows={(data?.rows.channels ?? []).map((row) => [row.group, row.name, money(row.qty), money(row.amount), money(row.gp), String(row.billCount)])} headers={['กลุ่ม', 'ช่องทาง', 'กก.', 'ยอด', 'GP', 'บิล']} /> : null}
-        {activeTab === 'trend' ? <SimpleTable tableKey="trend" rows={(data?.rows.trend ?? []).map((row) => [formatDateDisplay(row.date), money(row.buyAmount), money(row.revenue), money(row.cogs), money(row.gp), money(row.sellQty)])} headers={['วันที่', 'ซื้อ', 'ขาย', 'COGS', 'GP', 'ขาย กก.']} /> : null}
+        {activeTab === 'products' ? <ProductTable rows={data?.rows.products ?? []} onSelect={setSelectedProduct} sortDirection={productSortDirection} sortKey={productSortKey} onSort={(key, direction) => { setProductSortKey(key); setProductSortDirection(direction); setPage(1) }} /> : null}
+        {activeTab === 'suppliers' ? <SimpleTable tableKey="suppliers" rows={(data?.rows.suppliers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.paid), money(row.payable), String(row.billCount)])} headers={['ผู้ขาย', 'กก.', 'ซื้อ', 'จ่ายแล้ว', 'ค้างจ่าย', 'บิล']} sortKeys={['name', 'qty', 'amount', 'paid', 'payable', 'billCount']} sortDirection={dimensionSortDirection} sortKey={dimensionSortKey} onSort={(key, direction) => { setDimensionSortKey(key); setDimensionSortDirection(direction); setPage(1) }} /> : null}
+        {activeTab === 'customers' ? <SimpleTable tableKey="customers" rows={(data?.rows.customers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.gp), `${pct(row.gpPct)}%`, money(row.receivable)])} headers={['ลูกค้า', 'กก.', 'ขาย', 'GP', 'GP %', 'ค้างรับ']} sortKeys={['name', 'qty', 'amount', 'gp', 'gp', 'receivable']} sortDirection={dimensionSortDirection} sortKey={dimensionSortKey} onSort={(key, direction) => { setDimensionSortKey(key); setDimensionSortDirection(direction); setPage(1) }} /> : null}
+        {activeTab === 'channels' ? <SimpleTable tableKey="channels" rows={(data?.rows.channels ?? []).map((row) => [row.group, row.name, money(row.qty), money(row.amount), money(row.gp), String(row.billCount)])} headers={['กลุ่ม', 'ช่องทาง', 'กก.', 'ยอด', 'GP', 'บิล']} sortKeys={['group', 'name', 'qty', 'amount', 'gp', 'billCount']} sortDirection={dimensionSortDirection} sortKey={dimensionSortKey} onSort={(key, direction) => { setDimensionSortKey(key); setDimensionSortDirection(direction); setPage(1) }} /> : null}
+        {activeTab === 'trend' ? <SimpleTable tableKey="trend" rows={(data?.rows.trend ?? []).map((row) => [formatDateDisplay(row.date), money(row.buyAmount), money(row.revenue), money(row.cogs), money(row.gp), money(row.sellQty)])} headers={['วันที่', 'ซื้อ', 'ขาย', 'COGS', 'GP', 'ขาย กก.']} sortKeys={['date', 'amount', 'amount', 'gp', 'gp', 'qty']} sortDirection={dimensionSortDirection} sortKey={dimensionSortKey} onSort={(key, direction) => { setDimensionSortKey(key); setDimensionSortDirection(direction); setPage(1) }} /> : null}
         {activeTab === 'alerts' ? <SimpleTable tableKey="alerts" rows={(data?.alerts ?? []).map((row) => [row.severity, row.type, row.label, money(row.amount)])} headers={['ระดับ', 'ประเภท', 'รายการ', 'ค่า']} /> : null}
       </div>
 
@@ -416,25 +567,6 @@ function money(value?: number) {
 
 function pct(value?: number) {
   return (value ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 1 })
-}
-
-function compareSortValues(left: string | number, right: string | number) {
-  if (typeof left === 'number' && typeof right === 'number') {
-    return left - right
-  }
-
-  return String(left).localeCompare(String(right), 'th', { numeric: true })
-}
-
-function parseSortCell(value: string) {
-  const normalized = value.replace(/[^\d.-]/g, '')
-  if (!normalized) return value
-  const numberValue = Number(normalized)
-  return Number.isFinite(numberValue) ? numberValue : value
-}
-
-function getProductSortValue(row: ProductRow, key: ProductColumnKey): string | number {
-  return row[key] ?? ''
 }
 
 function formatProductCell(row: ProductRow, key: ProductColumnKey) {
@@ -523,65 +655,43 @@ function BarRows({ rows }: { rows: { label: string; value: number }[] }) {
   )
 }
 
-function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void; rows: ProductRow[] }) {
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState<(typeof productPageSizeOptions)[number]>(25)
-  const [sortKey, setSortKey] = useState<ProductColumnKey | null>(null)
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const columnResize = useResizableColumns('main.profit-cost-analysis.products.v1', productColumns)
-  const sortedRows = useMemo(() => {
-    if (!sortKey) return rows
-
-    return [...rows].sort((left, right) => {
-      const result = compareSortValues(getProductSortValue(left, sortKey), getProductSortValue(right, sortKey))
-      return sortDirection === 'asc' ? result : -result
-    })
-  }, [rows, sortDirection, sortKey])
-  const totalRows = sortedRows.length
+function TablePager({ onPageChange, onPageSizeChange, page, pageSize, totalRows }: {
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: (typeof productPageSizeOptions)[number]) => void
+  page: number
+  pageSize: (typeof productPageSizeOptions)[number]
+  totalRows: number
+}) {
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
-  const safePage = Math.min(page, totalPages)
-  const pagedRows = useMemo(() => sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize), [pageSize, safePage, sortedRows])
+  if (totalRows === 0) return null
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+      <span>แสดง {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalRows)} จาก {totalRows} รายการ</span>
+      <div className="flex items-center gap-2">
+        <PageSizeDropdown options={[...productPageSizeOptions]} value={pageSize} onChange={(value) => onPageSizeChange(value as (typeof productPageSizeOptions)[number])} />
+        <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={page <= 1} type="button" onClick={() => onPageChange(page - 1)}>ก่อนหน้า</button>
+        <span className="px-1 text-sm">หน้า {page} / {totalPages}</span>
+        <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={page >= totalPages} type="button" onClick={() => onPageChange(page + 1)}>ถัดไป</button>
+      </div>
+    </div>
+  )
+}
 
-  useEffect(() => {
-    setPage(1)
-  }, [rows])
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages)
-  }, [page, totalPages])
+function ProductTable({ onSelect, onSort, rows, sortDirection, sortKey }: {
+  onSelect: (row: ProductRow) => void
+  onSort: (key: ProductColumnKey, direction: SortDirection) => void
+  rows: ProductRow[]
+  sortDirection: SortDirection
+  sortKey: ProductColumnKey
+}) {
+  const columnResize = useResizableColumns('main.profit-cost-analysis.products.v1', productColumns)
 
   function changeSort(key: ProductColumnKey) {
-    if (sortKey === key) {
-      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
-      setPage(1)
-      return
-    }
-
-    setSortKey(key)
-    setSortDirection('asc')
-    setPage(1)
+    onSort(key, sortKey === key && sortDirection === 'asc' ? 'desc' : 'asc')
   }
 
   return (
     <>
-      {totalRows > 0 ? (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-          <span>แสดง {(safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, totalRows)} จาก {totalRows} รายการ</span>
-          <div className="flex items-center gap-2">
-            <PageSizeDropdown
-              options={[...productPageSizeOptions]}
-              value={pageSize}
-              onChange={(value) => {
-                setPageSize(value as (typeof productPageSizeOptions)[number])
-                setPage(1)
-              }}
-            />
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={safePage <= 1} type="button" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</button>
-            <span className="px-1 text-sm">หน้า {safePage} / {totalPages}</span>
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={safePage >= totalPages} type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</button>
-          </div>
-        </div>
-      ) : null}
       {/* Desktop view */}
       {columnResize.hasCustomWidths ? (
         <div className="mb-2 hidden justify-end lg:flex">
@@ -613,21 +723,21 @@ function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void;
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {pagedRows.map((row) => <tr key={row.id} className="cursor-pointer transition-colors hover:bg-slate-50" onClick={() => onSelect(row)}>
+            {rows.map((row) => <tr key={row.id} className="cursor-pointer transition-colors hover:bg-slate-50" onClick={() => onSelect(row)}>
               {productColumns.map((column) => (
                 <td key={column.key} className={`px-3 py-3 ${column.align === 'right' ? 'text-right font-mono tabular-nums' : 'text-left'} ${column.key === 'gp' ? row.gp >= 0 ? 'font-medium text-emerald-700' : 'font-medium text-red-700' : column.key === 'stockValue' ? 'font-medium text-slate-800' : column.key === 'name' ? 'font-medium text-slate-800' : 'text-slate-700'}`}>
                   <div className={column.align === 'right' ? 'whitespace-nowrap' : 'truncate'} title={String(formatProductCell(row, column.key))}>{formatProductCell(row, column.key)}</div>
                 </td>
               ))}
             </tr>)}
-            {totalRows === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={productColumns.length}>ไม่มีข้อมูล</td></tr> : null}
+            {rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={productColumns.length}>ไม่มีข้อมูล</td></tr> : null}
           </tbody>
         </table>
       </div>
 
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[600px] overflow-y-auto">
-        {pagedRows.map((row) => (
+        {rows.map((row) => (
           <div key={row.id} className="p-3 bg-white rounded-xl border border-slate-100 mb-2 shadow-sm flex flex-col gap-1.5 text-xs cursor-pointer" onClick={() => onSelect(row)}>
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800">{row.name}</span>
@@ -654,7 +764,7 @@ function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void;
             </div>
           </div>
         ))}
-        {totalRows === 0 && (
+        {rows.length === 0 && (
           <div className="py-8 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>
         )}
       </div>
@@ -707,9 +817,15 @@ function ProductModal({ onClose, product }: { onClose: () => void; product: Prod
   )
 }
 
-function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: string[][]; tableKey: string }) {
-  const [sortKey, setSortKey] = useState<string | null>(null)
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+function SimpleTable({ headers, onSort, rows, sortDirection, sortKey, sortKeys, tableKey }: {
+  headers: string[]
+  onSort?: (key: DimensionSortKey, direction: SortDirection) => void
+  rows: string[][]
+  sortDirection?: SortDirection
+  sortKey?: DimensionSortKey
+  sortKeys?: DimensionSortKey[]
+  tableKey: string
+}) {
   const columns = useMemo<Array<ResizableColumnDefinition<string> & { align?: 'center' | 'left' | 'right'; label: string }>>(() => {
     return headers.map((header, index) => ({
       key: String(index),
@@ -720,24 +836,9 @@ function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: str
     }))
   }, [headers])
   const columnResize = useResizableColumns(`main.profit-cost-analysis.${tableKey}.v1`, columns)
-  const sortedRows = useMemo(() => {
-    if (sortKey === null) return rows
-    const index = Number(sortKey)
-
-    return [...rows].sort((left, right) => {
-      const result = compareSortValues(parseSortCell(left[index] ?? ''), parseSortCell(right[index] ?? ''))
-      return sortDirection === 'asc' ? result : -result
-    })
-  }, [rows, sortDirection, sortKey])
-
-  function changeSort(key: string) {
-    if (sortKey === key) {
-      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
-      return
-    }
-
-    setSortKey(key)
-    setSortDirection('asc')
+  function changeSort(key: DimensionSortKey) {
+    if (!onSort) return
+    onSort(key, sortKey === key && sortDirection === 'asc' ? 'desc' : 'asc')
   }
 
   return (
@@ -760,12 +861,12 @@ function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: str
               {columns.map((column) => (
                 <ResizableTableHead
                   key={column.key}
-                  activeSortKey={sortKey ?? undefined}
+                  activeSortKey={sortKey}
                   align={column.align}
                   className="!font-medium"
                   direction={sortDirection}
                   label={column.label}
-                  sortKey={column.key}
+                  sortKey={sortKeys?.[Number(column.key)]}
                   onSort={changeSort}
                   resizeProps={columnResize.getResizeHandleProps(column.key, column.label)}
                 />
@@ -773,15 +874,15 @@ function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: str
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {sortedRows.map((row, index) => <tr key={`${row[0]}-${index}`} className="transition-colors hover:bg-slate-50">{row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className={`px-3 py-3 ${cellIndex > 1 ? 'text-right font-mono whitespace-nowrap tabular-nums' : 'min-w-0 overflow-hidden font-normal text-slate-700'}`}><div className={cellIndex <= 1 ? "truncate" : ""} title={cellIndex <= 1 ? cell : undefined}>{cell}</div></td>)}</tr>)}
-            {sortedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={headers.length}>ไม่มีข้อมูล</td></tr> : null}
+            {rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="transition-colors hover:bg-slate-50">{row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className={`px-3 py-3 ${cellIndex > 1 ? 'text-right font-mono whitespace-nowrap tabular-nums' : 'min-w-0 overflow-hidden font-normal text-slate-700'}`}><div className={cellIndex <= 1 ? "truncate" : ""} title={cellIndex <= 1 ? cell : undefined}>{cell}</div></td>)}</tr>)}
+            {rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={headers.length}>ไม่มีข้อมูล</td></tr> : null}
           </tbody>
         </table>
       </div>
 
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 bg-slate-50/30 p-2 max-h-[500px] overflow-y-auto">
-        {sortedRows.map((row, index) => (
+        {rows.map((row, index) => (
           <div key={index} className="mb-2 flex flex-col gap-2 rounded-xl border border-slate-100 bg-white p-3 text-xs shadow-sm">
             <div className="font-bold text-slate-800">{row[0]}</div>
             {row.length > 2 ? (
@@ -802,7 +903,7 @@ function SimpleTable({ headers, rows, tableKey }: { headers: string[]; rows: str
             ) : null}
           </div>
         ))}
-        {sortedRows.length === 0 && (
+        {rows.length === 0 && (
           <div className="py-6 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>
         )}
       </div>

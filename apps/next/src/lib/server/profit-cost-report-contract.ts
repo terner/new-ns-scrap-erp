@@ -7,6 +7,7 @@ export type ProfitCostAppliedFilter = {
   branchId?: bigint
   customerId?: bigint
   from: string
+  metalGroup?: string
   productId?: bigint
   purchaseChannelId?: bigint
   salesChannelId?: bigint
@@ -18,6 +19,7 @@ export type SerializedProfitCostAppliedFilter = {
   branchId?: string
   customerId?: string
   from: string
+  metalGroup?: string
   productId?: string
   purchaseChannelId?: string
   salesChannelId?: string
@@ -97,6 +99,7 @@ export function parseProfitCostFilter(searchParams: URLSearchParams): ProfitCost
     branchId: parseOptionalInternalId(searchParams, 'branchId'),
     customerId: parseOptionalInternalId(searchParams, 'customerId'),
     from,
+    ...(searchParams.get('metalGroup')?.trim() ? { metalGroup: searchParams.get('metalGroup')!.trim() } : {}),
     productId: parseOptionalInternalId(searchParams, 'productId'),
     purchaseChannelId: parseOptionalInternalId(searchParams, 'purchaseChannelId'),
     salesChannelId: parseOptionalInternalId(searchParams, 'salesChannelId'),
@@ -149,6 +152,7 @@ export function serializeProfitCostAppliedFilter(
     ...(filter.branchId != null ? { branchId: filter.branchId.toString() } : {}),
     ...(filter.customerId != null ? { customerId: filter.customerId.toString() } : {}),
     from: filter.from,
+    ...(filter.metalGroup ? { metalGroup: filter.metalGroup } : {}),
     ...(filter.productId != null ? { productId: filter.productId.toString() } : {}),
     ...(filter.purchaseChannelId != null ? { purchaseChannelId: filter.purchaseChannelId.toString() } : {}),
     ...(filter.salesChannelId != null ? { salesChannelId: filter.salesChannelId.toString() } : {}),
