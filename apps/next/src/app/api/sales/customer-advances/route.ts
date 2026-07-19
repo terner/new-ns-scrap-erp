@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { XLSX, applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import type { Prisma } from '../../../../../generated/prisma/client'
 import { calculateCustomerAdvancePaidBaseCapacity, calculateCustomerAdvanceTaxBreakdown, customerAdvanceFormSchema, customerAdvanceVatTypeLabel } from '@/lib/customer-advance'
 import { apiErrorResponse } from '@/lib/server/api-error'
@@ -57,6 +58,7 @@ function rowJson(row: CustomerAdvanceRow) {
   const subtotalAmount = toNumber(row.subtotal_amount)
   const targetAmount = toNumber(row.target_amount)
   const receivedAmount = toNumber(row.received_amount)
+  const remainingReceiptAmount = Math.max(0, targetAmount - receivedAmount)
   const canMutate = row.customer_advance_statuses.code === 'pending_receipt'
     && receivedAmount === 0
     && toNumber(row.allocated_amount) === 0
@@ -76,6 +78,7 @@ function rowJson(row: CustomerAdvanceRow) {
     invoiceNo: row.invoice_no ?? '',
     itemCount: row.customer_advance_items.length,
     receivedAmount,
+    remainingReceiptAmount,
     status: row.customer_advance_statuses.code,
     statusLabel: row.customer_advance_statuses.name,
     canCancel: canMutate,
@@ -95,6 +98,25 @@ function rowJson(row: CustomerAdvanceRow) {
     }),
     version: row.version,
   }
+}
+
+async function buildWorkbook(rows: Array<Record<string, string | number>>) {
+  const workbook = XLSX.utils.book_new()
+  const sheet = XLSX.utils.json_to_sheet(rows)
+  const headers = rows[0] ? Object.keys(rows[0]) : []
+  sheet['!cols'] = headers.map((header) => ({ wch: Math.max(14, header.length + 4) }))
+  applyWorksheetTableLayout(sheet, headers.length, rows.length + 1)
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Customer Advance')
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' })
+}
+
+function xlsxResponse(body: Buffer, filename: string) {
+  return new Response(new Uint8Array(body), {
+    headers: {
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    },
+  })
 }
 
 function actorEmail(context: Awaited<ReturnType<typeof getCurrentAuthContext>>) {
@@ -158,6 +180,37 @@ export async function GET(request: Request) {
           { customer_advance_items: { some: { product_name_snapshot: { contains: q, mode: 'insensitive' } } } },
         ],
       } : {}),
+    }
+
+    if (url.searchParams.get('format') === 'xlsx') {
+      const exportRows = await prisma.customer_advances.findMany({
+        include: {
+          branches: true,
+          customer_advance_items: { orderBy: { line_no: 'asc' } },
+          customer_advance_statuses: true,
+        },
+        orderBy: orderByFor(sortKey, sortDirection),
+        take: 10000,
+        where,
+      })
+      return xlsxResponse(await buildWorkbook(exportRows.map((row) => {
+        const mapped = rowJson(row)
+        return {
+          'เลขที่ CADV': mapped.docNo,
+          'วันที่เอกสาร': mapped.documentDate,
+          'สาขา': mapped.branchName,
+          'ลูกค้า': mapped.customerName,
+          'Invoice No.': mapped.invoiceNo || '-',
+          'Contract No.': mapped.contractNo || '-',
+          'น้ำหนักสุทธิ (กก.)': mapped.totalNetWeight,
+          'ยอดที่ต้องรับ': mapped.targetAmount,
+          'รับแล้ว': mapped.receivedAmount,
+          'คงค้างรับ': mapped.remainingReceiptAmount,
+          'ฐานที่ใช้หักบิล': mapped.usableCreditAmount,
+          'ฐานคงเหลือใช้หักบิล': mapped.availableAmount,
+          'สถานะ': mapped.statusLabel,
+        }
+      })), `customer_advances_${new Date().toISOString().slice(0, 10)}.xlsx`)
     }
 
     const [branches, rows, totalRows, customers, products, statuses, vatRates] = await Promise.all([

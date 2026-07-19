@@ -65,6 +65,7 @@ function toDetailJson(advance: NonNullable<Awaited<ReturnType<typeof findCustome
   const subtotalAmount = toNumber(advance.subtotal_amount)
   const targetAmount = toNumber(advance.target_amount)
   const receivedAmount = toNumber(advance.received_amount)
+  const remainingReceiptAmount = Math.max(0, targetAmount - receivedAmount)
   const canMutate = advance.customer_advance_statuses.code === 'pending_receipt'
     && receivedAmount === 0
     && toNumber(advance.allocated_amount) === 0
@@ -96,6 +97,7 @@ function toDetailJson(advance: NonNullable<Awaited<ReturnType<typeof findCustome
     })),
     remark: advance.remark ?? '',
     receivedAmount,
+    remainingReceiptAmount,
     status: advance.customer_advance_statuses.code,
     statusLabel: advance.customer_advance_statuses.name,
     subtotalAmount,

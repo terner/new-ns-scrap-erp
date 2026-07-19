@@ -601,6 +601,7 @@ export function AdvancePaymentsPageClient() {
   }
 
   const hasActiveFilters = Boolean(q || dateFrom || dateTo || statuses.length > 0)
+  const activeFilterCount = [q.trim(), dateFrom, dateTo, statuses.length > 0 ? 'status' : ''].filter(Boolean).length
   const exportHref = useMemo(() => `/api/purchase/advance-payments?${queryString ? `${queryString}&` : ''}format=xlsx`, [queryString])
   const listControls = (
     <>
@@ -815,7 +816,7 @@ export function AdvancePaymentsPageClient() {
             <KpiCard label="ยังไม่อนุมัติ" tone="pending" value={`${data?.summary.pendingCount ?? 0}`} />
             <KpiCard label="ใช้หักบิลแล้ว" tone="allocated" value={formatMoney(data?.summary.totalAllocated ?? 0)} />
             <div className="col-span-2 md:col-span-1">
-              <KpiCard label="เครดิตฐานคงเหลือ" tone="amber" value={formatMoney(data?.summary.totalRemaining ?? 0)} />
+              <KpiCard label="ฐานคงเหลือใช้หักบิล" tone="amber" value={formatMoney(data?.summary.totalRemaining ?? 0)} />
             </div>
           </div>
 
@@ -829,7 +830,7 @@ export function AdvancePaymentsPageClient() {
                 className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 md:hidden"
                 onClick={() => setShowMobileFilters(true)}
               >
-                ตัวกรอง {(dateFrom || dateTo || statuses.length > 0) ? '(1)' : ''}
+                ตัวกรอง {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
               </button>
 
               <div className="hidden md:flex flex-wrap items-center gap-2">
@@ -996,11 +997,11 @@ export function AdvancePaymentsPageClient() {
                     <span>น้ำหนักสุทธิ: <span className="font-semibold text-slate-700">{formatMoney(row.netWeight)}</span> กก.</span>
                     <div className="block">ยอดรวมมัดจำ: <span className="font-semibold text-slate-700">{formatMoney(row.totalAmount)}</span></div>
                     <div className="block">VAT: <span className="font-semibold text-slate-700">{row.vatTypeLabel}</span></div>
-                    <div className="block">เครดิตที่ใช้ได้: <span className="font-semibold text-slate-700">{formatMoney(row.subtotalAmount)}</span></div>
+                    <div className="block">ฐานที่ใช้หักบิล: <span className="font-semibold text-slate-700">{formatMoney(row.subtotalAmount)}</span></div>
                     {row.allocatedAmount > 0 ? <div className="block text-emerald-700">หักแล้ว: <span className="font-semibold">{formatMoney(row.allocatedAmount)}</span></div> : null}
                   </div>
                   <div className="text-right">
-                    <span className="text-xs text-slate-500 block">เครดิตฐานคงเหลือ</span>
+                    <span className="text-xs text-slate-500 block">ฐานคงเหลือใช้หักบิล</span>
                     <span className="font-bold text-amber-700 text-sm tabular-nums">{formatMoney(row.remainingAmount)}</span>
                   </div>
                 </div>
@@ -1031,8 +1032,8 @@ export function AdvancePaymentsPageClient() {
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} sortKey="productName" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'น้ำหนักสุทธิ')} sortKey="netWeight" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดรวมมัดจำ" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดรวมมัดจำ')} sortKey="amount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตที่ใช้ได้" resizeProps={columnResize.getResizeHandleProps('subtotalAmount', 'เครดิตที่ใช้ได้')} sortKey="subtotalAmount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตคงเหลือ" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'เครดิตคงเหลือ')} sortKey="remainingAmount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ฐานที่ใช้หักบิล" resizeProps={columnResize.getResizeHandleProps('subtotalAmount', 'ฐานที่ใช้หักบิล')} sortKey="subtotalAmount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ฐานคงเหลือใช้หักบิล" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'ฐานคงเหลือใช้หักบิล')} sortKey="remainingAmount" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
                   <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
                 </tr>
@@ -1153,7 +1154,7 @@ export function AdvancePaymentsPageClient() {
                 <Metric label="ยอดรวมมัดจำ" value={formatMoney(detail.totalAmount)} />
                 <Metric label="เครดิตฐานที่ใช้หักบิลแล้ว" value={formatMoney(detail.allocatedAmount)} />
                 <div className="col-span-2 sm:col-span-1">
-                  <Metric label="เครดิตฐานคงเหลือ" tone="amber" value={formatMoney(detail.remainingAmount)} />
+                  <Metric label="ฐานคงเหลือใช้หักบิล" tone="amber" value={formatMoney(detail.remainingAmount)} />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <Metric label="สถานะ" value={detail.statusLabel} />

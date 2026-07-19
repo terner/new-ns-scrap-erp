@@ -49,7 +49,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /api/dashboard:
+  /api/dashboard-overview:
     get:
       tags: [Reports]
       operationId: readMainDashboard

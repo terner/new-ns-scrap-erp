@@ -279,19 +279,34 @@ export async function summarizeAdvancePaymentApprovalStatus(
       status: { in: ['approved', 'paid'] },
     },
   })
+  if (approvals.length === 0) {
+    return {
+      activeApprovalAmount: 0,
+      activeApprovalCount: 0,
+      allActiveApprovalsSettled: false,
+      settledAmount: 0,
+    }
+  }
+
+  const payments = await tx.payments.findMany({
+    select: { amount: true, discount: true, payment_approval_id: true, withholding_tax: true },
+    where: {
+      payment_approval_id: { in: approvals.map((approval) => approval.id) },
+      NOT: { status: 'cancelled' },
+    },
+  })
+  const settledByApprovalId = new Map<bigint, number>()
+  for (const payment of payments) {
+    if (payment.payment_approval_id === null) continue
+    const settledAmount = toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
+    const currentAmount = settledByApprovalId.get(payment.payment_approval_id) ?? 0
+    settledByApprovalId.set(payment.payment_approval_id, currentAmount + settledAmount)
+  }
+
   let allActiveApprovalsSettled = approvals.length > 0
   let totalSettledAmount = 0
   for (const approval of approvals) {
-    const payments = await tx.payments.findMany({
-      select: { amount: true, discount: true, withholding_tax: true },
-      where: {
-        payment_approval_id: approval.id,
-        NOT: { status: 'cancelled' },
-      },
-    })
-    const settledAmount = payments.reduce((sum, payment) => (
-      sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
-    ), 0)
+    const settledAmount = settledByApprovalId.get(approval.id) ?? 0
     totalSettledAmount += settledAmount
     if (Math.max(0, toNumber(approval.approved_amount) - settledAmount) > EPSILON) {
       allActiveApprovalsSettled = false

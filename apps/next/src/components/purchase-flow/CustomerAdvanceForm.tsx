@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronLeft, ChevronRight, Plus, Save, Trash2, XCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Plus, Save, Trash2, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentProps } from 'react'
 
 import { Button } from '@/components/ui/Button'
@@ -41,6 +41,8 @@ type CustomerAdvanceRow = {
   statusLabel: string
   canCancel: boolean
   canEdit: boolean
+  receivedAmount: number
+  remainingReceiptAmount: number
   subtotalAmount: number
   targetAmount: number
   totalGrossWeight: number
@@ -80,7 +82,7 @@ type CustomerAdvanceLine = {
 
 type CustomerAdvanceSortDirection = 'asc' | 'desc'
 type CustomerAdvanceSortKey = 'availableAmount' | 'customerName' | 'documentDate' | 'docNo' | 'status' | 'targetAmount'
-type CustomerAdvanceColumnKey = 'action' | 'availableAmount' | 'branchName' | 'customerName' | 'documentDate' | 'docNo' | 'reference' | 'status' | 'targetAmount' | 'totalNetWeight' | 'usableCreditAmount'
+type CustomerAdvanceColumnKey = 'action' | 'availableAmount' | 'branchName' | 'customerName' | 'documentDate' | 'docNo' | 'reference' | 'remainingReceiptAmount' | 'receivedAmount' | 'status' | 'targetAmount' | 'totalNetWeight' | 'usableCreditAmount'
 
 type CustomerAdvanceFormState = {
   amount: string
@@ -144,6 +146,8 @@ const customerAdvanceColumns: Array<ResizableColumnDefinition<CustomerAdvanceCol
   { key: 'reference', defaultWidth: 180, minWidth: 140 },
   { key: 'totalNetWeight', defaultWidth: 130, minWidth: 110 },
   { key: 'targetAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'receivedAmount', defaultWidth: 130, minWidth: 115 },
+  { key: 'remainingReceiptAmount', defaultWidth: 130, minWidth: 115 },
   { key: 'usableCreditAmount', defaultWidth: 140, minWidth: 120 },
   { key: 'availableAmount', defaultWidth: 140, minWidth: 120 },
   { key: 'status', defaultWidth: 150, minWidth: 125 },
@@ -161,6 +165,17 @@ function parseDecimal(value: string) {
 
 function formatQuantity(value: number) {
   return new Intl.NumberFormat('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(value)
+}
+
+function ExportButton({ href }: { href: string }) {
+  return (
+    <Button asChild className="gap-2" size="sm" variant="export">
+      <a href={href}>
+        <Download className="h-4 w-4 shrink-0" />
+        <span>ส่งออก Excel</span>
+      </a>
+    </Button>
+  )
 }
 
 function vatRateForDate(rates: CustomerAdvanceResponse['settings']['vatRates'], documentDate: string) {
@@ -220,6 +235,7 @@ export function CustomerAdvanceForm() {
     if (dateTo) params.set('dateTo', dateTo)
     return params.toString()
   }, [branchFilter, dateFrom, dateTo, page, pageSize, query, sortDirection, sortKey, status])
+  const exportHref = useMemo(() => `/api/sales/customer-advances?${queryString}&format=xlsx`, [queryString])
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -569,9 +585,12 @@ export function CustomerAdvanceForm() {
         ) : null}
         {detail ? (
           <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50 p-4">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <DetailMetric label="ยอดรวมที่ต้องรับ" value={formatMoney(detail.targetAmount)} />
-              <DetailMetric label="เครดิตคงเหลือ" value={formatMoney(detail.availableAmount)} />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <DetailMetric label="ยอดที่ต้องรับ" value={formatMoney(detail.targetAmount)} />
+              <DetailMetric label="รับแล้ว" value={formatMoney(detail.receivedAmount)} />
+              <DetailMetric label="คงค้างรับ" value={formatMoney(detail.remainingReceiptAmount)} />
+              <DetailMetric label="ฐานที่ใช้หักบิล" value={formatMoney(detail.usableCreditAmount)} />
+              <DetailMetric label="ฐานคงเหลือใช้หักบิล" value={formatMoney(detail.availableAmount)} />
               <DetailMetric label="น้ำหนักรวม" value={`${formatQuantity(detail.totalGrossWeight)} กก.`} />
               <DetailMetric label="น้ำหนักสุทธิ" value={`${formatQuantity(detail.totalNetWeight)} กก.`} />
             </div>
@@ -629,7 +648,6 @@ export function CustomerAdvanceForm() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-900">รายการรับเงินล่วงหน้า</h2>
-          <p className="mt-1 text-sm text-slate-500">เอกสาร CADV สำหรับให้ใบเสร็จรับเงินดึงไปใช้งาน</p>
         </div>
       </div>
       <div className="space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
@@ -705,7 +723,8 @@ export function CustomerAdvanceForm() {
               }}
             />
           ))}
-          <div className="ml-auto">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <ExportButton href={exportHref} />
             <Button className="h-9 gap-2" disabled={isLoading || !data} size="sm" type="button" onClick={openCreateForm}>
               <Plus className="h-4 w-4" />
               สร้างรายการรับเงินล่วงหน้า
@@ -746,8 +765,10 @@ export function CustomerAdvanceForm() {
                     <ResizableTableHead label="Invoice / Contract" resizeProps={columnResize.getResizeHandleProps('reference', 'Invoice / Contract')} />
                     <ResizableTableHead align="right" label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('totalNetWeight', 'น้ำหนักสุทธิ')} />
                     <CustomerAdvanceSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดที่ต้องรับ" resizeProps={columnResize.getResizeHandleProps('targetAmount', 'ยอดที่ต้องรับ')} sortKey="targetAmount" onSort={changeSort} />
-                    <ResizableTableHead align="right" label="เครดิตที่ใช้ได้" resizeProps={columnResize.getResizeHandleProps('usableCreditAmount', 'เครดิตที่ใช้ได้')} />
-                    <CustomerAdvanceSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="เครดิตคงเหลือ" resizeProps={columnResize.getResizeHandleProps('availableAmount', 'เครดิตคงเหลือ')} sortKey="availableAmount" onSort={changeSort} />
+                    <ResizableTableHead align="right" label="รับแล้ว" resizeProps={columnResize.getResizeHandleProps('receivedAmount', 'รับแล้ว')} />
+                    <ResizableTableHead align="right" label="คงค้างรับ" resizeProps={columnResize.getResizeHandleProps('remainingReceiptAmount', 'คงค้างรับ')} />
+                    <ResizableTableHead align="right" label="ฐานที่ใช้หักบิล" resizeProps={columnResize.getResizeHandleProps('usableCreditAmount', 'ฐานที่ใช้หักบิล')} />
+                    <CustomerAdvanceSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ฐานคงเหลือใช้หักบิล" resizeProps={columnResize.getResizeHandleProps('availableAmount', 'ฐานคงเหลือใช้หักบิล')} sortKey="availableAmount" onSort={changeSort} />
                     <CustomerAdvanceSortHeader activeKey={sortKey} direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
                     <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
                   </tr>
@@ -755,7 +776,7 @@ export function CustomerAdvanceForm() {
                 <tbody>
                   {data.rows.length === 0 ? (
                     <tr>
-                      <td className="p-8 text-center text-sm text-slate-500" colSpan={11}>ไม่พบรายการรับเงินล่วงหน้า</td>
+                      <td className="p-8 text-center text-sm text-slate-500" colSpan={13}>ไม่พบรายการรับเงินล่วงหน้า</td>
                     </tr>
                   ) : data.rows.map((row) => (
                     <tr
@@ -786,6 +807,8 @@ export function CustomerAdvanceForm() {
                       </td>
                       <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatQuantity(row.totalNetWeight)} กก.</td>
                       <td className="p-3 text-right tabular-nums whitespace-nowrap"><p>{formatMoney(row.targetAmount)}</p><p className="text-xs text-slate-500">{row.vatTypeLabel}</p></td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatMoney(row.receivedAmount)}</td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatMoney(row.remainingReceiptAmount)}</td>
                       <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatMoney(row.usableCreditAmount)}</td>
                       <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatMoney(row.availableAmount)}</td>
                       <td className="p-3">
