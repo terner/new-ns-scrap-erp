@@ -207,7 +207,7 @@ function billJson(row: SalesBillRow, activeReceiptCount = 0, lineCount?: number)
     totalAmount: toNumber(row.total_amount),
     transactionMode: row.transaction_mode ?? 'STOCK',
     updatedAt: row.updated_at?.toISOString(),
-    updatedBy: row.updated_by ?? '',
+    updatedBy: row.updated_by === 'backfill:profit-cost-report' ? 'ระบบ' : row.updated_by ?? '',
     vatInvoiceDate: row.vat_invoice_date ? toDateOnly(row.vat_invoice_date) : '',
     vatInvoiceIssued: row.vat_invoice_issued ?? false,
     vatInvoiceNo: row.vat_invoice_no ?? '',

@@ -5,7 +5,7 @@ type TxClient = Prisma.TransactionClient
 
 export async function normalizeSalesBillProfitCostSource(
   tx: TxClient,
-  input: { actor: string; salesBillDocNo: string; salesBillId: bigint },
+  input: { actor: string; preserveAuditFields?: boolean; salesBillDocNo: string; salesBillId: bigint },
 ) {
   const [bill, lines, tradingFacts, sourceAllocations, ledgerRows] = await Promise.all([
     tx.sales_bills.findUnique({
@@ -112,7 +112,7 @@ export async function normalizeSalesBillProfitCostSource(
       data: {
         cogs_amount: new Prisma.Decimal(cogsAmount),
         gross_profit: new Prisma.Decimal(grossProfit),
-        updated_by: input.actor,
+        ...(input.preserveAuditFields ? {} : { updated_by: input.actor }),
       },
       where: { id: line.id },
     })
@@ -124,7 +124,7 @@ export async function normalizeSalesBillProfitCostSource(
       cogs_amount: new Prisma.Decimal(headerCogs),
       gross_profit: headerGrossProfit,
       total_cost: new Prisma.Decimal(headerCogs),
-      updated_by: input.actor,
+      ...(input.preserveAuditFields ? {} : { updated_by: input.actor }),
     },
     where: { id: input.salesBillId },
   })

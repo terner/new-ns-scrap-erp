@@ -18,6 +18,7 @@ async function main() {
     await prisma.$transaction(async (tx) => {
       await normalizeSalesBillProfitCostSource(tx, {
         actor: 'backfill:profit-cost-report',
+        preserveAuditFields: true,
         salesBillDocNo: bill.doc_no,
         salesBillId: bill.id,
       })
