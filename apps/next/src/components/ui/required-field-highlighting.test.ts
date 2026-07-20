@@ -8,12 +8,14 @@ import { poSellFormSchema, poSellPageFormSchema } from '../../lib/sales'
 const source = (relativePath: string) => readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8')
 
 describe('manual-entry field highlighting contract', () => {
-  it('keeps every editable business-entry field yellow while excluding filters, automatic, readonly, disabled, invalid, and non-data controls', () => {
+  it('keeps every editable entry, search, filter, and date field yellow while excluding automatic, readonly, disabled, invalid, and non-data controls', () => {
     const css = source('../../app/globals.css')
 
     expect(css).toContain('--ns-manual-entry-bg: #fff7cc')
     expect(css).toContain('--ns-field-invalid-bg: #fef2f2')
-    expect(css).toContain('Every manual business-entry field stays pale yellow')
+    expect(css).toContain('Every field users type into or select stays pale yellow')
+    expect(css).toContain('Filter/search/date controls are also user-owned inputs')
+    expect(css).toContain(':where([data-ns-field-scope="filter"])')
     expect(css).toContain('form:not([data-ns-field-scope="filter"])')
     expect(css).toContain('[data-ns-dialog-content]:not([data-ns-field-scope="filter"])')
     expect(css).toContain('[data-ns-field-scope="entry"]')
@@ -37,7 +39,7 @@ describe('manual-entry field highlighting contract', () => {
     )
   })
 
-  it('marks form-free business surfaces as entry scopes and keeps mobile filters neutral', () => {
+  it('marks form-free business surfaces and filter scopes explicitly', () => {
     const dialog = source('./Dialog.tsx')
     const mobileFilterSheet = source('./MobileFilterSheet.tsx')
     const weightTicketForm = source('../daily/WeightTicketFormCore.tsx')

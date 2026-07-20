@@ -930,7 +930,7 @@ aside a:visited {
   box-shadow: 0 0 0 3px var(--ns-field-focus-ring) !important;
 }
 
-/* Office/ERP data-entry convention: Every manual business-entry field stays pale yellow, including optional fields. */
+/* Office/ERP data-entry convention: Every field users type into or select stays pale yellow, including optional fields and filters. */
 :where(
   form:not([data-ns-field-scope="filter"]),
   [data-ns-dialog-content]:not([data-ns-field-scope="filter"]),
@@ -1000,6 +1000,18 @@ aside a:visited {
   background-color: var(--ns-manual-entry-bg) !important;
 }
 
+/* Filter/search/date controls are also user-owned inputs; keep them yellow while preserving disabled, auto, readonly, and error semantics. */
+:where([data-ns-field-scope="filter"]) :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="reset"]):not([type="button"]):not([type="image"]),
+  select,
+  textarea,
+  [role="combobox"]
+):not(:disabled):not([aria-disabled="true"]):not([readonly]):not([aria-readonly="true"]):not([aria-invalid="true"]):not([data-auto-filled="true"]):not([class*="bg-red-"]):not(:where([data-field-invalid="true"] *)),
+:where([data-ns-field-scope="filter"]) :where(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]), [data-slot="input-group"]:has(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]))):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)),
+:where([data-ns-field-scope="filter"]) :where([data-slot="input-group"]):has(input:not(:disabled):not([readonly]):not([aria-invalid="true"]):not([data-auto-filled="true"])):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)) {
+  background-color: var(--ns-manual-entry-bg) !important;
+}
+
 /* Validation errors override manual-entry yellow with a red field surface. */
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), select, textarea)[aria-invalid="true"]:not(:disabled):not([readonly]),
 :where([role="combobox"])[aria-invalid="true"]:not(:disabled):not([aria-readonly="true"]),
@@ -1051,6 +1063,19 @@ aside a:visited {
   background-color: var(--ns-dark-surface-soft) !important;
   color: var(--ns-dark-text) !important;
   color-scheme: dark;
+}
+
+/* Dark-mode filter/search/date controls keep the shared yellow manual-entry token too. */
+.dark :where([data-ns-field-scope="filter"]) :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="reset"]):not([type="button"]):not([type="image"]),
+  select,
+  textarea,
+  [role="combobox"]
+):not(:disabled):not([aria-disabled="true"]):not([readonly]):not([aria-readonly="true"]):not([aria-invalid="true"]):not([data-auto-filled="true"]):not([class*="bg-red-"]):not(:where([data-field-invalid="true"] *)),
+.dark :where([data-ns-field-scope="filter"]) :where(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]), [data-slot="input-group"]:has(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]))):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)),
+.dark :where([data-ns-field-scope="filter"]) :where([data-slot="input-group"]):has(input:not(:disabled):not([readonly]):not([aria-invalid="true"]):not([data-auto-filled="true"])):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)) {
+  background-color: var(--ns-manual-entry-bg) !important;
+  color: var(--ns-dark-text) !important;
 }
 
 .dark :where(thead, thead tr, thead th) {
