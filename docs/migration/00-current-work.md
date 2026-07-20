@@ -12,15 +12,15 @@ Blocker: the full Next build reaches successful Webpack compilation but fails ro
 
 Objective: implement the approved Access Control Module design across User Admin, Security Admin, multiple roles, action permissions, and branch-scoped finance flows.
 
-## Active Sales Plan UX Batch 2026-07-19
+## Active Sales Plan Design Alignment Batch 2026-07-20
 
-Objective: ปรับ `/sales-plan` ตาม UX audit โดยคงหน้าเดียวและ line-tab วิเคราะห์ 2 มุมมองเดิม ไม่แยกเป็น 4 tabs ระดับหน้า; แก้ wording/status, LME/assumption grouping, KPI, modal, filter, table, dark-mode classes และ no-fallback calculation contract.
+Objective: align operational `/sales-plan` with `docs/design.md` after `/sales-plan-analysis` became the separate read-only analysis route; preserve Sales Plan persistence, formulas, stock behavior, and PO Sell flow.
 
-Write areas: `apps/next/src/components/main/MainSalesControlClients.tsx`, `apps/next/src/lib/server/main-sales-control.ts`, `docs/notes/page-flows/main-dashboard-reports-sales-plan.md`.
+Write areas: Sales Plan API validation, `apps/next/src/components/main/MainSalesControlClients.tsx`, `apps/next/src/lib/server/main-sales-control.ts`, focused design-contract test, and `docs/notes/page-flows/main-dashboard-reports-sales-plan.md`.
 
-Completed locally: UI restructuring and Thai status wording; server analysis now uses only same-product Sales Plan price/% LME and returns no projected price/profit when no plan exists.
+Completed locally: split KPI counts for `draft` / `locked` / `po_created`; shared KPI cards without page-local spacing overrides; persistent yellow manual fields with blue focus and field-level validation; per-field auto/manual provenance; client/API `USD/THB` and `กก./ตู้ > 0` guards; desktop/mobile LME disclosure with visible mobile errors; grouped filters that also drive the product-level pending-sale rows; single-line resizable pending-sale table with canonical alignment/density; neutral mobile shortage cards with quantity, value, price, and profit data; Thai source summary plus technical disclosure. Same-product no-fallback price/profit behavior remains unchanged.
 
-Validation pending: workspace lint, type-check, build, and diff-check.
+Validation: focused Sales Plan + required-field contracts pass `13/13`; workspace lint passes with zero errors and four existing warnings; workspace type-check passes; production build completes `322/322` routes; `npm audit --audit-level=high` reports zero vulnerabilities; staged diff check and independent standards/spec reviews pass. Full Vitest finishes `371/385`; the 14 failures are confined to 10 existing Finance/shared-table/weight-ticket-image test files with no diff from `HEAD`, outside this Sales Plan batch. Browser/DOM UAT was not requested.
 
 Completed locally: effective-permission helper/tests; action catalog and legacy-permission mapping migrations; User Admin/Security Admin split; multi-role user assignment; action checks for petty advance, payment approval, WTI open-bill buttons, purchase/sales bills, supplier payment, customer receipts, supplier ADV and daily expenses.
 
