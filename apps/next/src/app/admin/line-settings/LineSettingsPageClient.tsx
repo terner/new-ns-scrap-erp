@@ -1357,7 +1357,7 @@ export function LineSettingsPageClient() {
 
         {/* Tab 2: Channel Credentials */}
         {activeTab === 'credentials' && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6 animate-fade-in">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6 animate-fade-in" data-ns-field-scope="entry">
             <h3 className="text-base font-bold text-slate-900 pb-2 border-b border-slate-100 flex items-center gap-2">
               <span>🔑</span> การตั้งค่า LINE Messaging API & Credential Configuration
             </h3>

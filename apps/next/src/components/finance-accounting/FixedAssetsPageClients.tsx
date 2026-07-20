@@ -1964,7 +1964,7 @@ function Modal({ children, title }: { children: ReactNode; title: string }) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-0 sm:p-4">
-      <div className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-slate-900 shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-6xl sm:rounded-md">
+      <div className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-slate-900 shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-6xl sm:rounded-md" data-ns-field-scope="entry">
         <div data-ns-dialog-header className="flex shrink-0 flex-wrap items-center justify-between gap-3 bg-slate-900 px-4 py-3 text-white dark:bg-[#0f172a] sm:px-6 sm:py-4">
           <h2 className="min-w-0 truncate text-sm font-semibold text-white">{title}</h2>
           {actions ? <div className="flex shrink-0 flex-wrap justify-end gap-2">{actions}</div> : null}

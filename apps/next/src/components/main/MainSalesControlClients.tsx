@@ -1168,7 +1168,7 @@ export function SalesPlanPageClient() {
             </button>
           </div>
         </div>
-        <details className="group mt-3 lg:mt-4" open={isLmeReferenceOpen} onToggle={(event) => setIsLmeReferenceOpen(event.currentTarget.open)}>
+        <details className="group mt-3 lg:mt-4" data-ns-field-scope="entry" open={isLmeReferenceOpen} onToggle={(event) => setIsLmeReferenceOpen(event.currentTarget.open)}>
           <summary className="flex h-9 cursor-pointer list-none items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 lg:hidden">
             <span>ดูราคาและสมมติฐาน</span>
             <ChevronDown className="size-4 transition-transform group-open:rotate-180" />

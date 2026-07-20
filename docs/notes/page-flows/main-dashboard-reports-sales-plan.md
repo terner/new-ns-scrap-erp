@@ -55,11 +55,13 @@ related_route: /sales-plan-analysis
 
 ## Design Decisions (2026-07-20)
 
+Manual-entry visual follow-up: every field that the user types into or selects in an operational business form stays pale yellow whether it is required or optional. Filters and system-owned values remain neutral; validation remains red and focus remains blue. This does not change which fields are actually required by the Sales Plan schema.
+
 | Topic | Decision |
 |---|---|
 | Route split | `/sales-plan` เป็น operational planning surface ส่วน `/sales-plan-analysis` เป็น read-only analysis surface; ไม่ render ตารางวิเคราะห์ซ้ำในหน้า operational |
 | Status KPI | KPI ของแผนต้องแยก `รอล็อกแผน (draft)`, `ล็อกแผนแล้ว (locked)`, และ `เปิด PO ขายแล้ว (po_created)` เป็นคนละค่า ห้ามรวม `locked` กับ `po_created`; ไม่เพิ่ม card `แผนทั้งหมด` ถ้าซ้ำกับ count/pagination ของตาราง และคง KPI สต๊อกไว้เฉพาะค่าที่ช่วยตัดสินใจจริง |
-| Required manual fields | field ที่ผู้ใช้ต้องกรอกเองและเป็น required ใช้พื้นเหลืองอ่อนคงอยู่แม้กรอกถูกแล้ว; focus ใช้กรอบน้ำเงิน `#3B82F6` กับวงแหวนโปร่ง 3px; validation error ใช้แดงแทนเหลือง ส่วนค่า API, calculated, read-only และ disabled ใช้พื้น neutral |
+| Manual-entry fields | field ที่ผู้ใช้กรอกหรือเลือกเองใช้พื้นเหลืองอ่อนคงอยู่ทั้ง required และ optional; focus ใช้กรอบน้ำเงิน `#3B82F6` กับวงแหวนโปร่ง 3px; validation error ใช้แดงแทนเหลือง ส่วน filter/search, ค่า API, calculated, read-only และ disabled ใช้พื้น neutral |
 | Auto-fill provenance | `USD/THB`, `กก./ตู้` และ `LME cf` ใช้พื้น neutral เฉพาะตอนค่าถูกเติมจากระบบจริง; เมื่อผู้ใช้แก้เอง field นั้นกลับเป็น manual-yellow และสินค้าที่ไม่มี LME อัตโนมัติต้องเริ่มเป็น manual-yellow |
 | LME on mobile | action ดึงราคา/บันทึกยังเข้าถึงได้ใน first viewport ส่วนราคาและสมมติฐานอยู่ใน native disclosure `ดูราคาและสมมติฐาน` ที่ปิดเริ่มต้นเพื่อลดความสูง; Desktop แสดงข้อมูลชุดเดิมโดยไม่ต้องเปิด disclosure |
 | Filters on mobile | ใช้ toolbar กระชับ 2 แถว: ค้นหาสินค้า + `ตัวกรอง` และ `สร้างแผนขาย` + `ส่งออก Excel`; ย้ายเดือน/ประเภทโลหะ/ช่องทางเข้า `MobileFilterSheet` โดยแก้ค่าแบบ draft และค่อยใช้เมื่อกด `ใช้ตัวกรอง`; ซ่อน action ยกเลิกเมื่อไม่มีแผนรอล็อก และเมื่อมีให้แสดงเป็น destructive action ขนาดเล็กแยกจาก primary actions |
