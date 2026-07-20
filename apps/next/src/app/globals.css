@@ -1012,6 +1012,18 @@ aside a:visited {
   background-color: var(--ns-manual-entry-bg) !important;
 }
 
+/* Global fallback: active pages without an explicit scope still follow the same editable-field contract. */
+:where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="reset"]):not([type="button"]):not([type="image"]),
+  select,
+  textarea,
+  [role="combobox"]
+):not(:disabled):not([aria-disabled="true"]):not([readonly]):not([aria-readonly="true"]):not([aria-invalid="true"]):not([data-auto-filled="true"]):not([class*="bg-red-"]):not(:where([data-field-invalid="true"] *)),
+:where(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]), [data-slot="input-group"]:has(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]))):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)),
+:where([data-slot="input-group"]):has(input:not(:disabled):not([readonly]):not([aria-invalid="true"]):not([data-auto-filled="true"])):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)) {
+  background-color: var(--ns-manual-entry-bg) !important;
+}
+
 /* Validation errors override manual-entry yellow with a red field surface. */
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), select, textarea)[aria-invalid="true"]:not(:disabled):not([readonly]),
 :where([role="combobox"])[aria-invalid="true"]:not(:disabled):not([aria-readonly="true"]),
@@ -1074,6 +1086,18 @@ aside a:visited {
 ):not(:disabled):not([aria-disabled="true"]):not([readonly]):not([aria-readonly="true"]):not([aria-invalid="true"]):not([data-auto-filled="true"]):not([class*="bg-red-"]):not(:where([data-field-invalid="true"] *)),
 .dark :where([data-ns-field-scope="filter"]) :where(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]), [data-slot="input-group"]:has(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]))):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)),
 .dark :where([data-ns-field-scope="filter"]) :where([data-slot="input-group"]):has(input:not(:disabled):not([readonly]):not([aria-invalid="true"]):not([data-auto-filled="true"])):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)) {
+  background-color: var(--ns-manual-entry-bg) !important;
+  color: var(--ns-dark-text) !important;
+}
+
+.dark :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="reset"]):not([type="button"]):not([type="image"]),
+  select,
+  textarea,
+  [role="combobox"]
+):not(:disabled):not([aria-disabled="true"]):not([readonly]):not([aria-readonly="true"]):not([aria-invalid="true"]):not([data-auto-filled="true"]):not([class*="bg-red-"]):not(:where([data-field-invalid="true"] *)),
+.dark :where(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]), [data-slot="input-group"]:has(input[data-manual-entry-readonly="true"][readonly]:not(:disabled):not([aria-invalid="true"]))):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)),
+.dark :where([data-slot="input-group"]):has(input:not(:disabled):not([readonly]):not([aria-invalid="true"]):not([data-auto-filled="true"])):not(:has([aria-invalid="true"])):not(:where([data-field-invalid="true"] *)) {
   background-color: var(--ns-manual-entry-bg) !important;
   color: var(--ns-dark-text) !important;
 }

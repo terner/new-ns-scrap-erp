@@ -16,6 +16,7 @@ describe('manual-entry field highlighting contract', () => {
     expect(css).toContain('Every field users type into or select stays pale yellow')
     expect(css).toContain('Filter/search/date controls are also user-owned inputs')
     expect(css).toContain(':where([data-ns-field-scope="filter"])')
+    expect(css).toContain('Global fallback: active pages without an explicit scope')
     expect(css).toContain('form:not([data-ns-field-scope="filter"])')
     expect(css).toContain('[data-ns-dialog-content]:not([data-ns-field-scope="filter"])')
     expect(css).toContain('[data-ns-field-scope="entry"]')
