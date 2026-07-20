@@ -54,6 +54,7 @@ describe('manual-entry field highlighting contract', () => {
     const intlTransfer = source('../finance/foreign/IntlTransferPageClient.tsx')
     const salesPlan = source('../main/MainSalesControlClients.tsx')
     const overseasReceipt = source('../finance/foreign/OverseasReceiptPageClient.tsx')
+    const advancePayments = source('../purchase-flow/AdvancePaymentsPageClient.tsx')
 
     expect(dialog).toContain('data-ns-dialog-content={shellMode}')
     expect(mobileFilterSheet).toContain('data-ns-field-scope="filter"')
@@ -73,6 +74,7 @@ describe('manual-entry field highlighting contract', () => {
     ]) {
       expect(businessSurface).toContain('data-ns-field-scope="entry"')
     }
+    expect(advancePayments).toContain('data-ns-field-scope="filter"')
     expect(weightTicketForm).toMatch(/<div className="relative" data-ns-field-scope="filter">[\s\S]*?<Search[\s\S]*?<Input/)
   })
 

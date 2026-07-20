@@ -820,7 +820,7 @@ export function AdvancePaymentsPageClient() {
             </div>
           </div>
 
-          <div className="space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
+          <div className="space-y-3 rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm" data-ns-field-scope="filter">
             <div className="flex flex-wrap items-center gap-2">
               <Input className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหา ADV / ใบชั่งใหญ่ / ผู้ขาย / ทะเบียน..." type="search" value={q} onChange={(event) => { setQ(event.target.value); setPage(1) }} />
 
