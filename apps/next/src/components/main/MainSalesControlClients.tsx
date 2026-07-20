@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, Calculator, ChevronDown, Download, ExternalLink, LockKeyhole, Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, Calculator, ChevronDown, Download, ExternalLink, LockKeyhole, Plus, RefreshCw, Save, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay, sanitizeDecimalInput } from '@/lib/format'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { KpiCard } from '@/components/ui/KpiCard'
+import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
@@ -82,6 +83,12 @@ type ClearPendingPlansDialogState = {
   }
   message: string
   planIds?: string[]
+}
+type SalesPlanFilterDraft = {
+  channel: string
+  group: string
+  month: string
+  productCode: string
 }
 
 type CommissionSalespersonRow = {
@@ -468,6 +475,7 @@ export function SalesPlanPageClient() {
   const [planFilterGroup, setPlanFilterGroup] = useState('')
   const [planFilterChannel, setPlanFilterChannel] = useState('')
   const [planFilterProductCode, setPlanFilterProductCode] = useState('')
+  const [mobilePlanFilterDraft, setMobilePlanFilterDraft] = useState<SalesPlanFilterDraft | null>(null)
   const [insightFilterGroup, setInsightFilterGroup] = useState('')
   const [insightFilterProductCode, setInsightFilterProductCode] = useState('')
   const [lmeForm, setLmeForm] = useState<LmeConfig | null>(null)
@@ -794,11 +802,41 @@ export function SalesPlanPageClient() {
     )
   }
 
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const hasActivePlanFilters = Boolean(planFilterProductCode || planFilterGroup || planFilterChannel || (month && month !== currentMonth))
+
   const clearPlanFilters = () => {
-    setMonth(new Date().toISOString().slice(0, 7))
+    setMonth(currentMonth)
     setPlanFilterGroup('')
     setPlanFilterChannel('')
     setPlanFilterProductCode('')
+  }
+
+  const openMobilePlanFilters = () => {
+    setMobilePlanFilterDraft({
+      channel: planFilterChannel,
+      group: planFilterGroup,
+      month: month || data?.filters.month || currentMonth,
+      productCode: planFilterProductCode,
+    })
+  }
+
+  const clearMobilePlanFilters = () => {
+    setMobilePlanFilterDraft((current) => current ? {
+      channel: '',
+      group: '',
+      month: currentMonth,
+      productCode: '',
+    } : current)
+  }
+
+  const applyMobilePlanFilters = () => {
+    if (!mobilePlanFilterDraft) return
+    setMonth(mobilePlanFilterDraft.month)
+    setPlanFilterGroup(mobilePlanFilterDraft.group)
+    setPlanFilterChannel(mobilePlanFilterDraft.channel)
+    setPlanFilterProductCode(mobilePlanFilterDraft.productCode)
+    setMobilePlanFilterDraft(null)
   }
 
   function changePlanSort(key: SalesPlanColumnKey) {
@@ -1171,13 +1209,13 @@ export function SalesPlanPageClient() {
         <PendingStatCard label="เปิด PO ขายแล้ว" sublabel="ไม่แสดงในตารางงานค้าง" value={count(data?.summary.poCreatedCount)} tone="info" />
         <PendingStatCard label="สต๊อกว่างขาย" sublabel="หลังหักแผนที่ล็อก" value={`${money(data?.summary.stockRemainingKg)} กก.`} />
       </div>
-      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
-          <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 sm:shrink-0" htmlFor="sales-plan-filter-month">
+      <div data-sales-plan-filter-toolbar="desktop" className="hidden rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 lg:block">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex shrink-0 items-center gap-2 text-xs text-slate-500 dark:text-slate-400" htmlFor="sales-plan-filter-month">
             <span>เดือน:</span>
-            <input className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-[3px] focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/25 sm:w-auto" id="sales-plan-filter-month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+            <input className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-[3px] focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-500/25" id="sales-plan-filter-month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
           </label>
-          <div className="min-w-0 flex-1 sm:min-w-[240px] sm:max-w-sm">
+          <div className="min-w-[240px] max-w-sm flex-1">
             <SearchCombobox
               hideLabel
               inputClassName="h-9 text-sm font-normal text-slate-700 dark:text-slate-100"
@@ -1190,10 +1228,9 @@ export function SalesPlanPageClient() {
               onChange={setPlanFilterProductCode}
             />
           </div>
-          {planFilterProductCode ? (
-            <button className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:w-auto" onClick={() => setPlanFilterProductCode('')} type="button">ล้างสินค้า</button>
+          {hasActivePlanFilters ? (
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" onClick={clearPlanFilters} type="button">ล้างตัวกรอง</button>
           ) : null}
-          <button className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:w-auto" onClick={clearPlanFilters} type="button">ล้างตัวกรอง</button>
         </div>
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
@@ -1214,9 +1251,58 @@ export function SalesPlanPageClient() {
             </label>
           </div>
           <div className="grid grid-cols-2 gap-2 lg:flex lg:items-center lg:justify-end">
+            {pendingPlanCount > 0 ? (
+              <button
+                className="col-span-2 inline-flex h-9 items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50 lg:col-span-1"
+                disabled={isClearingPendingPlans || isSavingPlan}
+                onClick={() => handleClearPendingPlans()}
+                type="button"
+              >
+                {isClearingPendingPlans
+                  ? 'กำลังยกเลิกแผน...'
+                  : selectedVisiblePendingPlanIds.length > 0
+                    ? `ยกเลิกแผนที่เลือก (${selectedVisiblePendingPlanIds.length})`
+                    : `ยกเลิกแผนรอล็อก (${pendingPlanCount})`}
+              </button>
+            ) : null}
+            <button className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700" onClick={openPlanForm} type="button"><Plus className="size-4" />สร้างแผนขาย</button>
+            <button className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700" onClick={exportPlan} type="button"><Download className="size-4" />ส่งออก Excel</button>
+          </div>
+        </div>
+      </div>
+      <div data-sales-plan-filter-toolbar="mobile" className="space-y-2 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 lg:hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <SearchCombobox
+              hideLabel
+              inputClassName="h-9 text-sm font-normal text-slate-700 dark:text-slate-100"
+              inputId="sales-plan-filter-product-mobile"
+              label="สินค้า"
+              openOnFocus={false}
+              options={filterProductOptions}
+              placeholder="ค้นหาสินค้า"
+              value={planFilterProductCode}
+              onChange={setPlanFilterProductCode}
+            />
+          </div>
+          <button
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            onClick={openMobilePlanFilters}
+            type="button"
+          >
+            <SlidersHorizontal className="size-4" />
+            <span>ตัวกรอง{hasActivePlanFilters ? ' (มี)' : ''}</span>
+          </button>
+        </div>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <button className="inline-flex h-9 min-w-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700" onClick={openPlanForm} type="button"><Plus className="size-4" />สร้างแผนขาย</button>
+          <button className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700" onClick={exportPlan} type="button"><Download className="size-4" />ส่งออก Excel</button>
+        </div>
+        {pendingPlanCount > 0 ? (
+          <div className="flex justify-end border-t border-slate-100 pt-2 dark:border-slate-800">
             <button
-              className="col-span-2 inline-flex h-9 items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50 lg:col-span-1"
-              disabled={!pendingPlanCount || isClearingPendingPlans || isSavingPlan}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-rose-200 bg-white px-3 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950/30"
+              disabled={isClearingPendingPlans || isSavingPlan}
               onClick={() => handleClearPendingPlans()}
               type="button"
             >
@@ -1226,11 +1312,48 @@ export function SalesPlanPageClient() {
                   ? `ยกเลิกแผนที่เลือก (${selectedVisiblePendingPlanIds.length})`
                   : `ยกเลิกแผนรอล็อก (${pendingPlanCount})`}
             </button>
-            <button className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700" onClick={openPlanForm} type="button"><Plus className="size-4" />สร้างแผนขาย</button>
-            <button className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700" onClick={exportPlan} type="button"><Download className="size-4" />ส่งออก Excel</button>
           </div>
-        </div>
+        ) : null}
       </div>
+      {mobilePlanFilterDraft ? (
+        <MobileFilterSheet
+          footer={(
+            <>
+              <button className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={clearMobilePlanFilters} type="button">ล้างตัวกรอง</button>
+              <button className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={!mobilePlanFilterDraft.month} onClick={applyMobilePlanFilters} type="button">ใช้ตัวกรอง</button>
+            </>
+          )}
+          onClose={() => setMobilePlanFilterDraft(null)}
+          title="ตัวกรองแผนขาย"
+          visibleClassName="lg:hidden"
+        >
+          <label className="block text-xs font-semibold text-slate-600" htmlFor="sales-plan-filter-month-mobile">
+            <span className="mb-1 block">เดือน</span>
+            <input
+              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 outline-none transition focus:border-blue-500 focus:ring-[3px] focus:ring-blue-500/20"
+              id="sales-plan-filter-month-mobile"
+              type="month"
+              value={mobilePlanFilterDraft.month}
+              onChange={(event) => setMobilePlanFilterDraft((current) => current ? { ...current, month: event.target.value } : current)}
+            />
+          </label>
+          <label className="block text-xs font-semibold text-slate-600" htmlFor="sales-plan-filter-group-mobile">
+            <span className="mb-1 block">ประเภทโลหะ</span>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 outline-none transition focus:border-blue-500 focus:ring-[3px] focus:ring-blue-500/20" id="sales-plan-filter-group-mobile" value={mobilePlanFilterDraft.group} onChange={(event) => setMobilePlanFilterDraft((current) => current ? { ...current, group: event.target.value } : current)}>
+              <option value="">ทุกหมวด (ทองแดง+ทองเหลือง)</option>
+              <option value="ทองแดง">ทองแดงเท่านั้น</option>
+              <option value="ทองเหลือง">ทองเหลืองเท่านั้น</option>
+            </select>
+          </label>
+          <label className="block text-xs font-semibold text-slate-600" htmlFor="sales-plan-filter-channel-mobile">
+            <span className="mb-1 block">ช่องทาง</span>
+            <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 outline-none transition focus:border-blue-500 focus:ring-[3px] focus:ring-blue-500/20" id="sales-plan-filter-channel-mobile" value={mobilePlanFilterDraft.channel} onChange={(event) => setMobilePlanFilterDraft((current) => current ? { ...current, channel: event.target.value } : current)}>
+              <option value="">ทุกช่องทาง</option>
+              {(data?.filters.channels ?? []).map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+            </select>
+          </label>
+        </MobileFilterSheet>
+      ) : null}
       {/* 1. Sales Plan Section */}
       <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
         <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-semibold text-slate-600">
