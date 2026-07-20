@@ -1279,7 +1279,7 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
           <DialogContent className="max-w-2xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
             <form className="flex flex-col h-full overflow-hidden" onSubmit={saveUser}>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900 px-5 py-4 text-white shrink-0 dark:border-slate-700 dark:bg-slate-950">
+              <div data-ns-dialog-header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900 px-5 py-4 text-white shrink-0 dark:border-slate-700 dark:bg-slate-950">
                 <DialogTitle className="text-lg font-bold text-white">{editingUser ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้'}</DialogTitle>
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm font-normal text-white hover:border-rose-700 hover:bg-rose-700 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
@@ -1445,10 +1445,10 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
         <Dialog open={roleFormOpen} onOpenChange={setRoleFormOpen}>
           <DialogContent className="max-w-3xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
             <form className="flex flex-col h-full overflow-hidden" onSubmit={saveRole}>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900 px-5 py-4 shrink-0">
+              <div data-ns-dialog-header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900 px-5 py-4 shrink-0">
                 <DialogTitle className="text-lg font-bold text-slate-100">{editingRole ? 'แก้ไขหน้าที่งาน' : 'เพิ่มหน้าที่งาน'}</DialogTitle>
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                  <ActiveToggle checked={roleForm.active} onChange={(active) => setRoleForm((current) => ({ ...current, active }))} />
+                  <ActiveToggle checked={roleForm.active} labelClassName="text-sm font-medium text-current" onChange={(active) => setRoleForm((current) => ({ ...current, active }))} />
                   <button className="h-9 rounded-md border border-rose-600 bg-rose-600 px-4 text-sm text-white hover:bg-rose-700 disabled:opacity-50" disabled={isSavingRole} type="button" onClick={() => setRoleFormOpen(false)}>ยกเลิก</button>
                   <button className="h-9 rounded-md bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={isSavingRole} type="submit">{isSavingRole ? 'กำลังบันทึก...' : 'บันทึก'}</button>
                 </div>

@@ -97,7 +97,7 @@ export function MobileFilterSheet({
         role="dialog"
         tabIndex={-1}
       >
-        <div className="flex items-center rounded-t-md bg-slate-900 px-4 py-4 text-white">
+        <div data-ns-dialog-header className="flex items-center rounded-t-md bg-slate-900 px-4 py-4 text-white">
           <h4 className="text-sm font-bold text-white" id={titleId}>{title}</h4>
         </div>
 

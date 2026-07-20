@@ -480,7 +480,7 @@ export function DailyTransferPageClient() {
       {formOpen ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4">
           <form noValidate className="mx-auto my-4 w-full max-w-3xl overflow-hidden rounded-md bg-slate-900 shadow-xl animate-in fade-in zoom-in-95 duration-150" onSubmit={saveForm}>
-            <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+            <div data-ns-dialog-header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
               <h3 className="font-bold text-white">{form.id ? 'แก้ไขรายการโอนเงิน' : 'โอนเงินระหว่างบัญชี'}</h3>
               <div className="flex shrink-0 flex-wrap justify-end gap-2">
                 <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" size="sm" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>

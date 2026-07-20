@@ -484,7 +484,7 @@ export function StockTransferPageClient() {
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
           <form noValidate data-combobox-portal-root="true" className="relative w-full max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 shadow-xl outline-none focus:outline-none flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
-            <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white shrink-0">
+            <div data-ns-dialog-header className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white shrink-0">
               <div>
                 <h3 className="font-bold text-slate-100 text-lg">{editingDocNo ? 'แก้ไขรายการโอนสินค้า' : 'โอนสินค้าระหว่างสาขา'}</h3>
               </div>

@@ -2450,7 +2450,7 @@ export function LineSettingsPageClient() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in">
           <div className="relative w-full max-w-md overflow-hidden rounded-md bg-slate-900 shadow-2xl animate-zoom-in">
             {/* Modal Header */}
-            <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+            <div data-ns-dialog-header className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
               <h3 className="text-base font-bold">
                 {editingTarget.id ? '📝 แก้ไขรายละเอียดผู้รับ' : '👥 เพิ่มเป้าหมายรับแจ้งเตือนใหม่'}
               </h3>
@@ -2873,7 +2873,7 @@ export function LineSettingsPageClient() {
       {isTemplateModalOpen && editingTemplate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in">
           <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-md border-0 bg-slate-900 shadow-2xl animate-zoom-in">
-            <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+            <div data-ns-dialog-header className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
               <h3 className="text-base font-bold">
                 {editingTemplate.id ? '📝 แก้ไขเทมเพลตและ Preview' : '➕ เพิ่มเทมเพลตการ์ดใหม่'}
               </h3>
@@ -3174,7 +3174,7 @@ export function LineSettingsPageClient() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in">
           <div className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-md bg-slate-900 shadow-2xl animate-zoom-in">
             {/* Header */}
-            <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+            <div data-ns-dialog-header className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
               <h3 className="text-base font-bold">📋 ประวัติการยิงและการส่งของบิล {selectedJob.document_no}</h3>
               <button
                 type="button"

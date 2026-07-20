@@ -418,7 +418,7 @@ export function SystemSettingsPageClient() {
       {pendingSave ? (
         <Dialog open={!!pendingSave} onOpenChange={() => setPendingSave(null)}>
           <DialogContent className="max-w-md rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
-            <div className="border-b border-slate-800 px-5 py-4 bg-slate-900 shrink-0 flex items-center justify-between">
+            <div data-ns-dialog-header className="border-b border-slate-800 px-5 py-4 bg-slate-900 shrink-0 flex items-center justify-between">
               <div>
                 <DialogTitle className="text-lg font-bold text-slate-100">ยืนยันการเปลี่ยนค่าระบบ</DialogTitle>
                 <p className="mt-1 text-xs text-slate-400">{pendingSave.record.name}</p>

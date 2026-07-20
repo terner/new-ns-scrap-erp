@@ -372,6 +372,44 @@ code {
   background-color: var(--ns-dark-table-header) !important;
 }
 
+/* Modal headers share the same visual hierarchy as table headers. */
+[data-ns-dialog-header] {
+  background-color: var(--color-slate-100) !important;
+  border-bottom: 1px solid var(--color-slate-200) !important;
+  color: var(--color-slate-700) !important;
+}
+
+[data-ns-dialog-header] :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--color-slate-800) !important;
+}
+
+[data-ns-dialog-header] :where(p) {
+  color: var(--color-slate-600) !important;
+}
+
+.dark [data-ns-dialog-header] {
+  background-color: var(--ns-dark-table-header) !important;
+  border-bottom-color: var(--ns-dark-border-strong) !important;
+  color: var(--ns-dark-muted) !important;
+}
+
+/* Beat the higher-specificity legacy dark utility remap on older modal headers. */
+.dark [data-ns-dialog-header].bg-slate-800.text-white,
+.dark [data-ns-dialog-header].bg-slate-900.text-white,
+.dark [data-ns-dialog-header].bg-slate-950.text-white {
+  background-color: var(--ns-dark-table-header) !important;
+  border-bottom-color: var(--ns-dark-border-strong) !important;
+  color: var(--ns-dark-muted) !important;
+}
+
+.dark [data-ns-dialog-header] :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--ns-dark-text) !important;
+}
+
+.dark [data-ns-dialog-header] :where(p) {
+  color: var(--ns-dark-muted) !important;
+}
+
 /* Legacy form baseline: plain Tailwind `border` controls should render light slate, and text color should match theme. */
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 select,
