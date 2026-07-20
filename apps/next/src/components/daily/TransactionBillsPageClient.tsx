@@ -655,7 +655,7 @@ const initialPurchaseForm = (): PurchaseBillFormValues => ({
   note: null,
   notes: null,
   poBuyId: null,
-  purchaseChannelId: '',
+  purchaseChannelId: null,
   purchaseSource: 'SPOT_BUY',
   receiptTicketId: null,
   refNo: null,
@@ -2000,7 +2000,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       note: row.note || null,
       notes: row.note || null,
       poBuyId: row.poBuyId || null,
-      purchaseChannelId: row.purchaseChannelId ?? '',
+      purchaseChannelId: row.purchaseChannelId || null,
       purchaseSource: (row.purchaseSource === 'PO_RECEIPT' || row.purchaseSource === 'MIXED') ? row.purchaseSource : 'SPOT_BUY',
       receiptTicketId: items[0]?.receiptTicketId ?? null,
       refNo: row.refNo || null,
@@ -3273,17 +3273,17 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                   </td>
                 ) : null}
                 {mode === 'sales' ? <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.refNo || '-'}</td> : null}
-                <td className="p-2 text-center text-xs font-semibold text-slate-700">{formatDateDisplay(row.date)}</td>
+                <td className="p-2 text-left text-xs font-semibold text-slate-700">{formatDateDisplay(row.date)}</td>
                 <td className="ns-table-textual-column p-2 text-xs font-semibold text-slate-700">{'supplierName' in row ? row.supplierName : row.customerName}</td>
                 {mode !== 'purchase' ? <td className="p-2 text-xs font-semibold text-slate-700">{formatBranchWarehouse(row)}</td> : null}
-                <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.transactionMode === 'TRADING' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>{transactionModeLabel(row.transactionMode)}</span></td>
-                <td className="p-2 text-center">
+                <td className="p-2 text-left"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.transactionMode === 'TRADING' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>{transactionModeLabel(row.transactionMode)}</span></td>
+                <td className="p-2 text-left">
                   <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${mode === 'purchase' ? workflowStatusBadgeClass(row.paymentWorkflowStatus ?? 'pending_approval') : statusBadgeClass(row.status)}`}>
                     <span className="size-1.5 rounded-full bg-current" />
                     {mode === 'purchase' ? workflowStatusText(row.paymentWorkflowStatus ?? 'pending_approval') : statusText(row.status)}
                   </span>
                 </td>
-                {mode === 'purchase' ? <td className="p-2 text-center text-xs font-semibold text-slate-700"><CollapsedList items={row.paymentDocNos} splitItems={true} /></td> : null}
+                {mode === 'purchase' ? <td className="p-2 text-left text-xs font-semibold text-slate-700"><CollapsedList items={row.paymentDocNos} splitItems={true} /></td> : null}
                 {mode !== 'purchase' ? <td className="p-2 pr-4 text-right text-xs font-semibold text-slate-700 tabular-nums">{row.itemCount}</td> : null}
                 <TableNumberCell strong value={formatMoney(row.totalAmount ?? 0)} />
                 {mode === 'sales' ? <td className={`p-2 pr-4 text-right font-semibold tabular-nums ${(row.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}><div>{formatMoney(row.grossProfit ?? 0)}</div><div className="text-xs text-slate-500">{formatMoney((row.subtotal ?? row.totalAmount ?? 0) > 0 ? (row.grossProfit ?? 0) / (row.subtotal ?? row.totalAmount ?? 1) * 100 : 0)}%</div></td> : null}
@@ -3409,22 +3409,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
               <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
                 <h4 className="mb-2 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
-                <div className="grid gap-x-4 gap-y-2 md:grid-cols-[120px_180px_170px_300px_300px] md:justify-start">
+                <div className="grid gap-x-4 gap-y-2 md:grid-cols-[120px_170px_300px_300px] md:justify-start">
                   <BranchSelectCombobox branches={activeBranches} disabled={stockReceiptLocked} error={fieldErrors.branchId} errorKey="branchId" inputId="purchase-bill-branch-search" label="สาขา *" placeholder="เลือกสาขา" value={form.branchId} widthClassName="max-w-[120px]" onChange={(branchId) => updateForm('branchId', branchId ?? '')} />
-                  <SearchCombobox
-                    error={fieldErrors.purchaseChannelId}
-                    errorKey="purchaseChannelId"
-                    inputId="purchase-bill-purchase-channel-search"
-                    label="ช่องทางซื้อ *"
-                    options={options.purchaseChannels.map((channel) => ({
-                      id: channel.id,
-                      label: channel.label ?? channel.name,
-                      searchText: `${channel.code ?? ''} ${channel.name} ${channel.label ?? ''}`,
-                    }))}
-                    placeholder="เลือกช่องทางซื้อ"
-                    value={form.purchaseChannelId}
-                    onChange={(value) => updateForm('purchaseChannelId', value)}
-                  />
                   {form.transactionMode === 'STOCK' ? (
                     <label className="block text-xs font-medium text-slate-600">
                       คลัง <span className="ml-1 text-red-600">*</span>

@@ -1023,7 +1023,7 @@ export function PoBuyPageClient() {
               <ResizableTableHead align="center" label={<input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} />} resizeProps={columnResize.getResizeHandleProps('checkbox', 'เลือก')} />
               <PoBuySortHeader activeKey={sortKey} className="ns-leading-business-column" direction={sortDirection} label="เลขที่ PO ซื้อ" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่ PO ซื้อ')} sortKey="docNo" onSort={changeSort} />
               <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่สร้างเอกสาร" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่สร้างเอกสาร')} sortKey="date" onSort={changeSort} />
-              <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="ผู้ขาย" resizeProps={columnResize.getResizeHandleProps('supplierName', 'ผู้ขาย')} sortKey="supplierName" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} className="ns-leading-business-column [&>button]:justify-start [&>button]:text-left [&>div]:justify-start [&>div]:text-left" direction={sortDirection} label="ผู้ขาย" resizeProps={columnResize.getResizeHandleProps('supplierName', 'ผู้ขาย')} sortKey="supplierName" onSort={changeSort} />
               <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการสินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'รายการสินค้า')} sortKey="productName" onSort={changeSort} />
               <PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" resizeProps={columnResize.getResizeHandleProps('qty', 'จำนวนรวม')} sortKey="qty" onSort={changeSort} />
               <PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'มูลค่ารวม')} sortKey="totalAmount" onSort={changeSort} />
@@ -1043,7 +1043,9 @@ export function PoBuyPageClient() {
                 <TableCell className="text-center"><input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} /></TableCell>
                 <TableCell className="ns-leading-business-column whitespace-nowrap font-mono">{row.docNo}</TableCell>
                 <TableCell className="whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
-                <TableCell className="w-36">{row.supplierName}</TableCell>
+                <TableCell className="w-36">
+                  <div className="w-full text-left">{row.supplierName}</div>
+                </TableCell>
                 <TableCell className="w-[280px] max-w-[280px]">
                   <PoBuyItemSummary fallbackText={row.productName} items={row.items} />
                 </TableCell>
