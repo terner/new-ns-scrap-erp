@@ -1765,10 +1765,10 @@ function AdjustDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-10">
       <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-md border-0 bg-slate-900 shadow-2xl outline-none">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+        <div data-ns-dialog-header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white">
           <div className="min-w-0">
             <h3 className="text-base font-bold text-white">รายละเอียดปรับสต๊อก · {formatCell(detail.docNo)}</h3>
-            <div className="mt-1 text-xs text-slate-400">{formatDateDisplay(String(detail.date ?? ''))} · {formatCell(detail.branchWarehouse)} · {formatCell(detail.status)}</div>
+            <p className="mt-1 text-xs">{formatDateDisplay(String(detail.date ?? ''))} · {formatCell(detail.branchWarehouse)} · {formatCell(detail.status)}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <span className={`inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold ${statusClass}`}>

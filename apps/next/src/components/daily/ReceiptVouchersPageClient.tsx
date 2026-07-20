@@ -1277,7 +1277,7 @@ function CancelReceiptVoucherDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 print:hidden">
       <div data-ns-modal-shell="dialog" className="w-full max-w-lg overflow-hidden rounded-md bg-slate-900 shadow-xl">
-        <div className="bg-slate-900 px-5 py-3 text-white">
+        <div data-ns-dialog-header className="bg-slate-900 px-5 py-3 text-white">
           <h3 className="text-base font-bold text-white">ยกเลิกใบสำคัญรับเงิน {row.docNo}</h3>
           <p className="mt-1 text-xs text-slate-300">{row.sellerName || '-'}</p>
         </div>

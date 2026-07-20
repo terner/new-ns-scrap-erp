@@ -3889,7 +3889,7 @@ function PaymentHistoryDetailDialog({
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="min-w-0">
             <DialogTitle className="truncate text-base font-bold text-white">รายละเอียด {detailDocNo}</DialogTitle>
-            <div className="mt-1 truncate text-xs text-slate-300">{detailPartyName}</div>
+            <p className="mt-1 truncate text-xs">{detailPartyName}</p>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             {row && row.status !== 'cancelled' ? (
