@@ -108,9 +108,11 @@ function isModalHeaderSlot(node: ts.JsxElement) {
 }
 
 function cssRule(source: string, selector: string) {
-  const start = source.indexOf(`${selector} {`)
+  const normalizedSource = source.replace(/\r\n/g, '\n')
+  const normalizedSelector = selector.replace(/\r\n/g, '\n')
+  const start = normalizedSource.indexOf(`${normalizedSelector} {`)
   if (start < 0) return ''
-  return source.slice(start, source.indexOf('}', start) + 1)
+  return normalizedSource.slice(start, normalizedSource.indexOf('}', start) + 1)
 }
 
 describe('Dialog header palette', () => {
