@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Select } from '@/components/ui/Select'
 import { SegmentedFilterButton } from '@/components/ui/SegmentedFilterButton'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -299,7 +300,7 @@ export function MatchLogPageClient() {
               <td className="p-2 text-center text-xs">{row.allocationMode}</td>
               <td className="p-2 text-center"><span className={`rounded-md px-2 py-0.5 text-xs ${row.status === 'reversed' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{statusLabel(row.status)}</span></td>
               <td className="p-2 text-right">
-                {row.status !== 'reversed' ? <button className="text-xs text-red-600 opacity-60" disabled title="Reverse ยังเป็น read-only shell" type="button">ย้อนกลับ</button> : null}
+                {row.status !== 'reversed' ? <TableActionButton className="text-red-600" disabled title="Reverse ยังเป็น read-only shell" label="ย้อนกลับ" /> : null}
               </td>
             </tr>
           ))}

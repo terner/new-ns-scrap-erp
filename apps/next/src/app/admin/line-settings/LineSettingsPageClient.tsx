@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { getErrorMessage } from '@/lib/api-client'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem, tableActionButtonClassName } from '@/components/ui/TableActionButton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader } from '@/components/ui/Dialog'
@@ -1632,40 +1633,14 @@ export function LineSettingsPageClient() {
                             })()}
                           </td>
                           <td className="px-3 py-3 text-right">
-                            <div className="flex justify-end gap-1.5">
-                              <button
-                                type="button"
-                                className="px-2 py-1 text-xs font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 hover:bg-slate-50 rounded-md transition focus:outline-none h-7 flex items-center"
-                                onClick={() => void handleTestTarget(t.target_id, t.id)}
-                              >
-                                🔌 ทดสอบส่ง
-                              </button>
-                              <button
-                                type="button"
-                                className="px-2 py-1 text-xs font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 hover:bg-slate-50 rounded-md transition focus:outline-none h-7 flex items-center"
-                                onClick={() => void handleSetDefaultTarget(t.id)}
-                                disabled={t.is_default}
-                              >
-                                ⭐ ตั้งดีฟอลต์
-                              </button>
-                              <button
-                                type="button"
-                                className="px-2 py-1 text-xs font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 hover:bg-slate-50 rounded-md transition focus:outline-none h-7 flex items-center"
-                                onClick={() => {
-                                  setEditingTarget(t)
-                                  setIsTargetModalOpen(true)
-                                }}
-                              >
-                                📝 แก้ไข
-                              </button>
-                              <button
-                                type="button"
-                                className="px-2 py-1 text-xs font-semibold text-red-600 hover:text-red-700 border border-slate-200 hover:bg-slate-50 rounded-md transition focus:outline-none h-7 flex items-center"
-                                onClick={() => void handleDeleteTarget(t.id)}
-                              >
-                                ❌ ลบ
-                              </button>
-                            </div>
+                            <TableActionButton menu={(
+                              <>
+                                <TableActionMenuItem onSelect={() => void handleTestTarget(t.target_id, t.id)}>ทดสอบส่ง</TableActionMenuItem>
+                                <TableActionMenuItem disabled={t.is_default} onSelect={() => void handleSetDefaultTarget(t.id)}>ตั้งดีฟอลต์</TableActionMenuItem>
+                                <TableActionMenuItem onSelect={() => { setEditingTarget(t); setIsTargetModalOpen(true) }}>แก้ไข</TableActionMenuItem>
+                                <TableActionMenuItem onSelect={() => void handleDeleteTarget(t.id)}>ลบ</TableActionMenuItem>
+                              </>
+                            )} />
                           </td>
                         </tr>
                       ))}
@@ -1730,40 +1705,14 @@ export function LineSettingsPageClient() {
                             </span>
                           )
                         })()}
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            className="px-2 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 text-slate-700 h-8 flex items-center"
-                            onClick={() => void handleTestTarget(t.target_id, t.id)}
-                          >
-                            🔌 ทดสอบ
-                          </button>
-                          <button
-                            type="button"
-                            className="px-2 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 text-slate-700 h-8 flex items-center"
-                            onClick={() => void handleSetDefaultTarget(t.id)}
-                            disabled={t.is_default}
-                          >
-                            ⭐ ดีฟอลต์
-                          </button>
-                          <button
-                            type="button"
-                            className="px-2 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 text-slate-700 h-8 flex items-center"
-                            onClick={() => {
-                              setEditingTarget(t)
-                              setIsTargetModalOpen(true)
-                            }}
-                          >
-                            📝 แก้ไข
-                          </button>
-                          <button
-                            type="button"
-                            className="px-2 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 text-red-600 h-8 flex items-center"
-                            onClick={() => void handleDeleteTarget(t.id)}
-                          >
-                            ❌ ลบ
-                          </button>
-                        </div>
+                        <TableActionButton menu={(
+                          <>
+                            <TableActionMenuItem onSelect={() => void handleTestTarget(t.target_id, t.id)}>ทดสอบ</TableActionMenuItem>
+                            <TableActionMenuItem disabled={t.is_default} onSelect={() => void handleSetDefaultTarget(t.id)}>ตั้งดีฟอลต์</TableActionMenuItem>
+                            <TableActionMenuItem onSelect={() => { setEditingTarget(t); setIsTargetModalOpen(true) }}>แก้ไข</TableActionMenuItem>
+                            <TableActionMenuItem onSelect={() => void handleDeleteTarget(t.id)}>ลบ</TableActionMenuItem>
+                          </>
+                        )} />
                       </div>
                     </div>
                   ))
@@ -1884,26 +1833,12 @@ export function LineSettingsPageClient() {
                               </span>
                             </td>
                             <td className="px-3 py-3 text-right">
-                              <div className="flex justify-end gap-1.5">
-                                <button
-                                  type="button"
-                                  className="px-2 py-1 text-xs font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 hover:bg-slate-50 rounded-md transition focus:outline-none h-7 flex items-center"
-                                  onClick={() => {
-                                    setRuleFieldErrors({})
-                                    setEditingRule(r)
-                                    setIsRuleModalOpen(true)
-                                  }}
-                                >
-                                  📝 แก้ไข
-                                </button>
-                                <button
-                                  type="button"
-                                  className="px-2 py-1 text-xs font-semibold text-red-600 hover:text-red-700 border border-slate-200 hover:bg-slate-50 rounded-md transition focus:outline-none h-7 flex items-center"
-                                  onClick={() => void handleDeleteRule(r.id)}
-                                >
-                                  ❌ ลบ
-                                </button>
-                              </div>
+                              <TableActionButton menu={(
+                                <>
+                                  <TableActionMenuItem onSelect={() => { setRuleFieldErrors({}); setEditingRule(r); setIsRuleModalOpen(true) }}>แก้ไข</TableActionMenuItem>
+                                  <TableActionMenuItem onSelect={() => void handleDeleteRule(r.id)}>ลบ</TableActionMenuItem>
+                                </>
+                              )} />
                             </td>
                           </tr>
                         )
@@ -1956,7 +1891,7 @@ export function LineSettingsPageClient() {
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
-                            className="px-2.5 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 text-slate-700 h-8 flex items-center"
+                            className={`${tableActionButtonClassName} text-sm`}
                             onClick={() => {
                               setRuleFieldErrors({})
                               setEditingRule(r)
@@ -1967,7 +1902,7 @@ export function LineSettingsPageClient() {
                           </button>
                           <button
                             type="button"
-                            className="px-2.5 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 text-red-600 h-8 flex items-center"
+                            className={`${tableActionButtonClassName} text-sm text-red-600`}
                             onClick={() => void handleDeleteRule(r.id)}
                           >
                             ❌ ลบ
@@ -2205,32 +2140,13 @@ export function LineSettingsPageClient() {
                               {job.attempt_count} / {job.max_attempts}
                             </td>
                             <td className="px-3 py-3 text-right">
-                              <div className="flex justify-end gap-1.5">
-                                <button
-                                  type="button"
-                                  className="px-2 py-1 text-xs font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 hover:bg-slate-50 rounded-md transition focus:outline-none h-7 flex items-center"
-                                  onClick={() => setSelectedJob(job)}
-                                >
-                                  👁️ ดูประวัติยิง
-                                </button>
-                                <button
-                                  type="button"
-                                  className="px-2 py-1 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition focus:outline-none h-7 flex items-center"
-                                  onClick={() => void handleRetryJob(job.id, job.document_no)}
-                                  disabled={job.status === 'processing'}
-                                >
-                                  🔄 ยิงใหม่
-                                </button>
-                                {job.status === 'pending' && (
-                                  <button
-                                    type="button"
-                                    className="px-2 py-1 text-xs font-semibold text-rose-600 hover:text-rose-700 border border-slate-200 hover:bg-slate-50 rounded-md transition focus:outline-none h-7 flex items-center"
-                                    onClick={() => void handleCancelJob(job.id)}
-                                  >
-                                    🚫 ยกเลิก
-                                  </button>
-                                )}
-                              </div>
+                              <TableActionButton menu={(
+                                <>
+                                  <TableActionMenuItem onSelect={() => setSelectedJob(job)}>ดูประวัติยิง</TableActionMenuItem>
+                                  <TableActionMenuItem disabled={job.status === 'processing'} onSelect={() => void handleRetryJob(job.id, job.document_no)}>ยิงใหม่</TableActionMenuItem>
+                                  {job.status === 'pending' ? <TableActionMenuItem onSelect={() => void handleCancelJob(job.id)}>ยกเลิก</TableActionMenuItem> : null}
+                                </>
+                              )} />
                             </td>
                           </tr>
                         )
@@ -2287,7 +2203,7 @@ export function LineSettingsPageClient() {
                         <div className="flex justify-end gap-2 pt-1.5">
                           <button
                             type="button"
-                            className="px-2.5 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 text-slate-700 h-8 flex items-center"
+                            className={`${tableActionButtonClassName} text-sm`}
                             onClick={() => setSelectedJob(job)}
                           >
                             👁️ ดูประวัติยิง
@@ -2303,7 +2219,7 @@ export function LineSettingsPageClient() {
                           {job.status === 'pending' && (
                             <button
                               type="button"
-                              className="px-2.5 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 text-rose-600 h-8 flex items-center"
+                              className={`${tableActionButtonClassName} text-sm text-rose-600`}
                               onClick={() => void handleCancelJob(job.id)}
                             >
                               🚫 ยกเลิก

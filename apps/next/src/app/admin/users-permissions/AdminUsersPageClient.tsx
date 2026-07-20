@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { Copy, EllipsisVertical, KeyRound, Mail, Pencil, Send } from 'lucide-react'
+import { Copy, KeyRound, Mail, Pencil, Send } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
@@ -11,6 +11,7 @@ import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
 import { SegmentedFilterButton } from '@/components/ui/SegmentedFilterButton'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { getErrorMessage, readJsonResponse } from '@/lib/api-client'
@@ -706,15 +707,12 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
+          <TableActionButton
             aria-label={`จัดการ ${fullName(user)}`}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-slate-400"
             disabled={actionUserId === user.id}
+            label="จัดการ"
             title="จัดการ"
-            type="button"
-          >
-            <EllipsisVertical aria-hidden="true" className="h-4 w-4" />
-          </button>
+          />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56 bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
           <DropdownMenuItem className="cursor-pointer gap-2 text-slate-700 focus:text-slate-950 dark:text-slate-100 dark:focus:text-white" onSelect={() => openEditUser(user)}>

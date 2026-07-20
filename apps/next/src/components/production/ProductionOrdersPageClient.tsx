@@ -8,6 +8,7 @@ import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Select } from '@/components/ui/Select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -1609,13 +1610,10 @@ function MovementPanel({
                   </td>
                   <td className="p-2 text-right">
                     {canWrite && isRowActive ? (
-                      <button
-                        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-normal text-slate-700 hover:bg-slate-50"
-                        type="button"
+                      <TableActionButton
                         onClick={() => onReverse(row.docNo)}
-                      >
-                        Reverse
-                      </button>
+                        label="Reverse"
+                      />
                     ) : null}
                   </td>
                 </tr>

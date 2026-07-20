@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
@@ -793,17 +794,16 @@ export function ReceiptVouchersPageClient() {
                   <TableNumberCell value={formatMoney(row.totalQty)} />
                   <TableNumberCell strong value={formatMoney(row.totalAmount)} />
                   <td className="whitespace-nowrap p-2 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60" type="button" disabled={printingDocNo === row.docNo} onClick={(event) => { event.stopPropagation(); void printReceiptVoucher(row) }}>
-                        {printingDocNo === row.docNo ? 'กำลังพิมพ์...' : 'พิมพ์'}
-                      </button>
-                      {row.status !== 'cancelled' ? (
+                    <TableActionButton
+                      busy={printingDocNo === row.docNo}
+                      menu={(
                         <>
-                          <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
-                          <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50" type="button" onClick={(event) => { event.stopPropagation(); setCancelingRow(row); setCancelNote(''); setCancelError(null) }}>ยกเลิก</button>
+                          <TableActionMenuItem disabled={printingDocNo === row.docNo} onSelect={() => void printReceiptVoucher(row)}>พิมพ์</TableActionMenuItem>
+                          {row.status !== 'cancelled' ? <TableActionMenuItem onSelect={() => openEditForm(row)}>แก้ไข</TableActionMenuItem> : null}
+                          {row.status !== 'cancelled' ? <TableActionMenuItem onSelect={() => { setCancelingRow(row); setCancelNote(''); setCancelError(null) }}>ยกเลิก</TableActionMenuItem> : null}
                         </>
-                      ) : null}
-                    </div>
+                      )}
+                    />
                   </td>
                 </TableRow>
               ))}

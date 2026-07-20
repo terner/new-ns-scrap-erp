@@ -7,6 +7,7 @@ import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -732,10 +733,16 @@ export function DailyPettyAdvancePageClient() {
                 <td className="p-2 pr-4 text-right text-emerald-700 tabular-nums">{formatMoney(row.returned)}</td>
                 <td className={`p-2 pr-4 text-right font-bold tabular-nums ${row.remaining > 1 ? 'text-red-700' : 'text-emerald-700'}`}>{formatMoney(row.remaining)}</td>
                 <td className="p-2 text-center"><StatusBadge status={row.status} /></td>
-                <td className="space-x-1 whitespace-nowrap p-2 text-right">
-                  <button className="text-xs text-blue-600 hover:underline" title="ดูรายละเอียด" type="button" onClick={(event) => { event.stopPropagation(); setDetailRow(row) }}>ดู</button>
-                  {row.status === 'active' && row.remaining > 0 && row.pendingReturn <= 0 ? <button className="rounded-md bg-emerald-600 px-2 py-1 text-xs text-white" type="button" onClick={(event) => { event.stopPropagation(); openReturnForm(row) }}>คืนเงิน</button> : null}
-                  {row.status === 'active' ? <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button> : null}
+                <td className="whitespace-nowrap p-2 text-right">
+                  <TableActionButton
+                    menu={(
+                      <>
+                        <TableActionMenuItem onSelect={() => setDetailRow(row)}>ดูรายละเอียด</TableActionMenuItem>
+                        {row.status === 'active' && row.remaining > 0 && row.pendingReturn <= 0 ? <TableActionMenuItem onSelect={() => openReturnForm(row)}>คืนเงิน</TableActionMenuItem> : null}
+                        {row.status === 'active' ? <TableActionMenuItem onSelect={() => openEditForm(row)}>แก้ไข</TableActionMenuItem> : null}
+                      </>
+                    )}
+                  />
                 </td>
               </tr>
             ))}

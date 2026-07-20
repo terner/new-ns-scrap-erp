@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 
 type CustomerFilter = {
   active: boolean | null
@@ -159,7 +160,7 @@ export function CustomerAdvancePageClient() {
             </button>
           ) : null}
         </div>
-        <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+        <table className="ns-table w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {customerAdvanceColumns.map((col) => (
               <col key={col.key} style={columnResize.getColumnStyle(col.key)} />
@@ -177,7 +178,7 @@ export function CustomerAdvancePageClient() {
               <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="ใช้แล้ว" resizeProps={columnResize.getResizeHandleProps('usedAmount', 'ใช้แล้ว')} sortKey="usedAmount" onSort={changeSort} />
               <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="คงเหลือ" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'คงเหลือ')} sortKey="remainingAmount" onSort={changeSort} />
               <ResizableTableHead activeSortKey={sortKey ?? undefined} align="center" direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
-              <ResizableTableHead label="" resizeProps={columnResize.getResizeHandleProps('action', '')} />
+              <ResizableTableHead label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
             </tr>
           </thead>
           <tbody>
@@ -195,7 +196,7 @@ export function CustomerAdvancePageClient() {
                 <td className="truncate px-4 py-3.5 text-right text-slate-600">{formatMoney(row.usedAmount)}</td>
                 <td className="truncate px-4 py-3.5 text-right font-bold text-emerald-700">{formatMoney(row.remainingAmount)}</td>
                 <td className="truncate px-4 py-3.5 text-center"><StatusBadge status={row.status} /></td>
-                <td className="truncate px-4 py-3.5 text-right"><button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled type="button">ยกเลิก</button></td>
+                <td className="truncate px-4 py-3.5 text-right"><TableActionButton disabled label="ยกเลิก" /></td>
               </tr>
             ))}
           </tbody>

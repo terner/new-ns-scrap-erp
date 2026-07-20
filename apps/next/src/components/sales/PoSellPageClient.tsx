@@ -16,6 +16,7 @@ import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { poSellPageFormSchema, type PoSellPageFormValues as PoSellFormValues } from '@/lib/sales'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -886,63 +887,14 @@ export function PoSellPageClient() {
                 <div className="truncate font-mono text-xs text-slate-400" title={formatTimestampDisplay(row.updatedAt)}>{formatTimestampDisplay(row.updatedAt)}</div>
               </TableCell>
               <TableCell className="whitespace-nowrap text-right">
-                <div className="flex justify-end gap-1">
-                  {row.canEdit ? (
-                    <button
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50"
-                      disabled={isSaving}
-                      title={`แก้ไข ${row.docNo}`}
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        openEditForm(row)
-                      }}
-                    >
-                      แก้ไข
-                    </button>
-                  ) : null}
-                  <button
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center gap-1"
-                    disabled={printingPoDocNo === row.docNo}
-                    title={`พิมพ์ ${row.docNo}`}
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      void printPoSell(row)
-                    }}
-                  >
-                    <Printer className="size-3" />
-                    {printingPoDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
-                  </button>
-                  {canShortClosePoSell(row) ? (
-                    <button
-                      className="rounded-md border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:cursor-wait disabled:opacity-50"
-                      disabled={isSaving}
-                      title={`ปิดส่งไม่ครบ ${row.docNo}`}
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        openShortCloseDialog(row)
-                      }}
-                    >
-                      ปิดส่งไม่ครบ
-                    </button>
-                  ) : null}
-                  {row.canCancel ? (
-                    <button
-                      className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
-                      disabled={isSaving}
-                      title={`ยกเลิก ${row.docNo}`}
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        openCancelDialog(row)
-                      }}
-                    >
-                      ยกเลิก
-                    </button>
-                  ) : null}
-                </div>
+                <TableActionButton menu={(
+                  <>
+                    {row.canEdit ? <TableActionMenuItem disabled={isSaving} onSelect={() => openEditForm(row)}>แก้ไข</TableActionMenuItem> : null}
+                    <TableActionMenuItem disabled={printingPoDocNo === row.docNo} onSelect={() => void printPoSell(row)}>พิมพ์</TableActionMenuItem>
+                    {canShortClosePoSell(row) ? <TableActionMenuItem disabled={isSaving} onSelect={() => openShortCloseDialog(row)}>ปิดส่งไม่ครบ</TableActionMenuItem> : null}
+                    {row.canCancel ? <TableActionMenuItem disabled={isSaving} onSelect={() => openCancelDialog(row)}>ยกเลิก</TableActionMenuItem> : null}
+                  </>
+                )} />
               </TableCell>
             </TableRow>
           ))}

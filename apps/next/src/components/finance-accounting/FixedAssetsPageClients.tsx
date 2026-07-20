@@ -6,6 +6,7 @@ import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { SegmentedFilterButton } from '@/components/ui/SegmentedFilterButton'
 import { Select } from '@/components/ui/Select'
@@ -740,12 +741,12 @@ export function AssetRegisterPageClient() {
                   <td className={`whitespace-nowrap px-3 py-3 text-right font-mono font-medium tabular-nums ${row.monthlyDep > 0 ? 'text-amber-700' : 'text-slate-700'}`}>{formatMoney(row.monthlyDep)}</td>
                   <td className="px-3 py-3 text-right"><StatusPill status={row.assetStatus} /></td>
                   <td className="px-3 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button className="rounded border border-slate-100 px-2 py-0.5 text-xs font-normal text-slate-600 hover:bg-slate-50 transition outline-none" disabled={isSaving} onClick={() => openEdit(row)} type="button">แก้ไข</button>
-                      {!['Inactive', 'Sold', 'Disposed', 'Lost'].includes(row.assetStatus) ? (
-                        <button className="rounded border border-red-200 px-2 py-0.5 text-xs font-normal text-red-600 hover:bg-red-50 transition outline-none" disabled={isSaving} onClick={() => deactivateAsset(row)} type="button">ปิดใช้งาน</button>
-                      ) : null}
-                    </div>
+                    <TableActionButton menu={(
+                      <>
+                        <TableActionMenuItem disabled={isSaving} onSelect={() => openEdit(row)}>แก้ไข</TableActionMenuItem>
+                        {!['Inactive', 'Sold', 'Disposed', 'Lost'].includes(row.assetStatus) ? <TableActionMenuItem disabled={isSaving} onSelect={() => deactivateAsset(row)}>ปิดใช้งาน</TableActionMenuItem> : null}
+                      </>
+                    )} />
                   </td>
                 </tr>
               ))}
@@ -781,10 +782,12 @@ export function AssetRegisterPageClient() {
                 <div><span className="text-slate-400 block text-xs">ค่าเสื่อม/เดือน</span><span className={`font-bold block ${row.monthlyDep > 0 ? 'text-amber-700' : 'text-slate-700'}`}>{formatMoney(row.monthlyDep)}</span></div>
               </div>
               <div className="border-t border-slate-100 pt-2 flex justify-end gap-2">
-                <button className="rounded border border-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition outline-none focus:ring-0" disabled={isSaving} onClick={() => openEdit(row)} type="button">แก้ไข</button>
-                {!['Inactive', 'Sold', 'Disposed', 'Lost'].includes(row.assetStatus) ? (
-                  <button className="rounded border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 transition outline-none focus:ring-0" disabled={isSaving} onClick={() => deactivateAsset(row)} type="button">ปิดใช้งาน</button>
-                ) : null}
+                <TableActionButton menu={(
+                  <>
+                    <TableActionMenuItem disabled={isSaving} onSelect={() => openEdit(row)}>แก้ไข</TableActionMenuItem>
+                    {!['Inactive', 'Sold', 'Disposed', 'Lost'].includes(row.assetStatus) ? <TableActionMenuItem disabled={isSaving} onSelect={() => deactivateAsset(row)}>ปิดใช้งาน</TableActionMenuItem> : null}
+                  </>
+                )} />
               </div>
             </div>
           ))
@@ -1290,14 +1293,7 @@ export function DepreciationPageClient() {
                     {row.status === 'reversed' ? (
                       <span className="text-xs text-slate-400 font-medium">{row.reversalReason || '-'}</span>
                     ) : (
-                      <button 
-                        className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-normal text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition"
-                        disabled={isSaving} 
-                        onClick={() => setReverseRow(row)} 
-                        type="button"
-                      >
-                        ย้อนกลับ
-                      </button>
+                      <TableActionButton disabled={isSaving} label="ย้อนกลับ" onClick={() => setReverseRow(row)} />
                     )}
                   </td>
                 </tr>
@@ -1679,14 +1675,7 @@ export function AssetDisposalPageClient() {
                     {row.status === 'reversed' ? (
                       <span className="text-xs text-slate-400 font-medium">{row.reversalReason || '-'}</span>
                     ) : (
-                      <button 
-                        className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-normal text-red-700 hover:bg-red-50 focus:outline-none focus:ring-0 transition"
-                        disabled={isSaving} 
-                        onClick={() => openReverse(row)} 
-                        type="button"
-                      >
-                        ย้อนกลับ
-                      </button>
+                      <TableActionButton disabled={isSaving} label="ย้อนกลับ" onClick={() => openReverse(row)} />
                     )}
                   </td>
                 </tr>

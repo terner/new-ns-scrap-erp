@@ -9,6 +9,7 @@ import { Dialog, DialogContent } from '@/components/ui/Dialog'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Select } from '@/components/ui/Select'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -684,16 +685,7 @@ export function ProductsPageClient() {
                         />
                       </TableCell>
                       <TableCell className="text-center text-xs font-semibold text-slate-700">
-                        <button
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openEditForm(product)
-                          }}
-                        >
-                          แก้ไข
-                        </button>
+                        <TableActionButton label="แก้ไข" onClick={(event) => { event.stopPropagation(); openEditForm(product) }} />
                       </TableCell>
                     </TableRow>
                   ))}

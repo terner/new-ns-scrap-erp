@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/Input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { Select } from '@/components/ui/Select'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
@@ -533,16 +534,12 @@ export function CostPoolPageClient() {
                   <td className="p-3 text-right font-mono tabular-nums text-slate-700">{formatMoney(group.avgUnitCost)}</td>
                   <td className="p-3 text-right font-mono font-semibold tabular-nums text-slate-900">{formatMoney(group.availableValue)}</td>
                   <td className="p-3 text-right">
-                    <button
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                      type="button"
+                    <TableActionButton
                       onClick={(event) => {
                         event.stopPropagation()
                         openGroupDetail(group)
                       }}
-                    >
-                      ดูรายละเอียด
-                    </button>
+                    />
                   </td>
                 </tr>
               ))}

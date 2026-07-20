@@ -12,6 +12,7 @@ import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 
 type TradingPayload = {
   deals: Array<{ customerName: string; date: string; dealNo: string; grossProfit: number; grossProfitPct: number; id: string; matchedPurchaseAmount: number; matchedQty: number; matchedSalesAmount: number; productName: string; purchaseBillNo: string; salesBillNo: string; status: string; supplierName: string }>
@@ -341,9 +342,7 @@ export function TradingMatchingPageClient() {
                       <td className={`p-2.5 text-right font-bold overflow-hidden truncate ${row.grossProfit >= 0 ? 'text-purple-700' : 'text-red-700'}`}>{formatMoney(row.grossProfit)}</td>
                       <td className="p-2.5 text-right font-medium text-slate-505 overflow-hidden truncate">{row.grossProfitPct.toFixed(2)}%</td>
                       <td className="whitespace-nowrap p-2.5 text-center overflow-hidden truncate">
-                        <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-655 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-2xs cursor-pointer" type="button" onClick={() => setSelectedDeal(row)}>
-                          รายละเอียด
-                        </button>
+                        <TableActionButton label="รายละเอียด" onClick={() => setSelectedDeal(row)} />
                       </td>
                     </tr>
                   ))}
