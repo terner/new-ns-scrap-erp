@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/Dialog'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import {
@@ -336,15 +337,12 @@ export function SystemSettingsPageClient() {
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Button
+                          <TableActionButton
+                            busy={savingKey === saveKey}
                             disabled={savingKey !== null}
-                            size="xs"
-                            type="button"
-                            className="font-bold"
                             onClick={() => requestSave(whtSetting, record, value, saveKey)}
-                          >
-                            {savingKey === saveKey ? 'บันทึก...' : 'บันทึก'}
-                          </Button>
+                            label="บันทึก"
+                          />
                         </TableCell>
                       </TableRow>
                     )
@@ -465,4 +463,3 @@ export function SystemSettingsPageClient() {
     </section>
   )
 }
-

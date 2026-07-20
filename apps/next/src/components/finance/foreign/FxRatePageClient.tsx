@@ -5,6 +5,7 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SegmentedFilterButton } from '@/components/ui/SegmentedFilterButton'
 import { Select } from '@/components/ui/Select'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
@@ -410,7 +411,9 @@ export function FxRatePageClient() {
                 <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-slate-900">{formatRate(row.rate)}</td>
                 <td className="min-w-0 truncate px-3 py-3 text-xs text-slate-700">{row.source || '-'}</td>
                 <td className="whitespace-nowrap px-3 py-3 text-center text-xs text-slate-600">{row.active ? 'Yes' : 'No'}</td>
-                <td className="whitespace-nowrap px-3 py-3 text-right"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={() => openEdit(row)}>จัดการ</button></td>
+                <td className="whitespace-nowrap px-3 py-3 text-right">
+                  <TableActionButton onClick={() => openEdit(row)} />
+                </td>
               </tr>
             ))}
           </tbody>

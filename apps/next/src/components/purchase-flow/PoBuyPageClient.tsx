@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ButtonHTMLAttributes, Dispatch, SetStateAction } from 'react'
 import { Download, Plus, Printer } from 'lucide-react'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
@@ -274,10 +275,6 @@ function poBuyStatusActionLabel(action: string) {
       return 'อัปเดตสถานะ'
   }
 }
-
-const rowActionButtonClass = 'rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
-const rowDangerActionButtonClass = 'rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
-const rowWarningActionButtonClass = 'rounded-md border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50'
 
 type PoBuyColumnKey = 'action' | 'checkbox' | 'date' | 'docNo' | 'expectedDelivery' | 'note' | 'productName' | 'qty' | 'remainingQty' | 'status' | 'supplierName' | 'totalAmount' | 'updatedAt'
 
@@ -1062,32 +1059,14 @@ export function PoBuyPageClient() {
                 </TableCell>
                 <TableCell className="w-28 whitespace-nowrap text-xs text-slate-600"><div className="truncate">{row.updatedBy || row.createdBy || '-'}</div><div className="font-mono text-xs text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></TableCell>
                 <TableCell className="whitespace-nowrap text-right">
-                  {row.status === 'Open' && row.qty === row.remainingQty ? (
+                  <TableActionButton menu={(
                     <>
-                      <button className={`${rowActionButtonClass} mr-1.5`} type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
-                      <button className={`${rowDangerActionButtonClass} mr-1.5`} type="button" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</button>
+                      {row.status === 'Open' && row.qty === row.remainingQty ? <TableActionMenuItem onSelect={() => openEditForm(row)}>แก้ไข</TableActionMenuItem> : null}
+                      {row.status === 'Open' && row.qty === row.remainingQty ? <TableActionMenuItem onSelect={() => openCancelDialog(row)}>ยกเลิก</TableActionMenuItem> : null}
+                      <TableActionMenuItem disabled={printingPoDocNo === row.docNo} onSelect={() => void printPoBuy(row)}>พิมพ์</TableActionMenuItem>
+                      {shouldShowShortCloseButton(row) ? <TableActionMenuItem disabled={!canShortClosePoBuy(row)} onSelect={() => openShortCloseDialog(row)}>ปิดรับไม่ครบ</TableActionMenuItem> : null}
                     </>
-                  ) : null}
-                  <button
-                    className={`inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60 ${row.status === 'Open' && row.qty === row.remainingQty ? '' : 'mr-1.5'}`}
-                    disabled={printingPoDocNo === row.docNo}
-                    type="button"
-                    onClick={(event) => { event.stopPropagation(); void printPoBuy(row) }}
-                  >
-                    <Printer className="size-3" />
-                    {printingPoDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
-                  </button>
-                  {shouldShowShortCloseButton(row) ? (
-                    <button
-                      className={`${rowWarningActionButtonClass} ml-1.5 disabled:cursor-not-allowed disabled:opacity-50`}
-                      disabled={!canShortClosePoBuy(row)}
-                      title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อ PO ยังไม่รับหรือรับสินค้าบางส่วน และยังมียอดคงเหลือ'}
-                      type="button"
-                      onClick={(event) => { event.stopPropagation(); openShortCloseDialog(row) }}
-                    >
-                      ปิดรับไม่ครบ
-                    </button>
-                  ) : null}
+                  )} />
                 </TableCell>
               </TableRow>
             ))}

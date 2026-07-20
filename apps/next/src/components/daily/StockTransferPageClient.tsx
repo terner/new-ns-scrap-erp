@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
@@ -596,9 +597,7 @@ export function StockTransferPageClient() {
                             </td>
                             <td className="p-2 pt-4 text-right tabular-nums font-medium text-emerald-700">{formatMoney(lineValue)}</td>
                             <td className="p-2 text-right">
-                              <Button className="mt-2" disabled={form.items.length <= 1} size="xs" type="button" variant="outline" onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_entry, entryIndex) => entryIndex !== index) }))}>
-                                ลบ
-                              </Button>
+                              <TableActionButton disabled={form.items.length <= 1} onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_entry, entryIndex) => entryIndex !== index) }))} />
                             </td>
                           </tr>
                         )
@@ -843,9 +842,17 @@ export function StockTransferPageClient() {
                 <TableCell><StatusBadge status={row.status} /></TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
-                    <RowActionButton disabled={!row.canEdit || isSaving} label="แก้ไข" onClick={() => openEditForm(row)} />
-                    <RowActionButton disabled={!row.canPost || isSaving} label="ส่ง" onClick={() => postDraft(row)} />
-                    <RowActionButton destructive disabled={!row.canCancel || isSaving} label="ยกเลิก" onClick={() => cancelDraft(row)} />
+                    <RowActionButton
+                      menu={(
+                        <>
+                          <TableActionMenuItem disabled={!row.canEdit || isSaving} onSelect={() => openEditForm(row)}>แก้ไข</TableActionMenuItem>
+                          <TableActionMenuItem disabled={!row.canPost || isSaving} onSelect={() => postDraft(row)}>ส่ง</TableActionMenuItem>
+                          <TableActionMenuItem disabled={!row.canCancel || isSaving} onSelect={() => cancelDraft(row)}>ยกเลิก</TableActionMenuItem>
+                        </>
+                      )}
+                      label="จัดการ"
+                      onClick={() => undefined}
+                    />
                   </div>
                 </TableCell>
               </TableRow>
@@ -899,21 +906,8 @@ function SummaryCell(props: { label: string; value: string }) {
   )
 }
 
-function RowActionButton(props: { destructive?: boolean; disabled?: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      aria-label={props.label}
-      className={props.destructive
-        ? 'rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40'
-        : 'rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40'}
-      disabled={props.disabled}
-      title={props.label}
-      type="button"
-      onClick={props.onClick}
-    >
-      {props.label}
-    </button>
-  )
+function RowActionButton(props: { destructive?: boolean; disabled?: boolean; label: string; menu?: React.ReactNode; onClick: () => void }) {
+  return <TableActionButton aria-label={props.label} className={props.destructive ? 'border-red-200 text-red-700' : undefined} label={props.label} menu={props.menu} title={props.label} onClick={props.onClick} />
 }
 
 function FormField(props: { children: React.ReactNode; className?: string; error?: string; errorKey?: string; label: string; hideLabel?: boolean }) {

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Select } from '@/components/ui/Select'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -681,8 +682,8 @@ export function DailyTransferPageClient() {
                 <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-amber-700 tabular-nums">{formatMoney(row.fee)}</TableCell>
                 <TableCell className="text-xs font-semibold text-slate-700">{row.byPerson || '-'}</TableCell>
                 <TableCell className="text-xs font-semibold text-slate-700 truncate max-w-[200px]" title={row.notes ?? ''}>{row.notes || '-'}</TableCell>
-                <TableCell className="space-x-2 whitespace-nowrap text-right">
-                  <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
+                <TableCell className="whitespace-nowrap text-right">
+                  <TableActionButton label="แก้ไข" onClick={(event) => { event.stopPropagation(); openEditForm(row) }} />
                 </TableCell>
               </TableRow>
             ))}

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { KpiCard as SharedKpiCard, type KpiCardTone } from '@/components/ui/KpiCard'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
@@ -1947,10 +1948,12 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                       </td>
                       <td className="p-2 text-center">
                         {canMutateExpense(row.status) ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
-                            <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50" type="button" onClick={(event) => { event.stopPropagation(); void cancelExpense(row) }}>ยกเลิก</button>
-                          </div>
+                          <TableActionButton menu={(
+                            <>
+                              <TableActionMenuItem onSelect={() => openEditForm(row)}>แก้ไข</TableActionMenuItem>
+                              <TableActionMenuItem onSelect={() => void cancelExpense(row)}>ยกเลิก</TableActionMenuItem>
+                            </>
+                          )} />
                         ) : null}
                       </td>
                     </tr>

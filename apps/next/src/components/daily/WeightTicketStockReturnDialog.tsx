@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Select } from '@/components/ui/Select'
 import { formatMoney } from '@/lib/daily'
@@ -282,14 +283,11 @@ export function WeightTicketStockReturnDialog({
                           />
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Button
-                            className="h-8 px-3 text-xs font-normal"
+                          <TableActionButton
                             disabled={isReturningPendingOutKey === option.pendingOutKey}
-                            type="button"
                             onClick={() => void submitReturn(option)}
-                          >
-                            {isReturningPendingOutKey === option.pendingOutKey ? 'กำลังบันทึก...' : 'บันทึกรับคืน'}
-                          </Button>
+                            busy={isReturningPendingOutKey === option.pendingOutKey}
+                          />
                         </td>
                       </tr>
                     )

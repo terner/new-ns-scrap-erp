@@ -12,6 +12,7 @@ import { KpiCard as SharedKpiCard } from '@/components/ui/KpiCard'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -1058,42 +1059,13 @@ export function AdvancePaymentsPageClient() {
                     <TableNumberCell tone="amber" value={formatMoney(row.remainingAmount)} />
                     <td className="p-3"><StatusDot status={row.status} label={row.statusLabel} /></td>
                     <td className="p-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 cursor-pointer"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handlePrint(row)
-                          }}
-                        >
-                          พิมพ์
-                        </button>
-                        <button
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={!row.canEdit}
-                          title={!row.canEdit ? row.lockedReason ?? 'รายการนี้ยังแก้ไขไม่ได้' : undefined}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openEditForm(row)
-                          }}
-                        >
-                          แก้ไข
-                        </button>
-                        <button
-                          className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={!row.canCancel}
-                          title={!row.canCancel ? row.lockedReason ?? 'รายการนี้ยังยกเลิกไม่ได้' : undefined}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            void openCancelFromRow(row.id)
-                          }}
-                        >
-                          ยกเลิก
-                        </button>
-                      </div>
+                      <TableActionButton menu={(
+                        <>
+                          <TableActionMenuItem onSelect={() => handlePrint(row)}>พิมพ์</TableActionMenuItem>
+                          <TableActionMenuItem disabled={!row.canEdit} onSelect={() => openEditForm(row)}>แก้ไข</TableActionMenuItem>
+                          <TableActionMenuItem disabled={!row.canCancel} onSelect={() => void openCancelFromRow(row.id)}>ยกเลิก</TableActionMenuItem>
+                        </>
+                      )} />
                     </td>
                   </tr>
                 ))}

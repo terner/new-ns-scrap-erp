@@ -21,6 +21,7 @@ import { FormSelectField } from '@/components/ui/FormSelectField'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PhoneInput } from '@/components/ui/PhoneInput'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { formatDecimalDisplay, formatDecimalDraft, formatPhoneDisplay, sanitizeAccountNoInput, sanitizeDecimalInput } from '@/lib/format'
@@ -676,16 +677,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                       </TableCell>
                     ))}
                     <TableCell className="p-3 text-center">
-                      <button
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openEditForm(record)
-                        }}
-                      >
-                        แก้ไข
-                      </button>
+                      <TableActionButton label="แก้ไข" onClick={(event) => { event.stopPropagation(); openEditForm(record) }} />
                     </TableCell>
                   </TableRow>
                 ))}

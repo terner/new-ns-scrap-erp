@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/Input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { tableActionButtonClassName } from '@/components/ui/TableActionButton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns } from '@/components/ui/useResizableColumns'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
@@ -67,8 +68,8 @@ const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; value
   ],
 }
 
-const rowActionButtonClass = 'inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
-const rowDestructiveActionButtonClass = 'inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
+const rowActionButtonClass = tableActionButtonClassName
+const rowDestructiveActionButtonClass = `${tableActionButtonClassName} border-red-200 text-red-700`
 
 function formatDateTime(value?: string | null) {
   if (!value) return '-'

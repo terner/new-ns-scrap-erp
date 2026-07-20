@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { MoreHorizontal, Pencil, XCircle } from 'lucide-react'
+import { Pencil, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { Select } from '@/components/ui/Select'
 import { SegmentedFilterButton } from '@/components/ui/SegmentedFilterButton'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -1559,10 +1560,7 @@ function LedgerActionMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button aria-label="เปิดเมนูการจัดการ" className="h-8 gap-1 px-2 text-xs" disabled={disabled || busy} size="xs" type="button" variant="outline">
-          <MoreHorizontal className="size-4" />
-          {busy ? 'กำลังทำ...' : 'จัดการ'}
-        </Button>
+        <TableActionButton aria-label="เปิดเมนูการจัดการ" busy={busy} disabled={disabled || busy} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-40">
         <DropdownMenuItem onSelect={onEdit}>

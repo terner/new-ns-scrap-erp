@@ -16,6 +16,7 @@ import { CollapsedList } from '@/components/ui/CollapsedList'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select as UiSelect } from '@/components/ui/Select'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
@@ -2512,36 +2513,12 @@ export function MoneyMovementPageClient({
                       <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-blue-700 tabular-nums">{formatMoney(receivedAmount)}</TableCell>
                       <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-emerald-700 tabular-nums">{formatMoney(balance)}</TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                        <UiButton
-                          className="font-normal"
-                          size="xs"
-                          type="button"
-                          variant="outline"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openFormForBill(bill)
-                          }}
-                        >
-                          รับเงิน
-                        </UiButton>
-                        {cancelableReceipt ? (
-                          <UiButton
-                            className="font-normal border-red-200 text-red-700"
-                            size="xs"
-                            title={`ยกเลิกใบรับเงิน ${cancelableReceipt.docNo}`}
-                            type="button"
-                            variant="outline"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setCancelReceiptTarget(cancelableReceipt)
-                              setCancelReceiptReason('')
-                            }}
-                          >
-                            ยกเลิก
-                          </UiButton>
-                        ) : null}
-                        </div>
+                        <TableActionButton menu={(
+                          <>
+                            <TableActionMenuItem onSelect={() => openFormForBill(bill)}>รับเงิน</TableActionMenuItem>
+                            {cancelableReceipt ? <TableActionMenuItem onSelect={() => { setCancelReceiptTarget(cancelableReceipt); setCancelReceiptReason('') }}>ยกเลิก</TableActionMenuItem> : null}
+                          </>
+                        )} />
                       </TableCell>
                     </TableRow>
                   )
@@ -2795,32 +2772,12 @@ export function MoneyMovementPageClient({
                         <TableCell className={`whitespace-nowrap text-right pr-4 text-xs font-semibold tabular-nums ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</TableCell>
                         <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{ageInDays(bill.date)}</TableCell>
                         <TableCell className="sticky right-0 z-10 bg-white text-right group-hover:bg-slate-50">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                openFormForBill(bill)
-                              }}
-                            >
-                              ทำจ่าย
-                            </button>
-                            {canCancelApproval ? (
-                              <button
-                                className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  setCancelApprovalTarget(bill)
-                                  setCancelApprovalReason('')
-                                  setError(null)
-                                }}
-                              >
-                                ยกเลิก
-                              </button>
-                            ) : null}
-                          </div>
+                          <TableActionButton menu={(
+                            <>
+                              <TableActionMenuItem onSelect={() => openFormForBill(bill)}>ทำจ่าย</TableActionMenuItem>
+                              {canCancelApproval ? <TableActionMenuItem onSelect={() => { setCancelApprovalTarget(bill); setCancelApprovalReason(''); setError(null) }}>ยกเลิก</TableActionMenuItem> : null}
+                            </>
+                          )} />
                         </TableCell>
                       </TableRow>
                     )
@@ -3653,56 +3610,14 @@ export function MoneyMovementPageClient({
                         </TableCell>
                         <TableCell className="max-w-56 truncate text-sm font-medium text-slate-700">{row.notes || '-'}</TableCell>
                         <TableCell className="p-2">
-                          <div className="flex items-center gap-1 bg-transparent justify-start">
-                            <UiButton
-                              className="h-7 px-2 text-xs font-medium"
-                              size="sm"
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                if (mode === 'payment') void openPaymentHistoryRow(row)
-                                else openReceiptDetail(row)
-                              }}
-                            >
-                              ดูรายละเอียด
-                            </UiButton>
-                            {row.status !== 'cancelled' && mode === 'receipt' ? (
-                              <>
-                                <UiButton
-                                  className="h-7 border-slate-300 px-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                                  size="sm"
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => openFormForReceipt(row)}
-                                >
-                                  แก้ไข
-                                </UiButton>
-                                <UiButton
-                                  className="h-7 border-red-200 px-2 text-xs font-medium text-red-700 hover:bg-red-50 hover:text-red-700"
-                                  size="sm"
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setCancelReceiptTarget(row)
-                                    setCancelReceiptReason('')
-                                  }}
-                                >
-                                  ยกเลิก
-                                </UiButton>
-                              </>
-                            ) : null}
-                            {row.status !== 'cancelled' && mode !== 'receipt' ? (
-                              <UiButton
-                                className="h-7 border-red-200 px-2 text-xs font-semibold text-red-700 hover:bg-red-50 hover:text-red-700"
-                                size="sm"
-                                type="button"
-                                variant="outline"
-                                onClick={() => setCancelPaymentTarget(row)}
-                              >
-                                ยกเลิก
-                              </UiButton>
-                            ) : null}
-                          </div>
+                          <TableActionButton menu={(
+                            <>
+                              <TableActionMenuItem onSelect={() => { if (mode === 'payment') void openPaymentHistoryRow(row); else openReceiptDetail(row) }}>ดูรายละเอียด</TableActionMenuItem>
+                              {row.status !== 'cancelled' && mode === 'receipt' ? <TableActionMenuItem onSelect={() => openFormForReceipt(row)}>แก้ไข</TableActionMenuItem> : null}
+                              {row.status !== 'cancelled' && mode === 'receipt' ? <TableActionMenuItem onSelect={() => { setCancelReceiptTarget(row); setCancelReceiptReason('') }}>ยกเลิก</TableActionMenuItem> : null}
+                              {row.status !== 'cancelled' && mode !== 'receipt' ? <TableActionMenuItem onSelect={() => setCancelPaymentTarget(row)}>ยกเลิก</TableActionMenuItem> : null}
+                            </>
+                          )} />
                         </TableCell>
                       </TableRow>
                     )

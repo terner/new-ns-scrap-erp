@@ -16,6 +16,7 @@ import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/Searc
 import { Select } from '@/components/ui/Select'
 import { SegmentedFilterButton } from '@/components/ui/SegmentedFilterButton'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableActionButton'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { CollapsedList } from '@/components/ui/CollapsedList'
 import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/Table'
@@ -3156,71 +3157,17 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 </div>
               </div>
 
-              {/* Mobile Action Buttons (Inline in Card) */}
-              <div className="flex justify-end gap-2 mt-3 pt-2 border-t border-slate-100/60" onClick={(e) => e.stopPropagation()}>
-                {mode === 'purchase' ? (
+              <div className="flex justify-end mt-3 pt-2 border-t border-slate-100/60" onClick={(e) => e.stopPropagation()}>
+                <TableActionButton menu={(
                   <>
-                    <button
-                      className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                      disabled={printingBillDocNo === row.docNo}
-                      type="button"
-                      onClick={() => void printPurchaseBill(row)}
-                    >
-                      พิมพ์
-                    </button>
-                    {row.canEdit !== false ? (
-                      <>
-                        <button
-                          className="rounded-md border border-slate-300 px-2.5 py-1 text-xs hover:bg-slate-50"
-                          type="button"
-                          onClick={() => openEditPurchaseForm(row)}
-                        >
-                          แก้ไข
-                        </button>
-                        <button
-                          className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50"
-                          type="button"
-                          onClick={() => openCancelPurchaseBill(row)}
-                        >
-                          ยกเลิก
-                        </button>
-                      </>
-                    ) : null}
+                    {mode === 'purchase' ? <TableActionMenuItem disabled={printingBillDocNo === row.docNo} onSelect={() => void printPurchaseBill(row)}>พิมพ์</TableActionMenuItem> : null}
+                    {mode === 'purchase' && row.canEdit !== false ? <TableActionMenuItem onSelect={() => openEditPurchaseForm(row)}>แก้ไข</TableActionMenuItem> : null}
+                    {mode === 'purchase' && row.canEdit !== false ? <TableActionMenuItem onSelect={() => openCancelPurchaseBill(row)}>ยกเลิก</TableActionMenuItem> : null}
+                    {mode === 'sales' ? <TableActionMenuItem disabled={printingBillDocNo === row.docNo} onSelect={() => void printSalesBill(row)}>พิมพ์</TableActionMenuItem> : null}
+                    {mode === 'sales' && row.canEdit !== false ? <TableActionMenuItem disabled={isDetailLoading} onSelect={() => void openEditSalesForm(row)}>แก้ไข</TableActionMenuItem> : null}
+                    {mode === 'sales' && row.canCancel !== false ? <TableActionMenuItem onSelect={() => openCancelSalesBill(row)}>ยกเลิก</TableActionMenuItem> : null}
                   </>
-                ) : null}
-
-                {mode === 'sales' ? (
-                  <>
-                    <button
-                      className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                      disabled={printingBillDocNo === row.docNo}
-                      type="button"
-                      onClick={() => void printSalesBill(row)}
-                    >
-                      พิมพ์
-                    </button>
-                    {row.canEdit !== false ? (
-                      <button
-                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50"
-                        disabled={isDetailLoading}
-                        type="button"
-                        onClick={() => void openEditSalesForm(row)}
-                      >
-                        แก้ไข
-                      </button>
-                    ) : null}
-                    {row.canCancel !== false ? (
-                      <button
-                        className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50"
-                        type="button"
-                        onClick={() => openCancelSalesBill(row)}
-                      >
-                        ยกเลิก
-                      </button>
-                    ) : null}
-                  </>
-                ) : null}
-
+                )} />
               </div>
             </div>
           )
@@ -3301,67 +3248,24 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <td className="p-2 text-xs font-semibold text-slate-700"><div>{row.updatedBy || row.createdBy || '-'}</div><div className="text-xs font-normal text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></td>
                 {mode === 'purchase' ? (
                   <td className="p-2 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
-                        disabled={printingBillDocNo === row.docNo}
-                        type="button"
-                        onClick={(event) => { event.stopPropagation(); void printPurchaseBill(row) }}
-                      >
-                        {printingBillDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
-                      </button>
-                      {row.canEdit !== false ? (
-                        <>
-                          <button
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
-                            type="button"
-                            onClick={(event) => { event.stopPropagation(); openEditPurchaseForm(row) }}
-                          >
-                            แก้ไข
-                          </button>
-                          <button
-                            className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                            type="button"
-                            onClick={(event) => { event.stopPropagation(); openCancelPurchaseBill(row) }}
-                          >
-                            ยกเลิก
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
+                    <TableActionButton menu={(
+                      <>
+                        <TableActionMenuItem disabled={printingBillDocNo === row.docNo} onSelect={() => void printPurchaseBill(row)}>พิมพ์</TableActionMenuItem>
+                        {row.canEdit !== false ? <TableActionMenuItem onSelect={() => openEditPurchaseForm(row)}>แก้ไข</TableActionMenuItem> : null}
+                        {row.canEdit !== false ? <TableActionMenuItem onSelect={() => openCancelPurchaseBill(row)}>ยกเลิก</TableActionMenuItem> : null}
+                      </>
+                    )} />
                   </td>
                 ) : null}
                 {mode === 'sales' ? (
                   <td className="p-2 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
-                        disabled={printingBillDocNo === row.docNo}
-                        type="button"
-                        onClick={(event) => { event.stopPropagation(); void printSalesBill(row) }}
-                      >
-                        {printingBillDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
-                      </button>
-                      {row.canEdit !== false ? (
-                        <button
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50"
-                          disabled={isDetailLoading}
-                          type="button"
-                          onClick={(event) => { event.stopPropagation(); void openEditSalesForm(row) }}
-                        >
-                          แก้ไข
-                        </button>
-                      ) : null}
-                      {row.canCancel !== false ? (
-                        <button
-                          className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                          type="button"
-                          onClick={(event) => { event.stopPropagation(); openCancelSalesBill(row) }}
-                        >
-                          ยกเลิก
-                        </button>
-                      ) : null}
-                    </div>
+                    <TableActionButton menu={(
+                      <>
+                        <TableActionMenuItem disabled={printingBillDocNo === row.docNo} onSelect={() => void printSalesBill(row)}>พิมพ์</TableActionMenuItem>
+                        {row.canEdit !== false ? <TableActionMenuItem disabled={isDetailLoading} onSelect={() => void openEditSalesForm(row)}>แก้ไข</TableActionMenuItem> : null}
+                        {row.canCancel !== false ? <TableActionMenuItem onSelect={() => openCancelSalesBill(row)}>ยกเลิก</TableActionMenuItem> : null}
+                      </>
+                    )} />
                   </td>
                 ) : null}
               </TableRow>
@@ -4252,11 +4156,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                                  <div className="rounded-md border border-slate-200 bg-white px-2 py-2 text-right font-bold tabular-nums text-slate-900">{formatMoney(Math.max(0, item.qty * item.price - item.discount))}</div>
 	                                </td>
 	                                <td className="p-2">
-	                                  <div className="flex justify-end gap-1">
-	                                    <Button disabled={!summaryState || summaryState.rowIndices.length <= 1} size="xs" type="button" variant="outline" onClick={() => removeSalesStockAllocationRow(index)}>
-	                                      ลบ
-	                                    </Button>
-	                                  </div>
+                                  <TableActionButton disabled={!summaryState || summaryState.rowIndices.length <= 1} onClick={() => removeSalesStockAllocationRow(index)} />
 	                                </td>
 	                              </tr>
 	                              {isLastRowOfSummary ? (

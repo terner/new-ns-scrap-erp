@@ -21,6 +21,7 @@ import { FormSelectField } from '@/components/ui/FormSelectField'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
 import { PhoneInput } from '@/components/ui/PhoneInput'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { TableActionButton } from '@/components/ui/TableActionButton'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { getErrorMessage } from '@/lib/api-client'
@@ -690,16 +691,7 @@ export function CustomersPageClient() {
                         />
                       </TableCell>
                       <TableCell className="text-center text-xs font-semibold text-slate-700">
-                        <button
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            void openEditForm(customer)
-                          }}
-                        >
-                          แก้ไข
-                        </button>
+                        <TableActionButton label="แก้ไข" onClick={(event) => { event.stopPropagation(); void openEditForm(customer) }} />
                       </TableCell>
                     </TableRow>
                   ))}
