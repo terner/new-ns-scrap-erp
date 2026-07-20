@@ -627,7 +627,7 @@ export function AdvancePaymentsPageClient() {
               <DialogTitle>{editingAdvanceId ? `แก้ไขรายการ ADV ${editingAdvanceNo ?? ''}` : 'สร้างรายการจ่ายเงินล่วงหน้า / มัดจำ'}</DialogTitle>
               <DialogDescription>{editingAdvanceId ? 'แก้ไขได้เฉพาะรายการที่ยังไม่อนุมัติ และยังไม่ถูกใช้หักบิล' : 'บันทึกเอกสาร ADV ใหม่จากประเภทมัดจำ ข้อมูลผู้ขาย และยอดการจ่ายเงิน'}</DialogDescription>
             </div>
-            <Button className="bg-white/10 text-white hover:bg-white/20 hover:text-white" disabled={isSaving} size="sm" type="button" variant="ghost" onClick={closeForm}>ปิด</Button>
+            <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" disabled={isSaving} size="sm" type="button" variant="outline" onClick={closeForm}>ปิด</Button>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4">
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
