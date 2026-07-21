@@ -6,6 +6,12 @@ Development database and auth testing should use a separate Supabase dev/target 
 
 The customer's old production Supabase remains the legacy source system for read-only audit and migration-source dumps.
 
+### Weight Ticket Working-Draft Migration 2026-07-21
+
+- Applied `20260721030145_create_weight_ticket_form_drafts.sql` to dev-target `fhglqymcdmrgbsbadnwr` only, after confirming both the table and migration-history row were absent.
+- Postflight confirmed the table is owned by the server `postgres` role, RLS is enabled, `anon` and `authenticated` have no table access, the owner/scope unique constraint and lookup index exist, and the migration-history row is present.
+- A rollback-only server write smoke succeeded. This table is a private form snapshot for WTI/WTO entry and is not a document, stock, ledger, timeline, audit, PDF, or LINE source.
+
 ### Access Control Migration Checkpoint 2026-07-19
 
 - Applied with Supabase CLI to dev-target `fhglqymcdmrgbsbadnwr` and SIT `vbjlkxbytccklhqvxjuu`: `20260719010334_access_control_finance_action_grants` and `20260719011602_access_control_advance_expense_actions`.

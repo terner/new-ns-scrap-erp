@@ -9,6 +9,11 @@ import { findActiveBranchReferencesByCodes } from '@/lib/server/branch-reference
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
+import {
+  removeWeightTicketWorkingDraftOrThrow,
+  WeightTicketWorkingDraftConflictError,
+  weightTicketWorkingDraftCleanupFromRequest,
+} from '@/lib/server/weight-ticket-working-draft'
 import { appendWtoPendingOutEventsFromHolds, getWeightTicketPendingOutEvents } from '@/lib/server/weight-ticket-pending-out-events'
 import { buildWeightTicketEditChanges } from '@/lib/server/weight-ticket-write/edit-audit'
 import { assertWeightTicketImpurityRules, assertWeightTicketPartyForType, WeightTicketWriteValidationError } from '@/lib/server/weight-ticket-write/type-guards'
@@ -137,6 +142,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const { id } = await context.params
     const values = weightTicketFormSchema.parse(await request.json())
+    const workingDraftCleanup = weightTicketWorkingDraftCleanupFromRequest(request, `ticket:${id}`)
+    if (workingDraftCleanup && !auth.appUser) {
+      throw new AuthContextError('ไม่พบข้อมูลผู้ใช้งานในระบบ', 403)
+    }
     const scopedBranchIds = branchScopeIds(auth)
     const existing = await findScopedTicket(id, scopedBranchIds)
     if (!existing) return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบใบรับ-ส่งของที่ต้องการแก้ไข' }, { status: 404 })
@@ -400,6 +409,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           weightTicketId: existing.id,
         })
       }
+      await removeWeightTicketWorkingDraftOrThrow(tx, auth.appUser!.id, workingDraftCleanup)
 
       return tx.weight_tickets.findUniqueOrThrow({
         include: ticketInclude,
@@ -442,6 +452,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    if (caught instanceof WeightTicketWorkingDraftConflictError) {
+      return NextResponse.json({ code: 'CONFLICT', error: caught.message }, { status: 409 })
+    }
     if (caught instanceof WtoPendingOutError) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: caught.message, fieldErrors: caught.fieldErrors }, { status: 400 })
     }

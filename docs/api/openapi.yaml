@@ -388,6 +388,74 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  /api/daily/weight-ticket-form-drafts:
+    get:
+      tags: [Daily]
+      operationId: getWeightTicketFormDraft
+      summary: Read the current user's private WTI/WTO working draft
+      description: Returns a no-store form snapshot only; it never reads or writes a business weight ticket.
+      parameters:
+        - name: scopeKey
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      tags: [Daily]
+      operationId: saveWeightTicketFormDraft
+      summary: Save the current user's private WTI/WTO working draft
+      description: Queued client snapshots use optimistic revision control and create no document, stock, timeline, audit, PDF, or LINE side effect.
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Daily]
+      operationId: deleteWeightTicketFormDraft
+      summary: Delete the current user's private WTI/WTO working draft
+      parameters:
+        - name: scopeKey
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: revision
+          in: query
+          required: true
+          description: Deletes only the snapshot revision held by this form, so a stale tab cannot remove a newer draft.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "204":
+          description: Draft removed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
   /api/daily/expenses:
     get:
       tags: [Daily]

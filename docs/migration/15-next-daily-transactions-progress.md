@@ -13,6 +13,13 @@
 - ทุกฟอร์มและ API write ต้อง validate syntax ด้วย Zod หรือ schema layer ที่ใช้ร่วมกัน
 - ธุรกรรมที่กระทบเงิน/สต๊อกต้องบันทึก side effect และ reconciliation query ให้ชัด
 
+## WTI/WTO Working-Draft Checkpoint 2026-07-21
+
+- Added private per-user WTI/WTO form snapshots for product confirmation/change, `เพิ่มสินค้า`, and `เพิ่มเต๋า`. The asynchronous queue leaves data entry enabled and reports saving, saved, retry, or cross-tab conflict state.
+- Added `weight_ticket_form_drafts` with owner/scope revision control and server-only access. It is not a business document and never creates document numbers, stock, pending-out, ledger, timeline, audit, PDF, or LINE effects.
+- Real WTI/WTO save removes only the exact draft revision in the same transaction; a newer draft causes `409` and rolls back the real save. Explicit `ยกเลิก`/`ยกเลิกและกลับรายการ` discards a draft, while Escape/backdrop/browser navigation retains it for recovery.
+- Migration `20260721030145_create_weight_ticket_form_drafts.sql` is applied to dev-target. Clean-runner validation passed: focused Vitest `16/16`, scoped diff check, type-check (4 GB Node heap), and production build (4 GB heap, two workers). Lint exited `0` with zero errors and four pre-existing warnings. Browser/UAT and push/promotion were not requested.
+
 ## Legacy Inventory
 
 | Route | Legacy Component | Current Next Status | Target Notes |

@@ -13,7 +13,7 @@ tags:
   - decision
 status: draft
 created: 2026-06-11
-updated: 2026-07-11
+updated: 2026-07-21
 ---
 
 # WTI/WTO Flow / Flow ใบรับ-ส่งของ
@@ -52,6 +52,29 @@ updated: 2026-07-11
 - PDF/LINE share ต้องให้หน้าแรกเป็นใบพิมพ์ A4 และต่อหน้า 2+ เป็นอัลบั้มรูปหลักฐานจากรูปรถและรูปสินค้า
 - history/timeline ของเอกสารต้องเป็น append-only ตาม [[Document Timeline Policy]]
 
+## ร่างระหว่างกรอก (Working Draft)
+
+`working draft` คือสำเนาส่วนตัวระหว่างกรอกฟอร์ม แยกจากสถานะเอกสารจริง
+`แบบร่าง` ของ WTI/WTO อย่างชัดเจน โดยเก็บใน `weight_ticket_form_drafts` ตามผู้ใช้
+และ scope ของฟอร์ม (`new:WTI`, `new:WTO` หรือ `ticket:{id}`).
+
+- เมื่อผู้ใช้ยืนยัน/เปลี่ยนสินค้าในรายการ กด `เพิ่มสินค้า` หรือกด `เพิ่มเต๋า` ระบบต้อง queue
+  snapshot ล่าสุดไปบันทึกแบบ asynchronous โดยไม่ disable ช่องกรอกหรือขัดการคีย์ต่อ
+- UI ต้องสื่อสถานะ `กำลังบันทึกร่าง…`, `บันทึกร่างแล้ว` หรือให้ `ลองใหม่` เมื่อไม่สำเร็จ; หากเปิดฟอร์มซ้ำหลายหน้าต่างแล้วพบ revision ใหม่กว่า ต้องให้ผู้ใช้เลือก `โหลดฉบับล่าสุด` หรือ `เก็บข้อมูลที่กำลังกรอก` อย่างชัดเจน ไม่เขียนทับแบบเงียบ ๆ
+- ถ้าเปิดฟอร์มแล้วตรวจสอบ baseline ของ draft ไม่สำเร็จ/timeout ผู้ใช้ยังคีย์ข้อมูลต่อได้ แต่ระบบจะไม่เขียนทับ draft เดิมจากการเดา revision; action ถัดไปหรือปุ่มลองใหม่จะตรวจสอบ baseline ซ้ำก่อน queue write
+- การเข้าถึง draft ต้องใช้สิทธิ์เปิดฟอร์ม `daily.weight_tickets.view` ร่วมกับอย่างน้อยหนึ่งสิทธิ์ `daily.weight_tickets.create` หรือ `daily.weight_tickets.update`; route และ proxy ต้องใช้ contract เดียวกัน
+- สำหรับการแก้เอกสารจริง ให้กู้ draft ได้เฉพาะ draft ที่ใหม่กว่า `updated_at` (หรือ `created_at` ถ้าไม่มี `updated_at`) ของเอกสารจริง เพื่อไม่ให้ draft เก่าทับข้อมูลเอกสารที่บันทึกไปแล้ว
+- เก็บเฉพาะ field ที่กำลังกรอกและ reference ของรูปที่อัปโหลดแล้วเท่านั้น; ห้ามเก็บ
+  base64/data URL หรือใช้ working draft กับเอกสารเก่าที่มีรูป legacy ซึ่งกู้คืนอย่างปลอดภัยไม่ได้
+- การบันทึก working draft ห้ามออกเลขเอกสาร, เปลี่ยนสถานะ WTI/WTO,
+  เขียน stock/pending_out/ledger, timeline/audit ธุรกิจ, PDF หรือ LINE notification
+- เมื่อกดบันทึกเอกสารจริงสำเร็จ หรือกด `ยกเลิก` / `ยกเลิกและกลับรายการ` ระบบต้องหยุด autosave,
+  รอ write ที่ค้างอยู่ แล้วลบเฉพาะ working draft revision ที่ฟอร์มนี้ถืออยู่; การลบร่างพร้อม save เอกสารจริงต้องอยู่ใน transaction เดียวกัน และถ้ามีหน้าต่างอื่นบันทึก revision ใหม่กว่า ต้อง rollback เอกสารจริงแทนการลบร่างใหม่
+- การปิด modal ด้วย Escape/คลิก backdrop หรือการเปลี่ยนหน้าโดยไม่มี action `ยกเลิก` ต้องเก็บ working draft ไว้เพื่อกู้คืนครั้งถัดไป ไม่ตีความเป็นการทิ้งข้อมูลโดยปริยาย
+
+เหตุผล: ผู้ใช้หน้างานต้องพิมพ์ต่อได้ทันทีและกลับเข้าฟอร์มเดิมได้หลังหลุดออกจากหน้า
+โดยไม่ทำให้ข้อมูลที่ยังไม่ผ่าน validation กลายเป็นเอกสารธุรกิจจริง
+
 ## ขอบเขตของ WTI กับ WTO
 
 | เอกสาร | ใช้ทำอะไร | downstream หลัก | สถานะตั้งต้น |
@@ -79,6 +102,7 @@ updated: 2026-07-11
 | Header options API | `GET /api/daily/weight-tickets/options` | โหลดสาขา ผู้ขาย ลูกค้า สิ่งเจือปน |
 | Product picker API | `GET /api/daily/weight-tickets/products` | preload รายการสินค้าพร้อม thumbnail |
 | WTO stock options API | `GET /api/daily/weight-tickets/stock-options` | API สำหรับคลัง RM/FG และคงเหลือรายสินค้า/สาขา/คลัง |
+| Working draft API | `GET/PUT/DELETE /api/daily/weight-ticket-form-drafts` | อ่าน/บันทึก/ลบร่างส่วนตัวระหว่างกรอก โดยไม่มี side effect ธุรกิจ |
 | Save API | `POST /api/daily/weight-tickets` | สร้างเอกสารใหม่ |
 | Read/Update API | `GET/PUT/PATCH /api/daily/weight-tickets/{docNo}` | อ่าน detail แก้ไข และ cancel เอกสาร |
 

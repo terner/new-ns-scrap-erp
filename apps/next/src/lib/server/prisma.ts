@@ -84,6 +84,7 @@ function hasExpectedDelegates(client: PrismaClient) {
     && typeof clientRecord.receipt_voucher_status_logs?.createMany === 'function'
     && typeof clientRecord.stock_holds?.findMany === 'function'
     && typeof clientRecord.stock_issue_status_logs?.createMany === 'function'
+    && typeof clientRecord.weight_ticket_form_drafts?.findFirst === 'function'
     && typeof clientRecord.system_settings?.findMany === 'function'
     && typeof clientRecord.line_groups?.findMany === 'function'
     && hasAccountSubtypeField

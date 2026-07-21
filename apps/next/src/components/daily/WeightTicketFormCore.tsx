@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -17,6 +17,16 @@ import { WeightTicketAttachmentGrid as AttachmentProfileGrid, type WeightTicketA
 import { WeightTicketWtiFormSection, WeightTicketWtoFormSection } from '@/components/daily/WeightTicketTypeFormSections'
 import { ApiError, getErrorMessage } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
+import {
+  deleteWeightTicketFormDraft,
+  getWeightTicketFormDraft,
+  isWeightTicketWorkingDraftNewerThanDocument,
+  isWeightTicketDraftAttachmentReference,
+  saveWeightTicketFormDraft,
+  WeightTicketDraftAutosaveQueue,
+  type WeightTicketFormDraftPayload,
+  type WeightTicketFormDraftRecord,
+} from '@/lib/weight-ticket-drafts'
 import { cachedWeightTicketReferences } from '@/lib/weight-ticket-reference-cache'
 import {
   calculateWeightTicketLineTotals,
@@ -65,6 +75,8 @@ type FormState = {
   vehicleNo: string
   godownName: string
 }
+
+type DraftAutosaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflict'
 
 type WeightTicketOptionsPayload = {
   branches?: Array<{ code?: string | null; id: string; name: string }>
@@ -358,6 +370,88 @@ function ticketToFormState(ticket: WeightTicketRecord): FormState {
   }
 }
 
+function draftAttachmentReferences(files: AttachmentPreview[]) {
+  return files
+    .map((file) => file.rawValue.trim())
+    .filter(isWeightTicketDraftAttachmentReference)
+}
+
+function hasUnsupportedTicketAttachments(ticket: WeightTicketRecord) {
+  return ticket.vehicleImageNames.some((value) => !isWeightTicketDraftAttachmentReference(value))
+    || ticket.lines.some((line) => line.imageNames.some((value) => !isWeightTicketDraftAttachmentReference(value)))
+}
+
+function formToWorkingDraftPayload(form: FormState): WeightTicketFormDraftPayload {
+  return {
+    branchId: form.branchId,
+    branchName: form.branchName,
+    godownName: form.godownName.trim(),
+    lines: form.lines.map((line) => ({
+      containerDeductionWeight: line.containerDeductionWeight,
+      deductionMode: line.deductionMode,
+      deductionValue: line.deductionValue,
+      grossWeight: line.grossWeight,
+      id: line.id,
+      imageNames: draftAttachmentReferences(line.imageFiles),
+      impurityId: line.impurityId,
+      impurityName: line.impurityName ?? '',
+      impurityProductId: line.impurityProductId ?? '',
+      impurityProductName: line.impurityProductName ?? '',
+      impurityPurchaseAction: line.impurityPurchaseAction ?? 'none',
+      impuritySourceLineId: line.impuritySourceLineId,
+      note: line.note,
+      parentId: line.parentId,
+      productId: line.productId,
+      productName: line.productName ?? '',
+      warehouseId: line.warehouseId,
+      warehouseName: line.warehouseName ?? '',
+      warehouseType: line.warehouseType ?? '',
+    })),
+    partyId: form.partyId,
+    partyName: form.partyName,
+    remark: form.remark.trim(),
+    type: form.type,
+    vehicleImageNames: draftAttachmentReferences(form.vehicleImageFiles),
+    vehicleNo: form.vehicleNo.trim(),
+  }
+}
+
+function workingDraftToFormState(draft: WeightTicketFormDraftPayload): FormState {
+  return {
+    branchId: draft.branchId,
+    branchName: draft.branchName,
+    godownName: draft.godownName,
+    lines: draft.lines.map((line) => ({
+      containerDeductionWeight: line.containerDeductionWeight,
+      deductionMode: line.deductionMode,
+      deductionValue: line.deductionValue,
+      grossWeight: line.grossWeight,
+      id: line.id,
+      imageFiles: line.imageNames.map(createAttachmentPreview),
+      imageNames: line.imageNames,
+      impurityId: line.impurityId,
+      impurityName: line.impurityName,
+      impurityProductId: line.impurityProductId,
+      impurityProductName: line.impurityProductName,
+      impurityPurchaseAction: line.impurityPurchaseAction,
+      impuritySourceLineId: line.impuritySourceLineId,
+      note: line.note,
+      parentId: line.parentId,
+      productId: line.productId,
+      productName: line.productName,
+      warehouseId: line.warehouseId,
+      warehouseName: line.warehouseName,
+      warehouseType: line.warehouseType,
+    })),
+    partyId: draft.partyId,
+    partyName: draft.partyName,
+    remark: draft.remark,
+    type: draft.type,
+    vehicleImageFiles: draft.vehicleImageNames.map(createAttachmentPreview),
+    vehicleNo: draft.vehicleNo,
+  }
+}
+
 function warehouseOptionsForLine(stock: WtoStockOptionsState[string] | undefined, line: FormWeightTicketLine) {
   const options = stock?.options ?? []
   if (!line.warehouseId) return options
@@ -465,6 +559,7 @@ export type WeightTicketFormCoreProps = {
   ticketId?: string
   embeddedModal?: boolean
   onClose?: () => void
+  onWorkingDraftDiscardReady?: (discard: (() => Promise<boolean>) | null) => void
   onDirtyChange?: (dirty: boolean) => void
   onSaveSuccess?: (ticket: WeightTicketRecord) => void
 }
@@ -475,11 +570,13 @@ export function WeightTicketFormCore({
   ticketId = '',
   embeddedModal = false,
   onClose,
+  onWorkingDraftDiscardReady,
   onDirtyChange,
   onSaveSuccess,
 }: WeightTicketFormCoreProps) {
   const router = useRouter()
   const editingTicketId = ticketId.trim()
+  const draftScopeKey = editingTicketId ? `ticket:${editingTicketId}` : `new:${initialType}`
   const [form, setForm] = useState<FormState>(() => initialForm(initialType))
   const [branches, setBranches] = useState<OptionItem[]>([])
   const [suppliers, setSuppliers] = useState<OptionItem[]>([])
@@ -491,7 +588,18 @@ export function WeightTicketFormCore({
   const [loadedTicket, setLoadedTicket] = useState<WeightTicketRecord | null>(null)
   const [savedTicket, setSavedTicket] = useState<WeightTicketRecord | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [isLoadingTicket, setIsLoadingTicket] = useState(Boolean(editingTicketId))
+  const [isLoadingTicket, setIsLoadingTicket] = useState(true)
+  const [isWorkingDraftReady, setIsWorkingDraftReady] = useState(false)
+  const [isWorkingDraftBaselineUnavailable, setIsWorkingDraftBaselineUnavailable] = useState(false)
+  const [draftAutosaveStatus, setDraftAutosaveStatus] = useState<DraftAutosaveStatus>('idle')
+  const [draftAutosaveRequest, setDraftAutosaveRequest] = useState<{ id: number; scopeKey: string } | null>(null)
+  const [draftAutosaveConflict, setDraftAutosaveConflict] = useState<WeightTicketFormDraftRecord | null>(null)
+  const draftAutosaveQueueRef = useRef<WeightTicketDraftAutosaveQueue<WeightTicketFormDraftPayload> | null>(null)
+  const latestFormRef = useRef(form)
+  const isWorkingDraftAutosaveEnabledRef = useRef(false)
+  const isWorkingDraftBaselineUnavailableRef = useRef(false)
+  const hasDraftAutosaveConflictRef = useRef(false)
+  const processedDraftAutosaveRequestRef = useRef('')
   const [loadError, setLoadError] = useState('')
   const [mergeNotice, setMergeNotice] = useState('')
   const [previewImage, setPreviewImage] = useState<AttachmentPreview | null>(null)
@@ -502,6 +610,10 @@ export function WeightTicketFormCore({
   const [draftStartedAt] = useState(() => new Date().toISOString())
   const [timerNow, setTimerNow] = useState(() => Date.now())
   const [isWeightTicketSummaryCollapsed, setIsWeightTicketSummaryCollapsed] = useState(true)
+
+  useEffect(() => {
+    latestFormRef.current = form
+  }, [form])
 
   useEffect(() => {
     onDirtyChange?.(hasEnteredTicketData(form))
@@ -687,37 +799,233 @@ export function WeightTicketFormCore({
   }, [form.branchId, form.type, wtoProductKeys])
 
   useEffect(() => {
-    if (!editingTicketId) {
-      setIsLoadingTicket(false)
-      setLoadedTicket(null)
-      return
-    }
-
     let cancelled = false
+    const draftController = new AbortController()
+    const draftTimeoutId = window.setTimeout(() => draftController.abort(), 4_000)
+    const queue = new WeightTicketDraftAutosaveQueue<WeightTicketFormDraftPayload>((payload, revision) => saveWeightTicketFormDraft({
+      payload,
+      revision,
+      scopeKey: draftScopeKey,
+    }))
+    draftAutosaveQueueRef.current = queue
+    isWorkingDraftAutosaveEnabledRef.current = false
+    isWorkingDraftBaselineUnavailableRef.current = false
+    hasDraftAutosaveConflictRef.current = false
+    processedDraftAutosaveRequestRef.current = ''
+    setIsLoadingTicket(true)
+    setIsWorkingDraftReady(false)
+    setIsWorkingDraftBaselineUnavailable(false)
+    setLoadError('')
+    setDraftAutosaveStatus('idle')
+    setDraftAutosaveConflict(null)
+    setSavedTicket(null)
 
-    async function loadTicket() {
-      setIsLoadingTicket(true)
-      setLoadError('')
-      try {
-        const ticket = await getWeightTicket(editingTicketId)
-        if (cancelled) return
-        setLoadedTicket(ticket)
-        setForm(ticketToFormState(ticket))
-        setSavedTicket(null)
-        setActiveLineId('')
-        setTouched({})
-      } catch (caught) {
-        if (!cancelled) setLoadError(getErrorMessage(caught, 'โหลดใบรับ-ส่งของที่ต้องการแก้ไขไม่ได้'))
-      } finally {
-        if (!cancelled) setIsLoadingTicket(false)
+    async function loadTicketAndWorkingDraft() {
+      const [ticketResult, draftResult] = await Promise.allSettled([
+        editingTicketId ? getWeightTicket(editingTicketId) : Promise.resolve(null),
+        getWeightTicketFormDraft(draftScopeKey, { signal: draftController.signal }),
+      ])
+      window.clearTimeout(draftTimeoutId)
+      if (cancelled) return
+
+      const ticket = ticketResult.status === 'fulfilled' ? ticketResult.value : null
+      if (ticketResult.status === 'rejected') {
+        setLoadError(getErrorMessage(ticketResult.reason, 'โหลดใบรับ-ส่งของที่ต้องการแก้ไขไม่ได้'))
       }
+      setLoadedTicket(ticket)
+      const hasUnsupportedAttachments = Boolean(ticket && hasUnsupportedTicketAttachments(ticket))
+      const canUseWorkingDraft = !editingTicketId || Boolean(ticket && !hasUnsupportedAttachments)
+      const workingDraft = draftResult.status === 'fulfilled' ? draftResult.value : null
+      const draftMatchesCurrentForm = Boolean(workingDraft && (
+        editingTicketId
+          ? Boolean(ticket
+            && ticket.type === workingDraft.payload.type
+            && isWeightTicketWorkingDraftNewerThanDocument(workingDraft.savedAt, ticket.updatedAt, ticket.createdAt))
+          : initialType === workingDraft.payload.type
+      ))
+
+      if (hasUnsupportedAttachments && ticket) {
+        queue.reset()
+        const ticketForm = ticketToFormState(ticket)
+        latestFormRef.current = ticketForm
+        setForm(ticketForm)
+        setLoadError('เอกสารนี้มีรูปภาพรูปแบบเดิม ระบบจะไม่กู้คืนหรือบันทึกร่างอัตโนมัติ เพื่อป้องกันไฟล์แนบหาย')
+      } else if (canUseWorkingDraft && workingDraft && draftMatchesCurrentForm) {
+        queue.setRevision(workingDraft.revision)
+        const restoredForm = workingDraftToFormState(workingDraft.payload)
+        latestFormRef.current = restoredForm
+        setForm(restoredForm)
+      } else {
+        queue.setRevision(workingDraft?.revision ?? 0)
+        const initialTicketForm = ticket ? ticketToFormState(ticket) : initialForm(initialType)
+        latestFormRef.current = initialTicketForm
+        setForm(initialTicketForm)
+        if (draftResult.status === 'rejected') setDraftAutosaveStatus('error')
+      }
+
+      setActiveLineId('')
+      setTouched({})
+      const isDraftBaselineAvailable = draftResult.status === 'fulfilled'
+      isWorkingDraftAutosaveEnabledRef.current = canUseWorkingDraft && isDraftBaselineAvailable
+      isWorkingDraftBaselineUnavailableRef.current = canUseWorkingDraft && !isDraftBaselineAvailable
+      setIsWorkingDraftBaselineUnavailable(isWorkingDraftBaselineUnavailableRef.current)
+      setIsWorkingDraftReady(isWorkingDraftAutosaveEnabledRef.current)
+      setIsLoadingTicket(false)
     }
 
-    void loadTicket()
+    void loadTicketAndWorkingDraft()
     return () => {
       cancelled = true
+      window.clearTimeout(draftTimeoutId)
+      draftController.abort()
+      if (draftAutosaveQueueRef.current === queue) draftAutosaveQueueRef.current = null
     }
-  }, [editingTicketId])
+  }, [draftScopeKey, editingTicketId, initialType])
+
+  useEffect(() => {
+    if (!draftAutosaveRequest || draftAutosaveRequest.scopeKey !== draftScopeKey) return
+    if (isWorkingDraftBaselineUnavailable) {
+      void retryWorkingDraftBaseline()
+      return
+    }
+    if (!isWorkingDraftAutosaveEnabledRef.current || !isWorkingDraftReady) return
+    const requestKey = `${draftAutosaveRequest.scopeKey}:${draftAutosaveRequest.id}`
+    if (processedDraftAutosaveRequestRef.current === requestKey) return
+    processedDraftAutosaveRequestRef.current = requestKey
+
+    const queue = draftAutosaveQueueRef.current
+    if (!queue) return
+    setDraftAutosaveStatus('saving')
+    void queue.enqueue(formToWorkingDraftPayload(form))
+      .then(() => {
+        if (draftAutosaveQueueRef.current === queue) setDraftAutosaveStatus('saved')
+      })
+      .catch(async (caught) => {
+        if (caught instanceof ApiError && caught.status === 409) {
+          try {
+            const latestDraft = await getWeightTicketFormDraft(draftScopeKey)
+            if (draftAutosaveQueueRef.current === queue) {
+              if (latestDraft) {
+                queue.setRevision(latestDraft.revision)
+                hasDraftAutosaveConflictRef.current = true
+                setDraftAutosaveConflict(latestDraft)
+                setDraftAutosaveStatus('conflict')
+                return
+              }
+              queue.reset()
+            }
+          } catch {
+            // Keep the visible retry available even if the revision refresh is offline.
+          }
+        }
+        if (draftAutosaveQueueRef.current === queue) setDraftAutosaveStatus('error')
+      })
+  // A retry only belongs to the explicit draft action; subscribing to its render-scoped helper would replay it on retry state changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftAutosaveRequest, draftScopeKey, form, isWorkingDraftBaselineUnavailable, isWorkingDraftReady])
+
+  async function retryWorkingDraftBaseline() {
+    const queue = draftAutosaveQueueRef.current
+    if (!queue || !isWorkingDraftBaselineUnavailableRef.current) {
+      return Boolean(queue && isWorkingDraftAutosaveEnabledRef.current)
+    }
+
+    setDraftAutosaveStatus('saving')
+    try {
+      const latestDraft = await getWeightTicketFormDraft(draftScopeKey)
+      if (draftAutosaveQueueRef.current !== queue) return false
+      const currentForm = latestFormRef.current
+
+      const isLatestDraftUsable = Boolean(latestDraft && (
+        latestDraft.payload.type === currentForm.type
+        && (!editingTicketId || Boolean(
+          loadedTicket
+          && isWeightTicketWorkingDraftNewerThanDocument(latestDraft.savedAt, loadedTicket.updatedAt, loadedTicket.createdAt),
+        ))
+      ))
+
+      if (latestDraft && isLatestDraftUsable && hasEnteredTicketData(currentForm)) {
+        queue.setRevision(latestDraft.revision)
+        hasDraftAutosaveConflictRef.current = true
+        setDraftAutosaveConflict(latestDraft)
+        setDraftAutosaveStatus('conflict')
+        return false
+      }
+
+      if (latestDraft) {
+        queue.setRevision(latestDraft.revision)
+      } else {
+        queue.reset()
+      }
+      if (isLatestDraftUsable && latestDraft) {
+        const restoredForm = workingDraftToFormState(latestDraft.payload)
+        latestFormRef.current = restoredForm
+        setForm(restoredForm)
+        setActiveLineId('')
+        setTouched({})
+        setDraftAutosaveStatus('saved')
+      } else {
+        setDraftAutosaveStatus('idle')
+      }
+
+      isWorkingDraftAutosaveEnabledRef.current = true
+      isWorkingDraftBaselineUnavailableRef.current = false
+      setIsWorkingDraftBaselineUnavailable(false)
+      setIsWorkingDraftReady(true)
+      return true
+    } catch {
+      if (draftAutosaveQueueRef.current === queue) setDraftAutosaveStatus('error')
+      return false
+    }
+  }
+
+  function requestWorkingDraftAutosave() {
+    if (isWorkingDraftBaselineUnavailableRef.current) {
+      setDraftAutosaveRequest((current) => ({
+        id: (current?.id ?? 0) + 1,
+        scopeKey: draftScopeKey,
+      }))
+      return
+    }
+    if (!isWorkingDraftAutosaveEnabledRef.current || hasDraftAutosaveConflictRef.current) return
+    setDraftAutosaveRequest((current) => ({
+      id: (current?.id ?? 0) + 1,
+      scopeKey: draftScopeKey,
+    }))
+  }
+
+  function loadLatestWorkingDraft() {
+    const queue = draftAutosaveQueueRef.current
+    if (!queue || !draftAutosaveConflict) return
+
+    queue.reset(draftAutosaveConflict.revision)
+    const restoredForm = workingDraftToFormState(draftAutosaveConflict.payload)
+    latestFormRef.current = restoredForm
+    setForm(restoredForm)
+    setActiveLineId('')
+    setTouched({})
+    hasDraftAutosaveConflictRef.current = false
+    isWorkingDraftAutosaveEnabledRef.current = true
+    isWorkingDraftBaselineUnavailableRef.current = false
+    setIsWorkingDraftBaselineUnavailable(false)
+    setIsWorkingDraftReady(true)
+    setDraftAutosaveConflict(null)
+    setDraftAutosaveStatus('saved')
+  }
+
+  function keepCurrentWorkingDraft() {
+    const queue = draftAutosaveQueueRef.current
+    if (!queue || !draftAutosaveConflict) return
+
+    queue.setRevision(draftAutosaveConflict.revision)
+    hasDraftAutosaveConflictRef.current = false
+    isWorkingDraftAutosaveEnabledRef.current = true
+    isWorkingDraftBaselineUnavailableRef.current = false
+    setIsWorkingDraftBaselineUnavailable(false)
+    setIsWorkingDraftReady(true)
+    setDraftAutosaveConflict(null)
+    requestWorkingDraftAutosave()
+  }
 
   useEffect(() => {
     const parentLines = getMainParentLines(form.lines)
@@ -957,20 +1265,28 @@ export function WeightTicketFormCore({
         productName: products.find((product) => product.id === productId)?.label ?? '',
       }
 
-      return {
+      const nextForm = {
         ...current,
         lines: current.lines
           .filter((line) => line.id === lineId || (line.parentId !== lineId && !childIds.includes(line.impuritySourceLineId ?? '')))
           .map((line) => line.id === lineId ? resetLine : line),
       }
+      latestFormRef.current = nextForm
+      return nextForm
     })
+    requestWorkingDraftAutosave()
   }
 
   function addLine() {
     setMergeNotice('')
     const nextLine = createFormWeightTicketLine()
-    setForm((current) => ({ ...current, lines: [...current.lines, nextLine] }))
+    setForm((current) => {
+      const nextForm = { ...current, lines: [...current.lines, nextLine] }
+      latestFormRef.current = nextForm
+      return nextForm
+    })
     setActiveLineId(nextLine.id)
+    requestWorkingDraftAutosave()
   }
 
   function addSameProductLot(sourceLine: FormWeightTicketLine) {
@@ -990,7 +1306,12 @@ export function WeightTicketFormCore({
       ...Object.fromEntries(existingLotIds.map((lotId) => [lotId, true])),
       [nextLine.id]: false,
     }))
-    setForm((current) => ({ ...current, lines: [...current.lines, nextLine] }))
+    setForm((current) => {
+      const nextForm = { ...current, lines: [...current.lines, nextLine] }
+      latestFormRef.current = nextForm
+      return nextForm
+    })
+    requestWorkingDraftAutosave()
   }
 
   function changeLineWarehouse(lineId: string, warehouseId: string, warehouse: WtoStockWarehouseOption | null | undefined) {
@@ -1175,7 +1496,45 @@ export function WeightTicketFormCore({
     }))
   }
 
-  function backToList() {
+  const discardWorkingDraft = useCallback(async () => {
+    const queue = draftAutosaveQueueRef.current
+    if (!queue) return true
+    if (isWorkingDraftBaselineUnavailableRef.current || hasDraftAutosaveConflictRef.current) return true
+    isWorkingDraftAutosaveEnabledRef.current = false
+
+    try {
+      await queue.flush()
+    } catch {
+      // The user is leaving this form, so continue to remove any prior server snapshot.
+    }
+
+    try {
+      await deleteWeightTicketFormDraft(draftScopeKey, queue.revision)
+      if (draftAutosaveQueueRef.current === queue) {
+        queue.reset()
+        hasDraftAutosaveConflictRef.current = false
+        setDraftAutosaveConflict(null)
+        setDraftAutosaveStatus('idle')
+      }
+      return true
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) return true
+      if (draftAutosaveQueueRef.current === queue) {
+        isWorkingDraftAutosaveEnabledRef.current = true
+        setDraftAutosaveStatus('error')
+        setLoadError('ลบร่างที่กำลังกรอกไม่สำเร็จ กรุณาลองใหม่ก่อนออกจากฟอร์ม')
+      }
+      return false
+    }
+  }, [draftScopeKey])
+
+  useEffect(() => {
+    onWorkingDraftDiscardReady?.(discardWorkingDraft)
+    return () => onWorkingDraftDiscardReady?.(null)
+  }, [discardWorkingDraft, onWorkingDraftDiscardReady])
+
+  async function backToList() {
+    if (!await discardWorkingDraft()) return
     if (onClose) {
       onClose()
     } else {
@@ -1217,8 +1576,20 @@ export function WeightTicketFormCore({
       return
     }
 
+    const queue = draftAutosaveQueueRef.current
+    let canCleanWorkingDraft = false
     setIsSaving(true)
     try {
+      if (isWorkingDraftBaselineUnavailableRef.current && !await retryWorkingDraftBaseline()) {
+        setLoadError('ยังตรวจสอบแบบร่างเดิมไม่ได้ กรุณาโหลดฉบับล่าสุดก่อนบันทึกเอกสาร')
+        return
+      }
+      if (hasDraftAutosaveConflictRef.current) {
+        setLoadError('แบบร่างถูกแก้ไขจากอีกหน้าต่าง กรุณาเลือกฉบับที่ต้องการใช้ก่อนบันทึกเอกสาร')
+        return
+      }
+      canCleanWorkingDraft = isWorkingDraftAutosaveEnabledRef.current && Boolean(queue)
+      if (canCleanWorkingDraft) await queue!.flush()
       const ticket = await saveWeightTicket({
         branchId: form.branchId,
         id: editingTicketId || undefined,
@@ -1243,11 +1614,21 @@ export function WeightTicketFormCore({
         vehicleImageNames: form.vehicleImageFiles.map((file) => file.rawValue),
         vehicleNo: form.vehicleNo.trim(),
         godownName: form.godownName.trim(),
-      })
+      }, canCleanWorkingDraft ? {
+        workingDraftCleanup: {
+          revision: queue!.revision,
+          scopeKey: draftScopeKey,
+        },
+      } : undefined)
       setLoadError('')
       setLoadedTicket(ticket)
       setSavedTicket(ticket)
       setForm(ticketToFormState(ticket))
+      isWorkingDraftAutosaveEnabledRef.current = false
+      queue?.reset()
+      hasDraftAutosaveConflictRef.current = false
+      setDraftAutosaveConflict(null)
+      setDraftAutosaveStatus('idle')
       if (onSaveSuccess) {
         onSaveSuccess(ticket)
       } else {
@@ -1256,6 +1637,21 @@ export function WeightTicketFormCore({
     } catch (caught) {
       if (caught instanceof ApiError && Object.keys(caught.fieldErrors).length > 0) {
         setTouched((current) => ({ ...current, ...nextTouched }))
+      }
+      if (canCleanWorkingDraft && caught instanceof ApiError && caught.status === 409) {
+        try {
+          const latestDraft = await getWeightTicketFormDraft(draftScopeKey)
+          if (latestDraft && draftAutosaveQueueRef.current === queue) {
+            queue?.setRevision(latestDraft.revision)
+            hasDraftAutosaveConflictRef.current = true
+            setDraftAutosaveConflict(latestDraft)
+            setDraftAutosaveStatus('conflict')
+            setLoadError('แบบร่างถูกแก้ไขจากอีกหน้าต่าง กรุณาเลือกฉบับที่ต้องการใช้ก่อนบันทึกเอกสาร')
+            return
+          }
+        } catch {
+          // Keep the original save error when the latest draft cannot be loaded.
+        }
       }
       setLoadError(getErrorMessage(caught, editingTicketId ? 'แก้ไขใบรับ-ส่งของไม่ได้' : 'บันทึกใบรับ-ส่งของไม่ได้'))
     } finally {
@@ -1278,7 +1674,7 @@ export function WeightTicketFormCore({
                 {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
               </Button>
               <Button className="h-10 shrink-0 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white sm:h-9" disabled={isLoadingTicket || isSaving} type="button" variant="outline" onClick={backToList}>
-                {editingTicketId ? 'ปิด' : 'ยกเลิก'}
+                ยกเลิก
               </Button>
             </div>
           </div>
@@ -1374,7 +1770,7 @@ export function WeightTicketFormCore({
         <div>
           <Button type="button" variant="outline" onClick={backToList}>
             <ArrowLeft className="mr-1 h-4 w-4" />
-            กลับไปหน้ารายการ
+            ยกเลิกและกลับรายการ
           </Button>
         </div>
       )}
@@ -1394,6 +1790,44 @@ export function WeightTicketFormCore({
       {mergeNotice ? (
         <div className="rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
           {mergeNotice}
+        </div>
+      ) : null}
+      {draftAutosaveStatus !== 'idle' ? (
+        <div
+          aria-live="polite"
+          className={cn(
+            'inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium',
+            draftAutosaveStatus === 'error'
+              ? 'border-rose-200 bg-rose-50 text-rose-700'
+              : draftAutosaveStatus === 'saved'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-blue-200 bg-blue-50 text-blue-700',
+          )}
+          role="status"
+        >
+          <span>
+            {draftAutosaveStatus === 'saving'
+              ? 'กำลังบันทึกร่าง…'
+              : draftAutosaveStatus === 'saved'
+                ? 'บันทึกร่างแล้ว'
+                : draftAutosaveStatus === 'conflict'
+                  ? 'แบบร่างถูกแก้ไขจากอีกหน้าต่าง'
+                : 'บันทึกร่างไม่สำเร็จ'}
+          </span>
+          {draftAutosaveStatus === 'conflict' ? (
+            <>
+              <button className="font-semibold underline underline-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60" disabled={isSaving} type="button" onClick={loadLatestWorkingDraft}>
+                โหลดฉบับล่าสุด
+              </button>
+              <button className="font-semibold underline underline-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60" disabled={isSaving} type="button" onClick={keepCurrentWorkingDraft}>
+                เก็บข้อมูลที่กำลังกรอก
+              </button>
+            </>
+          ) : draftAutosaveStatus === 'error' ? (
+            <button className="font-semibold underline underline-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60" disabled={isSaving} type="button" onClick={requestWorkingDraftAutosave}>
+              {isWorkingDraftBaselineUnavailable ? 'ลองเชื่อมต่อใหม่' : 'ลองใหม่'}
+            </button>
+          ) : null}
         </div>
       ) : null}
       {isEmbeddedModal && !canShowWeightTicketTimer ? (
@@ -2211,8 +2645,8 @@ export function WeightTicketFormCore({
           <div className="ml-auto grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:justify-end">
             <Button className="h-9" disabled={isLoadingTicket || isSaving} type="button" variant="outline" onClick={backToList}>
               {!onClose && <ArrowLeft className="mr-1 h-4 w-4" />}
-              <span className="sm:hidden">กลับรายการ</span>
-              <span className="hidden sm:inline">{onClose ? 'ปิด' : 'กลับไปหน้ารายการ'}</span>
+              <span className="sm:hidden">{onClose ? 'ยกเลิก' : 'ยกเลิกและกลับรายการ'}</span>
+              <span className="hidden sm:inline">{onClose ? 'ยกเลิก' : 'ยกเลิกและกลับรายการ'}</span>
             </Button>
             <Button className="h-9 bg-blue-600 font-normal text-white hover:bg-blue-700" disabled={isLoadingTicket || isSaving} type="button" onClick={saveTicket}>
               {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}

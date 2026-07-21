@@ -1,4 +1,11 @@
-# Active Profit & Cost Performance Batch 2026-07-19
+# Active WTI/WTO Working-Draft Batch 2026-07-21
+
+Branch/worktree: `codex/weight-ticket-draft-autosave` at `C:\tmp\ns-erp-weight-ticket-draft-autosave`.
+`weight_ticket_form_drafts` is a per-user private form snapshot, not a WTI/WTO business document. It autosaves after product confirmation/change, `เพิ่มสินค้า`, and `เพิ่มเต๋า`, queues the write without blocking data entry, and removes the snapshot after a real save or an explicit `ยกเลิก`/`ยกเลิกและกลับรายการ`. Escape, backdrop dismissal, or browser navigation retain the private snapshot for recovery. It has no document number, stock, pending-out, ledger, timeline, audit, PDF, or LINE side effect. The migration `20260721030145_create_weight_ticket_form_drafts.sql` is applied to dev-target `fhglqymcdmrgbsbadnwr`; postflight confirmed RLS enabled, no anon/authenticated table access, migration history recorded, and a rollback-only server write smoke passed.
+
+Current write areas: working-draft route/helper, `WeightTicketFormCore`, Prisma runtime delegate guard, navigation permission, schema, and the two WTI/WTO flow notes. Local verification is complete in a clean runner: focused Vitest `16/16`, scoped diff check, type-check (4 GB Node heap), and production build (4 GB heap, two workers) passed; lint exited `0` with zero errors and four pre-existing warnings. Browser/UAT and push/promotion were not requested.
+
+## Previous Active Profit & Cost Performance Batch 2026-07-19
 
 Objective: cut `/profit-cost-analysis` over from transaction-wide Node aggregation to strict PostgreSQL fact/daily read models with split APIs, applied filters, request cancellation, branch scope, and server pagination/sort.
 

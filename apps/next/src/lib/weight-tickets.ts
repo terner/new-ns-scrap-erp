@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { WEIGHT_TICKET_WORKING_DRAFT_HEADER, type WeightTicketWorkingDraftCleanup } from '@/lib/weight-ticket-drafts'
 import { readJsonResponse } from '@/lib/api-client'
 
 export type WeightTicketType = 'WTI' | 'WTO'
@@ -1058,13 +1059,19 @@ function payloadFromForm(values: WeightTicketFormValues) {
   }
 }
 
-export async function saveWeightTicket(values: WeightTicketFormValues) {
+export async function saveWeightTicket(values: WeightTicketFormValues, options?: {
+  workingDraftCleanup?: WeightTicketWorkingDraftCleanup
+}) {
   const parsed = weightTicketFormSchema.parse(values)
   const method = parsed.id ? 'PUT' : 'POST'
   const path = parsed.id ? `/api/daily/weight-tickets/${encodeURIComponent(parsed.id)}` : '/api/daily/weight-tickets'
+  const workingDraftCleanup = options?.workingDraftCleanup
   const response = await fetch(path, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(workingDraftCleanup ? { [WEIGHT_TICKET_WORKING_DRAFT_HEADER]: JSON.stringify(workingDraftCleanup) } : {}),
+    },
     body: JSON.stringify(payloadFromForm(parsed)),
   })
   return readJsonResponse(response, weightTicketRecordSchema, parsed.id ? 'แก้ไขใบรับ-ส่งของไม่ได้' : 'บันทึกใบรับ-ส่งของไม่ได้')

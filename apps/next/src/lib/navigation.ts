@@ -86,6 +86,7 @@ const exactPathPermissions: Record<string, string> = {
   '/api/dashboard': 'reports.reports.view',
   '/api/daily-report': 'reports.reports.view',
   '/api/daily/weight-ticket-dashboard': 'daily.weight_tickets.view',
+  '/api/daily/weight-ticket-form-drafts': 'daily.weight_tickets.view',
   '/api/daily/weight-tickets': 'daily.weight_tickets.view',
   '/api/daily/weight-tickets/options': 'daily.weight_tickets.view',
   '/api/daily/weight-tickets/products': 'daily.weight_tickets.view',

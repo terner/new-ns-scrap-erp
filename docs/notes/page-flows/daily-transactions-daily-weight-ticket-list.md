@@ -4,7 +4,7 @@ tags:
   - page-flow
   - menu
 status: accepted-baseline
-updated: 2026-07-19
+updated: 2026-07-21
 route: /daily/weight-ticket-list
 ---
 
@@ -142,6 +142,7 @@ What is what: album เป็นภาพรวมหลักฐานทั้
 |---|---|---|
 | 1 | เปิด list | GET weight tickets list |
 | 2 | สร้าง/แก้ | ไป `/daily/weight-tickets?type=WTI|WTO` หรือ edit พร้อม type context และใช้ options/products APIs |
+| 2.1 | ยืนยัน/เปลี่ยนสินค้า, เพิ่มสินค้า หรือกดเพิ่มเต๋า | queue working draft ส่วนตัวแบบ asynchronous โดยฟอร์มยังพิมพ์ต่อได้ |
 | 3 | detail | GET by id/doc no แสดง summary/timeline/images |
 | 4 | PB/SB ใช้งาน | update usage/status/lock |
 | 5 | cancel/edit | ถ้าถูก bill ใช้แล้วต้อง lock; ถ้ายังไม่ใช้ให้ release/rebuild `pending_out` สำหรับ WTO |
@@ -163,6 +164,10 @@ What is what: album เป็นภาพรวมหลักฐานทั้
   - returns `onHandQty`, `onHoldQty`, and `availableQty` per warehouse
   - derives `onHandQty` from `stock_ledger`
   - derives `onHoldQty` from active `pending_out`
+- `GET/PUT/DELETE /api/daily/weight-ticket-form-drafts`
+  - private working copy ตาม `app_user_id + scope_key`; ใช้ได้เฉพาะผู้มีสิทธิ์เปิดฟอร์ม (`daily.weight_tickets.view`) ร่วมกับสิทธิ์ create หรือ update ใบรับ-ส่งของ
+  - optimistic `revision` ป้องกัน snapshot จากหน้าต่างเก่าเขียนทับหรือลบฉบับใหม่กว่า; เมื่อ conflict ให้ผู้ใช้เลือกโหลดฉบับล่าสุดหรือเก็บข้อมูลปัจจุบันเพื่อเขียนต่อจาก revision ล่าสุด และทุก response เป็น `private, no-store`
+  - ไม่อ่าน/เขียน `weight_tickets` และไม่เป็น source สำหรับเลขเอกสาร, status, stock, timeline, audit, PDF หรือ LINE
 - `POST /api/daily/weight-tickets`
   - for `WTO`, must require `warehouseId` per line
   - must validate requested qty/net weight against server-side `availableQty`
@@ -259,6 +264,7 @@ What is what: album เป็นภาพรวมหลักฐานทั้
 
 ## Side Effects
 
+- working draft หลังยืนยัน/เปลี่ยนสินค้า, เพิ่มสินค้า หรือเพิ่มเต๋าเก็บเพียง snapshot ส่วนตัวแบบ queue; ไม่สร้างเอกสารจริงหรือ side effect ธุรกิจ และถูกลบหลัง save จริงหรือกด `ยกเลิก`/`ยกเลิกและกลับรายการ` เฉพาะ revision ที่กำลังถืออยู่ เพื่อไม่ลบร่างใหม่จากอีกหน้าต่าง; การปิดด้วย Escape/backdrop หรือเปลี่ยนหน้าโดยไม่กด action ดังกล่าวคงร่างไว้สำหรับ recovery; save เอกสารจริงกับ cleanup ต้องเป็น transaction เดียวกัน และ revision conflict ต้อง rollback เอกสารจริง
 - WTI save สร้าง evidence/summary แต่ไม่ stock ledger
 - WTO draft save ยังไม่สร้าง `pending_out`; WTO confirm ตรวจ stock แล้วสร้าง pending_out พร้อม snapshot ราคาต้นทุนเฉลี่ยแบบแยกเต๋า/line
 - WTO edit หลัง confirm ต้องปิด/release เฉพาะ pending_out ส่วนที่ลด/ลบ/แก้, สร้างหรือ update snapshot ใหม่เฉพาะเต๋าที่แก้หรือเพิ่ม, เก็บประวัติ pending_out เดิมไว้, แล้ว recompute product-level weighted average cost summary จาก active pending_out ทุกเต๋าของ SKU นั้น
@@ -270,6 +276,8 @@ What is what: album เป็นภาพรวมหลักฐานทั้
 ## Form UI Behavior
 
 - ปุ่มเลือกสินค้าจากรูปและปุ่มเพิ่มเต๋าเป็น action ปกติ จึงใช้สีหลักของระบบ ไม่ใช้สีแดงซึ่งสงวนไว้สำหรับยกเลิกหรือลบ
+- หลังยืนยันสินค้าในรายการหรือกดเพิ่มรายการ/เพิ่มเต๋า ให้บันทึกร่างอัตโนมัติแบบไม่ block การพิมพ์ พร้อมสถานะสั้นและปุ่มลองใหม่เมื่อ write ไม่สำเร็จ; ถ้า baseline draft โหลดไม่สำเร็จให้คีย์ต่อได้ แต่ต้องตรวจสอบ revision ก่อนส่ง write ครั้งแรก
+- `ยกเลิก`/`ยกเลิกและกลับรายการ` เป็นการทิ้งร่างโดยเจตนา; Escape/backdrop และ browser navigation คงร่างไว้เพื่อให้ผู้ใช้กลับมากู้คืนได้
 - บนจอใหญ่ ข้อมูลหัวเอกสารจัดเป็นฟิลด์ 2 คอลัมน์คู่กับหลักฐานรูปภาพรถ เพื่อลดพื้นที่ว่างและยังคงลำดับกรอกข้อมูลเดิม; บนจอเล็กให้เรียงลงตามลำดับเดิม
 - เมื่อเพิ่มเต๋าใหม่ ระบบยุบเต๋าเดิมของสินค้านั้นและเปิดเฉพาะเต๋าใหม่ เพื่อให้กรอกต่อเนื่องโดยไม่เปลี่ยนข้อมูลเต๋าเดิม
 - ปุ่มลบรายการสินค้าแสดงเฉพาะเมื่อเอกสารมีมากกว่า 1 รายการ เพราะเอกสารต้องคงรายการเริ่มต้นอย่างน้อยหนึ่งรายการ
