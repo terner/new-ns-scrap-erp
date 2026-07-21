@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { cachedWeightTicketReferences } from '@/lib/weight-ticket-reference-cache'
 import { WeightTicketDetailModal } from './WeightTicketDetailModal'
 import { WeightTicketStockReturnDialog } from './WeightTicketStockReturnDialog'
+import { WeightTicketWorkingDraftsTab } from './WeightTicketWorkingDraftsTab'
 import { WeightTicketsPageClient } from './WeightTicketsPageClient'
 import {
   WEIGHT_TICKET_COLUMN_STORAGE_KEY,
@@ -200,6 +201,7 @@ export function WeightTicketListPageClient() {
   const [branches, setBranches] = useState<OptionItem[]>([])
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('WTI')
+  const [showWorkingDrafts, setShowWorkingDrafts] = useState(false)
   const [statusFilter, setStatusFilter] = useState<StatusFilter[]>([])
   const [sortBy, setSortBy] = useState<WeightTicketSortBy>('documentNo')
   const [sortDir, setSortDir] = useState<WeightTicketSortDir>('desc')
@@ -229,6 +231,10 @@ export function WeightTicketListPageClient() {
   const safePage = Math.min(page, totalPages)
   const activeFilters = Boolean(query || statusFilter.length > 0 || branchFilter !== 'all' || dateFrom || dateTo)
   const statusOptions = useMemo(() => statusOptionsByType[typeFilter], [typeFilter])
+  const workingDraftBranchCode = useMemo(() => {
+    if (branchFilter === 'all') return 'all'
+    return branches.find((branch) => branch.id === branchFilter)?.code ?? null
+  }, [branchFilter, branches])
   const exportHref = useMemo(() => {
     const params = new URLSearchParams({ format: 'xlsx', sortBy, sortDir, type: typeFilter })
     if (branchFilter !== 'all') params.set('branchId', branchFilter)
@@ -283,6 +289,7 @@ export function WeightTicketListPageClient() {
     let cancelled = false
 
     async function loadRows() {
+      if (showWorkingDrafts) return
       setIsLoading(true)
       setLoadError('')
       try {
@@ -317,7 +324,7 @@ export function WeightTicketListPageClient() {
     return () => {
       cancelled = true
     }
-  }, [branchFilter, dateFrom, dateTo, page, pageSize, query, sortBy, sortDir, statusFilter, typeFilter, refreshKey])
+  }, [branchFilter, dateFrom, dateTo, page, pageSize, query, showWorkingDrafts, sortBy, sortDir, statusFilter, typeFilter, refreshKey])
 
   function clearFilters() {
     setQuery('')
@@ -429,22 +436,30 @@ export function WeightTicketListPageClient() {
   return (
     <div className="space-y-5">
       {/* Floating Action Button (Mobile Only) */}
-      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 md:hidden">
-        <button
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
-          onClick={() => setActiveForm({ type: typeFilter })}
-          type="button"
-          aria-label="สร้างใบรับ-ส่งของ"
-        >
-          <Plus className="size-6 text-white" />
-        </button>
-      </div>
+      {!showWorkingDrafts ? (
+        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 md:hidden">
+          <button
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
+            onClick={() => setActiveForm({ type: typeFilter })}
+            type="button"
+            aria-label="สร้างใบรับ-ส่งของ"
+          >
+            <Plus className="size-6 text-white" />
+          </button>
+        </div>
+      ) : null}
 
       <Tabs
         className="gap-0"
-        value={typeFilter}
+        value={showWorkingDrafts ? 'working' : typeFilter}
         onValueChange={(value) => {
+          if (value === 'working') {
+            setShowWorkingDrafts(true)
+            setShowMobileFilters(false)
+            return
+          }
           const nextType = value as WeightTicketType
+          setShowWorkingDrafts(false)
           setTypeFilter(nextType)
           setStatusFilter([])
           setPage(1)
@@ -453,9 +468,12 @@ export function WeightTicketListPageClient() {
         <TabsList className="w-full" variant="line">
           <TabsTrigger value="WTI" variant="line">ใบรับของ WTI</TabsTrigger>
           <TabsTrigger value="WTO" variant="line">ใบส่งของ WTO</TabsTrigger>
+          <TabsTrigger value="working" variant="line">อัปเดตร่างล่าสุด</TabsTrigger>
         </TabsList>
       </Tabs>
 
+      {showWorkingDrafts ? <WeightTicketWorkingDraftsTab branchCode={workingDraftBranchCode} /> : (
+        <>
       {/* Desktop Filters (Hidden on Mobile) */}
       <Card className="hidden md:block p-4">
         <div className="space-y-3">
@@ -997,7 +1015,8 @@ export function WeightTicketListPageClient() {
         </div>
       </div>
 
-
+        </>
+      )}
 
       <Dialog open={Boolean(shareTicket)} onOpenChange={(open) => {
         if (!open) {

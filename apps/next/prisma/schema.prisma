@@ -752,6 +752,7 @@ model branches {
   supplier_branches         supplier_branches[]
   suppliers                 suppliers[]
   warehouses                warehouses[]
+  weight_ticket_form_draft_visibility weight_ticket_form_drafts[] @relation("weight_ticket_form_drafts_visibility_branch")
   weight_tickets            weight_tickets[]
 
   @@schema("public")
@@ -4161,18 +4162,21 @@ model app_users {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model weight_ticket_form_drafts {
-  id          BigInt    @id @default(autoincrement())
-  app_user_id BigInt
-  scope_key   String
-  ticket_type String
-  payload     Json
-  revision    Int       @default(1)
-  created_at  DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime  @default(now()) @db.Timestamptz(6)
-  app_users   app_users @relation(fields: [app_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                   BigInt    @id @default(autoincrement())
+  app_user_id          BigInt
+  scope_key            String
+  ticket_type          String
+  payload              Json
+  revision             Int       @default(1)
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @default(now()) @db.Timestamptz(6)
+  visibility_branch_id BigInt?
+  app_users            app_users @relation(fields: [app_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  visibility_branches  branches? @relation("weight_ticket_form_drafts_visibility_branch", fields: [visibility_branch_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@unique([app_user_id, scope_key], map: "uq_weight_ticket_form_drafts_owner_scope")
   @@index([app_user_id, updated_at(sort: Desc)], map: "idx_weight_ticket_form_drafts_owner_updated")
+  @@index([visibility_branch_id, updated_at(sort: Desc)], map: "idx_weight_ticket_form_drafts_visibility_updated")
   @@schema("public")
 }
 

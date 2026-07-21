@@ -13,12 +13,15 @@
 - ทุกฟอร์มและ API write ต้อง validate syntax ด้วย Zod หรือ schema layer ที่ใช้ร่วมกัน
 - ธุรกรรมที่กระทบเงิน/สต๊อกต้องบันทึก side effect และ reconciliation query ให้ชัด
 
-## WTI/WTO Working-Draft Checkpoint 2026-07-21
+## WTI/WTO Working-Draft and Shared Visibility Checkpoint 2026-07-21
 
-- Added private per-user WTI/WTO form snapshots for product confirmation/change, `เพิ่มสินค้า`, and `เพิ่มเต๋า`. The asynchronous queue leaves data entry enabled and reports saving, saved, retry, or cross-tab conflict state.
+- Added private per-user WTI/WTO form snapshots for product confirmation/change, `เพิ่มสินค้า`, and `เพิ่มเต๋า`. Those structural actions enter the asynchronous queue immediately, while the form remains editable and reports saving, saved, retry, or cross-tab conflict state.
+- Every manually editable WTI/WTO field now joins the same queue after an approximately 800ms typing pause, including retrying a temporarily unavailable draft baseline, so teammates see the latest saved values rather than only product/lot actions.
+- Added the read-only `อัปเดตร่างล่าสุด` list tab and `GET /api/daily/weight-ticket-form-drafts/team`. It polls only while visible, excludes the current user, keeps only 5-minute-active snapshots, respects the existing trusted branch scope convention, and returns a safe activity description derived by the server from the previous and next snapshots. Party/product/warehouse display labels resolve server-side from active masters in that scope; an unresolved or out-of-scope reference is omitted and never falls back to snapshot/client text. It may identify the resolved selected product, resolved selected warehouse, or current gross weight, but never `vehicleNo`, client-entered labels, free-text notes/remarks, attachment filenames/URLs, IDs/scope keys, prior values, or an action/context/description supplied by the client.
+- A writer remains the only user who can edit or discard their own snapshot. The shared reader is an L5 `private, no-store` projection and does not make a draft a document, presence lease, audit event, stock/ledger source, PDF, or LINE event.
 - Added `weight_ticket_form_drafts` with owner/scope revision control and server-only access. It is not a business document and never creates document numbers, stock, pending-out, ledger, timeline, audit, PDF, or LINE effects.
 - Real WTI/WTO save removes only the exact draft revision in the same transaction; a newer draft causes `409` and rolls back the real save. Explicit `ยกเลิก`/`ยกเลิกและกลับรายการ` discards a draft, while Escape/backdrop/browser navigation retains it for recovery.
-- Migration `20260721030145_create_weight_ticket_form_drafts.sql` is applied to dev-target. Clean-runner validation passed: focused Vitest `16/16`, scoped diff check, type-check (4 GB Node heap), and production build (4 GB heap, two workers). Lint exited `0` with zero errors and four pre-existing warnings. Browser/UAT and push/promotion were not requested.
+- Both working-draft migrations are applied to dev-target: `20260721030145_create_weight_ticket_form_drafts.sql` and `20260721120000_add_weight_ticket_form_draft_visibility_branch.sql`. Postflight confirmed the nullable trusted branch FK, `(visibility_branch_id, updated_at desc)` index, migration-history row, RLS, and no `anon`/`authenticated` grant. Prisma generate/schema validation, focused Vitest `35/35` plus shared-draft UI `2/2`, ESLint `0` errors with four pre-existing warnings, type-check with a 4 GB Node heap, production Webpack build `325/325` routes, and `git diff --check` pass. Browser/UAT and push/promotion were not requested.
 
 ## Legacy Inventory
 
