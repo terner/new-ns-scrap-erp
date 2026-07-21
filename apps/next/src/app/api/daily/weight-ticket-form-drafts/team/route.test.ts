@@ -140,7 +140,7 @@ beforeEach(() => {
 })
 
 describe('weight ticket team working-drafts route', () => {
-  it('returns only a safe summary of another user\'s current draft in an allowed branch', async () => {
+  it('returns a safe summary of the viewer\'s own current draft in an allowed branch', async () => {
     mocks.formDrafts.findMany.mockResolvedValue([draftRow()])
 
     const response = await GET()
@@ -150,7 +150,6 @@ describe('weight ticket team working-drafts route', () => {
     expect(mocks.formDrafts.findMany).toHaveBeenCalledWith(expect.objectContaining({
       take: 101,
       where: {
-        app_user_id: { not: viewerId },
         updated_at: { gte: expect.any(Date) },
         visibility_branch_id: { in: [1n] },
       },

@@ -90,7 +90,7 @@ function isNewWeightTicketDraftScope(scopeKey: string) {
 export async function GET() {
   try {
     const context = await getCurrentAuthContext()
-    const appUser = requireTeamDraftViewPermission(context)
+    requireTeamDraftViewPermission(context)
     const activeSince = new Date(Date.now() - activeDraftWindowMs)
     const activeBranches = await listActiveBranches()
     const allowedBranchCodes = new Set((context.appUser?.branchIds ?? []).map(normalizeBranchCode).filter(Boolean))
@@ -115,7 +115,6 @@ export async function GET() {
       },
       take: maxDraftRows + 1,
       where: {
-        app_user_id: { not: appUser.id },
         updated_at: { gte: activeSince },
         visibility_branch_id: { in: visibleBranchIds },
       },
