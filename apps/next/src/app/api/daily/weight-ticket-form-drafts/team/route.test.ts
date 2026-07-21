@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createHash } from 'node:crypto'
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => {
   class AuthContextError extends Error {
@@ -101,6 +103,7 @@ function payload(branchId: string) {
 
 function draftRow(overrides: Record<string, unknown> = {}) {
   return {
+    app_user_id: viewerId,
     app_users: { display_name: 'Somchai' },
     payload: payload('1'),
     scope_key: 'new:WTI',
@@ -121,6 +124,7 @@ function authContext(permissionCodes: string[], branchIds: string[] = []) {
 }
 
 beforeEach(() => {
+  vi.stubEnv('WEIGHT_TICKET_DRAFT_KEY_SECRET', 'working-draft-test-secret')
   vi.clearAllMocks()
   mocks.apiErrorResponse.mockImplementation((_caught: unknown, fallback: string, status = 500) => Response.json({ error: fallback }, { status }))
   mocks.authContextErrorResponse.mockImplementation((caught: { message: string; status: number }) => Response.json({ error: caught.message }, { status: caught.status }))
@@ -139,7 +143,65 @@ beforeEach(() => {
   mocks.weightTickets.findMany.mockResolvedValue([])
 })
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 describe('weight ticket team working-drafts route', () => {
+  it('keeps the viewer own new draft visible before a branch is selected', async () => {
+    mocks.formDrafts.findMany.mockResolvedValue([draftRow({
+      payload: payload(''),
+      visibility_branch_id: null,
+      visibility_branches: null,
+    })])
+
+    const response = await GET()
+    const body = await response.json()
+
+    expect(body).toMatchObject({
+      drafts: [{
+        branchId: '__UNASSIGNED__',
+        branchName: 'ยังไม่เลือกสาขา',
+        drafterName: 'Somchai',
+        lineCount: 1,
+        productNames: ['Copper verified by master'],
+        type: 'WTI',
+      }],
+      truncated: false,
+    })
+    expect(body.drafts[0].partyName).toBe('')
+    expect(body.drafts[0].draftKey).toMatch(/^[a-f0-9]{64}$/)
+    expect(body.drafts[0].draftKey).not.toBe(createHash('sha256').update(`${viewerId.toString()}\u0000new:WTI`).digest('hex'))
+    expect(body.drafts[0]).not.toHaveProperty('app_user_id')
+  })
+
+  it('shows another user active new draft before a branch is selected without exposing branch-scoped fields', async () => {
+    mocks.formDrafts.findMany.mockResolvedValue([draftRow({
+      app_user_id: 99n,
+      payload: payload(''),
+      visibility_branch_id: null,
+      visibility_branches: null,
+    })])
+
+    const response = await GET()
+    const body = await response.json()
+
+    expect(body).toMatchObject({
+      drafts: [{
+        branchId: '__UNASSIGNED__',
+        branchName: 'ยังไม่เลือกสาขา',
+        drafterName: 'Somchai',
+        lineCount: 1,
+        productNames: ['Copper verified by master'],
+        type: 'WTI',
+      }],
+      truncated: false,
+    })
+    expect(body.drafts[0].partyName).toBe('')
+    expect(body.drafts[0].activityDescription).toContain('Copper verified by master')
+    expect(JSON.stringify(body)).not.toContain('CLIENT_')
+  })
+
   it('returns a safe summary of the viewer\'s own current draft in an allowed branch', async () => {
     mocks.formDrafts.findMany.mockResolvedValue([draftRow()])
 
@@ -150,8 +212,11 @@ describe('weight ticket team working-drafts route', () => {
     expect(mocks.formDrafts.findMany).toHaveBeenCalledWith(expect.objectContaining({
       take: 101,
       where: {
+        OR: [
+          { visibility_branch_id: { in: [1n] } },
+          { visibility_branch_id: null },
+        ],
         updated_at: { gte: expect.any(Date) },
-        visibility_branch_id: { in: [1n] },
       },
     }))
     const body = await response.json()

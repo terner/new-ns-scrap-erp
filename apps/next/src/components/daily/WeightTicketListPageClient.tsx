@@ -23,8 +23,16 @@ import { cn } from '@/lib/utils'
 import { cachedWeightTicketReferences } from '@/lib/weight-ticket-reference-cache'
 import { WeightTicketDetailModal } from './WeightTicketDetailModal'
 import { WeightTicketStockReturnDialog } from './WeightTicketStockReturnDialog'
-import { WeightTicketWorkingDraftsTab } from './WeightTicketWorkingDraftsTab'
+import {
+  WeightTicketWorkingDraftDesktopRow,
+  WeightTicketWorkingDraftDetailDialog,
+  WeightTicketWorkingDraftMobileCard,
+} from './WeightTicketWorkingDraftRows'
 import { WeightTicketsPageClient } from './WeightTicketsPageClient'
+import {
+  filterWeightTicketWorkingDrafts,
+  refreshSelectedWeightTicketWorkingDraft,
+} from './weight-ticket-working-draft-filter'
 import {
   WEIGHT_TICKET_COLUMN_STORAGE_KEY,
   WEIGHT_TICKET_TABLE_COLUMN_COUNT,
@@ -45,6 +53,7 @@ import {
   type WeightTicketType,
   weightTicketStatusBadgeClass,
 } from '@/lib/weight-tickets'
+import { getWeightTicketTeamDrafts, type WeightTicketTeamDraft } from '@/lib/weight-ticket-drafts'
 
 type TypeFilter = WeightTicketType
 type StatusFilter = WeightTicketStatus
@@ -199,9 +208,12 @@ export function WeightTicketListPageClient() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [totalRows, setTotalRows] = useState(0)
   const [branches, setBranches] = useState<OptionItem[]>([])
+  const [workingDrafts, setWorkingDrafts] = useState<WeightTicketTeamDraft[]>([])
+  const [selectedWorkingDraft, setSelectedWorkingDraft] = useState<WeightTicketTeamDraft | null>(null)
+  const [workingDraftsLoadError, setWorkingDraftsLoadError] = useState('')
+  const [workingDraftsTruncated, setWorkingDraftsTruncated] = useState(false)
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('WTI')
-  const [showWorkingDrafts, setShowWorkingDrafts] = useState(false)
   const [statusFilter, setStatusFilter] = useState<StatusFilter[]>([])
   const [sortBy, setSortBy] = useState<WeightTicketSortBy>('documentNo')
   const [sortDir, setSortDir] = useState<WeightTicketSortDir>('desc')
@@ -235,6 +247,14 @@ export function WeightTicketListPageClient() {
     if (branchFilter === 'all') return 'all'
     return branches.find((branch) => branch.id === branchFilter)?.code ?? null
   }, [branchFilter, branches])
+  const visibleWorkingDrafts = useMemo(() => filterWeightTicketWorkingDrafts(workingDrafts, {
+    branchCode: workingDraftBranchCode === 'all' ? null : workingDraftBranchCode,
+    dateFrom,
+    dateTo,
+    query,
+    status: statusFilter,
+    type: typeFilter,
+  }), [dateFrom, dateTo, query, statusFilter, typeFilter, workingDraftBranchCode, workingDrafts])
   const exportHref = useMemo(() => {
     const params = new URLSearchParams({ format: 'xlsx', sortBy, sortDir, type: typeFilter })
     if (branchFilter !== 'all') params.set('branchId', branchFilter)
@@ -287,9 +307,58 @@ export function WeightTicketListPageClient() {
 
   useEffect(() => {
     let cancelled = false
+    let isRequesting = false
+    let requestController: AbortController | null = null
+
+    async function loadWorkingDrafts() {
+      if (document.visibilityState === 'hidden' || isRequesting) return
+      isRequesting = true
+      const controller = new AbortController()
+      requestController = controller
+      try {
+        const result = await getWeightTicketTeamDrafts({ signal: controller.signal })
+        if (!cancelled) {
+          setWorkingDrafts(result.drafts)
+          setWorkingDraftsTruncated(result.truncated)
+          setSelectedWorkingDraft((current) => refreshSelectedWeightTicketWorkingDraft(current, result.drafts))
+          setWorkingDraftsLoadError('')
+        }
+      } catch {
+        if (!cancelled && !controller.signal.aborted) {
+          setWorkingDrafts([])
+          setWorkingDraftsTruncated(false)
+          setSelectedWorkingDraft(null)
+          setWorkingDraftsLoadError('ไม่สามารถโหลดร่างที่กำลังกรอกได้')
+        }
+      } finally {
+        if (requestController === controller) requestController = null
+        isRequesting = false
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        void loadWorkingDrafts()
+        return
+      }
+      requestController?.abort()
+    }
+
+    void loadWorkingDrafts()
+    const intervalId = window.setInterval(() => void loadWorkingDrafts(), 3_000)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      cancelled = true
+      requestController?.abort()
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
 
     async function loadRows() {
-      if (showWorkingDrafts) return
       setIsLoading(true)
       setLoadError('')
       try {
@@ -324,7 +393,7 @@ export function WeightTicketListPageClient() {
     return () => {
       cancelled = true
     }
-  }, [branchFilter, dateFrom, dateTo, page, pageSize, query, showWorkingDrafts, sortBy, sortDir, statusFilter, typeFilter, refreshKey])
+  }, [branchFilter, dateFrom, dateTo, page, pageSize, query, sortBy, sortDir, statusFilter, typeFilter, refreshKey])
 
   function clearFilters() {
     setQuery('')
@@ -436,30 +505,22 @@ export function WeightTicketListPageClient() {
   return (
     <div className="space-y-5">
       {/* Floating Action Button (Mobile Only) */}
-      {!showWorkingDrafts ? (
-        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 md:hidden">
-          <button
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
-            onClick={() => setActiveForm({ type: typeFilter })}
-            type="button"
-            aria-label="สร้างใบรับ-ส่งของ"
-          >
-            <Plus className="size-6 text-white" />
-          </button>
-        </div>
-      ) : null}
+      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 md:hidden">
+        <button
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
+          onClick={() => setActiveForm({ type: typeFilter })}
+          type="button"
+          aria-label="สร้างใบรับ-ส่งของ"
+        >
+          <Plus className="size-6 text-white" />
+        </button>
+      </div>
 
       <Tabs
         className="gap-0"
-        value={showWorkingDrafts ? 'working' : typeFilter}
+        value={typeFilter}
         onValueChange={(value) => {
-          if (value === 'working') {
-            setShowWorkingDrafts(true)
-            setShowMobileFilters(false)
-            return
-          }
           const nextType = value as WeightTicketType
-          setShowWorkingDrafts(false)
           setTypeFilter(nextType)
           setStatusFilter([])
           setPage(1)
@@ -468,12 +529,9 @@ export function WeightTicketListPageClient() {
         <TabsList className="w-full" variant="line">
           <TabsTrigger value="WTI" variant="line">ใบรับของ WTI</TabsTrigger>
           <TabsTrigger value="WTO" variant="line">ใบส่งของ WTO</TabsTrigger>
-          <TabsTrigger value="working" variant="line">อัปเดตร่างล่าสุด</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {showWorkingDrafts ? <WeightTicketWorkingDraftsTab branchCode={workingDraftBranchCode} /> : (
-        <>
       {/* Desktop Filters (Hidden on Mobile) */}
       <Card className="hidden md:block p-4">
         <div className="space-y-3">
@@ -651,7 +709,16 @@ export function WeightTicketListPageClient() {
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 text-sm text-slate-600">
-        <div>{summaryText}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span>{summaryText}</span>
+          {visibleWorkingDrafts.length > 0 ? (
+            <span className="rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+              กำลังกรอก {visibleWorkingDrafts.length.toLocaleString('th-TH')} รายการ
+            </span>
+          ) : null}
+          {workingDraftsLoadError ? <span className="text-xs text-rose-600">{workingDraftsLoadError}</span> : null}
+          {workingDraftsTruncated ? <span className="text-xs text-amber-700">รายการร่างมีมากกว่า 100 รายการ ระบบจึงแสดงเฉพาะรายการล่าสุดบางส่วน</span> : null}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {columnResize.hasCustomWidths ? <Button className="hidden lg:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
           <PageSizeDropdown disabled={isLoading} options={pageSizeOptions} value={pageSize} onChange={(size) => {
@@ -670,10 +737,14 @@ export function WeightTicketListPageClient() {
           <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : loadError ? (
           <div className="rounded-xl bg-white p-8 text-center text-red-600 shadow-sm border border-slate-200">{loadError}</div>
-        ) : tickets.length === 0 ? (
+        ) : tickets.length === 0 && visibleWorkingDrafts.length === 0 ? (
           <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">ยังไม่มีรายการตามเงื่อนไข</div>
         ) : (
-          tickets.map((ticket) => {
+          <>
+          {visibleWorkingDrafts.map((draft) => (
+            <WeightTicketWorkingDraftMobileCard draft={draft} key={draft.draftKey} onOpen={setSelectedWorkingDraft} typeFilter={typeFilter} />
+          ))}
+          {tickets.map((ticket) => {
             const isCancelled = ticket.status === 'cancelled'
             return (
             <div
@@ -817,7 +888,8 @@ export function WeightTicketListPageClient() {
               </div>
             </div>
           )
-          })
+          })}
+          </>
         )}
       </div>
 
@@ -853,11 +925,16 @@ export function WeightTicketListPageClient() {
                 <tr>
                   <td className="px-3 py-10 text-center text-red-600" colSpan={WEIGHT_TICKET_TABLE_COLUMN_COUNT}>{loadError}</td>
                 </tr>
-              ) : tickets.length === 0 ? (
+              ) : tickets.length === 0 && visibleWorkingDrafts.length === 0 ? (
                 <tr>
                   <td className="px-3 py-10 text-center text-slate-500" colSpan={WEIGHT_TICKET_TABLE_COLUMN_COUNT}>ยังไม่มีรายการตามเงื่อนไข</td>
                 </tr>
-              ) : tickets.map((ticket) => {
+              ) : (
+                <>
+                {visibleWorkingDrafts.map((draft) => (
+                  <WeightTicketWorkingDraftDesktopRow draft={draft} key={draft.draftKey} onOpen={setSelectedWorkingDraft} typeFilter={typeFilter} />
+                ))}
+                {tickets.map((ticket) => {
                 const { date: ticketDate, time: ticketTime } = formatDateTimeSplit(ticket.createdAt)
                 const isCancelled = ticket.status === 'cancelled'
                 return (
@@ -1009,14 +1086,13 @@ export function WeightTicketListPageClient() {
                     </td>
                   </tr>
                 )
-              })}
+                })}
+                </>
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-        </>
-      )}
 
       <Dialog open={Boolean(shareTicket)} onOpenChange={(open) => {
         if (!open) {
@@ -1130,6 +1206,11 @@ export function WeightTicketListPageClient() {
           }}
         />
       )}
+
+      <WeightTicketWorkingDraftDetailDialog
+        draft={selectedWorkingDraft}
+        onClose={() => setSelectedWorkingDraft(null)}
+      />
 
       {stockReturnTicket ? (
         <WeightTicketStockReturnDialog

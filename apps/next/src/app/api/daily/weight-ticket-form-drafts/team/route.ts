@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto'
+
 import { NextResponse } from 'next/server'
 
 import {
@@ -87,6 +89,16 @@ function isNewWeightTicketDraftScope(scopeKey: string) {
   return /^new:(WTI|WTO)$/.test(scopeKey)
 }
 
+function opaqueDraftKey(appUserId: bigint, scopeKey: string) {
+  const secret = process.env.WEIGHT_TICKET_DRAFT_KEY_SECRET
+    ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+    ?? process.env.DATABASE_URL
+  if (!secret) throw new Error('Working draft key secret is not configured.')
+  return createHmac('sha256', secret)
+    .update(`${appUserId.toString()}\u0000${scopeKey}`)
+    .digest('hex')
+}
+
 export async function GET() {
   try {
     const context = await getCurrentAuthContext()
@@ -100,11 +112,10 @@ export async function GET() {
       : activeBranches.filter((branch) => allowedBranchCodes.has(normalizeBranchCode(branch.code)))
     const visibleBranchIds = visibleBranches.map((branch) => branch.id)
     const visibleBranchCodes = visibleBranches.map((branch) => branch.code)
-    if (!visibleBranchIds.length) return privateJson({ drafts: [], truncated: false })
-
     const rows = await prisma.weight_ticket_form_drafts.findMany({
       orderBy: { updated_at: 'desc' },
       select: {
+        app_user_id: true,
         app_users: { select: { display_name: true } },
         payload: true,
         scope_key: true,
@@ -116,7 +127,10 @@ export async function GET() {
       take: maxDraftRows + 1,
       where: {
         updated_at: { gte: activeSince },
-        visibility_branch_id: { in: visibleBranchIds },
+        OR: [
+          ...(visibleBranchIds.length ? [{ visibility_branch_id: { in: visibleBranchIds } }] : []),
+          { visibility_branch_id: null },
+        ],
       },
     })
 
@@ -150,7 +164,10 @@ export async function GET() {
       if (!hasWeightTicketWorkingDraftContent(row.payload)) return []
       if (ticketDocumentNo && ticketBranchIdByDocumentNo.get(ticketDocumentNo) !== row.visibility_branch_id) return []
       const branch = row.visibility_branches
-      if (!branch) return []
+      const isUnassignedNewDraft = row.visibility_branch_id === null
+        && isNewWeightTicketDraftScope(row.scope_key)
+      if (!branch && !isUnassignedNewDraft) return []
+      const branchCode = branch?.code ?? ''
 
       const allProductNames = [...new Set(row.payload.lines
         .filter((line) => !line.parentId)
@@ -159,23 +176,26 @@ export async function GET() {
       const productNames = allProductNames.slice(0, 3)
       const totals = calculateWeightTicketLineTotals(row.payload.lines).totals
       const partyName = row.payload.type === 'WTI'
-        ? branchScopedReferenceName(suppliers, branch.code, row.payload.partyId)
-        : branchScopedReferenceName(customers, branch.code, row.payload.partyId)
+        ? branchScopedReferenceName(suppliers, branchCode, row.payload.partyId)
+        : branchScopedReferenceName(customers, branchCode, row.payload.partyId)
       const lastChange = {
         ...row.payload.lastChange,
         // Never fall back to text from the draft snapshot: it may originate
         // from a client payload. The team feed only receives master-derived labels.
         productName: referenceName(products, row.payload.lastChange.productId),
-        warehouseName: warehouseName(warehouses, branch.code, row.payload.lastChange.warehouseId),
+        warehouseName: warehouseName(warehouses, branchCode, row.payload.lastChange.warehouseId),
       }
       return [{
         activity: row.payload.activity,
         activityDetail: row.payload.activityDetail,
         activityDescription: describeWeightTicketWorkingDraftLastChange(lastChange),
-        branchId: branch.code,
-        branchName: branch.name,
+        branchId: branch?.code ?? '__UNASSIGNED__',
+        branchName: branch?.name ?? 'ยังไม่เลือกสาขา',
+        containerDeductionWeight: totals.containerDeductionWeight,
         drafterName: row.app_users.display_name?.trim() || 'ผู้ใช้งานในระบบ',
         documentNo: ticketDocumentNo ?? '',
+        deductionWeight: totals.deductionWeight,
+        draftKey: opaqueDraftKey(row.app_user_id, row.scope_key),
         grossWeight: totals.grossWeight,
         lineCount: row.payload.lines.filter((line) => line.productId.trim()).length,
         netWeight: totals.netWeight,
