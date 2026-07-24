@@ -17,14 +17,14 @@ function enclosingTableCell(source: string, marker: string) {
 }
 
 describe('PO Sell desktop table layout', () => {
-  it('keeps every permitted row action inside the non-collapsing action menu column', async () => {
+  it('keeps every permitted row action inside the non-collapsing action column', async () => {
     const source = await readFile(pageSourcePath, 'utf8')
-    const actionCell = enclosingTableCell(source, '<TableActionButton menu={(')
+    const actionCell = enclosingTableCell(source, 'row.canEdit ? (')
 
     expect(source).toContain("{ key: 'action', minWidth: 320, defaultWidth: 320 }")
     expect(source).toContain("style={{ tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}")
     expect(actionCell).toContain('className="whitespace-nowrap text-right"')
-    expect(actionCell).toContain('<TableActionButton menu={(')
+    expect(actionCell).toContain('<div className="flex justify-end gap-1">')
     expect(actionCell).toContain('row.canEdit')
     expect(actionCell).toContain('row.canCancel')
     expect(actionCell).toContain('canShortClosePoSell(row)')
