@@ -157,9 +157,9 @@ Implementation checklist: [[FCD Foreign Receipt Implementation Task List]]
 - `ถ้าใช้ rate ของวันนั้น จะคิดเป็นกี่ THB`
 - `เพิ่ม/ลดจาก carrying amount เท่าไหร่`
 
-### ความหมายทางบัญชี
-- ส่วนนี้เป็น `valuation view / dashboard`
-- ยัง `ไม่จำเป็นต้องลง GL ทุกวัน`
+### ความหมายของข้อมูลในระบบ
+- ส่วนนี้เป็น `valuation view / dashboard` จาก FCD subledger
+- เป็นการคำนวณเพื่อดูมูลค่า ไม่สร้าง GL journal
 
 ### สรุปของ 2A
 - รายวัน = `ดูมูลค่าได้`
@@ -169,12 +169,12 @@ Implementation checklist: [[FCD Foreign Receipt Implementation Task List]]
 ## 2B สิ้นเดือน: FCD Revaluation
 
 ### แนวคิด
-ตอนสิ้นเดือนต้องทำให้ `GL` สะท้อนมูลค่าเงินบาทของ `FCD` ตาม `rate สิ้นเดือน`
+ตอนสิ้นเดือนต้อง post การปรับ `carrying THB` ใน FCD subledger ตาม `rate สิ้นเดือน`
 
 ### ตัวอย่าง
 - คงเหลือ `10,000 USD`
 - rate สิ้นเดือน `36.50`
-- GL ต้องแสดง `365,000 THB`
+- FCD subledger ต้องแสดง `365,000 THB`
 - ถ้า carrying amount เดิมอยู่ `362,000 THB`
 - ต้องลงส่วนต่าง `3,000 THB` เป็น
   - `Unrealized FX Gain`
@@ -182,7 +182,7 @@ Implementation checklist: [[FCD Foreign Receipt Implementation Task List]]
 
 ### สรุปของ 2B
 - รายวัน = ดูมูลค่าได้
-- สิ้นเดือน = ค่อย `post GL` จริง
+- สิ้นเดือน = ค่อย post `FCD revaluation` เข้า subledger จริง
 
 ## เหตุการณ์ที่ 3: แลก USD จาก FCD เป็น THB จริง
 
@@ -211,7 +211,7 @@ Implementation checklist: [[FCD Foreign Receipt Implementation Task List]]
 - ปิดบิลเมื่อรับ `USD` ได้เลย ณ วันรับเงิน
 - เงินที่รับแต่ยังไม่แลก ให้เข้า `FCD`
 - มูลค่า `FCD` ระหว่างเดือนแสดง realtime ได้
-- ลง `GL` ของ FCD จริงตอน `สิ้นเดือน`
+- post `FCD revaluation` เข้า subledger จริงตอน `สิ้นเดือน`
 - ตอนแลกเงินจริง ค่อยลง `realized FX` อีกชุดหนึ่ง
 - `ไม่ควรแก้บิลขายเดิมเพราะ FX`
 
@@ -268,7 +268,7 @@ user ใช้งานหลักแค่ `2 หน้า`
 - คำนวณส่วนต่างจากบิล
 - บังคับเลือก `reason` ของส่วนต่าง
 
-ผลลัพธ์ทางบัญชี
+ผลลัพธ์ใน FCD subledger และ audit trail
 - ปิดลูกหนี้
 - เกิด `FX gain/loss - AR settlement` ถ้าส่วนต่างมาจาก rate
 - หรือเกิด posting ประเภทอื่นตาม reason
@@ -281,9 +281,9 @@ user ใช้งานหลักแค่ `2 หน้า`
 - คำนวณ `revalued THB`
 - คำนวณ `unrealized diff`
 
-ผลลัพธ์ทางบัญชี
+ผลลัพธ์ใน FCD subledger และ audit trail
 - ระหว่างเดือนแสดงบน dashboard ได้
-- สิ้นเดือน post เข้า `GL` เป็น
+- สิ้นเดือน post เข้า `FCD subledger` เป็น
   - `FX gain/loss - FCD revaluation`
 
 ### เหตุการณ์ที่ 3: FCD Conversion
@@ -310,7 +310,14 @@ user ใช้งานหลักแค่ `2 หน้า`
 1. รับเงินต่างประเทศแล้ว `ปิดบิลทันที`
 2. เงินที่รับเข้าไปเก็บใน `FCD`
 3. ระบบแสดงมูลค่า `FCD` รายวันได้จาก `rate table`
-4. สิ้นเดือนค่อย `revalue FCD` ลง `GL`
+4. สิ้นเดือนค่อย `revalue FCD` ใน `FCD subledger`
 5. ตอนแลกเงินจริงค่อยบันทึก `conversion` และ `realized FX` อีกครั้ง
 6. ห้ามเอา `FX` ไปแก้ยอดบิลขายเดิม
 7. ต้องแยก `settlement / revaluation / conversion` ออกจากกันเสมอ
+
+## ขอบเขต GL
+
+FCD batch นี้ไม่สร้าง GL journal, chart-of-account mapping หรือ GL reconciliation
+เพราะระบบยังไม่มี GL posting engine และไม่ได้อยู่ใน requirement ของ flow นี้
+คำว่า `post` ในเอกสารนี้หมายถึงการบันทึก operational fact ลง Customer Receipt,
+Bank Statement และ FCD subledger เท่านั้น

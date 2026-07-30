@@ -592,7 +592,7 @@ The optimization remains no-fallback/no-hardcode: master data still comes from a
 
 ## Current Gap
 
-Multi-bill receipt allocation, CADV receipt allocation, bank-statement posting, cancel/reversal, edit via cancel-and-reissue, print และ LINE notification มีใน active Next app แล้ว. Foreign receipt ใช้ rate provenance, native/carrying FCD facts และ FX event contract ที่ persist แล้ว; งานที่เหลือคือ reconciliation/integration coverage และ GL posting engine ซึ่งไม่ใช่ RCP write-path.
+Multi-bill receipt allocation, CADV receipt allocation, bank-statement posting, cancel/reversal, edit via cancel-and-reissue, print และ LINE notification มีใน active Next app แล้ว. Foreign receipt ใช้ rate provenance, native/carrying FCD facts และ FX event contract ที่ persist แล้ว; งานที่เหลือคือ reconciliation/integration coverage. GL posting engine อยู่นอก scope ของ RCP และ FCD batch นี้.
 
 ## Implementation Checklist
 
