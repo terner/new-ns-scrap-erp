@@ -19,6 +19,7 @@ import { ApiError, getErrorMessage } from '@/lib/api-client'
 import { recordImageDelivery } from '@/lib/client-image-delivery-telemetry'
 import { cn } from '@/lib/utils'
 import { cachedWeightTicketReferences } from '@/lib/weight-ticket-reference-cache'
+import { invalidatePurchaseBillOptionsCache } from '@/lib/purchase-bill-options-cache'
 import {
   calculateWeightTicketLineTotals,
   createWeightTicketLine,
@@ -1387,6 +1388,7 @@ export function WeightTicketFormCore({
         vehicleNo: form.vehicleNo.trim(),
         godownName: form.godownName.trim(),
       })
+      invalidatePurchaseBillOptionsCache()
       setLoadError('')
       setLoadedTicket(ticket)
       setSavedTicket(ticket)

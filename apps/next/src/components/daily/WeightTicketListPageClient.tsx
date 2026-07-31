@@ -21,6 +21,7 @@ import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib
 import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
 import { cn } from '@/lib/utils'
 import { cachedWeightTicketReferences } from '@/lib/weight-ticket-reference-cache'
+import { invalidatePurchaseBillOptionsCache } from '@/lib/purchase-bill-options-cache'
 import { WeightTicketDetailModal } from './WeightTicketDetailModal'
 import { WeightTicketStockReturnDialog } from './WeightTicketStockReturnDialog'
 import { WeightTicketsPageClient } from './WeightTicketsPageClient'
@@ -343,6 +344,7 @@ export function WeightTicketListPageClient() {
     setCancelError('')
     try {
       const updated = await cancelWeightTicket(cancelTicket.id, cancelNote)
+      invalidatePurchaseBillOptionsCache()
       setTickets((current) => current.map((ticket) => ticket.id === updated.id ? updated : ticket))
       setCancelTicket(null)
       setCancelNote('')
@@ -358,6 +360,7 @@ export function WeightTicketListPageClient() {
     setLoadError('')
     try {
       const updated = await confirmWeightTicket(ticket.id)
+      invalidatePurchaseBillOptionsCache()
       setTickets((current) => current.map((row) => row.id === updated.id ? updated : row))
     } catch (caught) {
       setLoadError(getErrorMessage(caught, 'ยืนยันใบรับ-ส่งของไม่ได้'))
