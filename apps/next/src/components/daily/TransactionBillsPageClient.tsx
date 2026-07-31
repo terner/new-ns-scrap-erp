@@ -315,6 +315,7 @@ type ReceiptOption = {
     usedQty: number
   }>
   productSummaries: Array<{
+    baseWeight: number
     billedWeight: number
     deductWeight: number
     grossWeight: number
@@ -326,7 +327,6 @@ type ReceiptOption = {
     productName: string
     remainingWeight: number
     sourceLineIds: string[]
-    totalDeductWeight: number
   }>
   partyName: string
   status: string
@@ -1172,7 +1172,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         productName: activeProducts.find((product) => product.id === item.productId)?.name ?? item.productId,
         remainingWeight: item.qty,
         sourceLineIds: item.receiptLineIds,
-        totalDeductWeight: item.deductWeight,
+        baseWeight: item.grossWeight,
       })
     })
     return {
@@ -1586,7 +1586,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       deductWeight: summary.deductWeight,
       discount: 0,
       displayName: null,
-      grossWeight: summary.grossWeight,
+      grossWeight: summary.baseWeight,
       lotNo: null,
       note: null,
       poBuyId: null,
@@ -2059,7 +2059,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         productName,
         remainingWeight: item.qty,
         sourceLineIds: item.receiptLineIds,
-        totalDeductWeight: item.deductWeight,
+        baseWeight: item.grossWeight,
       })
     })
 
@@ -3454,8 +3454,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                           <tr>
                             <th className="p-2 text-left">สินค้า</th>
-                            <th className="p-2 text-right">น้ำหนักรวม</th>
-                            <th className="p-2 text-right">หัก</th>
+                            <th className="p-2 text-right" title="น้ำหนักรวมหลังหักภาชนะ">น้ำหนักหลัก</th>
+                            <th className="p-2 text-right" title="หักสิ่งเจือปน">หัก</th>
                             <th className="p-2 text-right">น้ำหนักสุทธิ</th>
                             <th className="p-2 text-right">จำนวนตัดบิล</th>
                             <th className="p-2 text-left">อ้างอิง PO</th>
@@ -3505,10 +3505,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                 </td>
                                 <td className="p-2 text-right tabular-nums">
                                   <div className="flex flex-col items-end gap-1">
-                                    {isFirstRowOfSummary ? <span>{formatMoney(sourceSummary?.grossWeight ?? item.grossWeight)}</span> : null}
+                                    {isFirstRowOfSummary ? <span>{formatMoney(sourceSummary?.baseWeight ?? item.grossWeight)}</span> : null}
                                   </div>
                                 </td>
-                                <td className="p-2 text-right tabular-nums text-slate-700">{isFirstRowOfSummary ? formatMoney(sourceSummary?.totalDeductWeight ?? sourceSummary?.deductWeight ?? item.deductWeight) : ''}</td>
+                                <td className="p-2 text-right tabular-nums text-slate-700">{isFirstRowOfSummary ? formatMoney(sourceSummary?.deductWeight ?? item.deductWeight) : ''}</td>
                                 <td className="p-2 text-right tabular-nums text-slate-900">{isFirstRowOfSummary ? formatMoney(sourceSummary?.remainingWeight ?? sourceSummary?.netWeight ?? item.qty) : ''}</td>
                                 <td className="p-2 text-right">
                                   <InlineDecimalInput
@@ -4699,9 +4699,9 @@ function PurchaseBillDetailModal({
                       <th className="px-3 py-2 text-left font-medium">สินค้า</th>
                       <th className="px-3 py-2 text-left font-medium">ใบรับของ WTI</th>
                       <th className="px-3 py-2 text-left font-medium">PO / ที่มา</th>
-                      <th className="px-3 py-2 text-right font-medium">Gross</th>
-                      <th className="px-3 py-2 text-right font-medium">หัก</th>
-                      <th className="px-3 py-2 text-right font-medium">น้ำหนัก</th>
+                      <th className="px-3 py-2 text-right font-medium">น้ำหนักหลัก</th>
+                      <th className="px-3 py-2 text-right font-medium">หักสิ่งเจือปน</th>
+                      <th className="px-3 py-2 text-right font-medium">น้ำหนักสุทธิ</th>
                       <th className="px-3 py-2 text-right font-medium">ราคา/กก.</th>
                       <th className="px-3 py-2 text-right font-medium">ยอดรวม</th>
                     </tr>
