@@ -43,7 +43,7 @@ Legacy `view-bank`:
 ## Page Responsibilities
 
 - แสดง `bank_statement` ตาม account/date/ref type/type/search.
-- คำนวณ running balance จาก opening balance + movement หรือใช้ row balance ถ้ามี.
+- คำนวณ running balance จาก statement row ก่อนหน้า + movement หรือใช้ row balance ถ้ามี.
 - สรุปเงินเข้า/ออก/net movement ต่อ filter.
 - สรุปตามบัญชี.
 - export `.xlsx`.
@@ -106,6 +106,8 @@ Permission ปัจจุบัน: `finance.cash.view`.
 - `refType/refNo` must be source document outward reference where available.
 - Row date is document/movement date; target also needs `created_at` for audit display.
 - Running balance sort baseline: account, date, created_at, id.
+- Target amount contract ใช้ book amount THB เป็นยอดหลักของ list/KPI/chart/running balance. Foreign row เก็บ currency/native/rate/carrying THB เพิ่มสำหรับ audit และ FCD subledger โดยไม่รวม native เข้ากับ THB.
+- Native FCD balance ต่อ account+currency ต้องมาจาก FCD ledger/projection; Bank page เปิดรายละเอียดหรือ link ไป FCD flow แทนการเพิ่มยอดหลายสกุลใน summary หลัก.
 
 ## Validation / Status Rules
 
@@ -129,7 +131,15 @@ Permission ปัจจุบัน: `finance.cash.view`.
 - Source document links are incomplete across ref types.
 - Need created date in list/detail/export.
 - Admin correction/duplicate cleanup flow remains not designed.
-- Need reconcile row `balance` policy against derived opening + movement if source rows are edited/reversed.
+- Need reconcile row `balance` policy against derived statement movement if source rows are edited/reversed.
+- Foreign RCP additive currency/native/book/rate contract is implemented; remaining reconciliation import/match flow is separate from FCD posting.
+
+## Foreign Movement Contract 2026-07-30
+
+- `amount_in` and `amount_out` are persisted THB book facts for list, running balance, KPI and export.
+- `movement_currency_code`, `native_amount_in/out` and `book_fx_rate` are persisted audit facts. They describe the native movement and rate snapshot and are not added into THB totals.
+- A foreign receipt writes the THB projection and its FCD ledger event in the same transaction. A conversion writes the FCD source-out and THB destination-in as a classified internal transfer pair.
+- FCD native balance is inspected at `/finance/foreign/fcd-ledger` per account+currency. This page does not invent a rate or a native amount when the event snapshot is absent.
 
 ## Drilldown Scope Hydration 2026-07-17
 

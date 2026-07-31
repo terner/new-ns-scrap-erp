@@ -1,7 +1,8 @@
 import type { Prisma } from '../../../generated/prisma/client'
-import { parseInternalBigIntId } from '@/lib/business-code'
+import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import { listAllAccounts, type AccountReferenceRecord } from '@/lib/server/reference-master-cache'
+import { functionalBankStatementMovement } from '@/lib/server/bank-statement-booking'
 
 export function toDateOnly(value: Date | null | undefined) {
   return value ? value.toISOString().slice(0, 10) : ''
@@ -172,7 +173,7 @@ export async function listDailyAccounts(client: typeof prisma | Prisma.Transacti
   )
 
   return accounts.map((account: AccountReferenceRecord) => {
-    const ledgerBalance = (account.openingBalance == null ? 0 : Number(account.openingBalance)) + (statementTotalByAccountId.get(account.id.toString()) ?? 0)
+    const ledgerBalance = statementTotalByAccountId.get(account.id.toString()) ?? 0
     const odLimit = account.odLimit == null ? 0 : Number(account.odLimit)
     const odUsed = account.subtype === 'current' ? Math.max(0, -ledgerBalance) : 0
     const odRemaining = Math.max(0, odLimit - odUsed)
@@ -182,18 +183,47 @@ export async function listDailyAccounts(client: typeof prisma | Prisma.Transacti
     return {
       active: account.active,
       balance,
-      code: account.accountNo,
+      accountNo: account.accountNo,
+      code: account.code,
       id: account.code,
       name: account.name,
       type: account.type,
       accountGroup: account.accountGroup,
+      isFcd: account.isFcd,
       subtype: account.subtype,
+      supportedCurrencies: account.supportedCurrencies,
       odLimit,
       odUsed,
       odRemaining,
       availableToPay,
     }
   })
+}
+
+export function toDailyAccountOption(account: { accountNo?: string | null; code: string | null; name: string; type: string }) {
+  const code = requireBusinessCode(account.code, 'บัญชีเงิน')
+  return {
+    accountNo: account.accountNo ?? '',
+    bankName: account.name,
+    id: code,
+    isPrimary: false,
+    kind: account.type === 'cash' ? 'cash' as const : 'bank' as const,
+    label: [account.type, account.name, code].filter(Boolean).join(' / '),
+    paymentMethod: account.type,
+  }
+}
+
+export function assertJsonSafe(value: unknown, path = 'payload'): void {
+  if (typeof value === 'bigint') {
+    throw new Error(`${path} contains BigInt`)
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => assertJsonSafe(item, `${path}[${index}]`))
+    return
+  }
+  if (value && typeof value === 'object') {
+    Object.entries(value).forEach(([key, item]) => assertJsonSafe(item, `${path}.${key}`))
+  }
 }
 
 export async function lockDailyAccountBalances(tx: Prisma.TransactionClient, accountIds: bigint[]) {
@@ -209,6 +239,7 @@ export function bankStatementTransferRows(values: {
   docNo: string
   entryDocNos: [string, string]
   fee: number
+  functionalCurrencyCode: string
   fromBranchId: bigint
   fromAccountId: string
   fromAccountName: string
@@ -224,10 +255,16 @@ export function bankStatementTransferRows(values: {
   }
   return [
     {
+      ...functionalBankStatementMovement({
+        amountIn: 0,
+        amountOut: values.amount + values.fee,
+        functionalCurrencyCode: values.functionalCurrencyCode,
+        idempotencyKey: `transfer:${values.docNo}:from`,
+        sourceEventKey: `transfer:${values.docNo}:from`,
+        sourceEventType: 'internal_transfer_source',
+      }),
       account_id: fromAccountId,
       branch_id: values.fromBranchId,
-      amount_in: 0,
-      amount_out: values.amount + values.fee,
       created_by: values.by,
       date: normalizeDate(values.date),
       description: `โอนเข้า ${values.toAccountName}`,
@@ -238,10 +275,16 @@ export function bankStatementTransferRows(values: {
       type: 'โอนระหว่างบัญชี',
     },
     {
+      ...functionalBankStatementMovement({
+        amountIn: values.amount,
+        amountOut: 0,
+        functionalCurrencyCode: values.functionalCurrencyCode,
+        idempotencyKey: `transfer:${values.docNo}:destination`,
+        sourceEventKey: `transfer:${values.docNo}:destination`,
+        sourceEventType: 'internal_transfer_destination',
+      }),
       account_id: toAccountId,
       branch_id: values.toBranchId,
-      amount_in: values.amount,
-      amount_out: 0,
       created_by: values.by,
       date: normalizeDate(values.date),
       description: `รับโอนจาก ${values.fromAccountName}`,

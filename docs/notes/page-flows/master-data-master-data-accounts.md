@@ -5,7 +5,7 @@ tags:
   - menu
   - master-data
 status: accepted-baseline
-updated: 2026-07-29
+updated: 2026-07-30
 route: /master-data/accounts
 ---
 
@@ -37,8 +37,8 @@ company cash/bank account master used by TRF/PMT/RCP/PRET/bank statement
 | `account_group` | ประเภทบัญชี | `cash` เงินสด, `bank` บัญชีธนาคาร หรือ `virtual` บัญชีเจ้าหนี้เงินทดรองจ่าย |
 | `bank_account_type` | ประเภทบัญชีธนาคาร | ใช้เฉพาะ `bank`: `savings` ออมทรัพย์ หรือ `current` กระแสรายวัน |
 | `is_fcd` | บัญชีธนาคารเป็น FCD หรือไม่ | เลือกผ่าน dropdown; ใช้เฉพาะบัญชีธนาคาร และทุกกรณีต้องเลือกสกุลเงินจาก Currency Master โดย FCD ต้องเลือกสกุลเงินต่างประเทศ |
-| `currency` | สกุลเงินหลักของบัญชี | ค่าเริ่มต้นของฟอร์มเป็น THB แต่ผู้ใช้เลือกสกุลอื่นจาก Currency Master ได้ และค่านี้ชี้ว่ายอดใดเป็นยอดหลักของบัญชี |
-| `account_currency_balances` | ชุดสกุลเงินและยอดตั้งต้นของบัญชี | เก็บยอดของสกุลหลัก 1 รายการ และสำหรับ FCD เก็บสกุลเงินเพิ่มเติมได้หลายรายการ โดยไม่บังคับว่าชุดสกุลเงินต้องมี THB |
+| `currency` | สกุลเงินหลักของบัญชี | ค่าเริ่มต้นของฟอร์มเป็น THB แต่ผู้ใช้เลือกสกุลอื่นจาก Currency Master ได้ |
+| `account_currency_balances` | ชุดสกุลเงินที่รองรับของบัญชี | เก็บสกุลหลัก 1 รายการ และสำหรับ FCD เก็บสกุลเงินเพิ่มเติมได้หลายรายการ โดยไม่บังคับว่าชุดสกุลเงินต้องมี THB; ไม่ใช้ตั้งยอดจากหน้า master |
 | `od_limit` | วงเงิน OD | ใช้ได้เฉพาะบัญชีกระแสรายวัน โดยใช้ได้ทั้งบัญชี THB และ FCD เมื่อธนาคารอนุมัติวงเงิน |
 | `branch_id` | สาขาบริษัทเจ้าของบัญชี | ใช้ scope บัญชีในรายการรับ/จ่ายและรายงาน |
 | `bank_branch` | สาขาของธนาคาร | เป็นข้อมูลธนาคาร ไม่ใช่สาขาบริษัท |
@@ -51,8 +51,8 @@ company cash/bank account master used by TRF/PMT/RCP/PRET/bank statement
 2. เลือกสาขาบริษัท ชื่อบัญชี และสกุลเงินจาก Currency Master
 3. ถ้าเป็นบัญชีเจ้าหนี้เงินทดรองจ่าย ให้กำหนดเป็นบัญชีเสมือนกลางของบริษัท ไม่ต้องเลือกผู้ทดรองจ่าย และไม่ต้องกรอกข้อมูลธนาคาร ผู้ที่ออกเงินแทนจะผูกในหน้าเงินกู้กรรมการภายหลัง
 4. ถ้าเป็นบัญชีธนาคาร ให้เลือกประเภทบัญชีธนาคารก่อน: ออมทรัพย์ หรือ กระแสรายวัน
-5. ถ้าเป็นบัญชีธนาคาร ให้เลือก FCD ผ่าน dropdown; non-FCD มีสกุลหลัก 1 สกุล ส่วน FCD มีสกุลหลัก 1 สกุลและต้องเพิ่มสกุลอื่นอย่างน้อย 1 รายการ พร้อมยอดตั้งต้นแยกแต่ละสกุล โดยค่าเริ่มต้นของสกุลหลักเป็น THB แต่เปลี่ยนได้
-6. ถ้าเป็นกระแสรายวัน จึงกำหนดวงเงิน OD ได้ ไม่ว่าจะเป็นบัญชี THB หรือ FCD; สำหรับ FCD วงเงินและยอดใช้ OD ต้องอ้างอิงสกุลเงินของ Statement นั้น
+5. ถ้าเป็นบัญชีธนาคาร ให้เลือก FCD ผ่าน dropdown; non-FCD มีสกุลหลัก 1 สกุล ส่วน FCD มีสกุลหลัก 1 สกุลและต้องเพิ่มสกุลอื่นอย่างน้อย 1 รายการ โดยค่าเริ่มต้นของสกุลหลักเป็น THB แต่เปลี่ยนได้
+6. ถ้าเป็นกระแสรายวัน จึงกำหนดวงเงิน OD ได้ ไม่ว่าจะเป็นบัญชี THB หรือ FCD
 7. ถ้าเป็นบัญชีธนาคาร จึงกรอกธนาคาร สาขาธนาคาร และเลขที่บัญชี
 
 เหตุผลของลำดับนี้คือให้ผู้ใช้เลือก “สิ่งที่บัญชีเป็น” ก่อน “ความสามารถของบัญชี” และทำให้หน้ารับเงิน/จ่ายเงินใช้ account master เป็นตัวกรองได้โดยไม่ผูก payment method เข้ากับบัญชีถาวร
@@ -64,7 +64,7 @@ company cash/bank account master used by TRF/PMT/RCP/PRET/bank statement
 - ใช้ `ACC<รหัสสาขา>-<ลำดับ 3 หลัก>` เป็น business code เช่น `ACC01-001`; server เป็นผู้สร้างและเป็น source of truth
 - `account_no` คือเลขบัญชีธนาคารตัวเลขล้วน ไม่ใช่ business code และไม่รวมรหัสสาขา
 - ตารางบัญชีมีตัวกรอง `สาขา`, `ประเภทบัญชี`, `FCD` และ `สกุลเงิน` แยกจากการค้นหาและสถานะ; ค่าเริ่มต้นของทุกตัวกรองคือ `ทั้งหมด` และเมื่อเลือกจะเหลือเฉพาะบัญชีตามคุณสมบัตินั้น ส่วน `ประเภทบัญชีธนาคาร` ใช้ดูในตาราง ไม่เป็น filter เพราะไม่ใช่เงื่อนไขหลักในการค้นหาบัญชี
-- ตารางไม่แสดงคอลัมน์ `ประเภทบัญชีเงินบริษัท` ซ้ำกับตัวกรองหรือ `ยอดคงเหลือจริง`; list และ `/api/master-data/accounts` มีไว้ค้นหาและดูค่าตั้งต้นของบัญชีเท่านั้น ยอดคงเหลือ, OD ที่ใช้, OD คงเหลือ และยอดที่ใช้จ่ายได้ต้องอ่านจาก Statement/Finance endpoint ที่มีสิทธิ์ทางการเงิน
+- ตารางไม่แสดงคอลัมน์ `ประเภทบัญชีเงินบริษัท` ซ้ำกับตัวกรองหรือ `ยอดคงเหลือจริง`; list และ `/api/master-data/accounts` มีไว้ค้นหาและกำหนดคุณสมบัติบัญชีเท่านั้น ยอดคงเหลือ, OD ที่ใช้, OD คงเหลือ และยอดที่ใช้จ่ายได้ต้องอ่านจาก Statement/Finance endpoint ที่มีสิทธิ์ทางการเงิน
 - คอลัมน์ `สกุลเงิน` แสดงสกุลเงินทั้งหมดของบัญชีในช่องเดียว โดยเรียงสกุลหลักก่อน เช่น `USD, EUR`; ไม่แสดงยอดแยกสกุลเงินใน list
 - downstream ที่ต้องเลือกบัญชีรับ/จ่ายต้องส่ง business code เท่านั้น; ห้ามส่ง internal id เป็นทางเลือกสำรอง
 - แสดง created date/status และใช้งาน active-only ใน transaction pages
@@ -105,6 +105,7 @@ company cash/bank account master used by TRF/PMT/RCP/PRET/bank statement
 - FCD ต้องมีสกุลเงินเพิ่มเติมอย่างน้อย 1 สกุล และไม่บังคับว่าต้องมี THB
 - OD เปิดให้เลือกเฉพาะบัญชีกระแสรายวัน โดย FCD แบบกระแสรายวันสามารถกำหนดวงเงิน OD ได้
 - `od_limit` เป็นค่าตั้งค่าบัญชี ส่วนยอดใช้ OD, OD คงเหลือ และยอดที่ใช้จ่ายได้ต้องคำนวณใน Statement/Finance ตามสกุลเงินของรายการ
+- account master ไม่รับหรือแก้ยอดตั้งต้น
 - DB บังคับ account shape ซ้ำกับ API: cash/virtual ไม่มี FCD, OD หรือข้อมูลธนาคาร; OD ใช้ได้เฉพาะ current; non-FCD มี active currency balance 1 สกุล และ FCD มีอย่างน้อย 2 สกุลโดยต้องมีแถวตรงกับสกุลหลัก
 - Bank Statement ผูกได้เฉพาะบัญชี `bank`; DB ป้องกันทั้งการนำ cash/virtual ไปผูก Statement และการเปลี่ยนบัญชีที่มี Statement อยู่ให้เป็น cash/virtual
 - active/inactive ต้องใช้เป็น selection eligibility ใน transaction pages
@@ -134,9 +135,7 @@ company cash/bank account master used by TRF/PMT/RCP/PRET/bank statement
 
 ## Current Gap
 
-Current code uses branch-scoped account business codes. Bank statement and transaction flows resolve this code to the internal account FK; an unknown or numeric internal id is rejected rather than treated as an unfiltered request.
-
-การปรับโครงสร้างรอบนี้เพิ่ม canonical fields สำหรับแยกเงินสด/ธนาคาร, ประเภทบัญชีธนาคาร, FCD และความสามารถเช็ค โดยคง `payment_methods` เป็น master กลางของช่องทางรับ/จ่ายต่อไป ไม่ได้ทำให้ FCD transaction, FX rate หรือยอดเงินหลายสกุลเงินใน bank statement เสร็จใน batch นี้
+Current code uses branch-scoped account business codes. Bank statement and transaction flows resolve this code to the internal account FK; an unknown or numeric internal id is rejected rather than treated as an unfiltered request. Existing `opening_balance` columns remain a legacy reader dependency; account master no longer writes them.
 
 ## Implementation Checklist
 

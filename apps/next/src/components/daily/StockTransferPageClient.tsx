@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Edit3, Plus, Send, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
@@ -12,6 +13,7 @@ import { TableActionButton, TableActionMenuItem } from '@/components/ui/TableAct
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
+import { useActionConfirmation, useUnsavedChangesGuard } from '@/components/ui/FormSafetyProvider'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney, stockTransferFormSchema, todayDateInput, type StockTransferFormValues } from '@/lib/daily'
 import { firstErrorKeyFromZodIssues, focusFieldError, issueMapFromZodIssues } from '@/lib/form-errors'
@@ -95,7 +97,18 @@ const emptyForm: StockTransferFormValues = {
   toWarehouseId: '',
 }
 
+export function isBlankStockTransferItem(
+  item: Pick<StockTransferFormValues['items'][number], 'productId' | 'qty'>,
+) {
+  return !item.productId.trim() && Number(item.qty) === 0
+}
+
+function formSafetySnapshot(form: StockTransferFormValues) {
+  return JSON.stringify(form)
+}
+
 export function StockTransferPageClient() {
+  const { requestConfirmation } = useActionConfirmation()
   const [data, setData] = useState<Payload>({ branches: [], page: 1, pageSize: 10, products: [], rows: [], sourceStock: [], summary: { totalQty: 0, totalRows: 0, totalValue: 0 }, totalRows: 0, warehouses: [] })
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -105,6 +118,7 @@ export function StockTransferPageClient() {
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<StockTransferFormValues>(emptyForm)
+  const [formBaseline, setFormBaseline] = useState(() => formSafetySnapshot(emptyForm))
   const [formOpen, setFormOpen] = useState(false)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -118,6 +132,8 @@ export function StockTransferPageClient() {
   const [totalQtyFrom, setTotalQtyFrom] = useState('')
   const [totalQtyTo, setTotalQtyTo] = useState('')
   const columnResize = useResizableColumns('daily.stock-transfer.v5', stockTransferColumns)
+  const isFormDirty = formOpen && formSafetySnapshot(form) !== formBaseline
+  const { requestDiscard } = useUnsavedChangesGuard(isFormDirty)
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -232,17 +248,41 @@ export function StockTransferPageClient() {
     setFieldErrors((current) => ({ ...current, [`items.${index}.${key}`]: '' }))
   }
 
+  function requestRemoveItem(index: number) {
+    if (form.items.length <= 1) return
+    const target = form.items[index]
+    if (!target) return
+    const remove = () => {
+      setForm((current) => ({
+        ...current,
+        items: current.items.filter((_entry, entryIndex) => entryIndex !== index),
+      }))
+    }
+    if (isBlankStockTransferItem(target)) {
+      remove()
+      return
+    }
+    requestConfirmation({
+      confirmLabel: 'ยืนยันลบรายการ',
+      description: 'ต้องการลบรายการโอนสินค้านี้หรือไม่? สินค้าและจำนวนที่กรอกในแถวนี้จะหายไป',
+      destructive: true,
+      onConfirm: remove,
+      title: 'ยืนยันการลบรายการโอนสินค้า',
+    })
+  }
+
   function openCreateForm() {
+    const nextForm = { ...emptyForm, date: todayDateInput(), transferDate: todayDateInput(), items: [{ productId: '', qty: 0 }] }
     setEditingDocNo(null)
-    setForm({ ...emptyForm, date: todayDateInput(), transferDate: todayDateInput(), items: [{ productId: '', qty: 0 }] })
+    setForm(nextForm)
+    setFormBaseline(formSafetySnapshot(nextForm))
     setFieldErrors({})
     setError(null)
     setFormOpen(true)
   }
 
   function openEditForm(row: Row) {
-    setEditingDocNo(row.docNo)
-    setForm({
+    const nextForm: StockTransferFormValues = {
       date: row.date,
       transferDate: row.transferDate || '',
       docNo: row.docNo,
@@ -253,11 +293,36 @@ export function StockTransferPageClient() {
       submitMode: 'draft',
       toBranchId: row.toBranchId,
       toWarehouseId: row.toWarehouseId,
-    })
+    }
+    setEditingDocNo(row.docNo)
+    setForm(nextForm)
+    setFormBaseline(formSafetySnapshot(nextForm))
     setFieldErrors({})
     setError(null)
     setFormOpen(true)
   }
+
+  const closeForm = useCallback(() => {
+    if (isSaving) return
+    requestDiscard(() => {
+      setFormOpen(false)
+      setEditingDocNo(null)
+    })
+  }, [isSaving, requestDiscard])
+
+  useEffect(() => {
+    if (!formOpen) return
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (document.querySelector('[role="dialog"]')) return
+      event.preventDefault()
+      closeForm()
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [closeForm, formOpen])
 
   async function submitForm(mode: 'draft' | 'post') {
     const parsed = stockTransferFormSchema.safeParse({ ...form, submitMode: mode })
@@ -279,6 +344,7 @@ export function StockTransferPageClient() {
       } else {
         await dailyFetchJson('/api/stock/transfer', { body: JSON.stringify(parsed.data), method: 'POST' })
       }
+      setFormBaseline(formSafetySnapshot(parsed.data))
       setFormOpen(false)
       setEditingDocNo(null)
       await loadData()
@@ -289,8 +355,18 @@ export function StockTransferPageClient() {
     }
   }
 
-  async function cancelDraft(row: Row) {
+  function cancelDraft(row: Row) {
     if (!row.canCancel) return
+    requestConfirmation({
+      title: 'ยืนยันการยกเลิกรายการโอนสินค้า',
+      description: `ต้องการยกเลิกรายการโอนสินค้า ${row.docNo} หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้`,
+      confirmLabel: 'ยืนยันยกเลิก',
+      destructive: true,
+      onConfirm: () => cancelDraftConfirmed(row),
+    })
+  }
+
+  async function cancelDraftConfirmed(row: Row) {
     setIsSaving(true)
     setError(null)
     try {
@@ -301,6 +377,7 @@ export function StockTransferPageClient() {
       await loadData()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'ยกเลิกเอกสารไม่ได้')
+      throw caught
     } finally {
       setIsSaving(false)
     }
@@ -367,10 +444,18 @@ export function StockTransferPageClient() {
             onChange={(event) => setTotalQtyFrom(event.target.value)}
           />
           <span className="text-slate-400">→</span>
-          <Select className="h-9 w-auto" value={sourceBranchFilter} onChange={(event) => setSourceBranchFilter(event.target.value)}>
-            <option value="">ทุกสาขาต้นทาง</option>
-            {branchOptions.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
-          </Select>
+          <BranchSelectCombobox
+            allOptionLabel="ทุกสาขาต้นทาง"
+            branches={branchOptions.map((branch) => ({ id: branch.id, name: `${branch.code} · ${branch.name}` }))}
+            className="w-[12rem]"
+            controlSize="filter"
+            includeAllOption
+            inputId="stock-transfer-source-branch-filter"
+            label=""
+            placeholder="ทุกสาขาต้นทาง"
+            value={sourceBranchFilter || null}
+            onChange={(value) => setSourceBranchFilter(value ?? '')}
+          />
           <Input
             className={`h-9 w-[100px] text-right tabular-nums ${numberInputClass}`}
             inputMode="decimal"
@@ -436,10 +521,18 @@ export function StockTransferPageClient() {
         >
               <div>
                 <span className="mb-1 block text-xs font-semibold text-slate-600">สาขาต้นทาง</span>
-                <Select className="h-9 w-full" value={sourceBranchFilter} onChange={(event) => setSourceBranchFilter(event.target.value)}>
-                  <option value="">ทุกสาขาต้นทาง</option>
-                  {branchOptions.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
-                </Select>
+                <BranchSelectCombobox
+                  allOptionLabel="ทุกสาขาต้นทาง"
+                  branches={branchOptions.map((branch) => ({ id: branch.id, name: `${branch.code} · ${branch.name}` }))}
+                  className="w-full"
+                  controlSize="filter"
+                  includeAllOption
+                  inputId="stock-transfer-source-branch-filter-mobile"
+                  label=""
+                  placeholder="ทุกสาขาต้นทาง"
+                  value={sourceBranchFilter || null}
+                  onChange={(value) => setSourceBranchFilter(value ?? '')}
+                />
               </div>
 
               <div>
@@ -498,14 +591,14 @@ export function StockTransferPageClient() {
       </div>
 
       {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in" onMouseDown={(event) => { if (event.target === event.currentTarget) closeForm() }}>
           <form noValidate data-combobox-portal-root="true" className="relative w-full max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 shadow-xl outline-none focus:outline-none flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
             <div data-ns-dialog-header className="flex flex-wrap items-start justify-between gap-3 rounded-t-md bg-slate-900 px-5 py-4 text-white shrink-0">
               <div>
                 <h3 className="font-bold text-slate-100 text-lg">{editingDocNo ? 'แก้ไขรายการโอนสินค้า' : 'โอนสินค้าระหว่างสาขา'}</h3>
               </div>
               <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                <Button size="sm" type="button" variant="outline" className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
+                <Button disabled={isSaving} size="sm" type="button" variant="outline" className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" onClick={closeForm}>ยกเลิก</Button>
                 <Button disabled={isSaving} size="sm" type="button" variant="outline" className="h-9 border-slate-700 bg-slate-800 font-normal text-white hover:bg-slate-700 hover:text-white" onClick={() => submitForm('draft')}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</Button>
                 <Button disabled={isSaving} size="sm" type="button" className="h-9 bg-emerald-600 px-5 font-normal text-white hover:bg-emerald-700" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
               </div>
@@ -615,7 +708,7 @@ export function StockTransferPageClient() {
                               <TableActionButton
                                 disabled={form.items.length <= 1}
                                 label="ลบรายการ"
-                                menu={<TableActionMenuItem onSelect={() => setForm((current) => ({ ...current, items: current.items.filter((_entry, entryIndex) => entryIndex !== index) }))}>ลบรายการ</TableActionMenuItem>}
+                                menu={<TableActionMenuItem onSelect={() => requestRemoveItem(index)}>ลบรายการ</TableActionMenuItem>}
                               />
                             </td>
                           </tr>
@@ -648,7 +741,7 @@ export function StockTransferPageClient() {
                             type="button"
                             variant="outline"
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 h-7 px-2.5"
-                            onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_entry, entryIndex) => entryIndex !== index) }))}
+                            onClick={() => requestRemoveItem(index)}
                           >
                             ลบ
                           </Button>

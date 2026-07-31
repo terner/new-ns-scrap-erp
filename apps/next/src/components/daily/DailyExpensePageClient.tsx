@@ -3,6 +3,7 @@
 import { Download, Plus, Printer } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react'
 import { Button } from '@/components/ui/Button'
+import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { KpiCard as SharedKpiCard, type KpiCardTone } from '@/components/ui/KpiCard'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
@@ -11,6 +12,7 @@ import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/Searc
 import { Select } from '@/components/ui/Select'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { MobileFilterSheet } from '@/components/ui/MobileFilterSheet'
+import { useActionConfirmation, useUnsavedChangesGuard } from '@/components/ui/FormSafetyProvider'
 import { PageSizeDropdown } from '@/components/ui/PageSizeDropdown'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { paymentMethodGroupFromValue, type PaymentMethodGroup } from '@/lib/account-payment-method'
@@ -251,6 +253,20 @@ function createExpenseLine(seed: Partial<ExpenseLineDraft> = {}): ExpenseLineDra
   }
 }
 
+export function isBlankExpenseLine(
+  line: Pick<ExpenseLineDraft, 'amount' | 'categoryId' | 'categoryName' | 'description' | 'hasVat' | 'vatAmount' | 'vatPct' | 'whtAmount' | 'whtPct'>,
+) {
+  return !line.categoryId
+    && !line.categoryName?.trim()
+    && !line.description?.trim()
+    && !line.hasVat
+    && Number(line.amount) === 0
+    && Number(line.vatAmount) === 0
+    && Number(line.vatPct ?? 0) === 0
+    && Number(line.whtAmount) === 0
+    && Number(line.whtPct) === 0
+}
+
 function normalizeLookupText(value: string | null | undefined) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
 }
@@ -396,6 +412,7 @@ function buildLegacyExpenseDashboard(rows: ExpenseRow[], categories: CategoryOpt
 }
 
 export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnly?: boolean }) {
+  const { requestConfirmation } = useActionConfirmation()
   const [accounts, setAccounts] = useState<DailyAccountOption[]>([])
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [branches, setBranches] = useState<BranchOption[]>([])
@@ -431,6 +448,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
   const [selectedCategoryRow, setSelectedCategoryRow] = useState<ExpenseHeatmapRow | null>(null)
   const [showDashboardMobileFilters, setShowDashboardMobileFilters] = useState(false)
   const formRef = useRef<HTMLFormElement | null>(null)
+  const [formBaseline, setFormBaseline] = useState<string | null>(null)
   const columnResize = useResizableColumns('daily.expense.v5', expenseColumns)
 
   const loadData = useCallback(async () => {
@@ -532,6 +550,9 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
     })), [categories])
 
   const formLines = useMemo(() => normalizeExpenseLines(form.lines, form), [form])
+  const formSnapshot = useMemo(() => JSON.stringify({ form, paymentMethod }), [form, paymentMethod])
+  const hasUnsavedExpenseForm = formOpen && formBaseline !== null && formBaseline !== formSnapshot
+  const { requestDiscard: requestDiscardExpenseForm } = useUnsavedChangesGuard(hasUnsavedExpenseForm)
   const formTotals = useMemo(() => calculateExpenseTotals(formLines, vatRatePercent), [formLines, vatRatePercent])
   const selectedSupplier = useMemo(() => payeeOptions.find((option) => option.source === 'supplier' && option.code === form.supplierId) ?? null, [form.supplierId, payeeOptions])
   const supplierPaymentDestinations = useMemo(() => selectedSupplier?.bankAccounts?.filter((account) => account.active !== false) ?? [], [selectedSupplier])
@@ -622,8 +643,11 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
   function openCreateForm() {
     const today = todayDateInput()
-    setForm({ ...emptyForm, date: today, dueDate: today, lines: [createExpenseLine()], paymentAction: 'submit_approval' })
-    setPaymentMethod((current) => current || paymentMethods[0]?.name || '')
+    const nextForm: ExpenseFormValues = { ...emptyForm, date: today, dueDate: today, lines: [createExpenseLine()], paymentAction: 'submit_approval' }
+    const nextPaymentMethod = paymentMethod || paymentMethods[0]?.name || ''
+    setFormBaseline(JSON.stringify({ form: nextForm, paymentMethod: nextPaymentMethod }))
+    setForm(nextForm)
+    setPaymentMethod(nextPaymentMethod)
     setFieldErrors({})
     setFormOpen(true)
   }
@@ -634,7 +658,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
       return
     }
     const nextLines = normalizeExpenseLines(row.lines, row)
-    setForm(syncFormLines({
+    const nextForm = syncFormLines({
       accountId: row.accountId,
       amount: row.amount,
       bankFee: 0,
@@ -656,9 +680,12 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
       supplierId: row.supplierId,
       supplierPaymentDestinationId: null,
       taxInvoiceNo: row.taxInvoiceNo,
-    }, nextLines))
+    }, nextLines)
+    const nextPaymentMethod = paymentMethod || paymentMethods[0]?.name || ''
+    setFormBaseline(JSON.stringify({ form: nextForm, paymentMethod: nextPaymentMethod }))
+    setForm(nextForm)
     setError(null)
-    setPaymentMethod((current) => current || paymentMethods[0]?.name || '')
+    setPaymentMethod(nextPaymentMethod)
     setFieldErrors({})
     setFormOpen(true)
   }
@@ -690,20 +717,34 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
   }
 
   function removeExpenseLine(index: number) {
-    setForm((current) => {
-      const currentLines = normalizeExpenseLines(current.lines, current)
-      const nextLines = currentLines.filter((_, lineIndex) => lineIndex !== index)
-      return syncFormLines(current, nextLines.length > 0 ? nextLines : [createExpenseLine()])
+    const target = formLines[index]
+    if (!target) return
+    const remove = () => {
+      setForm((current) => {
+        const currentLines = normalizeExpenseLines(current.lines, current)
+        const nextLines = currentLines.filter((_, lineIndex) => lineIndex !== index)
+        return syncFormLines(current, nextLines.length > 0 ? nextLines : [createExpenseLine()])
+      })
+    }
+    if (isBlankExpenseLine(target)) {
+      remove()
+      return
+    }
+    requestConfirmation({
+      confirmLabel: 'ยืนยันลบรายการ',
+      description: 'ต้องการลบรายการค่าใช้จ่ายนี้หรือไม่? หมวดค่าใช้จ่าย รายละเอียด และจำนวนเงินในแถวนี้จะหายไป',
+      destructive: true,
+      onConfirm: remove,
+      title: 'ยืนยันการลบรายการค่าใช้จ่าย',
     })
   }
 
-  async function cancelExpense(row: ExpenseRow) {
+  function cancelExpense(row: ExpenseRow) {
     if (!canMutateExpense(row.status)) {
       setError('ยกเลิกได้เฉพาะรายการค่าใช้จ่ายที่ยังไม่อนุมัติ')
       return
     }
-    if (!window.confirm(`ยืนยันยกเลิกรายการ ${row.docNo} ?`)) return
-
+    requestConfirmation({ title: 'ยืนยันการยกเลิกรายการค่าใช้จ่าย', description: `ต้องการยกเลิกรายการ ${row.docNo} หรือไม่?`, confirmLabel: 'ยืนยันยกเลิก', destructive: true, onConfirm: async () => {
     setError(null)
     try {
       await dailyFetchJson(`/api/daily/expenses/${row.id}`, {
@@ -712,8 +753,33 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
       await loadData()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'ยกเลิกรายการค่าใช้จ่ายไม่ได้')
+      throw caught
     }
+      },
+    })
   }
+
+  const closeExpenseForm = useCallback(() => {
+    setFormBaseline(null)
+    setFormOpen(false)
+  }, [])
+
+  const requestCloseExpenseForm = useCallback(() => {
+    if (isSaving) return
+    requestDiscardExpenseForm(closeExpenseForm)
+  }, [closeExpenseForm, isSaving, requestDiscardExpenseForm])
+
+  useEffect(() => {
+    if (!formOpen) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (document.querySelector('[role="dialog"]')) return
+      event.preventDefault()
+      requestCloseExpenseForm()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [formOpen, requestCloseExpenseForm])
 
   async function saveForm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -746,7 +812,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
         body: JSON.stringify(parsed.data),
         method: 'POST',
       })
-      setFormOpen(false)
+      closeExpenseForm()
       await loadData()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'บันทึกค่าใช้จ่ายไม่ได้')
@@ -1452,14 +1518,20 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   <option value="">ทุกบัญชี</option>
                   {accounts.filter((account) => account.active).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
                 </Select>
-                <Select className="h-9 w-auto" value={branchId} onChange={(event) => setBranchId(event.target.value)}>
-                  <option value="">ทุกสาขา</option>
-                  {branches.filter((branch) => branch.active).map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
-                </Select>
+                <BranchSelectCombobox
+                  branches={branches.filter((branch) => branch.active).map((branch) => ({ id: branch.id, name: `${branch.code} · ${branch.name}` }))}
+                  className="w-[12rem]"
+                  controlSize="filter"
+                  inputId="daily-expense-branch-filter"
+                  label=""
+                  placeholder="ทุกสาขา"
+                  value={branchId || null}
+                  onChange={(value) => setBranchId(value ?? '')}
+                />
               </div>
 
-              {search || dateFrom || dateTo || categoryId || accountId || statusFilter.length > 0 ? (
-                <Button className="h-9" size="sm" type="button" variant="outline" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setCategoryId(''); setAccountId(''); setStatusFilter([]) }}>ล้างตัวกรอง</Button>
+              {search || dateFrom || dateTo || categoryId || accountId || branchId || statusFilter.length > 0 ? (
+                <Button className="h-9" size="sm" type="button" variant="outline" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setCategoryId(''); setAccountId(''); setBranchId(''); setStatusFilter([]) }}>ล้างตัวกรอง</Button>
               ) : null}
             </div>
 
@@ -1505,6 +1577,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                       setDateTo('')
                       setCategoryId('')
                       setAccountId('')
+                      setBranchId('')
                       setStatusFilter([])
                       setShowMobileFilters(false)
                     }}
@@ -1549,6 +1622,20 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   </label>
 
                   <div>
+                    <span className="mb-1 block text-xs font-semibold text-slate-600">สาขา</span>
+                    <BranchSelectCombobox
+                      branches={branches.filter((branch) => branch.active).map((branch) => ({ id: branch.id, name: `${branch.code} · ${branch.name}` }))}
+                      className="w-full"
+                      controlSize="filter"
+                      inputId="daily-expense-branch-filter-mobile"
+                      label=""
+                      placeholder="ทุกสาขา"
+                      value={branchId || null}
+                      onChange={(value) => setBranchId(value ?? '')}
+                    />
+                  </div>
+
+                  <div>
                     <span className="mb-2 block text-xs font-semibold text-slate-600">สถานะ</span>
                     <div className="grid grid-cols-2 gap-2">
                       {expenseStatusOptions.map((option) => {
@@ -1591,12 +1678,12 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           </div>
 
           {formOpen ? (
-            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
+            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" onMouseDown={(event) => { if (event.target === event.currentTarget) requestCloseExpenseForm() }}>
               <form ref={formRef} noValidate className="w-full max-w-6xl overflow-hidden rounded-md bg-slate-900 shadow-xl" onSubmit={saveForm}>
                 <div data-ns-dialog-header className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 px-5 py-4 text-white rounded-t-md shrink-0">
                   <h3 className="font-bold text-white text-base">{form.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h3>
                   <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                    <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
+                    <Button className="h-9 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white" type="button" variant="outline" onClick={requestCloseExpenseForm}>ยกเลิก</Button>
                     <Button className="h-9 rounded-md bg-emerald-600 px-5 font-medium text-white transition-colors hover:bg-emerald-700 outline-none focus:ring-0" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
                   </div>
                 </div>

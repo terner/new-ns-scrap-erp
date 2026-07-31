@@ -3,16 +3,18 @@ import { z } from 'zod'
 import { paymentMethodGroupFromValue, resolvePaymentMethodName } from '@/lib/account-payment-method'
 import { requireBusinessCode, requireDocumentNo } from '@/lib/business-code'
 import { supplierAdvanceTypeLabel, supplierAdvanceVatTypeLabel } from '@/lib/purchase-advance'
-import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
+import { PURCHASE_BILL_ACTIVE_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { recordAuthAuditEvent } from '@/lib/server/auth-audit'
 import { refreshAdvancePaymentWorkflowStatus } from '@/lib/server/advance-payments'
 import { AuthContextError, authContextErrorResponse, getBranchCodeIntersection, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { documentBranchCode, listDailyAccounts, nextBankStatementDocNos, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { assertJsonSafe, documentBranchCode, listDailyAccounts, nextBankStatementDocNos, normalizeDate, toDailyAccountOption, toDateOnly, toNumber } from '@/lib/server/daily'
 import { nextPaymentApprovalDocNos } from '@/lib/server/payment-approval-pending'
 import { getActivePaymentMethods, type ActivePaymentMethod } from '@/lib/server/payment-methods'
 import { appendPaymentApprovalStatusLog, PAYMENT_APPROVAL_STATUS_ACTION } from '@/lib/server/payment-history'
 import { prisma } from '@/lib/server/prisma'
+import { getFinanceCurrencyPolicy } from '@/lib/server/finance-currency-policy'
+import { functionalBankStatementMovement } from '@/lib/server/bank-statement-booking'
 import { listActiveBranches, listActiveBranchesByCodes } from '@/lib/server/reference-master-cache'
 
 export const runtime = 'nodejs'
@@ -109,7 +111,7 @@ export async function GET(request: Request) {
         orderBy: [{ date: 'asc' }, { doc_no: 'asc' }],
         take: 5000,
         where: {
-          status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] },
+          status: { in: [...PURCHASE_BILL_ACTIVE_STATUSES] },
           ...branchWhere,
         },
       }),
@@ -502,15 +504,7 @@ export async function GET(request: Request) {
       return [...pendingRows, ...approvedRows, ...voidedRows]
     })
 
-    const dailyAccountOptions = dailyAccounts.map((account) => ({
-      accountNo: account.code ?? '',
-      bankName: account.name,
-      id: account.id,
-      isPrimary: false,
-      kind: account.type === 'cash' ? 'cash' as const : 'bank' as const,
-      label: [account.type, account.name, account.code ?? ''].filter(Boolean).join(' / '),
-      paymentMethod: account.type,
-    }))
+    const dailyAccountOptions = dailyAccounts.map(toDailyAccountOption)
     const pettyReturnById = new Map(pettyReturns.map((entry) => [entry.id.toString(), entry] as const))
     const pendingPettyReturnRows = pettyReturns
       .filter((entry) => entry.status === 'pending')
@@ -585,14 +579,17 @@ export async function GET(request: Request) {
       ...row,
       branchId: row.approvalDisplayDocNo ? approvalBranchByDocNo.get(row.approvalDisplayDocNo) ?? branchBySourceDocNo.get(row.sourceDocNo) ?? null : branchBySourceDocNo.get(row.sourceDocNo) ?? null,
     }))
-    return NextResponse.json({
+    const payload = {
       apRows: attachBranch([...apRows, ...advanceRows]),
       branches: branches.map((branch) => ({ code: branch.code, id: branch.code, name: branch.name })),
       expenseRows: attachBranch(expenseRows),
       pettyReturnRows: attachBranch(pettyReturnRows),
-    })
+    }
+    assertJsonSafe(payload, 'payment-approval.GET')
+    return NextResponse.json(payload)
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    console.error('[payment-approval] GET failed', caught instanceof Error ? caught.message : caught)
     return apiErrorResponse(caught, 'โหลดรายการอนุมัติจ่ายเงินไม่ได้', 500)
   }
 }
@@ -604,6 +601,7 @@ export async function POST(request: Request) {
 
     const values = approvalRequestSchema.parse(await request.json())
     const actor = context.appUser?.email ?? context.authUser.email ?? context.authUser.id
+    const currencyPolicy = await getFinanceCurrencyPolicy()
     let selfApproval = false
     const paymentMethods = await getActivePaymentMethods()
 
@@ -626,7 +624,7 @@ export async function POST(request: Request) {
         },
         where: {
           ...(values.sourceType === 'purchase_bill' ? { doc_no: sourceDocNo } : { id: BigInt(-1) }),
-          status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] },
+          status: { in: [...PURCHASE_BILL_ACTIVE_STATUSES] },
         },
       })
       if (values.sourceType === 'purchase_bill' && bills.length !== 1) throw new Error('ไม่พบบิลซื้อที่ต้องการอนุมัติ หรือบิลถูกยกเลิกแล้ว')
@@ -986,10 +984,16 @@ export async function POST(request: Request) {
             const account = accountByCode.get(split.destinationId)
             if (!account) throw new Error('บัญชีรับคืนบางรายการไม่ถูกต้อง')
             return {
+              ...functionalBankStatementMovement({
+                amountIn: split.approvedAmount,
+                amountOut: 0,
+                functionalCurrencyCode: currencyPolicy.functionalCurrencyCode,
+                idempotencyKey: `petty-advance-return:${entry.doc_no}:split:${index + 1}`,
+                sourceEventKey: `petty-advance-return:${entry.doc_no}:split:${index + 1}`,
+                sourceEventType: 'petty_advance_return',
+              }),
               account_id: account.id,
               branch_id: advance.branch_id,
-              amount_in: split.approvedAmount,
-              amount_out: 0,
               created_by: actor,
               date: normalizeDate(returnDate),
               description: `คืน ${advance.doc_no} โดย ${advance.recipient_name}${values.splits.length > 1 ? ` (split ${index + 1}/${values.splits.length})` : ''}`,
