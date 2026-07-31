@@ -4,7 +4,7 @@ Objective: เพิ่ม foreign receipt/FCD โดยใช้ native currenc
 
 Active batch: `finance_currency_policies` เป็น source of truth แบบ singleton สำหรับ functional currency และตั้งค่า `THB` จาก Currency Master แล้วทั้ง dev-target/SIT. Runtime reader fail closed หากไม่มีหรือมีเกินหนึ่ง policy row. Receipt จะใช้ rate จาก API ตามวันรับเงิน, อนุญาตกรอก/แก้เอง และบันทึก snapshot ที่ใช้จริงโดยไม่มี latest-rate fallback. ยอด native/book คำนวณและแสดง 2 ตำแหน่ง; FX rate รับได้สูงสุด 3 ตำแหน่ง. FCD OD ใช้วงเงินต่อบัญชี. Carrying rate ใช้ moving weighted average ต่อ account+currency. เพื่อรักษา compatibility ของรายงานเดิม foreign receipt จะเขียนยอด THB ที่คำนวณแล้วลง `bank_statement.amount_in/out` และ mirror กับ `book_amount_*`; native/rate อยู่เฉพาะ FCD subledger/audit ไม่ย้าย reader เดิมไปอ่าน `book_amount_*`.
 
-Blockers: เหลือ `FCD-908` รอคำสั่ง browser/UAT เท่านั้น. ห้ามใช้ account currency, `THB` หรือ `USD` เป็น fallback ใน runtime. GL journal, chart-of-account mapping และ GL reconciliation ไม่อยู่ใน active FCD scope: ระบบปัจจุบันไม่มี GL posting engine และยังไม่มี requirement ให้สร้าง.
+Blockers: `FCD-908` ทำ browser smoke แล้ว แต่ยังรอ UAT data setup สำหรับ post event จริง เพราะ SIT ไม่มี active FCD account/ledger หลัง transaction reset. ห้ามใช้ account currency, `THB` หรือ `USD` เป็น fallback ใน runtime. GL journal, chart-of-account mapping และ GL reconciliation ไม่อยู่ใน active FCD scope: ระบบปัจจุบันไม่มี GL posting engine และยังไม่มี requirement ให้สร้าง.
 
 Write areas: FCD schema/ledger migration, money/rate/posting services, Customer Receipt API/UI, Bank Statement/Cash Position readers, FCD conversion/revaluation and their reconciliation/tests.
 
