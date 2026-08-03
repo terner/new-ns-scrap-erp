@@ -15,6 +15,7 @@ import {
   type WeightTicketRow,
 } from '@/lib/server/weight-tickets'
 import { syncWeightTicketToGoogleSheets } from '@/lib/server/google-sheets-sync'
+import { resolveLineTargetsForWeightTicket } from '@/lib/server/line-notification-routing'
 // module ใหม่ที่ใช้ react-pdf + @napi-rs/canvas แทน Playwright
 // (import เป็น alias เพื่อไม่ให้ชนกับชื่อ function legacy ในไฟล์นี้)
 import { generateWeightTicketPdf as generateWeightTicketPdfReactPdf } from '@/lib/server/pdf/weight-ticket-pdf'
@@ -38,7 +39,6 @@ async function resolveNotificationConfigs() {
         in: [
           'LINE_CHANNEL_ACCESS_TOKEN',
           'LINE_CHANNEL_SECRET',
-          'LINE_DEFAULT_TARGET_ID',
           'WEIGHT_TICKET_PDF_BUCKET',
           'NEXT_PUBLIC_APP_URL',
           'LINE_NOTIFY_TEXT_TEMPLATE_WTI',
@@ -60,7 +60,6 @@ async function resolveNotificationConfigs() {
   return {
     lineChannelAccessToken: configMap.LINE_CHANNEL_ACCESS_TOKEN || process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     lineChannelSecret: configMap.LINE_CHANNEL_SECRET || process.env.LINE_CHANNEL_SECRET || '',
-    lineDefaultTargetId: configMap.LINE_DEFAULT_TARGET_ID || process.env.LINE_DEFAULT_TARGET_ID || '',
     pdfBucket: configMap.WEIGHT_TICKET_PDF_BUCKET || process.env.WEIGHT_TICKET_PDF_BUCKET || 'weight-ticket-pdfs',
     appUrl: configMap.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '',
     wtiTemplate: configMap.LINE_NOTIFY_TEXT_TEMPLATE_WTI || wtiDefaultTemplate,
@@ -69,6 +68,47 @@ async function resolveNotificationConfigs() {
     albumShowTimestamps: configMap.LINE_ALBUM_SHOW_TIMESTAMPS !== 'false',
     albumQuality: configMap.LINE_ALBUM_QUALITY ? parseInt(configMap.LINE_ALBUM_QUALITY, 10) : 90,
   }
+}
+
+export async function resolveWeightTicketLineTargets(
+  ticket: Parameters<typeof resolveLineTargetsForWeightTicket>[0],
+  targetId?: string,
+): Promise<string[]> {
+  const notificationPreference = ticket.type === 'WTO'
+    ? { notify_wto: true }
+    : { notify_wti: true }
+
+  if (targetId && targetId !== 'routing') {
+    const target = await prisma.line_targets.findFirst({
+      where: {
+        target_id: targetId,
+        is_active: true,
+        ...notificationPreference,
+      },
+      select: { target_id: true },
+    })
+    return target ? [target.target_id] : []
+  }
+
+  const decisions = await resolveLineTargetsForWeightTicket(ticket)
+  const eligibleTargets = await prisma.line_targets.findMany({
+    where: {
+      target_id: { in: decisions.map((decision) => decision.targetId) },
+      is_active: true,
+      ...notificationPreference,
+    },
+    select: { is_default: true, target_id: true },
+  })
+  const eligibleTargetMap = new Map(
+    eligibleTargets.map((target) => [target.target_id, target]),
+  )
+
+  return decisions
+    .filter((decision) => {
+      const target = eligibleTargetMap.get(decision.targetId)
+      return Boolean(target && (decision.ruleId !== null || target.is_default))
+    })
+    .map((decision) => decision.targetId)
 }
 
 function cleanText(value: string | null | undefined, fallback = '-') {
@@ -967,15 +1007,20 @@ export async function sendLinePush(targetId: string, messages: any[], token: str
     headers['X-Line-Retry-Key'] = retryKey
   }
 
-  const response = await fetch('https://api.line.me/v2/bot/message/push', {
-    body: JSON.stringify({
-      messages,
-      to: targetId,
-    }),
-    headers,
-    method: 'POST',
-    signal,
-  })
+  let response: Response
+  try {
+    response = await fetch('https://api.line.me/v2/bot/message/push', {
+      body: JSON.stringify({
+        messages,
+        to: targetId,
+      }),
+      headers,
+      method: 'POST',
+      signal,
+    })
+  } catch {
+    throw new Error('เชื่อมต่อ LINE Push API ไม่สำเร็จ')
+  }
 
   if (response.status === 409 && retryKey) {
     const acceptedRequestId = response.headers.get('x-line-accepted-request-id') || response.headers.get('x-line-request-id')
@@ -986,8 +1031,7 @@ export async function sendLinePush(targetId: string, messages: any[], token: str
   }
 
   if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`LINE Push Message ไม่สำเร็จ (${response.status}): ${body}`)
+    throw new Error(`LINE Push Message ไม่สำเร็จ (${response.status})`)
   }
   return {
     lineRequestId: response.headers.get('x-line-request-id') || null,
@@ -1101,28 +1145,7 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
 
   const configs = await resolveNotificationConfigs()
 
-  let targets: string[] = []
-  if (options.targetId && options.targetId !== 'routing') {
-    targets = [options.targetId]
-  } else if (configs.lineDefaultTargetId && options.targetId !== 'routing') {
-    targets = [configs.lineDefaultTargetId]
-  } else {
-    // Multi-target & Branch Routing
-    const isWti = loaded.record.type === 'WTI'
-    const targetGroups = await prisma.line_groups.findMany({
-      where: {
-        is_active: true,
-        notify_wti: isWti ? true : undefined,
-        notify_wto: !isWti ? true : undefined,
-        OR: [
-          { branch_code: null },
-          { branch_code: '' },
-          { branch_code: loaded.record.branchId }
-        ]
-      }
-    })
-    targets = targetGroups.map(g => g.group_id)
-  }
+  const targets = await resolveWeightTicketLineTargets(loaded.record, options.targetId)
 
   if (targets.length === 0) {
     return {

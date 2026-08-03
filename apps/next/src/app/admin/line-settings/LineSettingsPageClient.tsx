@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader } from '@/components/ui/Dialog'
 import { Select } from '@/components/ui/Select'
+import { getLineWebhookUrl, getRuleTargetHealth } from './line-settings-onboarding'
 
 // Validation Schema for credentials and basic configs
 const credentialsSchema = z.object({
@@ -18,7 +19,9 @@ const credentialsSchema = z.object({
   lineChannelSecret: z.string().trim().nullable().or(z.literal('')),
   lineDefaultTargetId: z.string().trim().nullable().or(z.literal('')),
   pdfBucket: z.string().trim().min(1, 'กรุณาระบุชื่อ Storage Bucket'),
-  appUrl: z.string().trim().url('รูปแบบ URL ไม่ถูกต้อง').or(z.literal('')),
+  appUrl: z.string().trim().url('รูปแบบ URL ไม่ถูกต้อง')
+    .refine((value) => new URL(value).protocol === 'https:', 'Public App URL ต้องใช้ HTTPS')
+    .or(z.literal('')),
   lineAutoSendWti: z.boolean().default(false),
   lineAutoSendWto: z.boolean().default(false),
   googleSheetsWebhookUrl: z.string().trim().url('รูปแบบ URL ไม่ถูกต้อง').or(z.literal('')).nullable().or(z.literal('')),
@@ -192,6 +195,22 @@ type BotInfo = {
   pictureUrl: string | null
 }
 
+type LineWebhookStatus = {
+  active: boolean | null
+  endpoint: string | null
+  expectedEndpoint: string
+  matchesExpected: boolean | null
+  message?: string
+  ready: boolean
+  status: 'ready' | 'use_webhook_disabled' | 'test_failed' | 'propagating' | 'verification_unavailable'
+  test: {
+    detail: string
+    reason: string
+    statusCode: number
+    success: boolean
+  } | null
+}
+
 type WeightTicketOption = {
   id: string
   docNo: string
@@ -354,6 +373,7 @@ export function LineSettingsPageClient() {
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
   const [botInfo, setBotInfo] = useState<BotInfo | null>(null)
+  const [lineWebhookStatus, setLineWebhookStatus] = useState<LineWebhookStatus | null>(null)
 
   // Loading & Action states
   const [isLoading, setIsLoading] = useState(true)
@@ -444,7 +464,11 @@ export function LineSettingsPageClient() {
     try {
       const response = await fetch('/api/admin/line-settings', { cache: 'no-store' })
       const data = await response.json()
-      setForm(data)
+      const currentOrigin = window.location.origin
+      setForm({
+        ...data,
+        appUrl: currentOrigin.startsWith('https://') ? currentOrigin : data.appUrl || '',
+      })
     } catch (err) {
       console.error('Failed to load line credentials settings', err)
     }
@@ -582,7 +606,7 @@ export function LineSettingsPageClient() {
         body: JSON.stringify({ action: 'sync' }),
       })
       const body = await res.json()
-      if (!res.ok) throw new Error(body.error || 'ซิงค์กลุ่ม LINE ไม่สำเร็จ')
+      if (!res.ok) throw new Error(body.error || 'รีเฟรชกลุ่มที่ลงทะเบียนแล้วไม่สำเร็จ')
 
       // อัปเดต bot info + target list
       if (body.bot) {
@@ -597,13 +621,15 @@ export function LineSettingsPageClient() {
       const refreshed = body.refreshed ?? 0
       const notFound = body.notFound ?? 0
       const failed = body.failed ?? 0
+      const waitingForEvent = body.waitingForEvent ?? 0
       const total = body.total ?? 0
       const parts: string[] = [`รีเฟรช ${refreshed}/${total} รายการ`]
       if (notFound > 0) parts.push(`${notFound} รายการบอทออกแล้ว`)
+      if (waitingForEvent > 0) parts.push(`${waitingForEvent} ห้องรอ event ใหม่`)
       if (failed > 0) parts.push(`${failed} รายการผิดพลาด`)
-      setMessage(`🔄 ซิงค์กลุ่ม LINE สำเร็จ — ${parts.join(' · ')}`)
+      setMessage(`🔄 รีเฟรชกลุ่มที่ลงทะเบียนแล้วสำเร็จ — ${parts.join(' · ')}`)
     } catch (caught) {
-      setError(getErrorMessage(caught, 'ซิงค์กลุ่ม LINE ขัดข้อง'))
+      setError(getErrorMessage(caught, 'รีเฟรชกลุ่มที่ลงทะเบียนแล้วขัดข้อง'))
     } finally {
       setIsSyncingTargets(false)
     }
@@ -660,12 +686,23 @@ export function LineSettingsPageClient() {
         throw new Error(body.error || 'บันทึกข้อมูลการตั้งค่าล้มเหลว')
       }
       const responseBody = await res.json().catch(() => ({}))
-      // sync อัตโนมัติเมื่อเปลี่ยน token: ถ้า sync ล้มเหลวจะคืน warning (แต่ token ยังบันทึกสำเร็จ)
-      if (responseBody.syncWarning) {
-        setMessage(`บันทึกการเชื่อมต่อสำเร็จ แต่ซิงค์กลุ่มล้มเหลว: ${responseBody.syncWarning}`)
-      } else {
-        setMessage('บันทึกข้อมูลการเชื่อมต่อสำเร็จ')
+      if (responseBody.lineWebhook) setLineWebhookStatus(responseBody.lineWebhook)
+
+      const notices = ['บันทึกข้อมูลการเชื่อมต่อสำเร็จ']
+      if (responseBody.lineWebhook?.status === 'ready') {
+        notices.push('Webhook พร้อมรับกลุ่มจาก LINE แล้ว')
+      } else if (responseBody.lineWebhook?.status === 'use_webhook_disabled') {
+        notices.push('ระบบตั้ง URL และทดสอบแล้ว เหลือเปิด Use webhook ใน LINE Developers หนึ่งครั้ง')
+      } else if (responseBody.lineWebhook?.status === 'test_failed') {
+        notices.push('LINE ทดสอบ Webhook ไม่ผ่าน กรุณาตรวจ Channel Secret และ URL')
+      } else if (responseBody.lineWebhook?.status === 'verification_unavailable') {
+        notices.push('ระบบตั้ง URL แล้ว แต่ยังตรวจสถานะ Webhook จาก LINE ไม่ครบ กรุณากดตรวจอีกครั้ง')
+      } else if (responseBody.lineWebhook?.status === 'propagating') {
+        notices.push('LINE รายงาน URL ยังไม่ตรงกับค่าที่ตั้งล่าสุด กรุณากดตรวจอีกครั้ง')
       }
+      if (responseBody.syncWarning) notices.push(`รีเฟรชกลุ่มเดิมไม่สำเร็จ: ${responseBody.syncWarning}`)
+      if (responseBody.webhookWarning) notices.push(`ตรวจสถานะ Webhook ไม่ครบ: ${responseBody.webhookWarning}`)
+      setMessage(notices.join(' · '))
       void loadCredentials()
       void loadBotInfo()
       void loadTargets()
@@ -701,23 +738,39 @@ export function LineSettingsPageClient() {
     }
   }
 
-  const testWebhookSignature = async () => {
+  const testWebhook = async () => {
     setError(null)
     setMessage(null)
-    if (!form.lineChannelSecret) {
-      setError('กรุณากรอก LINE Channel Secret ก่อนทดสอบ')
+    if (!form.lineChannelAccessToken) {
+      setError('กรุณาบันทึก LINE Channel Access Token ก่อนตรวจ Webhook')
       return
     }
     setIsTestingWebhook(true)
     try {
       const res = await fetch('/api/admin/line-settings/test-webhook', { method: 'POST' })
       const body = await res.json()
-      if (!res.ok || body.ok === false) throw new Error(body.message || 'ลายเซ็นไม่ถูกต้อง')
-      setMessage(`✅ ตรวจสอบความถูกต้องของ Webhook ลายเซ็นสำเร็จ: ${body.message}`)
+      if (!res.ok) throw new Error(body.error || body.message || 'ตรวจ Webhook ไม่สำเร็จ')
+      setLineWebhookStatus(body)
+      if (body.ok === false) throw new Error(body.message || 'LINE ทดสอบ Webhook ไม่ผ่าน')
+      setMessage(body.message)
     } catch (caught) {
-      setError(getErrorMessage(caught, 'ทดสอบ Webhook ล้มเหลว'))
+      setError(getErrorMessage(caught, 'ตรวจ Webhook ผ่าน LINE ไม่สำเร็จ'))
     } finally {
       setIsTestingWebhook(false)
+    }
+  }
+
+  const webhookUrl = getLineWebhookUrl(form.appUrl)
+
+  const copyWebhookUrl = async () => {
+    if (!webhookUrl) return
+
+    try {
+      await navigator.clipboard.writeText(webhookUrl)
+      setError(null)
+      setMessage('คัดลอก Webhook URL แล้ว — ใช้สำหรับตรวจสอบหรือกรอกเองเมื่อระบบอัตโนมัติมีปัญหา')
+    } catch {
+      setError('คัดลอก Webhook URL ไม่สำเร็จ กรุณาคัดลอกจากช่อง URL')
     }
   }
 
@@ -1125,6 +1178,8 @@ export function LineSettingsPageClient() {
   }, [editingTarget])
 
   const templateFormConfig = editingTemplate ? getTemplateConfig(editingTemplate) : createDefaultTemplateConfig()
+  const inactiveTargetCount = targets.filter((target) => !target.is_active).length
+  const invalidRuleCount = rules.filter((rule) => getRuleTargetHealth(rule.target_id, targets) !== 'active').length
 
   return (
     <section className="line-settings-page w-full max-w-none space-y-6 px-6 py-5 lg:px-10 lg:py-8 animate-fade-in font-normal text-slate-800">
@@ -1301,7 +1356,27 @@ export function LineSettingsPageClient() {
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <span className="text-base leading-none mt-0.5">{targets.some(t => t.is_default) ? '✅' : '⚠️'}</span>
+                    <span className="text-base leading-none mt-0.5">{lineWebhookStatus?.ready ? '✅' : lineWebhookStatus ? '⚠️' : 'ℹ️'}</span>
+                    <div>
+                      <div className="text-sm font-bold text-slate-800">LINE Webhook</div>
+                      <div className="mt-0.5 text-xs text-slate-500">
+                        {lineWebhookStatus?.ready
+                          ? 'พร้อมรับ event จาก LINE'
+                          : lineWebhookStatus?.status === 'use_webhook_disabled'
+                            ? 'ตั้ง URL แล้ว · รอเปิด Use webhook'
+                            : lineWebhookStatus?.status === 'test_failed'
+                              ? 'LINE ทดสอบ endpoint ไม่ผ่าน'
+                              : lineWebhookStatus?.status === 'verification_unavailable'
+                                ? 'ตั้ง URL แล้ว · ยังตรวจสถานะไม่ครบ'
+                              : lineWebhookStatus
+                                ? 'LINE รายงาน URL ยังไม่ตรงกับค่าล่าสุด'
+                                : 'บันทึก Token/Secret หรือกดตรวจ Webhook'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <span className="text-base leading-none mt-0.5">{targets.some(t => t.is_default && t.is_active) ? '✅' : '⚠️'}</span>
                     <div>
                       <div className="text-sm font-bold text-slate-800">Default Target (เป้าหมายดีฟอลต์)</div>
                     </div>
@@ -1338,11 +1413,12 @@ export function LineSettingsPageClient() {
                 <button
                   type="button"
                   className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-md transition focus:outline-none flex items-center gap-1.5 h-10"
-                  onClick={() => void testWebhookSignature()}
+                  onClick={() => void testWebhook()}
                   disabled={isTestingWebhook}
                 >
-                  {isTestingWebhook ? 'กำลังทดสอบ...' : '🔑 ทดสอบสิทธิ์ Webhook'}
+                  {isTestingWebhook ? 'กำลังตรวจ...' : '🔗 ตั้งค่าและตรวจ Webhook ผ่าน LINE'}
                 </button>
+                <p className="basis-full text-xs text-slate-500">ระบบตั้ง URL และเรียก LINE ทดสอบ endpoint จริง ส่วนสวิตช์ Use webhook ต้องเปิดใน LINE Developers Console หนึ่งครั้ง</p>
                 <button
                   type="button"
                   className="px-3.5 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition focus:outline-none flex items-center gap-1.5 h-10"
@@ -1362,6 +1438,54 @@ export function LineSettingsPageClient() {
             <h3 className="text-base font-bold text-slate-900 pb-2 border-b border-slate-100 flex items-center gap-2">
               <span>🔑</span> การตั้งค่า LINE Messaging API & Credential Configuration
             </h3>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-3">
+              <div className="font-bold">ตั้งค่า Webhook สำหรับ LINE OA</div>
+              <p className="text-xs leading-5">เมื่อกดบันทึก ระบบจะตรวจ Token, ตั้ง URL นี้ผ่าน LINE API และทดสอบ endpoint ให้อัตโนมัติ</p>
+              {lineWebhookStatus ? (
+                <div className={`rounded-md border px-3 py-2 text-xs font-medium ${
+                  lineWebhookStatus.ready
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-300 bg-white text-amber-900'
+                }`}>
+                  {lineWebhookStatus.ready
+                    ? 'พร้อมใช้งาน — LINE ส่ง Webhook มาที่ระบบได้แล้ว'
+                    : lineWebhookStatus.status === 'use_webhook_disabled'
+                      ? 'ตั้ง URL และทดสอบสำเร็จแล้ว — เหลือเปิด Use webhook ใน LINE Developers หนึ่งครั้ง'
+                      : lineWebhookStatus.status === 'test_failed'
+                        ? 'LINE ทดสอบ endpoint ไม่ผ่าน — ตรวจว่า Secret มาจาก Channel เดียวกับ Token แล้วลองอีกครั้ง'
+                        : lineWebhookStatus.status === 'verification_unavailable'
+                          ? 'ระบบตั้ง URL แล้ว แต่ยังยืนยันสถานะ Webhook จาก LINE ไม่ครบ — กดตรวจ Webhook อีกครั้ง'
+                          : 'LINE รายงาน URL ยังไม่ตรงกับค่าที่ตั้งล่าสุด — กดตรวจ Webhook อีกครั้ง'}
+                </div>
+              ) : null}
+              {webhookUrl ? (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    aria-label="LINE Webhook URL"
+                    className="h-10 min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-3 font-mono text-xs text-slate-800"
+                    readOnly
+                    value={webhookUrl}
+                  />
+                  <button
+                    type="button"
+                    className="h-10 rounded-md bg-slate-900 px-3 text-xs font-bold text-white transition hover:bg-slate-800 focus:outline-none"
+                    onClick={() => void copyWebhookUrl()}
+                  >
+                    คัดลอก URL (สำรอง)
+                  </button>
+                </div>
+              ) : (
+                <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">กรอก Public App URL ก่อน จึงจะสร้าง Webhook URL ได้</p>
+              )}
+              <ol className="list-decimal space-y-1 pl-5 text-xs leading-5">
+                <li>กรอก Token และ Secret จาก Channel เดียวกัน แล้วกดบันทึก</li>
+                <li>ระบบตั้ง URL และทดสอบ Webhook ผ่าน LINE ให้อัตโนมัติ</li>
+                <li>ถ้าสถานะยังปิด ให้เปิด Use webhook ใน LINE Developers เพียงครั้งเดียว</li>
+                <li>กลุ่มใหม่ลงทะเบียนเมื่อเชิญ OA หรือส่งข้อความ; เมื่อเปลี่ยน OA ระบบจะตรวจกลุ่มที่เคยรู้จักให้อัตโนมัติ และให้ส่ง <span className="font-mono font-bold">/register</span> เฉพาะกลุ่มที่ยังไม่ขึ้น ส่วนห้องแบบ Room ต้องรอ event ใหม่เพราะ LINE ไม่มี Room Summary API</li>
+                <li>กลับมาตั้งกลุ่มดีฟอลต์และกฎส่งแจ้งเตือน</li>
+              </ol>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Channel Access Token */}
@@ -1441,10 +1565,11 @@ export function LineSettingsPageClient() {
                   type="text"
                   aria-invalid={Boolean(fieldErrors.appUrl)}
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none h-10"
-                  placeholder="เช่น https://ns-dev.devkub.com"
+                  placeholder="เช่น https://ns-erp.vercel.app"
                   value={form.appUrl}
                   onChange={(e) => setForm({ ...form, appUrl: e.target.value })}
                 />
+                <p className="text-xs text-slate-500">เมื่อใช้งานผ่าน HTTPS ระบบจะใช้โดเมนของหน้าปัจจุบันให้อัตโนมัติ ช่องนี้จำเป็นเฉพาะ local ที่ใช้ public tunnel</p>
                 {fieldErrors.appUrl && (
                   <p className="text-xs text-red-600">{fieldErrors.appUrl}</p>
                 )}
@@ -1493,6 +1618,7 @@ export function LineSettingsPageClient() {
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">👥 ช่องทางรับข่าวสาร / LINE Targets (Groups & Users)</h3>
+                  <p className="mt-1 text-xs text-slate-500">ช่องทางที่ใช้งาน {targets.length - inactiveTargetCount} รายการ · ประวัติกลุ่มเดิม {inactiveTargetCount} รายการ</p>
                 </div>
                 <div className="flex gap-2.5">
                   {targetResize.hasCustomWidths && (
@@ -1509,7 +1635,7 @@ export function LineSettingsPageClient() {
                     disabled={isSyncingTargets || !form.lineChannelAccessToken}
                     title={!form.lineChannelAccessToken ? 'กรุณาตั้งค่า LINE Channel Access Token ก่อน' : ''}
                   >
-                    {isSyncingTargets ? 'กำลังซิงค์...' : '🔄 ซิงค์กลุ่มจาก LINE'}
+                    {isSyncingTargets ? 'กำลังรีเฟรช...' : '🔄 รีเฟรชกลุ่มที่ลงทะเบียนแล้ว'}
                   </button>
                   <button
                     className="px-3.5 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition focus:outline-none h-8"
@@ -1529,6 +1655,10 @@ export function LineSettingsPageClient() {
                     ➕ เพิ่มกลุ่มแชทด้วยตนเอง
                   </button>
                 </div>
+              </div>
+
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                LINE ไม่อนุญาตให้ดึงรายชื่อทุกกลุ่มที่ OA อยู่ ปุ่มนี้จึงตรวจได้เฉพาะกลุ่มที่ระบบเคยรู้จัก โดยจะเปิดกลับเฉพาะกลุ่มที่ LINE ยืนยันว่า OA ปัจจุบันเข้าถึงได้ หากกลุ่มใดยังไม่ขึ้น ให้เปิด Webhook แล้วส่ง <span className="font-mono font-bold">/register</span> หนึ่งข้อความในกลุ่ม ส่วน Room จะรอ event ใหม่และไม่ถูกนับเป็นข้อผิดพลาด
               </div>
 
               {/* Lined table view with resize headers */}
@@ -1595,7 +1725,7 @@ export function LineSettingsPageClient() {
                                 <div className="font-semibold text-slate-800 flex items-center gap-1.5">
                                   <span className="truncate">{t.display_name}</span>
                                   {t.is_default && (
-                                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-bold uppercase select-none tracking-wider">Default</span>
+                                    <span className={`px-1.5 py-0.5 rounded text-xs font-bold uppercase select-none tracking-wider ${t.is_active ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'}`}>{t.is_active ? 'Default' : 'Default เดิม'}</span>
                                   )}
                                 </div>
                                 <div className="text-xs text-slate-400 font-mono mt-0.5 select-all truncate">{t.target_id}</div>
@@ -1624,19 +1754,20 @@ export function LineSettingsPageClient() {
                                 : isDisabled
                                   ? 'bg-rose-50 text-rose-700'
                                   : 'bg-emerald-50 text-emerald-700'
-                              const label = isLeft ? 'บอทออกจากกลุ่ม' : isDisabled ? 'ปิดใช้งาน' : 'อยู่ในกลุ่ม'
+                              const label = isLeft ? 'กลุ่มเดิม — OA ไม่อยู่แล้ว' : isDisabled ? 'ปิดใช้งาน' : 'อยู่ในกลุ่ม'
                               return (
-                                <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${cls}`}>
-                                  {label}
-                                </span>
+                                <div className="space-y-1">
+                                  <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${cls}`}>{label}</span>
+                                  {!t.is_active ? <p className="text-xs text-slate-400">เก็บเป็นประวัติ · ใช้ส่งไม่ได้</p> : null}
+                                </div>
                               )
                             })()}
                           </td>
                           <td className="px-3 py-3 text-right">
                             <TableActionButton menu={(
                               <>
-                                <TableActionMenuItem onSelect={() => void handleTestTarget(t.target_id, t.id)}>ทดสอบส่ง</TableActionMenuItem>
-                                <TableActionMenuItem disabled={t.is_default} onSelect={() => void handleSetDefaultTarget(t.id)}>ตั้งดีฟอลต์</TableActionMenuItem>
+                                <TableActionMenuItem disabled={!t.is_active} onSelect={() => void handleTestTarget(t.target_id, t.id)}>ทดสอบส่ง</TableActionMenuItem>
+                                <TableActionMenuItem disabled={!t.is_active || t.is_default} onSelect={() => void handleSetDefaultTarget(t.id)}>ตั้งดีฟอลต์</TableActionMenuItem>
                                 <TableActionMenuItem onSelect={() => { setEditingTarget(t); setIsTargetModalOpen(true) }}>แก้ไข</TableActionMenuItem>
                                 <TableActionMenuItem onSelect={() => void handleDeleteTarget(t.id)}>ลบ</TableActionMenuItem>
                               </>
@@ -1669,7 +1800,7 @@ export function LineSettingsPageClient() {
                           <div className="font-bold text-slate-900 flex items-center gap-1.5">
                             {t.display_name}
                             {t.is_default && (
-                              <span className="px-1.5 py-0.5 text-xs bg-slate-900 text-white rounded font-bold uppercase tracking-wider">Default</span>
+                              <span className={`px-1.5 py-0.5 text-xs rounded font-bold uppercase tracking-wider ${t.is_active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>{t.is_active ? 'Default' : 'Default เดิม'}</span>
                             )}
                           </div>
                           <div className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-[200px]">{t.target_id}</div>
@@ -1698,17 +1829,18 @@ export function LineSettingsPageClient() {
                             : isDisabled
                               ? 'bg-rose-50 text-rose-700'
                               : 'bg-emerald-50 text-emerald-700'
-                          const label = isLeft ? 'บอทออกจากกลุ่ม' : isDisabled ? 'ปิดใช้งาน' : 'อยู่ในกลุ่ม'
+                          const label = isLeft ? 'กลุ่มเดิม — OA ไม่อยู่แล้ว' : isDisabled ? 'ปิดใช้งาน' : 'อยู่ในกลุ่ม'
                           return (
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${cls}`}>
-                              {label}
-                            </span>
+                            <div className="space-y-1">
+                              <span className={`px-2 py-0.5 rounded text-xs font-bold ${cls}`}>{label}</span>
+                              {!t.is_active ? <p className="text-xs text-slate-400">เก็บเป็นประวัติ · ใช้ส่งไม่ได้</p> : null}
+                            </div>
                           )
                         })()}
                         <TableActionButton mobileLabel menu={(
                           <>
-                            <TableActionMenuItem onSelect={() => void handleTestTarget(t.target_id, t.id)}>ทดสอบ</TableActionMenuItem>
-                            <TableActionMenuItem disabled={t.is_default} onSelect={() => void handleSetDefaultTarget(t.id)}>ตั้งดีฟอลต์</TableActionMenuItem>
+                            <TableActionMenuItem disabled={!t.is_active} onSelect={() => void handleTestTarget(t.target_id, t.id)}>ทดสอบ</TableActionMenuItem>
+                            <TableActionMenuItem disabled={!t.is_active || t.is_default} onSelect={() => void handleSetDefaultTarget(t.id)}>ตั้งดีฟอลต์</TableActionMenuItem>
                             <TableActionMenuItem onSelect={() => { setEditingTarget(t); setIsTargetModalOpen(true) }}>แก้ไข</TableActionMenuItem>
                             <TableActionMenuItem onSelect={() => void handleDeleteTarget(t.id)}>ลบ</TableActionMenuItem>
                           </>
@@ -1729,6 +1861,7 @@ export function LineSettingsPageClient() {
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">🔀 กฎการกระจายการแจ้งเตือน (Notification Routing Rules)</h3>
+                  {invalidRuleCount > 0 ? <p className="mt-1 text-xs font-medium text-amber-700">พบ {invalidRuleCount} กฎที่ส่งไปยังกลุ่มเดิม — เลือก “เปลี่ยนกลุ่มปลายทาง” เพื่อแก้ไข</p> : null}
                 </div>
                 <button
                   className="px-3.5 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition focus:outline-none h-8"
@@ -1807,6 +1940,7 @@ export function LineSettingsPageClient() {
                     <tbody className="divide-y divide-slate-100">
                       {sortedRules.map((r) => {
                         const boundTarget = targets.find(t => t.target_id === r.target_id)
+                        const needsTargetChange = getRuleTargetHealth(r.target_id, targets) !== 'active'
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-xs">
                             <td className="px-3 py-3 font-semibold text-slate-600">
@@ -1820,6 +1954,7 @@ export function LineSettingsPageClient() {
                             </td>
                             <td className="px-3 py-3 text-slate-600">
                               <div className="font-semibold text-slate-800">{boundTarget?.display_name || 'ไม่พบลายเชื่อมโยง'}</div>
+                              {needsTargetChange ? <p className="mt-0.5 text-xs font-medium text-amber-700">กลุ่มเดิมใช้งานไม่ได้ — ต้องเปลี่ยนกลุ่มปลายทาง</p> : null}
                               <div className="text-xs font-mono text-slate-400 mt-0.5 truncate">{r.target_id}</div>
                             </td>
                             <td className="px-3 py-3">
@@ -1835,7 +1970,7 @@ export function LineSettingsPageClient() {
                             <td className="px-3 py-3 text-right">
                               <TableActionButton menu={(
                                 <>
-                                  <TableActionMenuItem onSelect={() => { setRuleFieldErrors({}); setEditingRule(r); setIsRuleModalOpen(true) }}>แก้ไข</TableActionMenuItem>
+                                  <TableActionMenuItem onSelect={() => { setRuleFieldErrors({}); setEditingRule(r); setIsRuleModalOpen(true) }}>{needsTargetChange ? 'เปลี่ยนกลุ่มปลายทาง' : 'แก้ไข'}</TableActionMenuItem>
                                   <TableActionMenuItem onSelect={() => void handleDeleteRule(r.id)}>ลบ</TableActionMenuItem>
                                 </>
                               )} />
@@ -1862,8 +1997,10 @@ export function LineSettingsPageClient() {
                 ) : (
                   sortedRules.map((r) => {
                     const boundTarget = targets.find(t => t.target_id === r.target_id)
+                    const needsTargetChange = getRuleTargetHealth(r.target_id, targets) !== 'active'
                     return (
                       <div key={r.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3 text-xs">
+                        {needsTargetChange ? <p className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 font-medium text-amber-700">กลุ่มเดิมใช้งานไม่ได้ — ต้องเปลี่ยนกลุ่มปลายทาง</p> : null}
                         <div className="flex justify-between items-start">
                           <div>
                             <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-xs font-mono font-bold">Priority # {r.priority}</span>
@@ -1889,6 +2026,15 @@ export function LineSettingsPageClient() {
                           </div>
                         </div>
                         <div className="pt-1.5">
+                          {needsTargetChange ? (
+                            <button
+                              type="button"
+                              className="mb-2 h-8 rounded-md border border-amber-300 bg-amber-50 px-3 text-xs font-bold text-amber-800"
+                              onClick={() => { setRuleFieldErrors({}); setEditingRule(r); setIsRuleModalOpen(true) }}
+                            >
+                              เปลี่ยนกลุ่มปลายทาง
+                            </button>
+                          ) : null}
                           <TableActionButton mobileLabel menu={(
                             <>
                               <TableActionMenuItem onSelect={() => {

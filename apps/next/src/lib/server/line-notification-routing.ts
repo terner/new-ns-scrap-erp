@@ -188,44 +188,6 @@ export async function resolveLineTargetsForDocument(
         reason: 'ส่งหาผู้รับดีฟอลต์ (Default Target) เนื่องจากไม่มีกฎคัดกรองตัวกรองใดตรงบิลชั่งนี้'
       })
     }
-
-    if (decisions.length === 0) {
-      const setting = await prisma.system_settings.findUnique({
-        where: { key: 'LINE_DEFAULT_TARGET_ID' }
-      })
-      if (setting?.value) {
-        const targetId = setting.value
-        const targetType = targetId.startsWith('U') 
-          ? 'user' 
-          : targetId.startsWith('C') 
-          ? 'group' 
-          : targetId.startsWith('R') 
-          ? 'room' 
-          : 'unknown'
-        decisions.push({
-          targetId: targetId,
-          targetType: targetType,
-          displayName: `Default Target (${targetId.slice(0, 6)}...)`,
-          ruleId: null,
-          ruleName: null,
-          reason: 'ส่งหาผู้รับดีฟอลต์ตามค่าตั้งระบบ (LINE_DEFAULT_TARGET_ID) เนื่องจากไม่มีตาราง Target หรือค่าเริ่มต้นใดที่กำหนดไว้'
-        })
-      }
-    }
-
-    if (decisions.length === 0) {
-      const activeTargets = targets.filter(t => t.is_active)
-      for (const t of activeTargets) {
-        decisions.push({
-          targetId: t.target_id,
-          targetType: t.target_type,
-          displayName: t.display_name,
-          ruleId: null,
-          ruleName: null,
-          reason: 'ส่งหาทุกกลุ่มแจ้งเตือนที่เปิดใช้งาน (All Active Targets) เนื่องจากไม่มีกฎคัดกรองหรือกลุ่มดีฟอลต์กำหนดไว้'
-        })
-      }
-    }
   }
 
   return decisions

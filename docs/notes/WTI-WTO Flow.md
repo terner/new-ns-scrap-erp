@@ -1008,29 +1008,49 @@ flowchart TD
 |---|---|
 | `LINE_CHANNEL_ACCESS_TOKEN` | token ส่งบอท (DB-first, env-fallback) |
 | `LINE_CHANNEL_SECRET` | verify webhook signature |
-| `LINE_DEFAULT_TARGET_ID` | target สำรองกรณีไม่มี rule ตรง |
-| `LINE_AUTO_SEND_WTI` | เปิด auto-send สำหรับ WTI (enqueue เท่านั้น) |
-| `LINE_AUTO_SEND_WTO` | เปิด auto-send สำหรับ WTO (enqueue เท่านั้น) |
+| `LINE_DEFAULT_TARGET_ID` | legacy setting ที่ยังอ่าน/เขียนเพื่อ compatibility แต่ runtime routing ไม่ใช้แล้ว |
+| `LINE_AUTO_SEND_WTI` | เปิด auto-send สำหรับ WTI หลังยืนยัน โดย enqueue และ execute ทันที |
+| `LINE_AUTO_SEND_WTO` | เปิด auto-send สำหรับ WTO หลังยืนยัน โดย enqueue และ execute ทันที |
 | `LINE_NOTIFY_TEXT_TEMPLATE_WTI/WTO` | text message template (ใช้จริง ไม่ใช่ Flex template) |
 
 หมายเหตุ: text template ทำงานจริง แต่ Flex Message Template ในแท็บ Templates
 ถูกซ่อนชั่วคราวเพราะยังไม่เชื่อมกับ flow ส่งจริง (ดู [[LINE Notification Control Center Ultimate Plan]])
+
+### การตั้ง OA และ Webhook อัตโนมัติ
+
+Checkpoint 2026-08-03:
+
+1. ผู้ดูแลกรอก `Channel Access Token` และ `Channel Secret` จาก Channel เดียวกัน; เมื่อเปิดหน้าจาก HTTPS ระบบใช้ origin ปัจจุบันเป็น Public App URL อัตโนมัติ (`https://ns-erp.vercel.app` บนเว็บจริง) ส่วน local HTTP จึงค่อยกรอก public tunnel URL เอง
+2. ระบบตรวจ Token ด้วย LINE `/v2/bot/info` ก่อนเขียน setting; Token ผิดต้องไม่แทนค่าที่ใช้งานอยู่ ถ้าหน้าจอส่งค่าที่ mask มา ระบบต้อง resolve ค่าเดิมฝั่ง server และห้ามใช้ mask เป็น Credential จริง
+3. เมื่อ Token หรือ Secret ตัวใดตัวหนึ่งเปลี่ยน ระบบใช้ effective Token/Secret คู่เต็มตรวจ `/v2/oauth/verify` (หรือ `/oauth2/v2.1/verify` สำหรับ Token v2.1) แล้วขอ stateless token อายุ 15 นาทีผ่าน `/oauth2/v3/token` เพื่อพิสูจน์ว่าเป็น Channel เดียวกัน; ถ้าไม่ตรงต้องไม่เขียน setting, ไม่ตั้ง Webhook และไม่พัก target เดิม
+4. ระบบสร้าง URL แบบ HTTPS เป็น `{public-origin}/api/line/webhook` แล้วตั้งผ่าน LINE Messaging API ให้อัตโนมัติ
+5. เมื่อเปลี่ยน Token ระบบพัก target เดิมทั้งหมด, ยกเลิก default เดิม และล้าง default target setting ก่อน refresh เพื่อไม่ให้ส่งด้วย OA ใหม่ไปยังปลายทางของ OA เก่า
+6. หลังบันทึก Secret แล้ว ระบบอ่านสถานะ endpoint และให้ LINE ทดสอบ endpoint จริง; ผล `success` จาก response body เป็นตัวตัดสิน ไม่ใช่ดู HTTP 200 ของ API อย่างเดียว และถ้า API ตรวจสถานะติดต่อไม่ได้ต้องรายงาน `verification_unavailable` โดยไม่เดาว่า LINE กำลัง propagate
+7. ถ้าแก้ Public App URL โดย Credential ยังเป็นค่าที่ mask ระบบใช้ Credential ที่เก็บอยู่ตั้งและทดสอบ Webhook URL ใหม่ให้เหมือนกัน
+8. ถ้า LINE รายงาน `active=false` ผู้ดูแลต้องเปิด `Use webhook` ใน LINE Developers Console หนึ่งครั้ง เพราะ Messaging API ไม่มี endpoint สำหรับเปิดสวิตช์นี้
+
+การสลับ Credential ใช้ PostgreSQL transaction advisory lock แบบ exclusive ส่วนการ execute งานแจ้งเตือน, การรับ Webhook ที่อาจ activate target และการ sync target ใช้ shared lock เดียวกัน. Webhook ต้องอ่าน Secret/Token หลังได้ lock และ sync ต้องยืนยันว่า Token snapshot ยังตรงกับ setting ปัจจุบันก่อน update target จึงมีลำดับที่แน่นอน: งานฝั่ง OA เดิมที่เริ่มก่อนต้องจบก่อนระบบพัก target หรือถ้าสลับเสร็จก่อน งานเก่าจะถูก reject/skip และห้ามเปิด target เดิมกลับด้วย Credential ใหม่
+
+`Channel Access Token` ใช้ยืนยัน OA, ตั้ง/อ่าน/ทดสอบ Webhook และส่งข้อความ ส่วน `Channel Secret` ใช้ตรวจ HMAC ของ `x-line-signature` ตอนรับ event เท่านั้น ห้าม log Token, Secret, signature, digest หรือ raw webhook body. การแยกหน้าที่นี้ทำให้หน้า admin บอกสถานะได้ตรงจริงโดยไม่อ้างว่าสามารถเปิด `Use webhook` แทนผู้ใช้ได้
 
 ### การจัดการกลุ่ม/เป้าหมาย
 
 ดูรายละเอียดเต็มที่ [[LINE Notification Control Center Ultimate Plan]] หัวข้อ Target Auto-Sync Flow
 
 สรุปสั้น:
-- กลุ่มใหม่เข้าระบบทาง **webhook** (`/api/line/webhook`) เมื่อบอทถูกเชิญ/ได้รับข้อความ
-- เปลี่ยน token → **auto-sync** รีเฟรชชื่อ/รูป/สถานะกลุ่มเดิมทันที
-- กดปุ่ม `🔄 ซิงค์กลุ่มจาก LINE` ในแท็บ Targets เพื่อ sync ด้วยมือ
-- LINE API ไม่มี endpoint "list ทุกกลุ่ม" → กลุ่มที่บอทยังไม่เคยได้รับ event ดึงมาไม่ได้
+- กลุ่มใหม่เข้าระบบทาง **webhook** (`/api/line/webhook`) เมื่อบอทถูกเชิญหรือได้รับข้อความ; กลุ่มเดิมที่อยู่มาก่อนเปิด Webhook ให้ส่ง `/register` หนึ่งครั้งเพื่อส่ง `groupId` เข้าระบบ
+- เปลี่ยน Token → พัก target เดิมก่อน แล้ว `รีเฟรชกลุ่มที่ลงทะเบียนแล้ว` เฉพาะ ID ที่ LINE API ยืนยันได้ว่า OA ปัจจุบันยังเข้าถึงอยู่; room ที่ไม่มี summary API จะไม่ถูกเปิดใช้งานจากการเดาและรายงานเป็น `waitingForEvent` แทนข้อผิดพลาดจนกว่าจะมี event ใหม่
+- LINE API ไม่มี endpoint "list ทุกกลุ่ม" ดังนั้น Token/Secret อย่างเดียวไม่สามารถดึงกลุ่มย้อนหลังทั้งหมดได้ และปุ่มรีเฟรชไม่ใช่ bulk discovery
+- target ที่ inactive ใช้ตั้ง default หรือส่งทดสอบไม่ได้; routing WTI/WTO ใช้เฉพาะ active target ที่เปิด `notify_wti`/`notify_wto` ตามประเภทเอกสาร และเป็น rule target หรือ default target ส่วน PB/SB/PMT/RCP ต้องมีกฎประเภทเอกสารตรงเท่านั้น
+- เมื่อเปลี่ยน OA ระบบพัก target และเปลี่ยนงาน `pending`/`processing`/`failed` เดิมเป็น `skipped/TARGET_INACTIVE` ภายใน transaction เดียวกัน ก่อน sync จะเปิดกลุ่มที่ OA ใหม่เข้าถึงได้กลับมา จึงไม่ส่งงานเก่าด้วย Credential ใหม่ ไม่เพิ่ม attempt และไม่ retry
+- การ resolve target/สร้าง job และการอ่าน job/ส่งจริงถือ shared credential lock; worker ต้องอ่านสถานะ job หลังได้ lock และ `/retry` ที่อยู่ใต้ outer lock จะ reuse lock เดิมเพื่อไม่เกิด nested-lock deadlock
+- กฎเดิมที่ชี้ target หาย/inactive ยังเก็บเป็นประวัติ แต่หน้า admin ต้องเตือนให้ `เปลี่ยนกลุ่มปลายทาง` ก่อนส่ง
 
 ### Follow-up ที่ควรทำต่อ (ตามสถานะจริง)
 
 | เรื่อง | เหตุผล |
 |---|---|
-| ทำความสะอาด `line_groups` dead code | เลิกใช้ใน jobs path แล้ว ควร migrate routing ที่เหลือไป `line_targets` แล้วลบตาราง/โค้ดเก่า |
+| ทำความสะอาด schema/API ของ `line_groups` ที่เหลือ | runtime routing และ admin test เลิกใช้แล้ว; คงเหลือเฉพาะ compatibility/setup surface ที่ต้องวาง migration แยกก่อนลบ |
 | เชื่อม Flex Message Template เข้า flow ส่งจริง | ตอนนี้ `buildFlexMessage` แบบ hardcoded ไม่ได้ดึงจาก `line_message_templates` |
 | เพิ่ม webhook handler `memberJoined`/`follow` | ตอนนี้รับแค่ `join`/`message`/`leave` |
 | พิจารณา cron/queue สำหรับงานที่เยอะมาก | auto-send แนว A execute ทันทีใน request — เหมาะกับโหลดปกติ แต่ถ้ามีการบันทึกเอกสารเป็นจำนวนมากพร้อมกันอาจต้องใช้ queue จริง |

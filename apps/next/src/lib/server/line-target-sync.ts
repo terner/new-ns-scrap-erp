@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/server/prisma'
+import { acquireLineCredentialReadLock } from './line-credential-lock'
 
 /**
  * LINE Target Sync Helpers
@@ -27,6 +28,7 @@ export interface LineTargetSyncSummary {
   refreshed: number
   notFound: number
   failed: number
+  waitingForEvent: number
   bot: LineBotInfo | null
 }
 
@@ -39,26 +41,44 @@ export async function fetchLineBotInfo(token: string): Promise<LineBotInfo> {
     throw new Error('กรุณาระบุ Channel Access Token ก่อนเชื่อมต่อ LINE')
   }
 
-  const response = await fetch(`${LINE_API_BASE}/info`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  let response: Response
+  try {
+    response = await fetch(`${LINE_API_BASE}/info`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  } catch {
+    throw new Error('เชื่อมต่อ LINE OA ไม่สำเร็จ (NETWORK_ERROR)')
+  }
 
   if (!response.ok) {
-    const errText = await response.text()
-    throw new Error(`เชื่อมต่อ LINE OA ไม่สำเร็จ (${response.status}): ${errText}`)
+    throw new Error(`เชื่อมต่อ LINE OA ไม่สำเร็จ (${response.status})`)
   }
 
-  const body = (await response.json()) as {
-    displayName: string
-    basicId: string
-    pictureUrl?: string
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    throw new Error('ข้อมูลตอบกลับจาก LINE OA ไม่ถูกต้อง')
   }
+  if (
+    !body
+    || typeof body !== 'object'
+    || typeof (body as Record<string, unknown>).displayName !== 'string'
+    || typeof (body as Record<string, unknown>).basicId !== 'string'
+    || (
+      (body as Record<string, unknown>).pictureUrl !== undefined
+      && typeof (body as Record<string, unknown>).pictureUrl !== 'string'
+    )
+  ) {
+    throw new Error('ข้อมูลตอบกลับจาก LINE OA ไม่ถูกต้อง')
+  }
+  const botInfo = body as { displayName: string; basicId: string; pictureUrl?: string }
 
   return {
-    botName: body.displayName,
-    basicId: body.basicId,
-    pictureUrl: body.pictureUrl || null,
+    botName: botInfo.displayName,
+    basicId: botInfo.basicId,
+    pictureUrl: botInfo.pictureUrl || null,
   }
 }
 
@@ -92,7 +112,7 @@ interface EnrichmentResult {
   name: string | null
   pictureUrl: string | null
   /** 'ok' = พบข้อมูล, 'not_found' = บอทไม่ได้อยู่ในกลุ่ม/ไม่ใช่เพื่อนแล้ว, 'error' = LINE ตอบผิดพลาด */
-  status: 'ok' | 'not_found' | 'error'
+  status: 'ok' | 'not_found' | 'error' | 'waiting_for_event'
   /** true เฉพาะเมื่อ LINE บอกว่า token ใช้ไม่ได้ ควรหยุด sync ทั้งลูป */
   unauthorized: boolean
 }
@@ -102,12 +122,13 @@ async function enrichTarget(
   targetType: LineTargetType,
   token: string
 ): Promise<EnrichmentResult> {
-  // room ไม่มี summary endpoint ใน LINE API เก็บ placeholder ไว้
+  // LINE ไม่มี room-summary endpoint จึงยืนยันไม่ได้ว่า OA ปัจจุบันยังอยู่ในห้องเดิม
+  // ปล่อยสถานะเดิมไว้จนมี webhook event ใหม่มายืนยันแทน
   if (targetType === 'room') {
     return {
-      name: `ห้องไลน์ ${targetId.slice(0, 6)}...`,
+      name: null,
       pictureUrl: null,
-      status: 'ok',
+      status: 'waiting_for_event',
       unauthorized: false,
     }
   }
@@ -117,10 +138,20 @@ async function enrichTarget(
       ? `${LINE_API_BASE}/group/${encodeURIComponent(targetId)}/summary`
       : `${LINE_API_BASE}/profile/${encodeURIComponent(targetId)}`
 
-  const response = await fetch(endpoint, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  let response: Response
+  try {
+    response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  } catch {
+    return {
+      name: null,
+      pictureUrl: null,
+      status: 'error',
+      unauthorized: false,
+    }
+  }
 
   // 401/403 ที่ /info หรือ /summary/profile: token ใช้ไม่ได้ → หยุดทั้งลูป
   if (response.status === 401 || response.status === 403) {
@@ -151,20 +182,42 @@ async function enrichTarget(
     }
   }
 
-  const body = (await response.json()) as {
-    groupName?: string
-    displayName?: string
-    pictureUrl?: string
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    return {
+      name: null,
+      pictureUrl: null,
+      status: 'error',
+      unauthorized: false,
+    }
+  }
+  if (!body || typeof body !== 'object') {
+    return {
+      name: null,
+      pictureUrl: null,
+      status: 'error',
+      unauthorized: false,
+    }
+  }
+  const targetInfo = body as Record<string, unknown>
+  const rawName = targetType === 'group' ? targetInfo.groupName : targetInfo.displayName
+  if (
+    typeof rawName !== 'string'
+    || (targetInfo.pictureUrl !== undefined && typeof targetInfo.pictureUrl !== 'string')
+  ) {
+    return {
+      name: null,
+      pictureUrl: null,
+      status: 'error',
+      unauthorized: false,
+    }
   }
 
-  const name =
-    targetType === 'group'
-      ? body.groupName || null
-      : body.displayName || null
-
   return {
-    name,
-    pictureUrl: body.pictureUrl || null,
+    name: rawName,
+    pictureUrl: typeof targetInfo.pictureUrl === 'string' ? targetInfo.pictureUrl : null,
     status: 'ok',
     unauthorized: false,
   }
@@ -186,68 +239,83 @@ export async function syncLineTargetsFromAPI(
     throw new Error('กรุณาระบุ LINE Channel Access Token ก่อน sync')
   }
 
-  const targets = await prisma.line_targets.findMany({
-    orderBy: { created_at: 'asc' },
-  })
+  return prisma.$transaction(async (transaction) => {
+    await acquireLineCredentialReadLock(transaction)
 
-  const summary: LineTargetSyncSummary = {
-    total: targets.length,
-    refreshed: 0,
-    notFound: 0,
-    failed: 0,
-    bot: null,
-  }
-
-  // ดึงข้อมูลบอทก่อน (เป็นการตรวจ token ไปในตัว) — ถ้า unauthorized โยนทันที
-  try {
-    summary.bot = await fetchLineBotInfo(token)
-  } catch (err) {
-    // ถ้าเป็น 401/403 ถือว่า token ใช้ไม่ได้ หยุด sync ทั้งลูป
-    if (err instanceof Error && /401|403/.test(err.message)) {
-      throw err
-    }
-    // error อื่นๆ (เช่น network) ไม่ block sync รายการ — แค่ไม่มี bot info
-    console.error('[line-target-sync] fetch bot info failed', err)
-  }
-
-  for (const target of targets) {
-    const result = await enrichTarget(target.target_id, target.target_type as LineTargetType, token)
-
-    if (result.unauthorized) {
-      throw new Error('LINE Channel Access Token ใช้งานไม่ได้ (401/403)')
+    const configuredToken = await transaction.system_settings.findUnique({
+      where: { key: 'LINE_CHANNEL_ACCESS_TOKEN' },
+    })
+    const currentToken = configuredToken?.value || process.env.LINE_CHANNEL_ACCESS_TOKEN
+    if (!currentToken || currentToken !== token) {
+      throw new Error('ข้อมูล LINE ถูกเปลี่ยนระหว่างซิงค์ กรุณาโหลดการตั้งค่าใหม่แล้วลองอีกครั้ง')
     }
 
-    if (result.status === 'ok' && result.name) {
-      await prisma.line_targets.update({
-        where: { id: target.id },
-        data: {
-          display_name: result.name,
-          picture_url: result.pictureUrl,
-          last_seen_at: new Date(),
-          last_event_type: 'sync',
-          is_active: true,
-          updated_at: new Date(),
-        },
-      })
-      summary.refreshed += 1
-    } else if (result.status === 'not_found') {
-      await prisma.line_targets.update({
-        where: { id: target.id },
-        data: {
-          last_seen_at: new Date(),
-          last_event_type: 'not_found',
-          is_active: false,
-          updated_at: new Date(),
-        },
-      })
-      summary.notFound += 1
-    } else {
-      // error อื่นๆ (network, 5xx) ไม่แตะข้อมูลเดิม
-      summary.failed += 1
+    const targets = await transaction.line_targets.findMany({
+      orderBy: { created_at: 'asc' },
+    })
+
+    const summary: LineTargetSyncSummary = {
+      total: targets.length,
+      refreshed: 0,
+      notFound: 0,
+      failed: 0,
+      waitingForEvent: 0,
+      bot: null,
     }
 
-    await sleep(SYNC_DELAY_MS)
-  }
+    // ดึงข้อมูลบอทก่อน (เป็นการตรวจ token ไปในตัว) — ถ้า unauthorized โยนทันที
+    try {
+      summary.bot = await fetchLineBotInfo(token)
+    } catch (err) {
+      // ถ้าเป็น 401/403 ถือว่า token ใช้ไม่ได้ หยุด sync ทั้งลูป
+      if (err instanceof Error && /401|403/.test(err.message)) {
+        throw err
+      }
+      // error อื่นๆ (เช่น network) ไม่ block sync รายการ — แค่ไม่มี bot info
+      console.error('[line-target-sync] fetch bot info failed')
+    }
 
-  return summary
+    for (const target of targets) {
+      const result = await enrichTarget(target.target_id, target.target_type as LineTargetType, token)
+
+      if (result.unauthorized) {
+        throw new Error('LINE Channel Access Token ใช้งานไม่ได้ (401/403)')
+      }
+
+      if (result.status === 'ok' && result.name) {
+        await transaction.line_targets.update({
+          where: { id: target.id },
+          data: {
+            display_name: result.name,
+            picture_url: result.pictureUrl,
+            last_seen_at: new Date(),
+            last_event_type: 'sync',
+            is_active: true,
+            updated_at: new Date(),
+          },
+        })
+        summary.refreshed += 1
+      } else if (result.status === 'not_found') {
+        await transaction.line_targets.update({
+          where: { id: target.id },
+          data: {
+            last_seen_at: new Date(),
+            last_event_type: 'not_found',
+            is_active: false,
+            updated_at: new Date(),
+          },
+        })
+        summary.notFound += 1
+      } else if (result.status === 'waiting_for_event') {
+        summary.waitingForEvent += 1
+      } else {
+        // error อื่นๆ (network, 5xx) ไม่แตะข้อมูลเดิม
+        summary.failed += 1
+      }
+
+      await sleep(SYNC_DELAY_MS)
+    }
+
+    return summary
+  }, { maxWait: 5_000, timeout: 180_000 })
 }

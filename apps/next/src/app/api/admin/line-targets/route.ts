@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
+import { acquireLineCredentialReadLock } from '@/lib/server/line-credential-lock'
 import { sendLinePush } from '@/lib/server/weight-ticket-line-notification'
 import { resolveLineAccessToken, syncLineTargetsFromAPI } from '@/lib/server/line-target-sync'
 
@@ -48,6 +49,10 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const values = targetSchema.parse(body)
+
+    if (values.isDefault && !values.isActive) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'กลุ่มที่ปิดใช้งานไม่สามารถเป็นกลุ่มเริ่มต้นได้' }, { status: 400 })
+    }
 
     // Check unique targetId
     const existing = await prisma.line_targets.findUnique({
@@ -110,12 +115,58 @@ export async function PATCH(request: Request) {
 
     const idBigInt = BigInt(id)
 
+    if (action === 'test') {
+      return prisma.$transaction(async (transaction) => {
+        await acquireLineCredentialReadLock(transaction)
+
+        const lockedTarget = await transaction.line_targets.findUnique({
+          where: { id: idBigInt },
+        })
+        if (!lockedTarget) {
+          return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบเป้าหมายผู้รับในระบบ' }, { status: 404 })
+        }
+        if (!lockedTarget.is_active) {
+          return NextResponse.json({
+            code: 'TARGET_INACTIVE',
+            error: 'กลุ่มนี้ถูกปิดใช้งาน กรุณาลงทะเบียนกับ LINE OA ปัจจุบันก่อน',
+          }, { status: 400 })
+        }
+
+        const config = await transaction.system_settings.findUnique({
+          where: { key: 'LINE_CHANNEL_ACCESS_TOKEN' },
+        })
+        const token = config?.value || process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
+        if (!token) {
+          return NextResponse.json({ code: 'CONFIG_INVALID', error: 'กรุณาตั้งค่า LINE Channel Access Token ก่อนทดสอบส่งข้อความ' }, { status: 400 })
+        }
+
+        try {
+          const textMessage = {
+            type: 'text',
+            text: `🔌 NS Scrap ERP: ข้อความทดสอบการเชื่อมต่อ\nเป้าหมาย: ${lockedTarget.display_name}\nเวลาส่ง: ${new Date().toLocaleString('th-TH')}`,
+          }
+          const pushResult = await sendLinePush(lockedTarget.target_id, [textMessage], token)
+          return NextResponse.json({ ok: true, lineRequestId: pushResult.lineRequestId })
+        } catch (caught) {
+          const error = caught instanceof Error ? caught.message : 'LINE Push Message ไม่สำเร็จ'
+          return NextResponse.json({ code: 'LINE_API_ERROR', error }, { status: 502 })
+        }
+      }, { maxWait: 5_000, timeout: 30_000 })
+    }
+
     const target = await prisma.line_targets.findUnique({
       where: { id: idBigInt }
     })
 
     if (!target) {
       return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบเป้าหมายผู้รับในระบบ' }, { status: 404 })
+    }
+
+    if (action === 'set-default' && !target.is_active) {
+      return NextResponse.json({
+        code: 'TARGET_INACTIVE',
+        error: 'กลุ่มนี้ถูกปิดใช้งาน กรุณาลงทะเบียนกับ LINE OA ปัจจุบันก่อน',
+      }, { status: 400 })
     }
 
     if (action === 'delete') {
@@ -139,29 +190,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: true })
     }
 
-    if (action === 'test') {
-      const config = await prisma.system_settings.findUnique({
-        where: { key: 'LINE_CHANNEL_ACCESS_TOKEN' },
-      })
-      const token = config?.value || process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
-      if (!token) {
-        return NextResponse.json({ code: 'CONFIG_INVALID', error: 'กรุณาตั้งค่า LINE Channel Access Token ก่อนทดสอบส่งข้อความ' }, { status: 400 })
-      }
-
-      try {
-        const textMessage = {
-          type: 'text',
-          text: `🔌 NS Scrap ERP: ข้อความทดสอบการเชื่อมต่อ\nเป้าหมาย: ${target.display_name}\nเวลาส่ง: ${new Date().toLocaleString('th-TH')}`
-        }
-        const pushResult = await sendLinePush(target.target_id, [textMessage], token)
-        return NextResponse.json({ ok: true, lineRequestId: pushResult.lineRequestId })
-      } catch (err: any) {
-        return NextResponse.json({ code: 'LINE_API_ERROR', error: err.message }, { status: 502 })
-      }
-    }
-
     // Default: update fields
     const parsedFields = targetSchema.partial().parse(fields)
+
+    if (parsedFields.isDefault && (parsedFields.isActive === false || (!target.is_active && parsedFields.isActive !== true))) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'กลุ่มที่ปิดใช้งานไม่สามารถเป็นกลุ่มเริ่มต้นได้' }, { status: 400 })
+    }
     
     if (parsedFields.isDefault) {
       // Clear previous defaults
@@ -178,7 +212,7 @@ export async function PATCH(request: Request) {
         target_type: parsedFields.targetType,
         display_name: parsedFields.displayName,
         branch_code: parsedFields.branchCode === undefined ? undefined : (parsedFields.branchCode || null),
-        is_default: parsedFields.isDefault,
+        is_default: parsedFields.isActive === false ? false : parsedFields.isDefault,
         is_active: parsedFields.isActive,
         notify_wti: parsedFields.notifyWti,
         notify_wto: parsedFields.notifyWto,

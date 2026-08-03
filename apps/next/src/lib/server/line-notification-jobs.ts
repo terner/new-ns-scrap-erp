@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import type { Prisma } from '../../../generated/prisma/client'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadBillLineNotificationSource, notifyBillLine } from './bill-line-notification'
@@ -7,9 +8,18 @@ import { loadPurchasePaymentLineNotificationSource, notifyPurchasePaymentLine } 
 import { notifyWeightTicketLine } from './weight-ticket-line-notification'
 import { findScopedWeightTicket, getWeightTicketUsageCounts, mapWeightTicketRow, type WeightTicketRow } from './weight-tickets'
 import { resolveLineTargetsForDocument, resolveLineTargetsForWeightTicket } from './line-notification-routing'
+import { acquireLineCredentialReadLock } from './line-credential-lock'
 
 export type JobStatus = 'pending' | 'sent' | 'failed' | 'skipped' | 'processing'
 export type LineNotificationSourceType = 'weight_ticket' | 'purchase_bill' | 'sales_bill' | 'purchase_payment' | 'customer_receipt'
+
+export type LineNotificationExecutionResult = {
+  error?: string
+  lineRequestId?: string | null
+  message?: string
+  pdfUrl?: string
+  status: Exclude<JobStatus, 'processing'> | 'not_found' | 'already_sent'
+}
 
 export type LineNotificationSource = {
   documentNo: string
@@ -17,11 +27,16 @@ export type LineNotificationSource = {
 }
 
 type EnqueueOptions = {
+  credentialLockHeld?: boolean
   customMessage?: string
   requestedBy: string
   targetId?: string
   force?: boolean
 }
+
+type EnqueueDatabase = Pick<Prisma.TransactionClient, 'line_notification_jobs' | 'line_targets'>
+type ExecutionDatabase = Pick<Prisma.TransactionClient,
+  'line_notification_attempts' | 'line_notification_jobs' | 'line_targets' | 'system_settings'>
 
 // Check font files path options helper
 export function checkFontsAvailability(): { available: boolean; triedPaths: string[] } {
@@ -105,19 +120,18 @@ async function enqueueNotificationSource(source: LineNotificationSource, options
     throw new Error(sourceNotFoundMessage(source))
   }
 
+  const enqueueWithDatabase = async (database: EnqueueDatabase) => {
   // Resolve Targets
   let targets: Array<{ targetId: string; targetType: string }> = []
 
   if (options.targetId && options.targetId !== 'routing') {
-    // Detect target type
-    const targetType = options.targetId.startsWith('U') 
-      ? 'user' 
-      : options.targetId.startsWith('C') 
-      ? 'group' 
-      : options.targetId.startsWith('R') 
-      ? 'room' 
-      : 'unknown'
-    targets = [{ targetId: options.targetId, targetType }]
+    const target = await database.line_targets.findFirst({
+      where: { target_id: options.targetId, is_active: true },
+    })
+    if (!target) {
+      throw new Error('กลุ่ม LINE นี้ไม่พร้อมใช้งาน กรุณาเลือกกลุ่มที่ลงทะเบียนและเปิดใช้งานอยู่')
+    }
+    targets = [{ targetId: target.target_id, targetType: target.target_type }]
   } else {
     const decisions = source.sourceType === 'weight_ticket'
       ? await resolveLineTargetsForWeightTicket(loaded.routingDocument)
@@ -138,7 +152,7 @@ async function enqueueNotificationSource(source: LineNotificationSource, options
   for (const target of targets) {
     // Avoid duplicate enqueues for the same target and ticket within pending/processing/sent status
     if (!options.force) {
-      const existingJob = await prisma.line_notification_jobs.findFirst({
+      const existingJob = await database.line_notification_jobs.findFirst({
         where: {
           source_type: source.sourceType,
           source_id: loaded.id,
@@ -154,7 +168,7 @@ async function enqueueNotificationSource(source: LineNotificationSource, options
     }
 
     try {
-      const job = await prisma.line_notification_jobs.create({
+      const job = await database.line_notification_jobs.create({
         data: {
           source_type: source.sourceType,
           source_id: loaded.id,
@@ -174,7 +188,7 @@ async function enqueueNotificationSource(source: LineNotificationSource, options
       // Handle potential race-condition unique constraint violation by fetching the existing job
       if (caught?.code === 'P2002' || String(caught).includes('unique constraint') || String(caught).includes('duplicate key')) {
         // Query for active pending/processing job first
-        let existingJob = await prisma.line_notification_jobs.findFirst({
+        let existingJob = await database.line_notification_jobs.findFirst({
           where: {
             source_type: source.sourceType,
             source_id: loaded.id,
@@ -186,7 +200,7 @@ async function enqueueNotificationSource(source: LineNotificationSource, options
         
         // If not found (e.g. it was just sent), fall back to looking for sent status
         if (!existingJob) {
-          existingJob = await prisma.line_notification_jobs.findFirst({
+          existingJob = await database.line_notification_jobs.findFirst({
             where: {
               source_type: source.sourceType,
               source_id: loaded.id,
@@ -210,6 +224,16 @@ async function enqueueNotificationSource(source: LineNotificationSource, options
     status: 'enqueued' as const,
     jobs: jobsCreated.map(j => ({ ...j, id: String(j.id), source_id: String(j.source_id) }))
   }
+  }
+
+  if (options.credentialLockHeld) {
+    return enqueueWithDatabase(prisma)
+  }
+
+  return prisma.$transaction(async (transaction) => {
+    await acquireLineCredentialReadLock(transaction)
+    return enqueueWithDatabase(transaction)
+  }, { maxWait: 10_000, timeout: 30_000 })
 }
 
 export async function enqueueAndExecuteNotification(source: LineNotificationSource, options: EnqueueOptions) {
@@ -219,7 +243,10 @@ export async function enqueueAndExecuteNotification(source: LineNotificationSour
   }
 
   const executionResults = await Promise.all(enqueued.jobs.map((job) =>
-    executeNotificationJob(job.id, { force: options.force }),
+    executeNotificationJob(job.id, {
+      credentialLockHeld: options.credentialLockHeld,
+      force: options.force,
+    }),
   ))
   return { ...enqueued, executionResults }
 }
@@ -228,11 +255,15 @@ export async function enqueueAndExecuteNotification(source: LineNotificationSour
  * Execute a single line notification job by ID.
  * Dispatches the queued source to its LINE notification renderer.
  */
-export async function executeNotificationJob(jobId: string, options?: { force?: boolean; lockedBy?: string }) {
+export async function executeNotificationJob(
+  jobId: string,
+  options?: { credentialLockHeld?: boolean; force?: boolean; lockedBy?: string },
+): Promise<LineNotificationExecutionResult> {
   const startTime = Date.now()
   const jobBigInt = BigInt(jobId)
 
-  const job = await prisma.line_notification_jobs.findUnique({
+  const executeWithDatabase = async (database: ExecutionDatabase): Promise<LineNotificationExecutionResult> => {
+  const job = await database.line_notification_jobs.findUnique({
     where: { id: jobBigInt }
   })
 
@@ -240,165 +271,199 @@ export async function executeNotificationJob(jobId: string, options?: { force?: 
     return { status: 'not_found' as const, error: 'ไม่พบงานแจ้งเตือนนี้' }
   }
 
+  if (job.status === 'skipped' && job.last_error_code === 'TARGET_INACTIVE') {
+    return {
+      status: 'skipped' as const,
+      message: job.last_error_message || 'LINE target is inactive or no longer registered',
+    }
+  }
+
   if (job.status === 'sent' && !(options?.force || job.attempt_count === 0)) {
     return { status: 'already_sent' as const, message: 'บิลนี้ถูกส่งไปไลน์กลุ่มนี้เรียบร้อยแล้ว' }
   }
 
-  // Update status to processing and increase attempt if not pre-locked
-  let attemptNo = job.attempt_count
-  if (options?.lockedBy && job.status === 'processing' && job.locked_by === options.lockedBy) {
-    const updated = await prisma.line_notification_jobs.update({
-      where: { id: jobBigInt },
-      data: {
-        attempt_count: { increment: 1 }
-      }
+    const target = await database.line_targets.findFirst({
+      where: { target_id: job.target_id, is_active: true },
     })
-    attemptNo = updated.attempt_count
-  } else {
-    const updated = await prisma.line_notification_jobs.update({
-      where: { id: jobBigInt },
-      data: {
-        status: 'processing',
-        attempt_count: { increment: 1 },
-        locked_at: new Date(),
-        locked_by: options?.lockedBy || ('worker-' + process.pid)
-      }
-    })
-    attemptNo = updated.attempt_count
-  }
-
-  try {
-    // 2. Fetch app URL for origin
-    const appUrlConfig = await prisma.system_settings.findUnique({
-      where: { key: 'NEXT_PUBLIC_APP_URL' }
-    })
-    const appUrl = appUrlConfig?.value || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
-    type NotificationDispatchResult = {
-      error?: string
-      lineRequestId?: string | null
-      pdfUrl?: string
-      sentResults?: Array<{ lineRequestId?: string | null }>
-      status: number
+    if (!target) {
+      await database.line_notification_jobs.update({
+        where: { id: jobBigInt },
+        data: {
+          status: 'skipped',
+          locked_at: null,
+          locked_by: null,
+          last_error_code: 'TARGET_INACTIVE',
+          last_error_message: 'LINE target is inactive or no longer registered',
+        },
+      })
+      return { status: 'skipped' as const, message: 'LINE target is inactive or no longer registered' }
     }
 
-    let result: NotificationDispatchResult
-    if (job.source_type === 'weight_ticket') {
-      const fonts = checkFontsAvailability()
-      if (!fonts.available) {
-        throw new Error(`ไม่พบไฟล์ฟอนต์ภาษาไทยสำหรับสร้างเอกสาร PDF (Tried paths: ${fonts.triedPaths.join(', ')})`)
-      }
-      result = await notifyWeightTicketLine(job.document_no, {
-        force: true, // We bypass log check inside notifyWeightTicketLine because we control it here
-        targetId: job.target_id,
-        customMessage: job.custom_message || undefined,
-        requestedBy: job.requested_by || 'system',
-        origin: appUrl,
-        scopedBranchIds: [],
-        retryKey: String(job.retry_key)
+    // Update status to processing and increase attempt if not pre-locked
+    let attemptNo = job.attempt_count
+    if (options?.lockedBy && job.status === 'processing' && job.locked_by === options.lockedBy) {
+      const updated = await database.line_notification_jobs.update({
+        where: { id: jobBigInt },
+        data: {
+          attempt_count: { increment: 1 }
+        }
       })
-    } else if (job.source_type === 'purchase_bill' || job.source_type === 'sales_bill') {
-      result = await notifyBillLine(job.source_type, job.document_no, {
-        targetId: job.target_id,
-        customMessage: job.custom_message || undefined,
-        origin: appUrl,
-        retryKey: String(job.retry_key),
-      })
-    } else if (job.source_type === 'purchase_payment') {
-      result = await notifyPurchasePaymentLine(job.document_no, {
-        targetId: job.target_id,
-        customMessage: job.custom_message || undefined,
-        origin: appUrl,
-        retryKey: String(job.retry_key),
-      })
-    } else if (job.source_type === 'customer_receipt') {
-      result = await notifyCustomerReceiptLine(job.document_no, {
-        targetId: job.target_id,
-        customMessage: job.custom_message || undefined,
-        origin: appUrl,
-        retryKey: String(job.retry_key),
-      })
+      attemptNo = updated.attempt_count
     } else {
-      throw new Error(`ไม่รองรับ LINE notification source_type: ${job.source_type}`)
+      const updated = await database.line_notification_jobs.update({
+        where: { id: jobBigInt },
+        data: {
+          status: 'processing',
+          attempt_count: { increment: 1 },
+          locked_at: new Date(),
+          locked_by: options?.lockedBy || ('worker-' + process.pid)
+        }
+      })
+      attemptNo = updated.attempt_count
     }
 
-    if (result.status !== 200 && result.status !== 201 && result.status !== 409) {
-      throw new Error(result.error || 'ส่ง LINE Notification ไม่สำเร็จ')
+    try {
+      // 2. Fetch app URL for origin
+      const appUrlConfig = await database.system_settings.findUnique({
+        where: { key: 'NEXT_PUBLIC_APP_URL' }
+      })
+      const appUrl = appUrlConfig?.value || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+      type NotificationDispatchResult = {
+        error?: string
+        lineRequestId?: string | null
+        pdfUrl?: string
+        sentResults?: Array<{ lineRequestId?: string | null }>
+        status: number
+      }
+
+      let result: NotificationDispatchResult
+      if (job.source_type === 'weight_ticket') {
+        const fonts = checkFontsAvailability()
+        if (!fonts.available) {
+          throw new Error(`ไม่พบไฟล์ฟอนต์ภาษาไทยสำหรับสร้างเอกสาร PDF (Tried paths: ${fonts.triedPaths.join(', ')})`)
+        }
+        result = await notifyWeightTicketLine(job.document_no, {
+          force: true, // We bypass log check inside notifyWeightTicketLine because we control it here
+          targetId: job.target_id,
+          customMessage: job.custom_message || undefined,
+          requestedBy: job.requested_by || 'system',
+          origin: appUrl,
+          scopedBranchIds: [],
+          retryKey: String(job.retry_key)
+        })
+      } else if (job.source_type === 'purchase_bill' || job.source_type === 'sales_bill') {
+        result = await notifyBillLine(job.source_type, job.document_no, {
+          targetId: job.target_id,
+          customMessage: job.custom_message || undefined,
+          origin: appUrl,
+          retryKey: String(job.retry_key),
+        })
+      } else if (job.source_type === 'purchase_payment') {
+        result = await notifyPurchasePaymentLine(job.document_no, {
+          targetId: job.target_id,
+          customMessage: job.custom_message || undefined,
+          origin: appUrl,
+          retryKey: String(job.retry_key),
+        })
+      } else if (job.source_type === 'customer_receipt') {
+        result = await notifyCustomerReceiptLine(job.document_no, {
+          targetId: job.target_id,
+          customMessage: job.custom_message || undefined,
+          origin: appUrl,
+          retryKey: String(job.retry_key),
+        })
+      } else {
+        throw new Error(`ไม่รองรับ LINE notification source_type: ${job.source_type}`)
+      }
+
+      if (result.status !== 200 && result.status !== 201 && result.status !== 409) {
+        throw new Error(result.error || 'ส่ง LINE Notification ไม่สำเร็จ')
+      }
+
+      const isConflict = result.status === 409
+      const lineRequestId = result.lineRequestId || result.sentResults?.[0]?.lineRequestId || null
+
+      // 4. Record success
+      await database.line_notification_jobs.update({
+        where: { id: jobBigInt },
+        data: {
+          status: isConflict ? 'skipped' : 'sent',
+          locked_at: null,
+          locked_by: null,
+          pdf_url: result.pdfUrl || null,
+          line_request_id: isConflict ? null : lineRequestId,
+          accepted_request_id: isConflict ? lineRequestId : null,
+          sent_at: new Date(),
+          last_error_code: null,
+          last_error_message: null
+        }
+      })
+
+      // Write attempt log
+      await database.line_notification_attempts.create({
+        data: {
+          job_id: jobBigInt,
+          attempt_no: attemptNo,
+          status: isConflict ? 'skipped' : 'success',
+          http_status: isConflict ? 409 : 200,
+          line_request_id: isConflict ? null : lineRequestId,
+          accepted_request_id: isConflict ? lineRequestId : null,
+          duration_ms: Date.now() - startTime
+        }
+      })
+
+      return { status: isConflict ? 'skipped' : 'sent', lineRequestId, pdfUrl: result.pdfUrl }
+
+    } catch (caught: any) {
+      const errorMsg = caught instanceof Error ? caught.message : String(caught)
+      console.error('[line-notification-job] dispatch failed')
+
+      // Check if error is permanent (e.g. invalid target group id, token expired)
+      const isPermanent = errorMsg.includes('400') || errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('404')
+      const hasReachedMax = attemptNo >= job.max_attempts
+      const finalStatus = (isPermanent || hasReachedMax) ? 'failed' : 'pending'
+
+      // Calculate next retry time with exponential backoff (30s, 5m, 15m, 1h)
+      const backoffSeconds = attemptNo === 1 ? 30 : attemptNo === 2 ? 300 : attemptNo === 3 ? 900 : 3600
+      const nextRetry = new Date(Date.now() + backoffSeconds * 1000)
+
+      await database.line_notification_jobs.update({
+        where: { id: jobBigInt },
+        data: {
+          status: finalStatus,
+          locked_at: null,
+          locked_by: null,
+          last_error_code: isPermanent ? 'PERMANENT_ERROR' : 'TRANSIENT_ERROR',
+          last_error_message: errorMsg.slice(0, 500),
+          next_retry_at: finalStatus === 'pending' ? nextRetry : job.next_retry_at
+        }
+      })
+
+      // Write attempt log
+      await database.line_notification_attempts.create({
+        data: {
+          job_id: jobBigInt,
+          attempt_no: attemptNo,
+          status: finalStatus,
+          error_code: isPermanent ? 'PERMANENT_ERROR' : 'TRANSIENT_ERROR',
+          error_message: errorMsg.slice(0, 500),
+          duration_ms: Date.now() - startTime
+        }
+      })
+
+      return { status: finalStatus, error: errorMsg }
     }
-
-    const isConflict = result.status === 409
-    const lineRequestId = result.lineRequestId || result.sentResults?.[0]?.lineRequestId || null
-
-    // 4. Record success
-    await prisma.line_notification_jobs.update({
-      where: { id: jobBigInt },
-      data: {
-        status: isConflict ? 'skipped' : 'sent',
-        locked_at: null,
-        locked_by: null,
-        pdf_url: result.pdfUrl || null,
-        line_request_id: isConflict ? null : lineRequestId,
-        accepted_request_id: isConflict ? lineRequestId : null,
-        sent_at: new Date(),
-        last_error_code: null,
-        last_error_message: null
-      }
-    })
-
-    // Write attempt log
-    await prisma.line_notification_attempts.create({
-      data: {
-        job_id: jobBigInt,
-        attempt_no: attemptNo,
-        status: isConflict ? 'skipped' : 'success',
-        http_status: isConflict ? 409 : 200,
-        line_request_id: isConflict ? null : lineRequestId,
-        accepted_request_id: isConflict ? lineRequestId : null,
-        duration_ms: Date.now() - startTime
-      }
-    })
-
-    return { status: (isConflict ? 'skipped' : 'sent') as any, lineRequestId, pdfUrl: result.pdfUrl }
-
-  } catch (caught: any) {
-    const errorMsg = caught instanceof Error ? caught.message : String(caught)
-    console.error(`[Job ${jobId}] Failed:`, errorMsg)
-
-    // Check if error is permanent (e.g. invalid target group id, token expired)
-    const isPermanent = errorMsg.includes('400') || errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('404')
-    const hasReachedMax = attemptNo >= job.max_attempts
-    const finalStatus = (isPermanent || hasReachedMax) ? 'failed' : 'pending'
-
-    // Calculate next retry time with exponential backoff (30s, 5m, 15m, 1h)
-    const backoffSeconds = attemptNo === 1 ? 30 : attemptNo === 2 ? 300 : attemptNo === 3 ? 900 : 3600
-    const nextRetry = new Date(Date.now() + backoffSeconds * 1000)
-
-    await prisma.line_notification_jobs.update({
-      where: { id: jobBigInt },
-      data: {
-        status: finalStatus,
-        locked_at: null,
-        locked_by: null,
-        last_error_code: isPermanent ? 'PERMANENT_ERROR' : 'TRANSIENT_ERROR',
-        last_error_message: errorMsg.slice(0, 500),
-        next_retry_at: finalStatus === 'pending' ? nextRetry : job.next_retry_at
-      }
-    })
-
-    // Write attempt log
-    await prisma.line_notification_attempts.create({
-      data: {
-        job_id: jobBigInt,
-        attempt_no: attemptNo,
-        status: finalStatus,
-        error_code: isPermanent ? 'PERMANENT_ERROR' : 'TRANSIENT_ERROR',
-        error_message: errorMsg.slice(0, 500),
-        duration_ms: Date.now() - startTime
-      }
-    })
-
-    return { status: finalStatus as any, error: errorMsg }
   }
+
+  if (options?.credentialLockHeld) {
+    return executeWithDatabase(prisma)
+  }
+
+  return prisma.$transaction(async (transaction) => {
+    await acquireLineCredentialReadLock(transaction)
+    return executeWithDatabase(transaction)
+  }, { maxWait: 10_000, timeout: 180_000 })
 }
 
 /**

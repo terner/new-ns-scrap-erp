@@ -170,3 +170,24 @@ describe('financial LINE document routing', () => {
     expect(decisions[0]?.targetId).toBe('C-RCP')
   })
 })
+
+describe('weight-ticket LINE fallback safety', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.findRules.mockResolvedValue([])
+  })
+
+  it('does not route to a stale setting or broadcast when no active default exists', async () => {
+    db.findTargets.mockResolvedValue([{
+      display_name: 'กลุ่มที่ยังเปิดอยู่แต่ไม่ได้ตั้งดีฟอลต์',
+      is_active: true,
+      is_default: false,
+      target_id: 'C-ACTIVE-NONDEFAULT',
+      target_type: 'group',
+    }])
+    db.findSetting.mockResolvedValue({ value: 'C-OLD-OA-GROUP' })
+
+    await expect(resolveLineTargetsForDocument({ type: 'WTI' })).resolves.toEqual([])
+    expect(db.findSetting).not.toHaveBeenCalled()
+  })
+})

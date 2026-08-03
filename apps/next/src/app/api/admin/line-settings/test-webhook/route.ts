@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createHmac } from 'node:crypto'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import {
+  deriveLineWebhookEndpoint,
+  getLineWebhookEndpointInfo,
+  setLineWebhookEndpoint,
+  testLineWebhookEndpoint,
+} from '@/lib/server/line-webhook-settings'
+import { acquireLineCredentialWriteLock } from '@/lib/server/line-credential-lock'
 import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
@@ -11,121 +17,70 @@ export async function POST(request: Request) {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'system.settings.manage')
 
-    // Read the current channel secret from the database
-    const config = await prisma.system_settings.findUnique({
-      where: { key: 'LINE_CHANNEL_SECRET' },
+    const result = await prisma.$transaction(async (transaction) => {
+      await acquireLineCredentialWriteLock(transaction)
+
+    const settings = await transaction.system_settings.findMany({
+      where: { key: { in: ['LINE_CHANNEL_ACCESS_TOKEN', 'NEXT_PUBLIC_APP_URL'] } },
     })
-    const secret = config?.value || process.env.LINE_CHANNEL_SECRET || ''
-
-    if (!secret) {
-      throw new Error('กรุณากรอกและบันทึก LINE Channel Secret ก่อนทดสอบ')
+    const config = Object.fromEntries(settings.map((setting) => [setting.key, setting.value]))
+    const token = config.LINE_CHANNEL_ACCESS_TOKEN || ''
+    if (!token) {
+      throw new Error('กรุณากรอกและบันทึก LINE Channel Access Token ก่อนทดสอบ')
     }
 
-    // Dummy LINE webhook event payload
-    const dummyPayload = {
-      destination: 'U1234567890abcdef1234567890abcdef',
-      events: [
-        {
-          type: 'message',
-          message: {
-            type: 'text',
-            id: '325708',
-            text: 'Hello, world',
-          },
-          timestamp: 1462629479859,
-          source: {
-            type: 'user',
-            userId: 'U1234567890abcdef1234567890abcdef',
-          },
-          replyToken: 'test-reply-token',
-        },
-      ],
+    const expectedEndpoint = deriveLineWebhookEndpoint(
+      config.NEXT_PUBLIC_APP_URL || new URL(request.url).origin,
+    )
+
+    await setLineWebhookEndpoint(token, expectedEndpoint)
+    let endpointInfo: Awaited<ReturnType<typeof getLineWebhookEndpointInfo>> | null = null
+    let warning: string | null = null
+    try {
+      endpointInfo = await getLineWebhookEndpointInfo(token)
+    } catch (caught) {
+      warning = caught instanceof Error ? caught.message : 'ตรวจสถานะ Webhook จาก LINE ไม่สำเร็จ'
     }
+    const test = await testLineWebhookEndpoint(token, expectedEndpoint)
+    const matchesExpected = endpointInfo ? endpointInfo.endpoint === expectedEndpoint : null
+    const ready = endpointInfo?.active === true && matchesExpected === true && test.success
+    const status = ready
+      ? 'ready'
+      : !test.success
+        ? 'test_failed'
+        : !endpointInfo
+          ? 'verification_unavailable'
+          : matchesExpected !== true
+            ? 'propagating'
+            : 'use_webhook_disabled'
 
-    const rawBody = JSON.stringify(dummyPayload)
-    const signature = createHmac('sha256', secret).update(rawBody).digest('base64')
+    const message = ready
+      ? 'LINE ทดสอบ Webhook สำเร็จ และเปิด Use webhook แล้ว'
+      : status === 'use_webhook_disabled'
+        ? 'ตั้ง URL และทดสอบ Webhook สำเร็จแล้ว กรุณาเปิด Use webhook ใน LINE Developers Console หนึ่งครั้ง'
+        : status === 'verification_unavailable'
+          ? 'ตั้ง URL และทดสอบ endpoint สำเร็จ แต่ยังตรวจสถานะ Use webhook จาก LINE ไม่ได้ กรุณากดตรวจอีกครั้ง'
+        : status === 'propagating'
+          ? 'LINE รายงาน URL ยังไม่ตรงกับค่าที่ตั้งล่าสุด กรุณากดตรวจอีกครั้ง'
+          : `LINE ทดสอบ Webhook ไม่สำเร็จ (${test.statusCode || '-'} ${test.reason || ''})`.trim()
 
-    // Get host URL from system settings or request header to call ourselves
-    const hostConfig = await prisma.system_settings.findUnique({
-      where: { key: 'NEXT_PUBLIC_APP_URL' },
-    })
-    
-    // Attempt local direct connection first to bypass external proxies/WAFs
-    const portsToTry = []
-    if (process.env.PORT) portsToTry.push(process.env.PORT)
-    portsToTry.push('3000', '6100') // Try default 3000 and Devkub's 6100 port
-
-    let response: Response | null = null
-    let webhookUrl = ''
-    let lastError: any = null
-
-    for (const port of portsToTry) {
-      const url = `http://127.0.0.1:${port}/api/line/webhook`
-      console.info(`[test-webhook] Attempting local test request to: ${url}`)
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-line-signature': signature,
-          },
-          body: rawBody,
-        })
-        response = res
-        webhookUrl = url
-        console.info(`[test-webhook] Local connection succeeded on port ${port} with status ${res.status}`)
-        break // Succeeded to connect (even if status is 401/400)
-      } catch (err) {
-        console.warn(`[test-webhook] Local test failed on port ${port}:`, err)
-        lastError = err
-      }
+    return {
+      active: endpointInfo?.active ?? null,
+      endpoint: endpointInfo?.endpoint ?? null,
+      expectedEndpoint,
+      matchesExpected,
+      message,
+      ok: test.success,
+      ready,
+      status,
+      test,
+      warning,
     }
+    }, { maxWait: 5_000, timeout: 30_000 })
 
-    if (!response) {
-      console.warn('[test-webhook] All local port attempts failed, falling back to public URL. Error:', lastError)
-      // Fallback to public URL
-      let appUrl = hostConfig?.value || process.env.NEXT_PUBLIC_APP_URL || ''
-      if (!appUrl) {
-        const host = request.headers.get('host')
-        const protocol = request.headers.get('x-forwarded-proto') || 'http'
-        appUrl = `${protocol}://${host}`
-      }
-      webhookUrl = `${appUrl.replace(/\/$/, '')}/api/line/webhook`
-      
-      console.info('[test-webhook] Sending fallback test request to:', webhookUrl)
-      response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-line-signature': signature,
-        },
-        body: rawBody,
-      })
-    }
-
-    const status = response.status
-    const text = await response.text()
-
-    if (response.ok) {
-      return NextResponse.json({
-        ok: true,
-        message: 'ทดสอบจำลองส่ง Webhook สำเร็จ! ระบบคำนวณและยืนยันลายเซ็น (Signature) ถูกต้อง',
-        webhookUrl,
-        status,
-        response: text,
-      })
-    } else {
-      return NextResponse.json({
-        ok: false,
-        message: `ระบบตรวจสอบลายเซ็นล้มเหลว (ตอบกลับเป็น HTTP ${status} จาก URL: ${webhookUrl}) - ผลลัพธ์: ${text}`,
-        webhookUrl,
-        status,
-        response: text,
-        secretPrefix: secret.slice(0, 4) + '***',
-      })
-    }
+    return NextResponse.json(result)
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
-    return apiErrorResponse(caught, 'ทดสอบจำลอง Webhook ล้มเหลว', 400)
+    return apiErrorResponse(caught, 'ตั้งค่าและทดสอบ Webhook ผ่าน LINE ไม่สำเร็จ', 400)
   }
 }
