@@ -10,7 +10,6 @@ import { functionalBankStatementMovement, reverseFunctionalBankStatementInflow }
 import { postFcdReceiptAccountSplits, reverseFcdReceiptAccountSplits } from '@/lib/server/fcd-receipt-posting'
 import { settlementDifferenceReasonForReceipt } from '@/lib/server/customer-receipt-settlement-difference'
 import { currentTransactionDate } from '@/lib/server/transaction-date'
-import { findFcdRateSnapshot } from '@/lib/server/fcd-rate-snapshot'
 import { calculateSettlementBookAmount, fcdFxRate, requireFcdInputMoneyAmount } from '@/lib/server/fcd-money'
 import { isSalesBillCancelledStatus, SALES_BILL_STATUS } from '@/lib/server/sales-bill-history'
 import { Prisma } from '../../../generated/prisma/client'
@@ -93,25 +92,57 @@ function decimalReceiptMoney(value: number, label: string) {
   return requireFcdInputMoneyAmount(value)
 }
 
-function allocateForeignReceiptLines<T extends { arAmount: Prisma.Decimal }>(
+function customerReceiptFxRate(value: number) {
+  const rate = fcdFxRate(value)
+  if (!rate.eq(rate.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP))) {
+    throw new Error('อัตราแลกเปลี่ยนต้องมีทศนิยมไม่เกิน 2 ตำแหน่ง')
+  }
+  return rate
+}
+
+function allocateForeignReceiptLines<T extends { receiptCashAmount: Prisma.Decimal }>(
   lines: T[],
   totalNative: Prisma.Decimal,
   totalSettlement: Prisma.Decimal,
 ) {
-  const totalAr = lines.reduce((total, line) => total.plus(line.arAmount), new Prisma.Decimal(0))
-  if (totalAr.lte(0)) throw new Error('ยอดตัด AR ต้องมากกว่า 0')
+  const totalReceiptCash = lines.reduce((total, line) => total.plus(line.receiptCashAmount), new Prisma.Decimal(0))
+  if (totalReceiptCash.lte(0)) throw new Error('ยอดรับเงินสดต้องมากกว่า 0')
   let remainingNative = totalNative
   let remainingSettlement = totalSettlement
   return lines.map((line, index) => {
     const nativeAmount = index === lines.length - 1
       ? remainingNative
-      : totalNative.mul(line.arAmount).div(totalAr).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+      : totalNative.mul(line.receiptCashAmount).div(totalReceiptCash).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
     const settlementBookAmount = index === lines.length - 1
       ? remainingSettlement
-      : totalSettlement.mul(line.arAmount).div(totalAr).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+      : totalSettlement.mul(line.receiptCashAmount).div(totalReceiptCash).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
     remainingNative = remainingNative.minus(nativeAmount)
     remainingSettlement = remainingSettlement.minus(settlementBookAmount)
     return { nativeAmount, settlementBookAmount }
+  })
+}
+
+function deriveForeignSalesBillCashAllocations<T extends {
+  discountAmount: Prisma.Decimal
+  outstandingAmount: Prisma.Decimal
+  withholdingTaxAmount: Prisma.Decimal
+}>(lines: T[], settlementBookAmount: Prisma.Decimal) {
+  const cashRequiredTotal = lines.reduce(
+    (total, line) => total.plus(Prisma.Decimal.max(0, line.outstandingAmount.minus(line.discountAmount).minus(line.withholdingTaxAmount))),
+    new Prisma.Decimal(0),
+  )
+  const cashAvailable = Prisma.Decimal.max(0, settlementBookAmount)
+  let remainingCash = Prisma.Decimal.min(cashAvailable, cashRequiredTotal)
+
+  return lines.map((line, index) => {
+    const cashRequiredAmount = Prisma.Decimal.max(0, line.outstandingAmount.minus(line.discountAmount).minus(line.withholdingTaxAmount))
+    const receiptCashAmount = index === lines.length - 1 || cashRequiredTotal.lte(cashAvailable)
+      ? cashRequiredAmount
+      : cashAvailable.mul(cashRequiredAmount).div(cashRequiredTotal).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+    const appliedCashAmount = Prisma.Decimal.min(receiptCashAmount, remainingCash)
+    remainingCash = remainingCash.minus(appliedCashAmount)
+    const arAmount = appliedCashAmount.plus(line.discountAmount).plus(line.withholdingTaxAmount)
+    return { arAmount, cashRequiredAmount, receiptCashAmount: appliedCashAmount }
   })
 }
 
@@ -139,7 +170,11 @@ function customerReceiptLines(values: CustomerReceiptFormValues): ReceiptLineInp
   throw new Error('เลือกบิลขายอย่างน้อย 1 รายการ')
 }
 
-async function prepareCustomerReceipt(values: CustomerReceiptFormValues, context: AuthContextForReceipt): Promise<PreparedCustomerReceipt> {
+async function prepareCustomerReceipt(
+  values: CustomerReceiptFormValues,
+  context: AuthContextForReceipt,
+  functionalCurrencyCode: string,
+): Promise<PreparedCustomerReceipt> {
   const actor = requireFinanceActor(context)
   const lines = customerReceiptLines(values)
   const customerAdvanceLines = values.sourceType === 'CADV'
@@ -190,8 +225,11 @@ async function prepareCustomerReceipt(values: CustomerReceiptFormValues, context
   if (!account) {
     throw new Error('บัญชีรับเงินไม่ถูกต้องหรือถูกปิดใช้งาน')
   }
-  if (account.accountGroup === 'virtual') {
-    throw new Error('บัญชีเจ้าหนี้เงินทดรองจ่ายใช้รับเงินลูกค้าไม่ได้')
+  if (accountSplits.some((split) => split.account.accountGroup !== 'cash' && split.account.accountGroup !== 'bank')) {
+    throw new Error('บัญชีรับเงินลูกค้าต้องเป็นเงินสดหรือบัญชีธนาคาร')
+  }
+  if (accountSplits.some((split) => !split.account.supportedCurrencies.includes(functionalCurrencyCode))) {
+    throw new Error(`บัญชีรับเงินต้องรองรับสกุลเงินหลัก ${functionalCurrencyCode} จาก Account Master`)
   }
 
   return { account, accountSplits, actor, bankFeeTotal, customerAdvanceLines, discountTotal, grossAmount, netCashIn, salesBillLines: lines, sourceType: values.sourceType, withholdingTaxTotal }
@@ -1170,6 +1208,27 @@ async function cancelCustomerReceiptInTransaction(
     where: { id: receipt.id },
   })
 
+  const settlementFxDifference = decimalReceiptMoney(toNumber(receipt.settlement_fx_difference), 'กำไร FX จากการปิดบิล')
+  if (receipt.receipt_currency_code && settlementFxDifference.gt(0)) {
+    const nativeAmount = decimalReceiptMoney(toNumber(receipt.customer_transferred_native_amount), 'ยอดที่ลูกค้าโอน')
+    const settlementBookAmount = decimalReceiptMoney(toNumber(receipt.settlement_book_amount), 'มูลค่าเงินบาท ณ วันรับเงิน')
+    const settlementRate = new Prisma.Decimal(receipt.fx_rate ?? 0)
+    await tx.fx_gain_loss.create({
+      data: {
+        amount_fc: nativeAmount,
+        branch_id: receipt.branch_id,
+        currency: receipt.receipt_currency_code,
+        date: normalizeDate(reversalDate),
+        gain_loss: settlementFxDifference.negated(),
+        notes: `${receipt.doc_no} - ยกเลิก`,
+        rate_book: settlementBookAmount.minus(settlementFxDifference).div(nativeAmount).toDecimalPlaces(3, Prisma.Decimal.ROUND_HALF_UP),
+        rate_settlement: settlementRate,
+        ref_id: receipt.id.toString(),
+        ref_type: RECEIPT_REF_TYPE,
+      },
+    })
+  }
+
   const statusLogAction = options.statusLogAction ?? 'cancelled'
   await tx.customer_receipt_status_logs.create({
     data: {
@@ -1204,17 +1263,11 @@ async function createForeignCustomerAdvanceReceiptInTransaction(
   if (values.sourceType !== 'CADV') throw new Error('ประเภทเอกสารรับเงินต่างประเทศไม่ถูกต้อง')
   const currencyCode = foreignReceiptCurrency(values, functionalCurrencyCode)
   const customerTransferredNativeAmount = decimalReceiptMoney(values.customerTransferredNativeAmount ?? 0, 'ยอดที่ลูกค้าโอน')
-  const receivedNativeAmount = decimalReceiptMoney(values.receivedNativeAmount ?? 0, 'ยอดเข้าบัญชีจริง')
-  const rate = fcdFxRate(values.fxRate ?? 0)
-  const rateType = values.fxRateType?.trim()
-  if (!rateType) throw new Error('ต้องระบุประเภทอัตราแลกเปลี่ยน')
-  if (receivedNativeAmount.gt(customerTransferredNativeAmount)) throw new Error('ยอดเข้าบัญชีจริงต้องไม่มากกว่ายอดที่ลูกค้าโอน')
+  const rate = customerReceiptFxRate(values.fxRate ?? 0)
   const settlementBookAmount = calculateSettlementBookAmount(customerTransferredNativeAmount, rate)
-  const carryingThbAmount = calculateSettlementBookAmount(receivedNativeAmount, rate)
   const bankFeeTotal = decimalReceiptMoney(values.fee, 'ค่าธรรมเนียมธนาคาร')
-  if (!settlementBookAmount.minus(carryingThbAmount).eq(bankFeeTotal)) {
-    throw new Error('ยอดที่ลูกค้าโอน, ยอดเข้าบัญชีจริง, rate และ Bank Fee (THB) ต้อง reconcile กัน')
-  }
+  const carryingThbAmount = settlementBookAmount.minus(bankFeeTotal)
+  if (carryingThbAmount.lte(0)) throw new Error('ยอดรับหลังหักค่าธรรมเนียมต้องมากกว่า 0')
 
   await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('customer_receipts.doc_no'))`
   await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('bank_statement.doc_no'))`
@@ -1226,6 +1279,7 @@ async function createForeignCustomerAdvanceReceiptInTransaction(
   if (!receiptCurrency) throw new Error(`ไม่พบสกุลเงิน ${currencyCode} ใน Currency Master`)
   if (!customer) throw new Error('ลูกค้าไม่ถูกต้องหรือถูกปิดใช้งาน')
   if (!paymentMethod) throw new Error('วิธีรับเงินไม่ถูกต้องหรือถูกปิดใช้งาน')
+  if (paymentMethod.type !== 'bank') throw new Error('Receipt ต่างประเทศต้องใช้วิธีรับเงินประเภทธนาคาร')
 
   const lines = values.customerAdvanceLines.map((line) => ({
     customerAdvanceDocNo: line.customerAdvanceDocNo.trim(),
@@ -1270,16 +1324,13 @@ async function createForeignCustomerAdvanceReceiptInTransaction(
   const rawSplits = values.splits?.length ? values.splits : []
   if (rawSplits.length === 0) throw new Error('เลือกบัญชี FCD รับเงินอย่างน้อย 1 รายการ')
   const splitNativeTotal = rawSplits.reduce((total, split) => total.plus(decimalReceiptMoney(split.amount, 'ยอดเข้าบัญชี FCD')), new Prisma.Decimal(0))
-  if (!splitNativeTotal.eq(receivedNativeAmount)) throw new Error('รวมยอดเข้าบัญชี FCD ต้องเท่ากับยอดเข้าบัญชีจริง')
+  if (!splitNativeTotal.eq(customerTransferredNativeAmount)) throw new Error('รวมยอดเข้าบัญชี FCD ต้องเท่ากับยอดที่ลูกค้าโอน')
 
   const docNo = values.docNo ?? await nextDailyDocNo('customer_receipts', RECEIPT_DOC_PREFIX, values.date, tx, branchCode)
   const bankStatementDocNos = await nextBankStatementDocNos(values.date, branchCode, rawSplits.length, tx)
   const primaryAccountCode = rawSplits[0]!.accountId.trim().toUpperCase()
-  const primaryAccount = await tx.accounts.findFirst({ select: { code: true, id: true, name: true }, where: { active: true, code: primaryAccountCode, is_fcd: true } })
+  const primaryAccount = await tx.accounts.findFirst({ select: { code: true, id: true, name: true }, where: { active: true, account_group: 'bank', code: primaryAccountCode, is_fcd: true } })
   if (!primaryAccount) throw new Error('บัญชี FCD หลักไม่ถูกต้องหรือไม่ active')
-  const exactRate = await findFcdRateSnapshot(tx, { fromCurrency: currencyCode, rateDate: values.date, rateType, toCurrency: functionalCurrencyCode })
-  const rateWasSuggested = exactRate.kind === 'suggested' && fcdFxRate(exactRate.rate).eq(rate)
-  if (!rateWasSuggested && !values.fxRateOverrideReason?.trim()) throw new Error('กรุณาระบุเหตุผลเมื่อกรอกหรือแก้ไขอัตราแลกเปลี่ยน')
   const actor = requireFinanceActor(context)
   const receipt = await tx.customer_receipts.create({
     data: {
@@ -1299,12 +1350,12 @@ async function createForeignCustomerAdvanceReceiptInTransaction(
       doc_no: docNo,
       fx_rate: rate,
       fx_rate_date: normalizeDate(values.date),
-      fx_rate_id: exactRate.kind === 'suggested' && rateWasSuggested ? exactRate.rateId : null,
-      fx_rate_overridden: !rateWasSuggested,
-      fx_rate_override_reason: rateWasSuggested ? null : values.fxRateOverrideReason?.trim() ?? null,
-      fx_rate_reference: exactRate.kind === 'suggested' && rateWasSuggested ? exactRate.rateId.toString() : null,
-      fx_rate_source: exactRate.kind === 'suggested' && rateWasSuggested ? exactRate.source : null,
-      fx_rate_type: rateType,
+      fx_rate_id: null,
+      fx_rate_overridden: true,
+      fx_rate_override_reason: null,
+      fx_rate_reference: null,
+      fx_rate_source: null,
+      fx_rate_type: null,
       gross_amount: settlementBookAmount,
       net_cash_in: carryingThbAmount,
       notes: values.notes,
@@ -1312,7 +1363,7 @@ async function createForeignCustomerAdvanceReceiptInTransaction(
       payment_method_id: paymentMethod.id,
       payment_method_name_snapshot: paymentMethod.name,
       receipt_currency_code: currencyCode,
-      received_native_amount: receivedNativeAmount,
+      received_native_amount: customerTransferredNativeAmount,
       replacement_of_id: options.replacementOfId ?? null,
       settlement_book_amount: settlementBookAmount,
       settlement_difference_reason: settlementDifferenceReason,
@@ -1327,6 +1378,7 @@ async function createForeignCustomerAdvanceReceiptInTransaction(
     actor,
     bankStatementDocNos,
     branchId,
+    carryingThbAmount,
     currencyCode,
     date: values.date,
     rate,
@@ -1336,7 +1388,7 @@ async function createForeignCustomerAdvanceReceiptInTransaction(
     splits: rawSplits.map((split) => ({ accountCode: split.accountId, nativeAmount: split.amount })),
   })
   await tx.customer_receipts.update({ data: { bank_statement_doc_no: bankStatementDocNos[0]!, bank_statement_id: postedSplits.created[0]!.bankStatementId }, where: { id: receipt.id } })
-  const allocationSnapshots = allocateForeignReceiptLines(lines.map((line) => ({ arAmount: line.receiptAmount })), customerTransferredNativeAmount, settlementBookAmount)
+  const allocationSnapshots = allocateForeignReceiptLines(lines.map((line) => ({ receiptCashAmount: line.receiptAmount })), customerTransferredNativeAmount, settlementBookAmount)
   for (const [index, line] of lines.entries()) {
     const advance = advanceByDocNo.get(line.customerAdvanceDocNo)!
     const settlement = await applyCustomerAdvanceReceipt(tx, advance.id, line.receiptAmount.toNumber(), actor)
@@ -1368,7 +1420,7 @@ async function createForeignCustomerAdvanceReceiptInTransaction(
       created_by: actor,
       event_key: `customer-receipt.${statusLogAction}.${docNo}`,
       gross_amount_snapshot: settlementBookAmount,
-      meta: { bankStatementDocNos, currencyCode, fcdLedgerEntryIds: postedSplits.created.map((split) => split.fcdLedgerEntryId.toString()), rate: rate.toFixed(3), receivedNativeAmount: receivedNativeAmount.toFixed(2), sourceType: 'CADV' },
+      meta: { bankStatementDocNos, currencyCode, fcdLedgerEntryIds: postedSplits.created.map((split) => split.fcdLedgerEntryId.toString()), nativeAmount: customerTransferredNativeAmount.toFixed(2), rate: rate.toFixed(3), sourceType: 'CADV' },
       net_cash_in_snapshot: carryingThbAmount,
       note: 'บันทึกรับเงิน CADV เข้าบัญชี FCD',
       receipt_doc_no: docNo,
@@ -1389,19 +1441,11 @@ async function createForeignSalesBillReceiptInTransaction(
   if (values.sourceType !== 'SB') throw new Error('การรับเงินต่างประเทศจาก CADV ยังไม่พร้อมใช้งาน')
   const currencyCode = foreignReceiptCurrency(values, functionalCurrencyCode)
   const customerTransferredNativeAmount = decimalReceiptMoney(values.customerTransferredNativeAmount ?? 0, 'ยอดที่ลูกค้าโอน')
-  const receivedNativeAmount = decimalReceiptMoney(values.receivedNativeAmount ?? 0, 'ยอดเข้าบัญชีจริง')
-  const rate = fcdFxRate(values.fxRate ?? 0)
-  const rateType = values.fxRateType?.trim()
-  if (!rateType) throw new Error('ต้องระบุประเภทอัตราแลกเปลี่ยน')
-  if (receivedNativeAmount.gt(customerTransferredNativeAmount)) {
-    throw new Error('ยอดเข้าบัญชีจริงต้องไม่มากกว่ายอดที่ลูกค้าโอน')
-  }
+  const rate = customerReceiptFxRate(values.fxRate ?? 0)
   const settlementBookAmount = calculateSettlementBookAmount(customerTransferredNativeAmount, rate)
-  const carryingThbAmount = calculateSettlementBookAmount(receivedNativeAmount, rate)
   const bankFeeTotal = decimalReceiptMoney(values.fee, 'ค่าธรรมเนียมธนาคาร')
-  if (!settlementBookAmount.minus(carryingThbAmount).eq(bankFeeTotal)) {
-    throw new Error('ยอดที่ลูกค้าโอน, ยอดเข้าบัญชีจริง, rate และ Bank Fee (THB) ต้อง reconcile กัน')
-  }
+  const carryingThbAmount = settlementBookAmount.minus(bankFeeTotal)
+  if (carryingThbAmount.lte(0)) throw new Error('ยอดรับหลังหักค่าธรรมเนียมต้องมากกว่า 0')
 
   await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('customer_receipts.doc_no'))`
   await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('bank_statement.doc_no'))`
@@ -1413,6 +1457,7 @@ async function createForeignSalesBillReceiptInTransaction(
   if (!receiptCurrency) throw new Error(`ไม่พบสกุลเงิน ${currencyCode} ใน Currency Master`)
   if (!customer) throw new Error('ลูกค้าไม่ถูกต้องหรือถูกปิดใช้งาน')
   if (!paymentMethod) throw new Error('วิธีรับเงินไม่ถูกต้องหรือถูกปิดใช้งาน')
+  if (paymentMethod.type !== 'bank') throw new Error('Receipt ต่างประเทศต้องใช้วิธีรับเงินประเภทธนาคาร')
   const selectedBranch = values.branchId
     ? await tx.branches.findFirst({ select: { code: true, id: true }, where: { active: true, code: values.branchId } })
     : null
@@ -1428,36 +1473,36 @@ async function createForeignSalesBillReceiptInTransaction(
   })
   const billByDocNo = new Map(bills.map((bill) => [bill.doc_no, bill]))
   if (bills.length !== billDocNos.length) throw new Error('ไม่พบบิลขายบางรายการ')
-  const allocationInputs = lines.map((line) => {
+  const allocationBaseInputs = lines.map((line) => {
     const bill = billByDocNo.get(line.salesBillDocNo)
     if (!bill) throw new Error(`ไม่พบบิลขาย ${line.salesBillDocNo}`)
     if (bill.customer_id !== customer.id || bill.branch_id !== selectedBranch.id) throw new Error(`บิลขาย ${line.salesBillDocNo} ไม่ตรงกับลูกค้าหรือสาขาที่เลือก`)
     if (isSalesBillCancelledStatus(bill.status, bill.doc_no)) throw new Error(`บิลขาย ${line.salesBillDocNo} ถูกยกเลิกแล้ว`)
-    const arAmount = decimalReceiptMoney(line.receiptAmount + line.discountAmount + line.withholdingTaxAmount, 'ยอดตัด AR')
+    const discountAmount = decimalReceiptMoney(line.discountAmount, 'ส่วนลด')
+    const withholdingTaxAmount = decimalReceiptMoney(line.withholdingTaxAmount, 'ภาษีหัก ณ ที่จ่าย')
     const outstanding = decimalReceiptMoney(toNumber(bill.receivable_balance), 'ยอดค้างรับ')
-    if (arAmount.gt(outstanding)) throw new Error(`ยอดตัด AR ของบิลขาย ${line.salesBillDocNo} เกินยอดค้างรับ`)
-    return { arAmount, bill, line }
+    if (discountAmount.plus(withholdingTaxAmount).gt(outstanding)) {
+      throw new Error(`ส่วนลดและภาษีหัก ณ ที่จ่ายของบิลขาย ${line.salesBillDocNo} เกินยอดค้างรับ`)
+    }
+    return { bill, discountAmount, line, outstandingAmount: outstanding, withholdingTaxAmount }
   })
+  const calculatedCashAllocations = deriveForeignSalesBillCashAllocations(allocationBaseInputs, settlementBookAmount)
+  const allocationInputs = allocationBaseInputs.map((item, index) => ({ ...item, ...calculatedCashAllocations[index]! }))
   const totalArAmount = allocationInputs.reduce((total, item) => total.plus(item.arAmount), new Prisma.Decimal(0))
-  const settlementDifference = settlementBookAmount.minus(totalArAmount)
+  const totalReceiptCashAmount = allocationInputs.reduce((total, item) => total.plus(item.receiptCashAmount), new Prisma.Decimal(0))
+  const settlementDifference = settlementBookAmount.minus(totalReceiptCashAmount)
   const settlementDifferenceReason = settlementDifferenceReasonForReceipt('SB', settlementDifference)
   const allocationSnapshots = allocateForeignReceiptLines(allocationInputs, customerTransferredNativeAmount, settlementBookAmount)
-
-  const exactRate = await findFcdRateSnapshot(tx, { fromCurrency: currencyCode, rateDate: values.date, rateType, toCurrency: functionalCurrencyCode })
-  const rateWasSuggested = exactRate.kind === 'suggested' && fcdFxRate(exactRate.rate).eq(rate)
-  if (!rateWasSuggested && !values.fxRateOverrideReason?.trim()) {
-    throw new Error('กรุณาระบุเหตุผลเมื่อกรอกหรือแก้ไขอัตราแลกเปลี่ยน')
-  }
 
   const rawSplits = values.splits?.length ? values.splits : []
   if (rawSplits.length === 0) throw new Error('เลือกบัญชี FCD รับเงินอย่างน้อย 1 รายการ')
   const splitNativeTotal = rawSplits.reduce((total, split) => total.plus(decimalReceiptMoney(split.amount, 'ยอดเข้าบัญชี FCD')), new Prisma.Decimal(0))
-  if (!splitNativeTotal.eq(receivedNativeAmount)) throw new Error('รวมยอดเข้าบัญชี FCD ต้องเท่ากับยอดเข้าบัญชีจริง')
+  if (!splitNativeTotal.eq(customerTransferredNativeAmount)) throw new Error('รวมยอดเข้าบัญชี FCD ต้องเท่ากับยอดที่ลูกค้าโอน')
 
   const docNo = values.docNo ?? await nextDailyDocNo('customer_receipts', RECEIPT_DOC_PREFIX, values.date, tx, branchCode)
   const bankStatementDocNos = await nextBankStatementDocNos(values.date, branchCode, rawSplits.length, tx)
   const primaryAccountCode = rawSplits[0]!.accountId.trim().toUpperCase()
-  const primaryAccount = await tx.accounts.findFirst({ select: { code: true, id: true, name: true }, where: { active: true, code: primaryAccountCode, is_fcd: true } })
+  const primaryAccount = await tx.accounts.findFirst({ select: { code: true, id: true, name: true }, where: { active: true, code: primaryAccountCode, is_fcd: true, type: 'bank' } })
   if (!primaryAccount) throw new Error('บัญชี FCD หลักไม่ถูกต้องหรือไม่ active')
   const actor = requireFinanceActor(context)
   const receipt = await tx.customer_receipts.create({
@@ -1474,16 +1519,16 @@ async function createForeignSalesBillReceiptInTransaction(
       customer_name_snapshot: customer.name,
       customer_transferred_native_amount: customerTransferredNativeAmount,
       date: normalizeDate(values.date),
-      discount_total: allocationInputs.reduce((total, item) => total.plus(decimalReceiptMoney(item.line.discountAmount, 'ส่วนลด')), new Prisma.Decimal(0)),
+      discount_total: allocationInputs.reduce((total, item) => total.plus(item.discountAmount), new Prisma.Decimal(0)),
       doc_no: docNo,
       fx_rate: rate,
       fx_rate_date: normalizeDate(values.date),
-      fx_rate_id: exactRate.kind === 'suggested' && rateWasSuggested ? exactRate.rateId : null,
-      fx_rate_overridden: !rateWasSuggested,
-      fx_rate_override_reason: rateWasSuggested ? null : values.fxRateOverrideReason?.trim() ?? null,
-      fx_rate_reference: exactRate.kind === 'suggested' && rateWasSuggested ? exactRate.rateId.toString() : null,
-      fx_rate_source: exactRate.kind === 'suggested' && rateWasSuggested ? exactRate.source : null,
-      fx_rate_type: rateType,
+      fx_rate_id: null,
+      fx_rate_overridden: true,
+      fx_rate_override_reason: null,
+      fx_rate_reference: null,
+      fx_rate_source: null,
+      fx_rate_type: null,
       gross_amount: settlementBookAmount,
       net_cash_in: carryingThbAmount,
       notes: values.notes,
@@ -1491,7 +1536,7 @@ async function createForeignSalesBillReceiptInTransaction(
       payment_method_id: paymentMethod.id,
       payment_method_name_snapshot: paymentMethod.name,
       receipt_currency_code: currencyCode,
-      received_native_amount: receivedNativeAmount,
+      received_native_amount: customerTransferredNativeAmount,
       replacement_of_id: options.replacementOfId ?? null,
       settlement_book_amount: settlementBookAmount,
       settlement_difference_reason: settlementDifferenceReason,
@@ -1499,13 +1544,30 @@ async function createForeignSalesBillReceiptInTransaction(
       source_type: 'SB',
       status: CUSTOMER_RECEIPT_STATUS_ACTIVE,
       updated_by: actor,
-      withholding_tax_total: allocationInputs.reduce((total, item) => total.plus(decimalReceiptMoney(item.line.withholdingTaxAmount, 'ภาษีหัก ณ ที่จ่าย')), new Prisma.Decimal(0)),
+      withholding_tax_total: allocationInputs.reduce((total, item) => total.plus(item.withholdingTaxAmount), new Prisma.Decimal(0)),
     },
   })
+  if (settlementDifference.gt(0)) {
+    await tx.fx_gain_loss.create({
+      data: {
+        amount_fc: customerTransferredNativeAmount,
+        branch_id: selectedBranch.id,
+        currency: currencyCode,
+        date: normalizeDate(values.date),
+        gain_loss: settlementDifference,
+        notes: docNo,
+        rate_book: totalReceiptCashAmount.div(customerTransferredNativeAmount).toDecimalPlaces(3, Prisma.Decimal.ROUND_HALF_UP),
+        rate_settlement: rate,
+        ref_id: receipt.id.toString(),
+        ref_type: RECEIPT_REF_TYPE,
+      },
+    })
+  }
   const postedSplits = await postFcdReceiptAccountSplits(tx, {
     actor,
     bankStatementDocNos,
     branchId: selectedBranch.id,
+    carryingThbAmount,
     currencyCode,
     date: values.date,
     rate,
@@ -1524,16 +1586,16 @@ async function createForeignSalesBillReceiptInTransaction(
     const receivedAfter = decimalReceiptMoney(toNumber(bill.received_amount), 'ยอดรับแล้ว').plus(item.arAmount)
     const nextStatus = outstandingAfter.lte(0) ? SALES_BILL_STATUS.RECEIVED : SALES_BILL_STATUS.PARTIAL
     const legacyReceipt = await tx.receipts.create({
-      data: { account_id: primaryAccount.id, amount: item.line.receiptAmount, bank_fee: 0, bill_id: bill.id, branch_id: selectedBranch.id, created_by: actor, customer_id: customer.id, date: normalizeDate(values.date), discount: item.line.discountAmount, doc_no: docNo, fee: 0, lines: { customerReceiptId: receipt.id.toString(), lineNo: index + 1, paymentMethodCode: paymentMethod.code, salesBillDocNo: bill.doc_no }, method: paymentMethod.name, net_amount: item.line.receiptAmount, notes: values.notes, status: CUSTOMER_RECEIPT_STATUS_ACTIVE, updated_by: actor, voucher_id: docNo, withholding_tax: item.line.withholdingTaxAmount },
+      data: { account_id: primaryAccount.id, amount: item.receiptCashAmount, bank_fee: 0, bill_id: bill.id, branch_id: selectedBranch.id, created_by: actor, customer_id: customer.id, date: normalizeDate(values.date), discount: item.discountAmount, doc_no: docNo, fee: 0, lines: { customerReceiptId: receipt.id.toString(), lineNo: index + 1, paymentMethodCode: paymentMethod.code, salesBillDocNo: bill.doc_no }, method: paymentMethod.name, net_amount: item.receiptCashAmount, notes: values.notes, status: CUSTOMER_RECEIPT_STATUS_ACTIVE, updated_by: actor, voucher_id: docNo, withholding_tax: item.withholdingTaxAmount },
     })
     await tx.customer_receipt_allocations.create({
-        data: { allocated_ar_amount: item.arAmount, created_by: actor, customer_code_snapshot: customer.code, discount_amount: item.line.discountAmount, line_no: index + 1, native_amount_allocated: snapshot.nativeAmount, outstanding_after: outstandingAfter, outstanding_before: outstandingBefore, receipt_amount: item.line.receiptAmount, receipt_id: receipt.id, receipt_line_id: legacyReceipt.id, sales_bill_doc_no_snapshot: bill.doc_no, sales_bill_id: bill.id, settlement_book_amount: snapshot.settlementBookAmount, settlement_difference_reason: settlementDifferenceReasonForReceipt('SB', snapshot.settlementBookAmount.minus(item.arAmount)), settlement_fx_difference: snapshot.settlementBookAmount.minus(item.arAmount), status: CUSTOMER_RECEIPT_STATUS_ACTIVE, updated_by: actor, withholding_tax_amount: item.line.withholdingTaxAmount },
+        data: { allocated_ar_amount: item.arAmount, created_by: actor, customer_code_snapshot: customer.code, discount_amount: item.discountAmount, line_no: index + 1, native_amount_allocated: snapshot.nativeAmount, outstanding_after: outstandingAfter, outstanding_before: outstandingBefore, receipt_amount: item.receiptCashAmount, receipt_id: receipt.id, receipt_line_id: legacyReceipt.id, sales_bill_doc_no_snapshot: bill.doc_no, sales_bill_id: bill.id, settlement_book_amount: snapshot.settlementBookAmount, settlement_difference_reason: settlementDifferenceReasonForReceipt('SB', snapshot.settlementBookAmount.minus(item.receiptCashAmount)), settlement_fx_difference: snapshot.settlementBookAmount.minus(item.receiptCashAmount), status: CUSTOMER_RECEIPT_STATUS_ACTIVE, updated_by: actor, withholding_tax_amount: item.withholdingTaxAmount },
     })
     await tx.sales_bills.update({ data: { receivable_balance: outstandingAfter, received_amount: receivedAfter, status: nextStatus, updated_at: new Date(), updated_by: actor }, where: { id: bill.id } })
   }
   const statusLogAction = options.statusLogAction ?? 'foreign_created'
   await tx.customer_receipt_status_logs.create({
-    data: { action: statusLogAction, created_by: actor, event_key: `customer-receipt.${statusLogAction}.${docNo}`, gross_amount_snapshot: settlementBookAmount, meta: { bankStatementDocNos, currencyCode, fcdLedgerEntryIds: postedSplits.created.map((split) => split.fcdLedgerEntryId.toString()), rate: rate.toFixed(3), receivedNativeAmount: receivedNativeAmount.toFixed(2), settlementDifference: settlementDifference.toFixed(2) }, net_cash_in_snapshot: carryingThbAmount, note: 'บันทึกรับเงิน Customer เข้าบัญชี FCD', receipt_doc_no: docNo, receipt_id: receipt.id, to_status: CUSTOMER_RECEIPT_STATUS_ACTIVE },
+    data: { action: statusLogAction, created_by: actor, event_key: `customer-receipt.${statusLogAction}.${docNo}`, gross_amount_snapshot: settlementBookAmount, meta: { bankStatementDocNos, currencyCode, fcdLedgerEntryIds: postedSplits.created.map((split) => split.fcdLedgerEntryId.toString()), nativeAmount: customerTransferredNativeAmount.toFixed(2), rate: rate.toFixed(3), settlementDifference: settlementDifference.toFixed(2) }, net_cash_in_snapshot: carryingThbAmount, note: 'บันทึกรับเงิน Customer เข้าบัญชี FCD', receipt_doc_no: docNo, receipt_id: receipt.id, to_status: CUSTOMER_RECEIPT_STATUS_ACTIVE },
   })
   return { id: docNo }
 }
@@ -1551,7 +1613,7 @@ export async function createCustomerReceipt(values: CustomerReceiptFormValues, c
       : createForeignSalesBillReceiptInTransaction(values, context, policy.functionalCurrencyCode, tx), CUSTOMER_RECEIPT_TRANSACTION_OPTIONS)
   }
 
-  const prepared = await prepareCustomerReceipt(values, context)
+  const prepared = await prepareCustomerReceipt(values, context, policy.functionalCurrencyCode)
   return prisma.$transaction((tx) => createCustomerReceiptInTransaction(values, prepared, policy.functionalCurrencyCode, tx), CUSTOMER_RECEIPT_TRANSACTION_OPTIONS)
 }
 
@@ -1587,7 +1649,7 @@ export async function replaceCustomerReceipt(originalDocNo: string, values: Cust
     }, CUSTOMER_RECEIPT_TRANSACTION_OPTIONS)
   }
 
-  const prepared = await prepareCustomerReceipt(replacementValues, context)
+  const prepared = await prepareCustomerReceipt(replacementValues, context, policy.functionalCurrencyCode)
 
   return prisma.$transaction(async (tx) => {
     await cancelCustomerReceiptInTransaction(tx, normalizedOriginalDocNo, reason, prepared.actor, { statusLogAction: 'reissued' })

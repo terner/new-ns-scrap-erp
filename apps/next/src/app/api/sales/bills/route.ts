@@ -25,6 +25,7 @@ import { findActiveWarehouseReferenceByCodeOrId } from '@/lib/server/warehouse-r
 import { appendWtoPendingOutEventsForHoldKeys, appendWtoPendingOutEventsForSalesBill, appendWtoPendingOutEventsFromHoldIds } from '@/lib/server/weight-ticket-pending-out-events'
 import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import { appendWeightTicketUsageLogs, WEIGHT_TICKET_USAGE_ACTION } from '@/lib/server/weight-ticket-usage-history'
+import { requiresWeightTicketOpenBillPermission, WEIGHT_TICKET_OPEN_BILL_PERMISSION } from '@/lib/server/weight-ticket-open-bill-permissions'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import { refreshCustomerAdvanceAllocation } from '@/lib/server/customer-advance-settlement'
 import { normalizeSalesBillProfitCostSource } from '@/lib/server/sales-bill-profit-cost-source'
@@ -1773,6 +1774,12 @@ export async function POST(request: Request) {
 
     const rawPayload = await request.json()
     const values = salesBillFormSchema.parse(rawPayload)
+    if (requiresWeightTicketOpenBillPermission({
+      hasWeightTicketSource: Boolean(values.deliveryTicketId) || values.items.some((item) => Boolean(item.deliveryTicketId)),
+      transactionMode: values.transactionMode,
+    })) {
+      requirePermission(context, WEIGHT_TICKET_OPEN_BILL_PERMISSION)
+    }
     const actor = currentActor(context)
     const createdAt = new Date()
     const billDate = createdAt.toISOString().slice(0, 10)
@@ -2076,7 +2083,7 @@ export async function POST(request: Request) {
         }
         const sourceLine = sourceBill.purchase_bill_items.find((line) => line.line_no === source.lineNo)
         if (!sourceLine) {
-          return NextResponse.json({ code: 'BAD_REQUEST', error: `ไม่พบรายการต้นทุน ${source.docNo}:${source.lineNo}` }, { status: 400 })
+          return NextResponse.json({ code: 'BAD_REQUEST', error: `ไม่พบรายการ ${source.docNo}:${source.lineNo}` }, { status: 400 })
         }
         const productId = parsedProductIds[index]
         if (sourceLine.product_id != null && productId != null && sourceLine.product_id !== productId) {

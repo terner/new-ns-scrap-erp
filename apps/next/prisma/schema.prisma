@@ -947,6 +947,7 @@ model branches {
   stock_transfers_from      stock_transfers[]           @relation("stock_transfers_from_branch_idTobranches")
   stock_transfers_to        stock_transfers[]           @relation("stock_transfers_to_branch_idTobranches")
   supplier_advance_payments supplier_advance_payments[]
+  fx_gain_loss              fx_gain_loss[]
   supplier_branches         supplier_branches[]
   suppliers                 suppliers[]
   trading_cost_sources      trading_cost_sources[]
@@ -1258,6 +1259,7 @@ model expenses {
 }
 
 model fx_gain_loss {
+  branch_id       BigInt?
   date            DateTime  @db.Date
   ref_type        String?
   ref_id          String?
@@ -1269,7 +1271,9 @@ model fx_gain_loss {
   notes           String?
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
   id              BigInt    @id @default(autoincrement())
+  branches        branches? @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@index([branch_id, date], map: "idx_fx_gain_loss_branch_date")
   @@schema("public")
 }
 
@@ -1348,6 +1352,7 @@ model stock_cost_pool_entries {
   updated_by                                                                                            String?
   stock_cost_pool_allocations_stock_cost_pool_allocations_source_pool_entry_idTostock_cost_pool_entries stock_cost_pool_allocations[] @relation("stock_cost_pool_allocations_source_pool_entry_idTostock_cost_pool_entries")
   stock_cost_pool_allocations_stock_cost_pool_allocations_target_pool_entry_idTostock_cost_pool_entries stock_cost_pool_allocations[] @relation("stock_cost_pool_allocations_target_pool_entry_idTostock_cost_pool_entries")
+  trading_allocation_facts                                                                              trading_allocation_facts[]
   branches                                                                                              branches?                     @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   products                                                                                              products                      @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   grade_adjustments                                                                                     grade_adjustments?            @relation(fields: [regrade_adjustment_id], references: [id], onUpdate: NoAction)
@@ -4561,7 +4566,10 @@ model trading_allocation_facts {
   created_by             String?
   updated_by             String?
   trading_cost_source_id BigInt?
+  cost_pool_entry_id     BigInt?
+  target_ref_id          String?
   customers              customers?            @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  stock_cost_pool_entries stock_cost_pool_entries? @relation(fields: [cost_pool_entry_id], references: [id], onUpdate: NoAction, onDelete: Restrict)
   products               products?             @relation(fields: [product_id], references: [id], onUpdate: NoAction)
   purchase_bills         purchase_bills?       @relation(fields: [purchase_bill_id], references: [id], onUpdate: NoAction)
   sales_bills            sales_bills?          @relation(fields: [sales_bill_id], references: [id], onUpdate: NoAction)
@@ -4578,6 +4586,8 @@ model trading_allocation_facts {
   @@index([sales_doc_no], map: "idx_trading_allocation_facts_sales_doc", where: raw("(sales_doc_no IS NOT NULL)"))
   @@index([source_doc_no], map: "idx_trading_allocation_facts_source_doc", where: raw("(source_doc_no IS NOT NULL)"))
   @@index([supplier_id, date(sort: Desc), id(sort: Desc)], map: "idx_trading_allocation_facts_supplier_date", where: raw("((status = 'active'::text) AND (supplier_id IS NOT NULL))"))
+  @@index([cost_pool_entry_id], map: "idx_trading_allocation_facts_cost_pool_entry", where: raw("(cost_pool_entry_id IS NOT NULL)"))
+  @@index([target_ref_id], map: "idx_trading_allocation_facts_target_ref", where: raw("(target_ref_id IS NOT NULL)"))
   @@schema("public")
 }
 

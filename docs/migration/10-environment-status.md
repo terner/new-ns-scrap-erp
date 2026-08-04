@@ -1,10 +1,34 @@
 # 10 Environment Status
 
+### Trading Allocation Fact Schema Parity 2026-08-01
+
+- Applied and recorded existing migration `20260727110000_add_trading_allocation_fact_cost_pool_entry.sql` on SIT (`vbjlkxbytccklhqvxjuu`) through the verified non-pooling PostgreSQL connection. Dev-target already had the same migration, columns, FK, and indexes.
+- Preflight confirmed SIT had neither migration history nor the two columns, `trading_allocation_facts` contained `0` rows, and `stock_cost_pool_entries` contained `403` rows. The migration added nullable `cost_pool_entry_id bigint` and `target_ref_id text`, the restrictive Cost Pool FK, and both partial indexes without backfilling or changing business rows.
+- Postflight confirmed both columns, the FK, both indexes, and migration history. Authenticated runtime smoke returned HTTP 200 for Customer Tracking, Product Tracking, Allocation Ledger, Trading Matching, and Trading Dashboard; this closes the former Dev/SIT difference recorded below without adding a runtime fallback.
+
+### Customer Receipt Payment Method Simplification 2026-07-31
+
+- Migration `20260731130000_limit_active_payment_methods_to_cash_and_bank_transfer.sql` is prepared to retain only the configured active `cash` and `bank` methods: `PM-001` and `PM-002`. It deactivates cheque, PromptPay, FCD transfer, and international transfer master rows without changing historical receipt snapshots.
+- Customer Receipt reads only active Payment Method Master rows. Functional-currency receipts therefore offer cash and bank transfer; foreign receipts filter the same source to the bank method, then enforce an FCD account that supports the selected currency. No runtime method-name or method-code condition is introduced.
+
+### Customer Receipt Google Finance Rate And Rate-Type Retirement 2026-07-31
+
+- Applied and recorded `20260731120000_remove_customer_receipt_fx_rate_type_requirement.sql` on SIT (`vbjlkxbytccklhqvxjuu`) through the non-pooling PostgreSQL connection. It supersedes the former foreign-receipt `fx_rate_type` requirement while retaining the deferred reconciliation guard for native amount, settlement THB, carrying THB, FCD split, and allocation facts.
+- No transaction data was changed or backfilled. Preflight found the migration absent and the former rate-type constraint present; postflight confirmed the migration history row exists and the obsolete constraint is removed.
+- Foreign RCP now obtains a suggested current-day USD/THB rate from the shared Google Finance service, shows the quote timestamp, and allows the user to enter or amend the rate before saving. There is no default rate or provider fallback; a missing quote requires manual input.
+
+### Customer Receipt Single-Native-Amount Contract 2026-07-31
+
+- Applied and recorded `20260731110000_simplify_foreign_customer_receipt_native_amount.sql` on SIT (`vbjlkxbytccklhqvxjuu`) through the non-pooling PostgreSQL connection. A blanket `supabase db push` was not used because SIT has known migration-history drift.
+- Preflight found `0` active foreign receipts and `0` active headers with unequal `customer_transferred_native_amount` and `received_native_amount`; no transaction data was backfilled or rewritten.
+- The deferred receipt guard now requires the two persisted native columns to be equal for new active foreign RCPs. It derives carrying THB as settlement THB minus Bank Fee, reconciles FCD splits to the one native amount, and permits both `SB` and `CADV` source types.
+- Postflight confirmed the history row, native-equality guard, CADV branch, and `0` active foreign receipts. Customer UAT was not changed.
+
 ### Dev/SIT Product Image Schema And Migration-History Reconciliation 2026-07-30
 
 - Applied and recorded `20260730190000_reconcile_legacy_product_image_names_schema.sql` in dev-target and SIT. It verifies that any remaining `public.products.image_names` values are empty before dropping the legacy column; Dev had the column with zero legacy values, while SIT already had no column. Postflight confirms the column is absent in both environments.
 - Repaired SIT migration history through Supabase CLI using its non-pooling connection: `20260608094500` is now recorded as `add_product_image_names`, and `20260725100000` is now recorded as `add_user_profile_image_storage`, matching Dev. The old pooler URL cannot run this CLI repair because it reuses prepared statements.
-- The remaining intentional Dev/SIT difference is `20260727110000_add_trading_allocation_fact_cost_pool_entry`: it remains Dev-only, with its two `trading_allocation_facts` columns and related FK/index absent from SIT by the explicit decision not to promote that Trading change in this batch.
+- The former intentional Dev/SIT difference for `20260727110000_add_trading_allocation_fact_cost_pool_entry` was closed on 2026-08-01 after Customer Tracking and Allocation Ledger exposed the shared Prisma schema drift at runtime.
 
 ### FCD Account Currency Opening-Balance Retirement 2026-07-30
 

@@ -9,6 +9,7 @@ import { AuthStatus } from '@/components/layout/AuthStatus'
 import { MobileBottomNavigation } from '@/components/layout/MobileBottomNavigation'
 import { ThemeModeToggle } from '@/components/layout/ThemeModeToggle'
 import { GuardedLink } from '@/components/ui/GuardedLink'
+import { AuthPermissionsProvider } from '@/components/layout/AuthPermissionsContext'
 import { breadcrumbsForPath, canAccessPath, navigationItems, navigationSections, pageTitleForPath, type NavigationItem } from '@/lib/navigation'
 
 type AppShellProps = {
@@ -90,7 +91,7 @@ export function AppShell({ children }: AppShellProps) {
   const [menuSearchFocused, setMenuSearchFocused] = useState(false)
   const [titleOverride, setTitleOverride] = useState<string | null>(null)
   const lastActivityPathRef = useRef<string | null>(null)
-  const title = titleOverride ?? pageTitleForPath(pathname)
+  const title = pageTitleForPath(pathname, titleOverride)
   const breadcrumbs = breadcrumbsForPath(pathname)
   const renderedBreadcrumbs = breadcrumbLabelOverride && breadcrumbs.length > 0
     ? breadcrumbs.map((breadcrumb, index) => (index === breadcrumbs.length - 1 ? { ...breadcrumb, label: breadcrumbLabelOverride } : breadcrumb))
@@ -228,7 +229,8 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-slate-100 text-slate-900">
+    <AuthPermissionsProvider permissions={authContext?.permissions ?? null}>
+      <div className="flex h-dvh overflow-hidden bg-slate-100 text-slate-900">
       <aside
         className={`${sidebarOpen ? 'fixed inset-0 z-50 flex w-full' : 'hidden'} flex-shrink-0 flex-col overflow-hidden bg-slate-900 text-slate-200 transition-[width] duration-200 ease-out lg:relative lg:flex ${desktopSidebarExpanded ? 'lg:w-64' : 'lg:w-16'}`}
         onBlur={handleSidebarBlur}
@@ -408,6 +410,7 @@ export function AppShell({ children }: AppShellProps) {
       {showMobileBottomNav && !sidebarOpen ? (
         <MobileBottomNavigation authContext={authContext} onOpenSidebar={() => setSidebarOpen(true)} />
       ) : null}
-    </div>
+      </div>
+    </AuthPermissionsProvider>
   )
 }

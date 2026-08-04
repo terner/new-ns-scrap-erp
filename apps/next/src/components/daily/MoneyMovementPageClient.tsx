@@ -26,6 +26,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { readJsonResponse } from '@/lib/api-client'
 import { companyProfileForPrint, companyProfileResponseSchema, type CompanyProfilePrintValues } from '@/lib/company-profile'
+import { calculateCustomerReceiptCashRequired, calculateCustomerReceiptSettlement } from '@/lib/customer-receipt-settlement'
 import { customerReceiptFormSchema, dailyFetchJson, formatMoney, supplierPaymentFormSchema, todayDateInput, type CustomerReceiptFormValues, type DailyAccountOption, type SupplierPaymentFormValues } from '@/lib/daily'
 import { formatAccountNoDisplay, formatDateDisplay } from '@/lib/format'
 import { normalizePaymentMethod, paymentDestinationKey } from '@/lib/payment-destination'
@@ -54,6 +55,8 @@ type Bill = {
   payableBalance?: number
   receivableBalance?: number
   receiptStatus?: string
+  receiptUpdatedAt?: string | null
+  receiptUpdatedBy?: string | null
   sourceDocNo?: string
   sourceType?: 'advance_payment' | 'expense' | 'petty_advance_return' | 'purchase_bill'
   status?: string
@@ -97,15 +100,13 @@ type MoneyRow = {
   discount?: number
   fee?: number
   foreignAudit?: {
+    arSettledThb: number
     carryingBookAmount: number
+    cashAppliedThb: number
     currencyCode: string
-    customerTransferredNativeAmount: number
     fxRate: number
     fxRateDate: string
-    fxRateOverridden: boolean
-    fxRateType: string
-    fxRateSource?: string | null
-    receivedNativeAmount: number
+    nativeAmount: number
     settlementBookAmount: number
     settlementFxDifference: number
   }
@@ -139,7 +140,6 @@ type Payload = {
   currencyPolicy?: { functionalCurrencyCode: string }
   customerAdvances?: CustomerAdvance[]
   customers?: Party[]
-  fxRateTypes?: string[]
   paymentMethods?: Array<{ name: string; type: PaymentMethodGroup }>
   rows: MoneyRow[]
   settings?: { whtRatePercent?: number }
@@ -147,9 +147,9 @@ type Payload = {
 }
 type PaymentHistoryTone = 'amber' | 'blue' | 'emerald' | 'rose' | 'slate'
 type FxRateLookup = {
+  quotedAt?: string | null
   rate: number | null
-  rateId?: string
-  source?: string
+  source?: 'Google Finance'
   status: 'manual_required' | 'not_required' | 'suggested'
 }
 type PaymentHistoryDetail = {
@@ -188,13 +188,15 @@ type PaymentSplit = SupplierPaymentFormValues['splits'][number]
 type ReceiptLine = NonNullable<CustomerReceiptFormValues['salesBillLines']>[number]
 type CustomerAdvanceReceiptLine = NonNullable<CustomerReceiptFormValues['customerAdvanceLines']>[number]
 type ReceiptSplit = NonNullable<CustomerReceiptFormValues['splits']>[number]
-type PaymentBillSort = 'age_asc' | 'age_desc' | 'balance_asc' | 'balance_desc' | 'date_asc' | 'date_desc' | 'doc_asc' | 'doc_desc' | 'paid_asc' | 'paid_desc' | 'source_asc' | 'source_desc' | 'supplier_asc' | 'supplier_desc' | 'total_asc' | 'total_desc'
-type PaymentBillSortField = 'age' | 'balance' | 'date' | 'docNo' | 'paidAmount' | 'sourceDocNo' | 'supplier' | 'totalAmount'
+type PaymentBillSort = 'age_asc' | 'age_desc' | 'balance_asc' | 'balance_desc' | 'date_asc' | 'date_desc' | 'doc_asc' | 'doc_desc' | 'operator_asc' | 'operator_desc' | 'paid_asc' | 'paid_desc' | 'source_asc' | 'source_desc' | 'status_asc' | 'status_desc' | 'supplier_asc' | 'supplier_desc' | 'total_asc' | 'total_desc' | 'updated_asc' | 'updated_desc'
+type PaymentBillSortField = 'age' | 'balance' | 'date' | 'docNo' | 'operator' | 'paidAmount' | 'sourceDocNo' | 'status' | 'supplier' | 'totalAmount' | 'updatedAt'
 type PaymentQueueSourceFilter = 'all' | NonNullable<Bill['sourceType']>
+type ReceiptQueueStatusFilter = 'active' | 'all' | 'pending'
 type HistorySortField = 'accountName' | 'amount' | 'bankFee' | 'billRefs' | 'date' | 'docNo' | 'netAmount' | 'notes' | 'partyName' | 'status' | 'wht'
 type PaymentHistoryStatusFilter = 'active' | 'all' | 'cancelled'
 type ReceiptTab = 'entry' | 'history'
 type PaymentQueueColumnKey = 'accountNo' | 'action' | 'age' | 'balance' | 'date' | 'destination' | 'docNo' | 'paidAmount' | 'partyName' | 'totalAmount'
+type ReceiptQueueColumnKey = 'accountNo' | 'action' | 'balance' | 'date' | 'docNo' | 'operator' | 'paidAmount' | 'partyName' | 'status' | 'totalAmount' | 'updatedAt'
 type MoneyHistoryColumnKey = 'accountName' | 'action' | 'amount' | 'bankFee' | 'billRefs' | 'date' | 'docNo' | 'netAmount' | 'notes' | 'partyName' | 'status' | 'wht'
 const pageSizeOptions = [10, 25, 50, 100]
 const paymentQueueSourceOptions = [
@@ -218,7 +220,7 @@ const paymentQueueColumns: Array<ResizableColumnDefinition<PaymentQueueColumnKey
   { key: 'age', defaultWidth: 145, minWidth: 135 },
   { key: 'action', defaultWidth: 72, minWidth: 64, maxWidth: 88 },
 ]
-const receiptQueueColumns: Array<ResizableColumnDefinition<PaymentQueueColumnKey>> = [
+const receiptQueueColumns: Array<ResizableColumnDefinition<ReceiptQueueColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 140, minWidth: 120 },
   { key: 'partyName', defaultWidth: 260, minWidth: 160 },
@@ -226,6 +228,9 @@ const receiptQueueColumns: Array<ResizableColumnDefinition<PaymentQueueColumnKey
   { key: 'totalAmount', defaultWidth: 120, minWidth: 100 },
   { key: 'paidAmount', defaultWidth: 110, minWidth: 90 },
   { key: 'balance', defaultWidth: 110, minWidth: 90 },
+  { key: 'status', defaultWidth: 120, minWidth: 100 },
+  { key: 'updatedAt', defaultWidth: 150, minWidth: 140 },
+  { key: 'operator', defaultWidth: 160, minWidth: 130 },
   { key: 'action', defaultWidth: 72, minWidth: 64, maxWidth: 88 },
 ]
 const paymentHistoryColumns: Array<ResizableColumnDefinition<MoneyHistoryColumnKey>> = [
@@ -314,25 +319,21 @@ export function isBlankReceiptSplit(split: Pick<ReceiptSplit, 'accountId' | 'amo
 }
 
 export function receiptForeignSettlementWillDiscardData(
-  receiptForm: Partial<Pick<CustomerReceiptFormValues, 'accountId' | 'customerTransferredNativeAmount' | 'fee' | 'fxRate' | 'fxRateOverrideReason' | 'fxRateType' | 'receivedNativeAmount' | 'splits'>>,
-  options: { includeFxRateType?: boolean } = {},
+  receiptForm: Partial<Pick<CustomerReceiptFormValues, 'accountId' | 'customerTransferredNativeAmount' | 'fee' | 'fxRate' | 'splits'>>,
 ) {
   return Boolean(
     receiptForm.accountId?.trim()
     || Number(receiptForm.customerTransferredNativeAmount ?? 0) !== 0
     || Number(receiptForm.fee ?? 0) !== 0
     || Number(receiptForm.fxRate ?? 0) !== 0
-    || receiptForm.fxRateOverrideReason?.trim()
-    || (options.includeFxRateType !== false && receiptForm.fxRateType?.trim())
-    || Number(receiptForm.receivedNativeAmount ?? 0) !== 0
     || (receiptForm.splits ?? []).some((split) => !isBlankReceiptSplit(split)),
   )
 }
 
 export function receiptDateChangeWillDiscardData(
-  receiptForm: Partial<Pick<CustomerReceiptFormValues, 'fxRate' | 'fxRateOverrideReason'>>,
+  receiptForm: Partial<Pick<CustomerReceiptFormValues, 'fxRate'>>,
 ) {
-  return Number(receiptForm.fxRate ?? 0) !== 0 || Boolean(receiptForm.fxRateOverrideReason?.trim())
+  return Number(receiptForm.fxRate ?? 0) !== 0
 }
 
 export function receiptLineReplacementWillDiscardData(
@@ -351,7 +352,7 @@ export function customerAdvanceLineReplacementWillDiscardData(
 
 export function receiptSourceChangeWillDiscardData(
   receiptForm: Pick<CustomerReceiptFormValues, 'customerAdvanceLines' | 'salesBillLines' | 'splits'>
-    & Partial<Pick<CustomerReceiptFormValues, 'accountId' | 'amount' | 'branchId' | 'customerTransferredNativeAmount' | 'fee' | 'fxRate' | 'fxRateOverrideReason' | 'fxRateType' | 'receiptCurrencyCode' | 'receivedNativeAmount'>>,
+    & Partial<Pick<CustomerReceiptFormValues, 'accountId' | 'amount' | 'branchId' | 'customerTransferredNativeAmount' | 'fee' | 'fxRate' | 'receiptCurrencyCode'>>,
   functionalCurrencyCode = '',
 ) {
   const receiptCurrencyCode = receiptForm.receiptCurrencyCode?.trim().toUpperCase()
@@ -377,11 +378,25 @@ function roundMoney(value: number) {
 }
 
 function roundFxRate(value: number) {
-  return Math.round((value + Number.EPSILON) * 1000) / 1000
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 function formatFxRate(value: number | null | undefined) {
-  return value == null ? '-' : value.toLocaleString('th-TH', { maximumFractionDigits: 3, minimumFractionDigits: 3 })
+  return value == null ? '-' : value.toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+}
+
+function formatFxQuoteTimestamp(value: string | null | undefined) {
+  if (!value) return null
+  const timestamp = new Date(value)
+  if (Number.isNaN(timestamp.getTime())) return null
+  return new Intl.DateTimeFormat('th-TH', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+  }).format(timestamp)
 }
 
 function parseMoneyInput(value: string) {
@@ -977,8 +992,8 @@ function buildForeignReceiptAuditPrintHtml(row: MoneyRow) {
     <div class="label">ข้อมูลต่างประเทศ (audit)</div>
     <div class="grid" style="margin:8px 0 0">
       <div><div class="label">สกุลเงินที่รับจริง</div><div class="value">${escapeHtml(foreign.currencyCode)}</div></div>
-      <div><div class="label">ยอดเข้าบัญชี FCD (${escapeHtml(foreign.currencyCode)})</div><div class="value">${escapeHtml(formatNativeAmount(foreign.receivedNativeAmount))}</div></div>
-      <div><div class="label">อัตราแลกเปลี่ยน</div><div class="value">${escapeHtml(formatFxRate(foreign.fxRate))} (${escapeHtml(foreign.fxRateType)})</div></div>
+      <div><div class="label">ยอดที่ลูกค้าโอน (${escapeHtml(foreign.currencyCode)})</div><div class="value">${escapeHtml(formatNativeAmount(foreign.nativeAmount))}</div></div>
+      <div><div class="label">อัตราแลกเปลี่ยน</div><div class="value">${escapeHtml(formatFxRate(foreign.fxRate))}</div></div>
       <div><div class="label">Carrying (THB)</div><div class="value">${escapeHtml(formatMoney(foreign.carryingBookAmount))}</div></div>
     </div>
   </div>`
@@ -988,11 +1003,25 @@ function receiptQueueDocNo(bill: Bill) {
   return bill.activeReceiptDocNos?.[0] ?? '-'
 }
 
-function receiptQueueStatusLabel(bill: Bill) {
+function receiptQueueStatus(bill: Bill): Exclude<ReceiptQueueStatusFilter, 'all'> {
   const status = String(bill.receiptStatus ?? '').toLowerCase()
-  if (status === 'pending') return 'รอรับเงิน'
-  if (status === 'active') return 'รับเงินแล้ว'
-  return bill.activeReceiptDocNos?.length ? 'รับเงินแล้ว' : 'รอรับเงิน'
+  if (status === 'active' || bill.activeReceiptDocNos?.length) return 'active'
+  return 'pending'
+}
+
+function receiptQueueStatusLabel(bill: Bill) {
+  return receiptQueueStatus(bill) === 'active' ? 'รับเงินแล้ว' : 'รอรับเงิน'
+}
+
+function formatDateTimeDisplay(value: string | null | undefined) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('th-TH', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'Asia/Bangkok',
+  }).format(date)
 }
 
 function buildReceivableBillPrintHtml(bill: Bill, customerName: string) {
@@ -1136,6 +1165,7 @@ export function MoneyMovementPageClient({
   const [billPageSize, setBillPageSize] = useState(25)
   const [billSort, setBillSort] = useState<PaymentBillSort>('date_desc')
   const [billSourceFilter, setBillSourceFilter] = useState<PaymentQueueSourceFilter>('all')
+  const [receiptQueueStatusFilter, setReceiptQueueStatusFilter] = useState<ReceiptQueueStatusFilter>('all')
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(10)
   const [historySortField, setHistorySortField] = useState<HistorySortField>(mode === 'payment' ? 'date' : 'docNo')
@@ -1258,17 +1288,36 @@ export function MoneyMovementPageClient({
   const receiptSplitTotal = receiptSplits.reduce((sum, split) => sum + (Number(split.amount) || 0), 0)
   const receiptForm = mode === 'receipt' ? form as CustomerReceiptFormValues : null
   const receiptRateDate = receiptForm?.date ?? ''
-  const receiptRateType = receiptForm?.fxRateType?.trim() ?? ''
-  const customerTransferredNativeAmount = Number(receiptForm?.customerTransferredNativeAmount) || 0
-  const receivedNativeAmount = Number(receiptForm?.receivedNativeAmount) || 0
+  const foreignReceiptAmount = isForeignReceipt ? roundMoney(receiptSplitTotal) : 0
   const foreignFxRate = Number(receiptForm?.fxRate) || 0
-  const settlementBookAmount = isForeignReceipt ? roundMoney(customerTransferredNativeAmount * foreignFxRate) : 0
-  const carryingBookAmount = isForeignReceipt ? roundMoney(receivedNativeAmount * foreignFxRate) : 0
-  const receiptArAmount = mode === 'receipt'
-    ? roundMoney(form.amount + (receiptSourceType === 'SB' ? form.withholdingTax + form.discount : 0))
+  const hasForeignReceiptCalculation = foreignReceiptAmount > 0 && foreignFxRate > 0
+  const settlementBookAmount = isForeignReceipt ? roundMoney(foreignReceiptAmount * foreignFxRate) : 0
+  const carryingBookAmount = isForeignReceipt ? roundMoney(settlementBookAmount - (Number(form.fee) || 0)) : 0
+  const receiptCalculationLines = isForeignReceipt && receiptSourceType === 'SB'
+    ? receiptLines.map((line) => {
+        const outstandingArAmount = billMap.get(line.salesBillDocNo)?.receivableBalance
+        if (outstandingArAmount == null) return line
+        return {
+          ...line,
+          receiptAmount: calculateCustomerReceiptCashRequired(outstandingArAmount, line.discountAmount, line.withholdingTaxAmount),
+        }
+      })
+    : receiptLines
+  const receiptSettlementCalculation = calculateCustomerReceiptSettlement(
+    receiptCalculationLines,
+    isForeignReceipt && hasForeignReceiptCalculation ? settlementBookAmount : Number(form.amount) || 0,
+  )
+  const receiptCashRequiredAmount = receiptSourceType === 'SB' ? receiptSettlementCalculation.cashRequiredAmount : Number(form.amount) || 0
+  const receiptArAmount = mode === 'receipt' && receiptSourceType === 'SB' ? receiptSettlementCalculation.arSettledAmount : Number(form.amount) || 0
+  const selectedReceiptBillBalance = mode === 'receipt' && receiptSourceType === 'SB'
+    ? roundMoney(receiptLines.reduce((sum, line) => sum + (billMap.get(line.salesBillDocNo)?.receivableBalance ?? 0), 0))
     : 0
-  const foreignReconciliationDifference = isForeignReceipt
-    ? roundMoney(settlementBookAmount - carryingBookAmount - form.fee)
+  const receiptArRemainingAmount = roundMoney(Math.max(0, selectedReceiptBillBalance - receiptArAmount))
+  const isPartialForeignReceipt = isForeignReceipt
+    && receiptSourceType === 'SB'
+    && receiptArRemainingAmount > 0.01
+  const settlementFxGain = isForeignReceipt && receiptSourceType === 'SB'
+    ? receiptSettlementCalculation.settlementFxGain
     : 0
 
   const receiptCurrencyOptions = useMemo<SearchComboboxOption[]>(() => (data.currencies ?? []).map((currency) => ({
@@ -1278,15 +1327,14 @@ export function MoneyMovementPageClient({
   })), [data.currencies])
   const availableReceiptCurrencyOptions = receiptCurrencyOptions
   const foreignFcdAccounts = useMemo(() => activeAccounts.filter((account) => (
-    account.isFcd === true && (account.supportedCurrencies ?? []).some((currency) => currency.trim().toUpperCase() === receiptCurrencyCode)
+    account.accountGroup === 'bank'
+    && account.isFcd === true
+    && (account.supportedCurrencies ?? []).some((currency) => currency.trim().toUpperCase() === receiptCurrencyCode)
   )), [activeAccounts, receiptCurrencyCode])
-  const foreignFcdAccountOptions = useMemo<SearchComboboxOption[]>(() => foreignFcdAccounts.map((account) => ({
-    id: account.id,
-    label: `${account.code ? `${account.code} - ` : ''}${account.name}`,
-    searchText: `${account.code ?? ''} ${account.name}`.toLowerCase(),
-  })), [foreignFcdAccounts])
+  const foreignReceiptPaymentMethods = useMemo(() => paymentMethods.filter((method) => method.type === 'bank'), [paymentMethods])
   const functionalReceiptAccounts = useMemo(() => activeAccounts.filter((account) => (
-    (account.supportedCurrencies ?? []).some((currency) => currency.trim().toUpperCase() === functionalCurrencyCode)
+    (account.accountGroup === 'cash' || account.accountGroup === 'bank')
+    && (account.supportedCurrencies ?? []).some((currency) => currency.trim().toUpperCase() === functionalCurrencyCode)
   )), [activeAccounts, functionalCurrencyCode])
 
   useEffect(() => {
@@ -1304,7 +1352,7 @@ export function MoneyMovementPageClient({
       setIsFxRateLoading(false)
       return
     }
-    if (!receiptRateDate || !receiptCurrencyCode || !receiptRateType) {
+    if (form.id || !receiptRateDate || !receiptCurrencyCode) {
       setFxRateLookup(null)
       setIsFxRateLoading(false)
       return
@@ -1312,27 +1360,27 @@ export function MoneyMovementPageClient({
 
     let cancelled = false
     setIsFxRateLoading(true)
-    void dailyFetchJson<FxRateLookup>(`/api/sales/receipts/rate?${new URLSearchParams({
+    void dailyFetchJson<FxRateLookup>(`/api/finance/foreign/live-fx-rate?${new URLSearchParams({
       currency: receiptCurrencyCode,
       date: receiptRateDate,
-      rateType: receiptRateType,
     }).toString()}`)
       .then((result) => {
         if (cancelled) return
         setFxRateLookup(result)
         if (result.status === 'suggested' && result.rate != null) {
           const suggestedRate = roundFxRate(result.rate)
-          setForm((current) => ({
-            ...(current as CustomerReceiptFormValues),
-            fxRate: suggestedRate,
-            fxRateOverrideReason: null,
-          }))
+          setForm((current) => {
+            const receipt = current as CustomerReceiptFormValues
+            return {
+              ...receipt,
+              fxRate: suggestedRate,
+            }
+          })
         }
       })
       .catch((caught) => {
         if (cancelled) return
-        setFxRateLookup(null)
-        setError(caught instanceof Error ? caught.message : 'โหลดอัตราแลกเปลี่ยนไม่ได้')
+        setFxRateLookup({ rate: null, status: 'manual_required' })
       })
       .finally(() => {
         if (!cancelled) setIsFxRateLoading(false)
@@ -1341,7 +1389,7 @@ export function MoneyMovementPageClient({
     return () => {
       cancelled = true
     }
-  }, [foreignRateReloadNonce, formOpen, isForeignReceipt, mode, receiptCurrencyCode, receiptRateDate, receiptRateType])
+  }, [foreignRateReloadNonce, form.id, formOpen, isForeignReceipt, mode, receiptCurrencyCode, receiptRateDate])
 
   const outstandingBills = useMemo(() => data.bills
     .filter((bill) => (mode === 'payment' ? (bill.payableBalance ?? 0) > 0 : (bill.receivableBalance ?? 0) > 0)), [data.bills, mode])
@@ -1472,7 +1520,8 @@ export function MoneyMovementPageClient({
       ].join(' ').toLowerCase()
       const matchesSearch = !query || searchHaystack.includes(query)
       const matchesBranch = !branchFilter || bill.branchId === branchFilter
-      return matchesSearch && matchesBranch && balance > 0
+      const matchesStatus = receiptQueueStatusFilter === 'all' || receiptQueueStatus(bill) === receiptQueueStatusFilter
+      return matchesSearch && matchesBranch && matchesStatus && balance > 0
     }).sort((left, right) => {
       const leftCustomerName = partyMap.get(left.customerId ?? '') ?? left.customerId ?? ''
       const rightCustomerName = partyMap.get(right.customerId ?? '') ?? right.customerId ?? ''
@@ -1493,6 +1542,10 @@ export function MoneyMovementPageClient({
           return receiptQueueDocNo(left).localeCompare(receiptQueueDocNo(right), 'th')
         case 'doc_desc':
           return receiptQueueDocNo(right).localeCompare(receiptQueueDocNo(left), 'th')
+        case 'operator_asc':
+          return String(left.receiptUpdatedBy ?? '').localeCompare(String(right.receiptUpdatedBy ?? ''), 'th')
+        case 'operator_desc':
+          return String(right.receiptUpdatedBy ?? '').localeCompare(String(left.receiptUpdatedBy ?? ''), 'th')
         case 'paid_asc':
           return (left.paidAmount ?? 0) - (right.paidAmount ?? 0)
         case 'paid_desc':
@@ -1501,6 +1554,14 @@ export function MoneyMovementPageClient({
           return left.docNo.localeCompare(right.docNo, 'th')
         case 'source_desc':
           return right.docNo.localeCompare(left.docNo, 'th')
+        case 'status_asc':
+          return receiptQueueStatusLabel(left).localeCompare(receiptQueueStatusLabel(right), 'th')
+        case 'status_desc':
+          return receiptQueueStatusLabel(right).localeCompare(receiptQueueStatusLabel(left), 'th')
+        case 'updated_asc':
+          return String(left.receiptUpdatedAt ?? '').localeCompare(String(right.receiptUpdatedAt ?? ''))
+        case 'updated_desc':
+          return String(right.receiptUpdatedAt ?? '').localeCompare(String(left.receiptUpdatedAt ?? ''))
         case 'supplier_asc':
           return leftCustomerName.localeCompare(rightCustomerName, 'th')
         case 'supplier_desc':
@@ -1513,7 +1574,7 @@ export function MoneyMovementPageClient({
           return String(right.date ?? '').localeCompare(String(left.date ?? ''))
       }
     })
-  }, [billSearch, billSort, branchFilter, data.bills, mode, partyMap])
+  }, [billSearch, billSort, branchFilter, data.bills, mode, partyMap, receiptQueueStatusFilter])
 
   const supplierBillTotalRows = supplierBills.length
   const supplierBillTotalPages = Math.max(1, Math.ceil(supplierBillTotalRows / billPageSize))
@@ -1524,10 +1585,10 @@ export function MoneyMovementPageClient({
   const receiptBillCurrentPage = Math.min(billPage, receiptBillTotalPages)
   const receiptBillPageRows = receiptBills.slice((receiptBillCurrentPage - 1) * billPageSize, receiptBillCurrentPage * billPageSize)
   const entryBillTotalPages = mode === 'payment' ? supplierBillTotalPages : receiptBillTotalPages
-  const hasActiveBillFilters = billSearch.trim() !== '' || billSort !== 'date_desc' || billSourceFilter !== 'all' || branchFilter !== ''
+  const hasActiveBillFilters = billSearch.trim() !== '' || billSort !== 'date_desc' || billSourceFilter !== 'all' || branchFilter !== '' || receiptQueueStatusFilter !== 'all'
   useEffect(() => {
     setBillPage(1)
-  }, [billPageSize, billSearch, billSort, billSourceFilter, branchFilter])
+  }, [billPageSize, billSearch, billSort, billSourceFilter, branchFilter, receiptQueueStatusFilter])
 
   useEffect(() => {
     if (billPage > entryBillTotalPages) setBillPage(entryBillTotalPages)
@@ -1742,12 +1803,9 @@ export function MoneyMovementPageClient({
       date: row.date,
       discount: roundMoney(lines.reduce((sum, line) => sum + line.discountAmount, 0)),
       fee: row.fee ?? 0,
-      customerTransferredNativeAmount: row.foreignAudit?.customerTransferredNativeAmount,
-      receivedNativeAmount: row.foreignAudit?.receivedNativeAmount,
+      customerTransferredNativeAmount: row.foreignAudit?.nativeAmount,
       receiptCurrencyCode: row.foreignAudit?.currencyCode,
       fxRate: row.foreignAudit?.fxRate,
-      fxRateType: row.foreignAudit?.fxRateType,
-      fxRateOverrideReason: row.foreignAudit?.fxRateOverridden ? 'ใช้ rate ที่บันทึกใน Receipt เดิม' : null,
       id: row.docNo,
       sourceType: row.sourceType ?? 'SB',
       salesBillLines: row.sourceType === 'CADV' ? [] : lines,
@@ -1769,7 +1827,7 @@ export function MoneyMovementPageClient({
             id: split.id ?? nextSplit.id,
           }
         })
-        : [{ ...newReceiptSplit(), accountId: row.accountId ?? '', amount: row.foreignAudit ? row.foreignAudit.receivedNativeAmount : receiptBookNetCashIn(row) }],
+        : [{ ...newReceiptSplit(), accountId: row.accountId ?? '', amount: row.foreignAudit ? row.foreignAudit.nativeAmount : receiptBookNetCashIn(row) }],
       withholdingTax: roundMoney(lines.reduce((sum, line) => sum + line.withholdingTaxAmount, 0)),
     } as MoneyForm
     setForm(nextForm)
@@ -1790,6 +1848,7 @@ export function MoneyMovementPageClient({
     setReceiptCurrencyFilter('')
     setReceiptSourceFilter('')
     setPaymentHistoryStatusFilter('all')
+    setReceiptQueueStatusFilter('all')
   }
 
   function switchMoneyTab(value: ReceiptTab) {
@@ -1814,6 +1873,7 @@ export function MoneyMovementPageClient({
     setReceiptCurrencyFilter('')
     setReceiptSourceFilter('')
     setPaymentHistoryStatusFilter('all')
+    setReceiptQueueStatusFilter('all')
     setBillSearch('')
     setBillSort('date_desc')
     setBillSourceFilter('all')
@@ -1843,9 +1903,12 @@ export function MoneyMovementPageClient({
       date: 'date',
       doc: 'docNo',
       paid: 'paidAmount',
+      operator: 'operator',
       source: 'sourceDocNo',
+      status: 'status',
       supplier: 'supplier',
       total: 'totalAmount',
+      updated: 'updatedAt',
     }
     return { direction: rawDirection, field: fieldMap[rawField] ?? 'date' }
   }
@@ -1856,10 +1919,13 @@ export function MoneyMovementPageClient({
       balance: 'balance',
       date: 'date',
       docNo: 'doc',
+      operator: 'operator',
       paidAmount: 'paid',
       sourceDocNo: 'source',
+      status: 'status',
       supplier: 'supplier',
       totalAmount: 'total',
+      updatedAt: 'updated',
     }
     return `${fieldMap[field]}_${direction}` as PaymentBillSort
   }
@@ -2136,8 +2202,33 @@ export function MoneyMovementPageClient({
     } as MoneyForm)
   }
 
+  function applyReceiptDiscount(totalDiscount: number) {
+    let remainingDiscount = roundMoney(Math.max(0, totalDiscount))
+    return receiptLines.map((line) => {
+      // Keep the line's AR settlement unchanged while moving the entered discount
+      // out of the per-bill UI. The final cent remains cash so the existing receipt
+      // account and allocation contracts remain valid.
+      const outstandingArAmount = billMap.get(line.salesBillDocNo)?.receivableBalance
+      const arSettlement = isForeignReceipt && outstandingArAmount != null
+        ? roundMoney(outstandingArAmount)
+        : roundMoney(line.receiptAmount + line.discountAmount + line.withholdingTaxAmount)
+      const maximumDiscount = Math.max(0, roundMoney(arSettlement - line.withholdingTaxAmount - 0.01))
+      const discountAmount = roundMoney(Math.min(maximumDiscount, remainingDiscount))
+      remainingDiscount = roundMoney(remainingDiscount - discountAmount)
+      return {
+        ...line,
+        discountAmount,
+        receiptAmount: roundMoney(arSettlement - line.withholdingTaxAmount - discountAmount),
+      }
+    })
+  }
+
   function updateReceiptForm(patch: Partial<CustomerReceiptFormValues>) {
     setError(null)
+    if (receiptSourceType === 'SB' && 'discount' in patch) {
+      syncReceiptLines(applyReceiptDiscount(Number(patch.discount) || 0), patch)
+      return
+    }
     const nextAmount = Number(form.amount) || 0
     const nextWithholdingTax = Number(form.withholdingTax) || 0
     const nextFee = 'fee' in patch ? Number(patch.fee) || 0 : Number(form.fee) || 0
@@ -2261,9 +2352,6 @@ export function MoneyMovementPageClient({
         customerTransferredNativeAmount: undefined,
         fee: 0,
         fxRate: undefined,
-        fxRateOverrideReason: null,
-        fxRateType: undefined,
-        receivedNativeAmount: undefined,
         receiptCurrencyCode: functionalCurrencyCode || undefined,
         salesBillLines: sourceType === 'SB' ? [newReceiptLine()] : [],
         sourceType,
@@ -2298,9 +2386,6 @@ export function MoneyMovementPageClient({
         customerTransferredNativeAmount: undefined,
         fee: 0,
         fxRate: undefined,
-        fxRateOverrideReason: null,
-        fxRateType: undefined,
-        receivedNativeAmount: undefined,
         receiptCurrencyCode: nextCurrencyCode,
         splits: [newReceiptSplit()],
       })
@@ -2329,7 +2414,6 @@ export function MoneyMovementPageClient({
         ...currentReceipt,
         date,
         fxRate: isForeignReceipt ? undefined : currentReceipt.fxRate,
-        fxRateOverrideReason: isForeignReceipt ? null : currentReceipt.fxRateOverrideReason,
       })
     }
     if (!isForeignReceipt || !receiptDateChangeWillDiscardData(currentReceipt)) {
@@ -2363,8 +2447,6 @@ export function MoneyMovementPageClient({
           customerTransferredNativeAmount: undefined,
           fee: 0,
           fxRate: undefined,
-          fxRateOverrideReason: null,
-          receivedNativeAmount: undefined,
           splits: [newReceiptSplit()],
         }
       : {}
@@ -2384,7 +2466,7 @@ export function MoneyMovementPageClient({
     }
     if (!currentReceipt.customerId?.trim()
       && !willDiscardLine
-      && !(isForeignReceipt && receiptForeignSettlementWillDiscardData(currentReceipt, { includeFxRateType: false }))) {
+      && !(isForeignReceipt && receiptForeignSettlementWillDiscardData(currentReceipt))) {
       applyBranch()
       return
     }
@@ -2427,7 +2509,18 @@ export function MoneyMovementPageClient({
 
   function updateReceiptLine(index: number, patch: Partial<ReceiptLine>) {
     setError(null)
-    syncReceiptLines(receiptLines.map((line, lineIndex) => (lineIndex === index ? { ...line, ...patch } : line)))
+    syncReceiptLines(receiptLines.map((line, lineIndex) => {
+      if (lineIndex !== index) return line
+      const nextLine = { ...line, ...patch }
+      const outstandingArAmount = billMap.get(nextLine.salesBillDocNo)?.receivableBalance
+      if (isForeignReceipt && outstandingArAmount != null && ('withholdingTaxAmount' in patch || 'discountAmount' in patch)) {
+        return {
+          ...nextLine,
+          receiptAmount: calculateCustomerReceiptCashRequired(outstandingArAmount, nextLine.discountAmount, nextLine.withholdingTaxAmount),
+        }
+      }
+      return nextLine
+    }))
   }
 
   function addReceiptLine() {
@@ -2463,8 +2556,6 @@ export function MoneyMovementPageClient({
           customerTransferredNativeAmount: undefined,
           fee: 0,
           fxRate: undefined,
-          fxRateOverrideReason: null,
-          receivedNativeAmount: undefined,
           splits: [newReceiptSplit()],
         }
       : {}
@@ -2496,7 +2587,7 @@ export function MoneyMovementPageClient({
       syncReceiptLines(nextBillLines, { customerId, ...resetForeignReceiptSettlement })
     }
     if (!willDiscardLine
-      && !(isForeignReceipt && receiptForeignSettlementWillDiscardData(currentReceipt, { includeFxRateType: false }))) {
+      && !(isForeignReceipt && receiptForeignSettlementWillDiscardData(currentReceipt))) {
       applyCustomer()
       return
     }
@@ -2712,7 +2803,7 @@ export function MoneyMovementPageClient({
       if (splitIndex !== index) return split
       const nextSplit = { ...split, ...patch }
       if ('accountId' in patch && receiptSplits.length === 1 && (Number(nextSplit.amount) || 0) <= 0) {
-        nextSplit.amount = isForeignReceipt ? receivedNativeAmount : formNetAmount
+        nextSplit.amount = isForeignReceipt ? foreignReceiptAmount : formNetAmount
       }
       return nextSplit
     }))
@@ -2788,7 +2879,24 @@ export function MoneyMovementPageClient({
     const normalizedReceiptCurrencyCode = receiptForm.receiptCurrencyCode?.trim().toUpperCase()
     const isForeign = Boolean(functionalCurrencyCode && normalizedReceiptCurrencyCode && normalizedReceiptCurrencyCode !== functionalCurrencyCode)
     const normalizedSplits = (receiptForm.splits ?? []).map((split) => ({ ...split }))
-    const payloadLines = (receiptForm.salesBillLines ?? [])
+    const transferredNativeAmount = roundMoney(normalizedSplits.reduce((sum, split) => sum + (Number(split.amount) || 0), 0))
+    const receiptTargetLines = isForeign && receiptForm.sourceType === 'SB'
+      ? (receiptForm.salesBillLines ?? []).map((line) => {
+          const outstandingArAmount = billMap.get(line.salesBillDocNo)?.receivableBalance
+          if (outstandingArAmount == null) return line
+          return {
+            ...line,
+            receiptAmount: calculateCustomerReceiptCashRequired(outstandingArAmount, line.discountAmount, line.withholdingTaxAmount),
+          }
+        })
+      : receiptForm.salesBillLines ?? []
+    const receiptSettlement = calculateCustomerReceiptSettlement(
+      receiptTargetLines,
+      isForeign
+        ? roundMoney(transferredNativeAmount * (Number(receiptForm.fxRate) || 0))
+        : Number(receiptForm.amount) || 0,
+    )
+    const payloadLines = receiptSettlement.lines
       .filter((line) => line.salesBillDocNo && Number(line.receiptAmount) > 0)
       .map((line) => ({
         ...line,
@@ -2810,14 +2918,11 @@ export function MoneyMovementPageClient({
       amount: receiptAmount,
       billId: payloadLines[0]?.salesBillDocNo ?? null,
       discount: roundMoney(payloadLines.reduce((sum, line) => sum + line.discountAmount, 0)),
-      customerTransferredNativeAmount: isForeign ? roundMoney(Number(receiptForm.customerTransferredNativeAmount) || 0) : undefined,
+      customerTransferredNativeAmount: isForeign ? transferredNativeAmount : undefined,
       accountId: normalizedSplits[0]?.accountId ?? receiptForm.accountId,
       fee: roundMoney(Number(receiptForm.fee) || 0),
       fxRate: isForeign ? roundFxRate(Number(receiptForm.fxRate) || 0) : undefined,
-      fxRateOverrideReason: isForeign ? receiptForm.fxRateOverrideReason ?? null : null,
-      fxRateType: isForeign ? receiptForm.fxRateType?.trim() || undefined : undefined,
       method: normalizedSplits[0]?.method ?? receiptForm.method ?? '',
-      receivedNativeAmount: isForeign ? roundMoney(Number(receiptForm.receivedNativeAmount) || 0) : undefined,
       receiptCurrencyCode: normalizedReceiptCurrencyCode || undefined,
       sourceType: receiptForm.sourceType,
       salesBillLines: receiptForm.sourceType === 'SB' ? payloadLines : [],
@@ -2861,14 +2966,6 @@ export function MoneyMovementPageClient({
       if (isForeignReceipt) {
         if (!functionalCurrencyCode) {
           setError('ยังไม่ได้ตั้งค่าสกุลเงินหลักของระบบ')
-          return
-        }
-        if (Math.abs(receiptSplitTotal - receivedNativeAmount) > 0.01) {
-          setError(`รวมยอดเข้าบัญชี FCD ต้องเท่ากับยอดเข้าบัญชีจริง (${receiptCurrencyCode})`)
-          return
-        }
-        if (Math.abs(foreignReconciliationDifference) > 0.01) {
-          setError('ยอดที่ลูกค้าโอน, ยอดเข้าบัญชีจริง, rate และ Bank Fee (THB) ต้อง reconcile กัน')
           return
         }
         const invalidAccount = (receiptPayload.splits ?? []).some((split) => !foreignFcdAccounts.some((account) => account.id === split.accountId))
@@ -3079,6 +3176,16 @@ export function MoneyMovementPageClient({
                 value={branchFilter}
                 onChange={(value) => setBranchFilter(value ?? '')}
               />
+              <UiSelect
+                aria-label="กรองสถานะใบรับเงิน"
+                className="h-9 w-full px-2 sm:w-auto sm:min-w-[140px]"
+                value={receiptQueueStatusFilter}
+                onChange={(event) => setReceiptQueueStatusFilter(event.target.value as ReceiptQueueStatusFilter)}
+              >
+                <option value="all">ทุกสถานะ</option>
+                <option value="pending">รอรับเงิน</option>
+                <option value="active">รับเงินแล้ว</option>
+              </UiSelect>
               {hasActiveBillFilters ? (
                 <UiButton
                   className="h-9 font-normal"
@@ -3089,6 +3196,7 @@ export function MoneyMovementPageClient({
                     setBillSearch('')
                     setBillSort('date_desc')
                     setBranchFilter('')
+                    setReceiptQueueStatusFilter('all')
                   }}
                 >
                   <X aria-hidden="true" className="mr-1 h-4 w-4" />
@@ -3130,10 +3238,10 @@ export function MoneyMovementPageClient({
                 >
                   <div className="mb-2 flex items-start justify-between">
                     <div>
-                      <div className="font-bold text-slate-800 text-sm">{receiptDocNo}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">อ้างอิง {bill.docNo}</div>
+                      <div className="text-center font-mono font-bold text-sm text-slate-800 whitespace-nowrap">{receiptDocNo}</div>
+                      <div className="mt-0.5 text-center font-mono text-xs text-slate-500 whitespace-nowrap">อ้างอิง {bill.docNo}</div>
                     </div>
-                    <span className="text-xs text-slate-500">{formatDateDisplay(bill.date)}</span>
+                    <span className="text-center text-xs text-slate-500 whitespace-nowrap">{formatDateDisplay(bill.date)}</span>
                   </div>
                   <div className="mb-3 space-y-1 text-xs text-slate-600">
                     <div>
@@ -3141,6 +3249,8 @@ export function MoneyMovementPageClient({
                       <span className="text-slate-800">{partyMap.get(bill.customerId ?? '') ?? bill.customerId ?? '-'}</span>
                     </div>
                     <div className="text-xs font-semibold text-amber-700">{receiptQueueStatusLabel(bill)}</div>
+                    <div className="text-center whitespace-nowrap"><span className="font-semibold text-slate-500">อัปเดตล่าสุด: </span>{formatDateTimeDisplay(bill.receiptUpdatedAt)}</div>
+                    <div><span className="font-semibold text-slate-500">ผู้ดำเนินการ: </span>{bill.receiptUpdatedBy || '-'}</div>
                   </div>
                   <div className="flex items-end justify-between border-t border-slate-100 pt-2">
                     <div>
@@ -3177,13 +3287,16 @@ export function MoneyMovementPageClient({
               </colgroup>
               <TableHeader className="text-slate-700">
                 <tr>
-                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="เลขที่ใบรับเงิน" resizeProps={receiptQueueColumnResize.getResizeHandleProps('docNo', 'เลขที่ใบรับเงิน')} sortKey="docNo" onSort={toggleBillSort} />
-                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="วันที่สร้างเอกสาร" resizeProps={receiptQueueColumnResize.getResizeHandleProps('date', 'วันที่สร้างเอกสาร')} sortKey="date" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="center" direction={billSortState.direction} label="เลขที่ใบรับเงิน" resizeProps={receiptQueueColumnResize.getResizeHandleProps('docNo', 'เลขที่ใบรับเงิน')} sortKey="docNo" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="center" direction={billSortState.direction} label="วันที่สร้างเอกสาร" resizeProps={receiptQueueColumnResize.getResizeHandleProps('date', 'วันที่สร้างเอกสาร')} sortKey="date" onSort={toggleBillSort} />
                   <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="ลูกค้า" resizeProps={receiptQueueColumnResize.getResizeHandleProps('partyName', 'ลูกค้า')} sortKey="supplier" onSort={toggleBillSort} />
-                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="บิลขายอ้างอิง" resizeProps={receiptQueueColumnResize.getResizeHandleProps('accountNo', 'บิลขายอ้างอิง')} sortKey="sourceDocNo" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="center" direction={billSortState.direction} label="บิลขายอ้างอิง" resizeProps={receiptQueueColumnResize.getResizeHandleProps('accountNo', 'บิลขายอ้างอิง')} sortKey="sourceDocNo" onSort={toggleBillSort} />
                   <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ยอดรวม" resizeProps={receiptQueueColumnResize.getResizeHandleProps('totalAmount', 'ยอดรวม')} sortKey="totalAmount" onSort={toggleBillSort} />
                   <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="รับแล้ว" resizeProps={receiptQueueColumnResize.getResizeHandleProps('paidAmount', 'รับแล้ว')} sortKey="paidAmount" onSort={toggleBillSort} />
                   <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ค้างรับ" resizeProps={receiptQueueColumnResize.getResizeHandleProps('balance', 'ค้างรับ')} sortKey="balance" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="center" direction={billSortState.direction} label="สถานะ" resizeProps={receiptQueueColumnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="center" direction={billSortState.direction} label="อัปเดตล่าสุด" resizeProps={receiptQueueColumnResize.getResizeHandleProps('updatedAt', 'อัปเดตล่าสุด')} sortKey="updatedAt" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="ผู้ดำเนินการ" resizeProps={receiptQueueColumnResize.getResizeHandleProps('operator', 'ผู้ดำเนินการ')} sortKey="operator" onSort={toggleBillSort} />
                   <ResizableTableHead align="center" label="จัดการ" resizeProps={receiptQueueColumnResize.getResizeHandleProps('action', 'Action')} />
                 </tr>
               </TableHeader>
@@ -3196,16 +3309,31 @@ export function MoneyMovementPageClient({
                   const receiptDocNo = receiptQueueDocNo(bill)
                   return (
                     <TableRow key={bill.id} className="cursor-pointer hover:bg-slate-50" onClick={() => openReceivableBillDetail(bill)}>
-                      <TableCell className="text-xs font-semibold text-slate-700">
-                        <div>{receiptDocNo}</div>
-                        <div className="mt-1 text-xs font-normal text-amber-700">{receiptQueueStatusLabel(bill)}</div>
+                      <TableCell className="whitespace-nowrap text-center font-mono text-xs font-semibold text-slate-700">
+                        {receiptDocNo}
                       </TableCell>
-                      <TableCell className="text-xs font-semibold text-slate-700">{formatDateDisplay(bill.date)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-center text-xs font-semibold text-slate-700">{formatDateDisplay(bill.date)}</TableCell>
                       <TableCell className="truncate text-xs font-semibold text-slate-700">{partyMap.get(bill.customerId ?? '') ?? bill.customerId ?? '-'}</TableCell>
-                      <TableCell className="text-xs font-semibold text-slate-700">{bill.docNo}</TableCell>
+                      <TableCell className="whitespace-nowrap text-center font-mono text-xs font-semibold text-slate-700">{bill.docNo}</TableCell>
                       <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(bill.totalAmount)}</TableCell>
                       <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-blue-700 tabular-nums">{formatMoney(receivedAmount)}</TableCell>
                       <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-emerald-700 tabular-nums">{formatMoney(balance)}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${receiptQueueStatus(bill) === 'active' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          <span className={`size-1.5 rounded-full ${receiptQueueStatus(bill) === 'active' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                          {receiptQueueStatusLabel(bill)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs font-medium text-slate-600">{formatDateTimeDisplay(bill.receiptUpdatedAt)}</TableCell>
+                      <TableCell className="truncate text-xs font-medium text-slate-700">{bill.receiptUpdatedBy || '-'}</TableCell>
+                      <TableCell className="text-center">
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${receiptQueueStatus(bill) === 'active' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          <span className={`size-1.5 rounded-full ${receiptQueueStatus(bill) === 'active' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                          {receiptQueueStatusLabel(bill)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-center text-xs font-medium text-slate-600">{formatDateTimeDisplay(bill.receiptUpdatedAt)}</TableCell>
+                      <TableCell className="truncate text-xs font-medium text-slate-700">{bill.receiptUpdatedBy || '-'}</TableCell>
                       <TableCell className="text-center">
                         <TableActionButton menu={(
                           <>
@@ -3311,10 +3439,10 @@ export function MoneyMovementPageClient({
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-bold text-slate-800">{bill.docNo}</div>
-                      {bill.sourceDocNo && bill.sourceDocNo !== bill.docNo ? <div className="mt-0.5 text-xs text-slate-500">อ้างอิง {bill.sourceDocNo}</div> : null}
+                      <div className="text-center font-mono text-sm font-bold text-slate-800 whitespace-nowrap">{bill.docNo}</div>
+                      {bill.sourceDocNo && bill.sourceDocNo !== bill.docNo ? <div className="mt-0.5 text-center font-mono text-xs text-slate-500 whitespace-nowrap">อ้างอิง {bill.sourceDocNo}</div> : null}
                     </div>
-                    <span className="shrink-0 text-xs text-slate-500">{formatDateDisplay(bill.date)}</span>
+                    <span className="shrink-0 text-center text-xs text-slate-500 whitespace-nowrap">{formatDateDisplay(bill.date)}</span>
                   </div>
                   <div className="mb-3 space-y-1.5 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
                     <div>
@@ -3347,7 +3475,7 @@ export function MoneyMovementPageClient({
                   <div className="flex items-end justify-between border-t border-slate-100 pt-2">
                     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                       <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-medium text-slate-700">{paymentSourceTypeLabel(bill.sourceType)}</span>
-                      <span>อายุ {ageInDays(bill.date).toLocaleString('th-TH')} วัน</span>
+                      <span className="whitespace-nowrap">อายุ {ageInDays(bill.date).toLocaleString('th-TH')} วัน</span>
                     </div>
                     <div className="text-right">
                       <span className="block text-xs text-slate-400">ยอดรอจ่าย</span>
@@ -3381,14 +3509,14 @@ export function MoneyMovementPageClient({
                 </colgroup>
                 <TableHeader className="text-slate-700">
                   <tr>
-                    <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="เลขที่ PMA / อ้างอิง" resizeProps={paymentQueueColumnResize.getResizeHandleProps('docNo', 'เลขที่ PMA / อ้างอิง')} sortKey="docNo" onSort={toggleBillSort} />
-                    <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="วันที่เอกสาร" resizeProps={paymentQueueColumnResize.getResizeHandleProps('date', 'วันที่เอกสาร')} sortKey="date" onSort={toggleBillSort} />
-                    <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ผู้รับเงิน" resizeProps={paymentQueueColumnResize.getResizeHandleProps('partyName', 'ผู้รับเงิน')} sortKey="supplier" onSort={toggleBillSort} />
-                    <ResizableTableHead align="right" label="ปลายทางรับเงิน" resizeProps={paymentQueueColumnResize.getResizeHandleProps('destination', 'ปลายทางรับเงิน')} />
+                    <TableSortHeader activeKey={billSortState.field} align="center" direction={billSortState.direction} label="เลขที่ PMA / อ้างอิง" resizeProps={paymentQueueColumnResize.getResizeHandleProps('docNo', 'เลขที่ PMA / อ้างอิง')} sortKey="docNo" onSort={toggleBillSort} />
+                    <TableSortHeader activeKey={billSortState.field} align="center" direction={billSortState.direction} label="วันที่เอกสาร" resizeProps={paymentQueueColumnResize.getResizeHandleProps('date', 'วันที่เอกสาร')} sortKey="date" onSort={toggleBillSort} />
+                    <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="ผู้รับเงิน" resizeProps={paymentQueueColumnResize.getResizeHandleProps('partyName', 'ผู้รับเงิน')} sortKey="supplier" onSort={toggleBillSort} />
+                    <ResizableTableHead align="left" label="ปลายทางรับเงิน" resizeProps={paymentQueueColumnResize.getResizeHandleProps('destination', 'ปลายทางรับเงิน')} />
                     <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ยอดอนุมัติ" resizeProps={paymentQueueColumnResize.getResizeHandleProps('totalAmount', 'ยอดอนุมัติ')} sortKey="totalAmount" onSort={toggleBillSort} />
                     <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ยอดรอจ่าย" resizeProps={paymentQueueColumnResize.getResizeHandleProps('balance', 'ยอดรอจ่าย')} sortKey="balance" onSort={toggleBillSort} />
                     <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="อายุเอกสาร (วัน)" sortKey="age" onSort={toggleBillSort} />
-                    <ResizableTableHead align="right" className="sticky right-0 z-20 bg-slate-100" label="จัดการ" resizeProps={paymentQueueColumnResize.getResizeHandleProps('action', 'จัดการ')} />
+                    <ResizableTableHead align="center" className="sticky right-0 z-20 bg-slate-100" label="จัดการ" resizeProps={paymentQueueColumnResize.getResizeHandleProps('action', 'จัดการ')} />
                   </tr>
                 </TableHeader>
                 <TableBody className="divide-y divide-slate-100">
@@ -3401,13 +3529,13 @@ export function MoneyMovementPageClient({
                     const canCancelApproval = (bill.paidAmount ?? 0) <= 0.01 && Boolean(bill.approvalId)
                     return (
                       <TableRow key={`${bill.id}:${bill.approvalId ?? 'no-approval'}`} className="group hover:bg-slate-50">
-                        <TableCell className="text-xs font-semibold text-slate-700">
+                        <TableCell className="whitespace-nowrap text-center font-mono text-xs font-semibold text-slate-700">
                           <div>{bill.docNo}</div>
                           {bill.sourceDocNo && bill.sourceDocNo !== bill.docNo ? <div className="mt-0.5 text-xs font-normal text-slate-500">อ้างอิง {bill.sourceDocNo}</div> : null}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap text-right text-xs font-semibold text-slate-700">{formatDateDisplay(bill.date)}</TableCell>
-                        <TableCell className="max-w-72 truncate text-right text-xs font-semibold text-slate-700">{partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'}</TableCell>
-                        <TableCell className="text-right text-xs font-semibold text-slate-700">
+                        <TableCell className="whitespace-nowrap text-center text-xs font-semibold text-slate-700">{formatDateDisplay(bill.date)}</TableCell>
+                        <TableCell className="max-w-72 truncate text-left text-xs font-semibold text-slate-700">{partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'}</TableCell>
+                        <TableCell className="text-left text-xs font-semibold text-slate-700">
                           {supplierBankAccounts.length > 0 ? (
                             <div className="space-y-1.5">
                               {supplierBankAccounts.map((account, index) => {
@@ -3444,7 +3572,7 @@ export function MoneyMovementPageClient({
                         <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(bill.totalAmount)}</TableCell>
                         <TableCell className={`whitespace-nowrap text-right pr-4 text-xs font-semibold tabular-nums ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</TableCell>
                         <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{ageInDays(bill.date)}</TableCell>
-                        <TableCell className="sticky right-0 z-10 bg-white text-right group-hover:bg-slate-50">
+                        <TableCell className="sticky right-0 z-10 bg-white text-center group-hover:bg-slate-50">
                           <TableActionButton menu={(
                             <>
                               <TableActionMenuItem onSelect={() => openFormForBill(bill)}>ทำจ่าย</TableActionMenuItem>
@@ -3543,7 +3671,7 @@ export function MoneyMovementPageClient({
                       <label className="block">
                         <span className="mb-1 block text-xs font-medium text-slate-600">วันที่</span>
                         <DatePickerInput
-                          className="w-full h-9 text-sm"
+                          className="w-full h-10 text-sm"
                           value={form.date}
                           onChange={changeReceiptDate}
                         />
@@ -3551,7 +3679,7 @@ export function MoneyMovementPageClient({
                       <label className="block">
                         <span className="mb-1 block text-xs font-medium text-slate-600">ประเภทเอกสารรับเงิน</span>
                         <UiSelect
-                          className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                          className="h-10 w-full rounded-md border border-slate-300 px-2 text-sm"
                           disabled={Boolean(form.id)}
                           value={receiptSourceType}
                           onChange={(event) => changeReceiptSourceType(event.target.value as 'SB' | 'CADV')}
@@ -3571,7 +3699,7 @@ export function MoneyMovementPageClient({
                       />
                       <SearchCombobox
                         disabled={Boolean(form.id || form.billId) || (receiptSourceType === 'SB' && !(form as CustomerReceiptFormValues).branchId)}
-                        inputClassName="!h-9 px-2 py-1.5"
+                        inputClassName="!h-10 px-2 py-1.5"
                         inputId="receipt-customer-search"
                         label={`${partyLabel} *`}
                         options={customerSearchOptions}
@@ -3593,14 +3721,13 @@ export function MoneyMovementPageClient({
                     </div>
                     {/* Desktop Table view (Visible on large screens) */}
                     <div className="hidden lg:block overflow-x-auto">
-                      <table className="ns-table w-full min-w-[910px] table-fixed text-xs">
+                      <table className="ns-table w-full min-w-[800px] table-fixed text-xs">
                         <thead className="bg-slate-50 text-slate-600">
                           <tr>
-                            <th className="w-[380px] p-2 text-left">Sales Bill</th>
+                            <th className="w-[380px] p-2 text-center">Sales Bill</th>
                             <th className="w-[110px] p-2 text-right">ค้างรับ (THB)</th>
                             <th className="w-[120px] p-2 text-right">ยอดรับ (THB)</th>
                             <th className="w-[110px] p-2 text-right">ภาษีหัก ณ ที่จ่าย (THB)</th>
-                            <th className="w-[110px] p-2 text-right">ส่วนลด (THB)</th>
                             <th className="w-[80px] p-2 text-center">ลบ</th>
                           </tr>
                         </thead>
@@ -3608,11 +3735,11 @@ export function MoneyMovementPageClient({
                           {receiptLines.map((line, index) => {
                             const selectedLineBill = billMap.get(line.salesBillDocNo)
                             const receiptAmountKey = receiptLineMoneyKey(line, index, 'receiptAmount')
+                            const displayedReceiptAmount = receiptCalculationLines[index]?.receiptAmount ?? line.receiptAmount
                             const withholdingTaxAmountKey = receiptLineMoneyKey(line, index, 'withholdingTaxAmount')
-                            const discountAmountKey = receiptLineMoneyKey(line, index, 'discountAmount')
                             return (
                               <tr key={line.id ?? `${index}-${line.salesBillDocNo}`} className="border-t border-slate-100">
-                                <td className="p-2">
+                                <td className="whitespace-nowrap p-2 text-center">
                                   <UiSelect
                                     disabled={!(form as CustomerReceiptFormValues).branchId}
                                     className="h-9 w-full rounded-md border border-slate-300 px-2 text-xs"
@@ -3631,13 +3758,13 @@ export function MoneyMovementPageClient({
                                 <td className="p-2">
                                   <UiInput
                                     className="h-9 text-right tabular-nums"
-                                    disabled={Boolean(form.id)}
+                                    disabled={Boolean(form.id) || isForeignReceipt}
                                     inputMode="decimal"
                                     type="text"
-                                    value={moneyInputValue(receiptAmountKey, line.receiptAmount)}
+                                    value={moneyInputValue(receiptAmountKey, displayedReceiptAmount)}
                                     onBlur={() => finishMoneyInput(receiptAmountKey)}
                                     onChange={(event) => changeMoneyInput(receiptAmountKey, event.target.value, (value) => updateReceiptLine(index, { receiptAmount: value }))}
-                                    onFocus={() => startMoneyInput(receiptAmountKey, line.receiptAmount)}
+                                    onFocus={() => startMoneyInput(receiptAmountKey, displayedReceiptAmount)}
                                   />
                                 </td>
                                 <td className="p-2">
@@ -3650,18 +3777,6 @@ export function MoneyMovementPageClient({
                                     onBlur={() => finishMoneyInput(withholdingTaxAmountKey)}
                                     onChange={(event) => changeMoneyInput(withholdingTaxAmountKey, event.target.value, (value) => updateReceiptLine(index, { withholdingTaxAmount: value }))}
                                     onFocus={() => startMoneyInput(withholdingTaxAmountKey, line.withholdingTaxAmount)}
-                                  />
-                                </td>
-                                <td className="p-2">
-                                  <UiInput
-                                    className="h-9 text-right tabular-nums"
-                                    disabled={Boolean(form.id)}
-                                    inputMode="decimal"
-                                    type="text"
-                                    value={moneyInputValue(discountAmountKey, line.discountAmount)}
-                                    onBlur={() => finishMoneyInput(discountAmountKey)}
-                                    onChange={(event) => changeMoneyInput(discountAmountKey, event.target.value, (value) => updateReceiptLine(index, { discountAmount: value }))}
-                                    onFocus={() => startMoneyInput(discountAmountKey, line.discountAmount)}
                                   />
                                 </td>
                                 <td className="p-2 text-center">
@@ -3681,8 +3796,8 @@ export function MoneyMovementPageClient({
                       {receiptLines.map((line, index) => {
                         const selectedLineBill = billMap.get(line.salesBillDocNo)
                         const receiptAmountKey = receiptLineMoneyKey(line, index, 'receiptAmount')
+                        const displayedReceiptAmount = receiptCalculationLines[index]?.receiptAmount ?? line.receiptAmount
                         const withholdingTaxAmountKey = receiptLineMoneyKey(line, index, 'withholdingTaxAmount')
-                        const discountAmountKey = receiptLineMoneyKey(line, index, 'discountAmount')
                         return (
                           <div key={line.id ?? `${index}-${line.salesBillDocNo}`} className="p-4 rounded-md border border-slate-200 bg-slate-50/50 space-y-3">
                             <div className="flex justify-between items-center">
@@ -3709,7 +3824,7 @@ export function MoneyMovementPageClient({
                               >
                                 <option value="">{(form as CustomerReceiptFormValues).branchId ? 'เลือกบิลขาย' : 'เลือกสาขาก่อน'}</option>
                                 {receiptSelectableBillsForLine(index).map((bill) => (
-                                  <option key={bill.docNo} value={bill.docNo}>
+                                  <option key={bill.docNo} className="whitespace-nowrap" value={bill.docNo}>
                                     {bill.docNo} - {partyMap.get(bill.customerId ?? '') ?? bill.customerId ?? '-'} - ค้าง {formatMoney(bill.receivableBalance ?? 0)}
                                   </option>
                                 ))}
@@ -3727,18 +3842,18 @@ export function MoneyMovementPageClient({
                                 <span className="mb-1 block text-xs font-medium text-slate-600">ยอดรับ (THB)</span>
                                 <UiInput
                                   className="h-9 w-full text-right tabular-nums text-xs"
-                                  disabled={Boolean(form.id)}
+                                  disabled={Boolean(form.id) || isForeignReceipt}
                                   inputMode="decimal"
                                   type="text"
-                                  value={moneyInputValue(receiptAmountKey, line.receiptAmount)}
+                                  value={moneyInputValue(receiptAmountKey, displayedReceiptAmount)}
                                   onBlur={() => finishMoneyInput(receiptAmountKey)}
                                   onChange={(event) => changeMoneyInput(receiptAmountKey, event.target.value, (value) => updateReceiptLine(index, { receiptAmount: value }))}
-                                  onFocus={() => startMoneyInput(receiptAmountKey, line.receiptAmount)}
+                                  onFocus={() => startMoneyInput(receiptAmountKey, displayedReceiptAmount)}
                                 />
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div>
                               <div>
                                 <span className="mb-1 block text-xs font-medium text-slate-600">ภาษีหัก ณ ที่จ่าย (THB)</span>
                                 <UiInput
@@ -3750,19 +3865,6 @@ export function MoneyMovementPageClient({
                                   onBlur={() => finishMoneyInput(withholdingTaxAmountKey)}
                                   onChange={(event) => changeMoneyInput(withholdingTaxAmountKey, event.target.value, (value) => updateReceiptLine(index, { withholdingTaxAmount: value }))}
                                   onFocus={() => startMoneyInput(withholdingTaxAmountKey, line.withholdingTaxAmount)}
-                                />
-                              </div>
-                              <div>
-                                <span className="mb-1 block text-xs font-medium text-slate-600">ส่วนลด (THB)</span>
-                                <UiInput
-                                  className="h-9 w-full text-right tabular-nums text-xs"
-                                  disabled={Boolean(form.id)}
-                                  inputMode="decimal"
-                                  type="text"
-                                  value={moneyInputValue(discountAmountKey, line.discountAmount)}
-                                  onBlur={() => finishMoneyInput(discountAmountKey)}
-                                  onChange={(event) => changeMoneyInput(discountAmountKey, event.target.value, (value) => updateReceiptLine(index, { discountAmount: value }))}
-                                  onFocus={() => startMoneyInput(discountAmountKey, line.discountAmount)}
                                 />
                               </div>
                             </div>
@@ -3786,7 +3888,7 @@ export function MoneyMovementPageClient({
                         <table className="ns-table w-full min-w-[760px] table-fixed text-xs">
                           <thead className="bg-slate-50 text-slate-600">
                             <tr>
-                              <th className="w-[320px] p-2 text-left">CADV</th>
+                              <th className="w-[320px] p-2 text-center">CADV</th>
                               <th className="w-[130px] p-2 text-right">ยอดเอกสาร (THB)</th>
                               <th className="w-[130px] p-2 text-right">รับแล้ว (THB)</th>
                               <th className="w-[130px] p-2 text-right">คงเหลือรับ (THB)</th>
@@ -3800,7 +3902,7 @@ export function MoneyMovementPageClient({
                               const amountKey = `customer-advance-receipt:${line.id ?? index}:amount`
                               return (
                                 <tr key={line.id ?? `${index}-${line.customerAdvanceDocNo}`} className="border-t border-slate-100">
-                                  <td className="p-2">
+                                  <td className="whitespace-nowrap p-2 text-center">
                                     <UiSelect
                                       className="h-9 w-full rounded-md border border-slate-300 px-2 text-xs"
                                       value={line.customerAdvanceDocNo}
@@ -3843,14 +3945,74 @@ export function MoneyMovementPageClient({
                     </section>
                   )}
 
-                  <section className="rounded-md border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-100 px-4 py-3">
-                      <h3 className="text-sm font-bold text-slate-900">สกุลเงินและบัญชีรับเงิน</h3>
+                  {receiptSourceType === 'SB' ? <div className="rounded-md border border-slate-200 bg-slate-50/50 p-4">
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-5 text-xs">
+                      <div>
+                        <span className="text-slate-500 block mb-1 font-semibold">ยอดลูกหนี้ก่อนตัด ({functionalCurrencyCode || '-'})</span>
+                        <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(selectedReceiptBillBalance)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block mb-1 font-semibold">ส่วนลด ({functionalCurrencyCode || '-'})</span>
+                        <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(form.discount)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block mb-1 font-semibold">ภาษีหัก ณ ที่จ่าย ({functionalCurrencyCode || '-'})</span>
+                        <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(form.withholdingTax)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block mb-1 font-semibold">ยอดเงินสดที่ต้องรับ ({functionalCurrencyCode || '-'})</span>
+                        <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(receiptCashRequiredAmount)}</span>
+                      </div>
+                      <div className="col-span-2 md:col-span-1">
+                        <span className="text-slate-500 block mb-1 font-semibold">ยอดตัดลูกหนี้ ({functionalCurrencyCode || '-'})</span>
+                        <span className={`font-extrabold text-sm tabular-nums ${theme.strong}`}>{formatMoney(receiptArAmount)}</span>
+                      </div>
                     </div>
-                    <div className="grid gap-4 p-4 md:grid-cols-3">
+                  </div> : null}
+
+                  <PaymentSplitsSection
+                    accountLabel={isForeignReceipt ? (account) => `${account.code ? `${account.code} - ` : ''}${account.name}` : undefined}
+                    activeAccounts={isForeignReceipt ? foreignFcdAccounts : functionalReceiptAccounts}
+                    addButtonLabel="+ เพิ่มบัญชีรับ"
+                    afterLabel="📊 หลังรับ"
+                    amountLabel="➕ รับ"
+                    balanceMode="add"
+                    calculationSummary={isForeignReceipt ? <div className="grid gap-3 text-xs md:grid-cols-3 xl:grid-cols-6">
+                      <div>
+                        <div className="text-slate-500">ยอดเข้า FCD ({receiptCurrencyCode})</div>
+                        <div className={`mt-1 font-bold tabular-nums ${theme.strong}`}>{foreignReceiptAmount > 0 ? formatMoney(foreignReceiptAmount) : '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500">{receiptSourceType === 'SB' ? 'ยอดตัดลูกหนี้' : 'ยอดตัดเงินรับล่วงหน้า'} ({functionalCurrencyCode})</div>
+                        <div className="mt-1 font-bold tabular-nums text-slate-800">{formatMoney(receiptArAmount)}</div>
+                      </div>
+                      {receiptSourceType === 'SB' ? <div>
+                        <div className="text-slate-500">ยอดลูกหนี้คงเหลือ ({functionalCurrencyCode})</div>
+                        <div className="mt-1 flex items-center gap-2 font-bold text-slate-800">
+                          <span className="tabular-nums">{formatMoney(receiptArRemainingAmount)}</span>
+                          <span className={`rounded px-1.5 py-0.5 text-[11px] ${isPartialForeignReceipt ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {isPartialForeignReceipt ? 'รับบางส่วน' : 'รับครบ'}
+                          </span>
+                        </div>
+                      </div> : null}
+                      {receiptSourceType === 'SB' && settlementFxGain > 0 ? <div>
+                        <div className="text-slate-500">กำไร FX จากการปิดบิล ({functionalCurrencyCode})</div>
+                        <div className="mt-1 font-bold tabular-nums text-slate-800">{formatMoney(settlementFxGain)}</div>
+                      </div> : null}
+                      <div>
+                        <div className="text-slate-500">มูลค่าตามบัญชี FCD ({functionalCurrencyCode})</div>
+                        <div className={`mt-1 font-bold tabular-nums ${theme.strong}`}>{hasForeignReceiptCalculation ? formatMoney(carryingBookAmount) : '-'}</div>
+                      </div>
+                    </div> : undefined}
+                    discountLabel={`ส่วนลด (${functionalCurrencyCode})`}
+                    equalSplitFieldWidths={isForeignReceipt}
+                    feeLabel={`ค่าธรรมเนียมธนาคาร (${functionalCurrencyCode})`}
+                    form={form}
+                    formNetAmount={isForeignReceipt ? foreignReceiptAmount : formNetAmount}
+                    introContent={<div className={`grid gap-4 ${isForeignReceipt ? 'max-w-[420px] md:grid-cols-[220px_180px]' : 'md:grid-cols-3'}`}>
                       <SearchCombobox
                         disabled={Boolean(form.id) || !functionalCurrencyCode}
-                        inputClassName="!h-9 px-2 py-1.5"
+                        inputClassName="!h-10 px-2 py-1.5"
                         inputId="receipt-currency"
                         label="สกุลเงินที่รับจริง *"
                         options={availableReceiptCurrencyOptions}
@@ -3858,154 +4020,43 @@ export function MoneyMovementPageClient({
                         value={receiptCurrencyCode}
                         onChange={changeReceiptCurrency}
                       />
-                      {isForeignReceipt ? <>
-                        <label className="block">
-                          <span className="mb-1 block text-xs font-medium text-slate-600">ยอดที่ลูกค้าโอน ({receiptCurrencyCode}) *</span>
-                          <UiInput
-                            className="h-9 w-full text-right tabular-nums"
-                            inputMode="decimal"
-                            type="text"
-                            value={moneyInputValue('receipt-customer-transferred-native', customerTransferredNativeAmount)}
-                            onBlur={() => finishMoneyInput('receipt-customer-transferred-native')}
-                            onChange={(event) => changeMoneyInput('receipt-customer-transferred-native', event.target.value, (value) => updateReceiptForm({ customerTransferredNativeAmount: value }))}
-                            onFocus={() => startMoneyInput('receipt-customer-transferred-native', customerTransferredNativeAmount)}
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-1 block text-xs font-medium text-slate-600">ยอดเข้าบัญชี FCD จริง ({receiptCurrencyCode}) *</span>
-                          <UiInput
-                            className="h-9 w-full text-right tabular-nums"
-                            inputMode="decimal"
-                            type="text"
-                            value={moneyInputValue('receipt-received-native', receivedNativeAmount)}
-                            onBlur={() => finishMoneyInput('receipt-received-native')}
-                            onChange={(event) => changeMoneyInput('receipt-received-native', event.target.value, (value) => updateReceiptForm({ receivedNativeAmount: value }))}
-                            onFocus={() => startMoneyInput('receipt-received-native', receivedNativeAmount)}
-                          />
-                        </label>
-                      </> : null}
-                    </div>
-                    {isForeignReceipt ? <div className="border-t border-slate-100 p-4">
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <label className="block">
-                          <span className="mb-1 block text-xs font-medium text-slate-600">ประเภทอัตราแลกเปลี่ยน *</span>
-                          <UiSelect
-                            className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
-                            value={receiptForm?.fxRateType ?? ''}
-                            onChange={(event) => updateReceiptForm({ fxRateType: event.target.value, fxRate: undefined, fxRateOverrideReason: null })}
-                          >
-                            <option value="">เลือกประเภทอัตราแลกเปลี่ยน</option>
-                            {(data.fxRateTypes ?? []).map((rateType) => <option key={rateType} value={rateType}>{rateType}</option>)}
-                          </UiSelect>
-                        </label>
-                        <label className="block">
-                          <span className="mb-1 block text-xs font-medium text-slate-600">อัตรา {receiptCurrencyCode} → {functionalCurrencyCode} *</span>
-                          <UiInput
-                            className="h-9 w-full text-right tabular-nums"
-                            inputMode="decimal"
-                            placeholder={isFxRateLoading ? 'กำลังโหลด rate' : '0.000'}
-                            type="text"
-                            value={fxRateInputValue('receipt-fx-rate', foreignFxRate)}
-                            onBlur={() => finishMoneyInput('receipt-fx-rate')}
-                            onChange={(event) => changeMoneyInput('receipt-fx-rate', event.target.value, (value) => updateReceiptForm({ fxRate: value }))}
-                            onFocus={() => startMoneyInput('receipt-fx-rate', foreignFxRate)}
-                          />
-                          <span className="mt-1 block text-xs text-slate-500">
-                            {isFxRateLoading ? 'กำลังค้นหา rate ตามวันที่รับเงิน' : fxRateLookup?.status === 'suggested' ? `ใช้ rate จาก ${fxRateLookup.source ?? 'Currency Master'}` : 'ไม่พบ rate ตามเงื่อนไข ให้กรอกเองพร้อมเหตุผล'}
-                          </span>
-                        </label>
-                        <label className="block">
-                          <span className="mb-1 block text-xs font-medium text-slate-600">Bank Fee ({functionalCurrencyCode}) *</span>
-                          <UiInput
-                            className="h-9 w-full text-right tabular-nums"
-                            inputMode="decimal"
-                            type="text"
-                            value={moneyInputValue('receipt-bank-fee', Number(form.fee) || 0)}
-                            onBlur={() => finishMoneyInput('receipt-bank-fee')}
-                            onChange={(event) => changeMoneyInput('receipt-bank-fee', event.target.value, (value) => updateReceiptForm({ fee: value }))}
-                            onFocus={() => startMoneyInput('receipt-bank-fee', Number(form.fee) || 0)}
-                          />
-                        </label>
-                      </div>
-                      {fxRateLookup?.status !== 'suggested' || (fxRateLookup.rate != null && roundFxRate(fxRateLookup.rate) !== roundFxRate(foreignFxRate)) ? <label className="mt-4 block">
-                        <span className="mb-1 block text-xs font-medium text-slate-600">เหตุผลที่กรอกหรือแก้ไขอัตราแลกเปลี่ยน *</span>
+                      {isForeignReceipt ? <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-slate-600">อัตรา {receiptCurrencyCode} → {functionalCurrencyCode} *</span>
                         <UiInput
-                          className="h-9 w-full"
+                          className="h-10 w-full text-right tabular-nums"
+                          inputMode="decimal"
+                          placeholder={isFxRateLoading ? 'กำลังโหลด rate' : '0.00'}
                           type="text"
-                          value={receiptForm?.fxRateOverrideReason ?? ''}
-                          onChange={(event) => updateReceiptForm({ fxRateOverrideReason: event.target.value })}
+                          value={fxRateInputValue('receipt-fx-rate', foreignFxRate)}
+                          onBlur={() => finishMoneyInput('receipt-fx-rate')}
+                          onChange={(event) => changeMoneyInput('receipt-fx-rate', event.target.value, (value) => updateReceiptForm({ fxRate: value }))}
+                          onFocus={() => startMoneyInput('receipt-fx-rate', foreignFxRate)}
                         />
+                        <span className="mt-1 block text-xs text-slate-500">
+                          {isFxRateLoading
+                            ? 'กำลังดึง rate ล่าสุดจาก Google Finance'
+                            : fxRateLookup?.status === 'suggested'
+                              ? `Rate ล่าสุดจาก Google Finance${formatFxQuoteTimestamp(fxRateLookup.quotedAt) ? ` ณ ${formatFxQuoteTimestamp(fxRateLookup.quotedAt)}` : ''}`
+                              : 'ไม่พบ rate ล่าสุดจาก Google Finance ให้กรอกเอง'}
+                        </span>
                       </label> : null}
-                    </div> : null}
-                  </section>
-
-                  <div className="rounded-md border border-slate-200 bg-slate-50/50 p-4">
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-5 text-xs">
-                      <div>
-                        <span className="text-slate-500 block mb-1 font-semibold">{receiptSourceType === 'SB' ? amountLabel : 'ยอดตัด CADV'} ({functionalCurrencyCode || '-'})</span>
-                        <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(form.amount)}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block mb-1 font-semibold">{receiptSourceType === 'SB' ? 'ภาษีหัก ณ ที่จ่าย' : 'Bank Fee'} ({functionalCurrencyCode || '-'})</span>
-                        <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(receiptSourceType === 'SB' ? form.withholdingTax : form.fee)}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block mb-1 font-semibold">{receiptSourceType === 'SB' ? 'ยอดตัด AR' : 'ยอดรับ CADV'} ({functionalCurrencyCode || '-'})</span>
-                        <span className="font-bold text-slate-800 text-sm tabular-nums">{formatMoney(receiptArAmount)}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block mb-1 font-semibold">{receiptSourceType === 'SB' ? 'Fee / Discount' : `ยอดเข้าบัญชี FCD (${receiptCurrencyCode || '-'})`}</span>
-                        <span className="font-bold text-slate-800 text-sm tabular-nums">{receiptSourceType === 'SB' ? `${formatMoney(form.fee)} / ${formatMoney(form.discount)}` : formatMoney(receivedNativeAmount)}</span>
-                      </div>
-                      <div className="col-span-2 md:col-span-1">
-                        <span className="text-slate-500 block mb-1 font-semibold">{isForeignReceipt ? 'Carrying' : 'Net (สุทธิ)'} ({functionalCurrencyCode || '-'})</span>
-                        <span className={`font-extrabold text-sm tabular-nums ${theme.strong}`}>{formatMoney(isForeignReceipt ? carryingBookAmount : formNetAmount)}</span>
-                      </div>
-                    </div>
-                    {isForeignReceipt ? <div className={`mt-3 grid gap-2 border-t border-slate-200 pt-3 text-xs ${receiptSourceType === 'SB' ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-                      <div><span className="text-slate-500">Settlement ({functionalCurrencyCode})</span><div className="font-bold tabular-nums">{formatMoney(settlementBookAmount)}</div></div>
-                      {receiptSourceType === 'SB' ? <div><span className="text-slate-500">Settlement FX ({functionalCurrencyCode})</span><div className="font-bold tabular-nums">{formatMoney(settlementBookAmount - receiptArAmount)}</div></div> : null}
-                      <div className={Math.abs(foreignReconciliationDifference) <= 0.01 ? 'text-emerald-700' : 'text-rose-700'}><span>ผลต่าง reconcile ({functionalCurrencyCode})</span><div className="font-bold tabular-nums">{formatMoney(foreignReconciliationDifference)}</div></div>
-                    </div> : null}
-                  </div>
-
-                  {isForeignReceipt ? <section className="rounded-md border border-slate-200 bg-white shadow-sm">
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">บัญชี FCD ที่รับเงิน *</h3>
-                        <p className="mt-1 text-xs text-slate-500">ทุกบัญชีต้องรองรับ {receiptCurrencyCode}; ยอดรวมต้องเท่ากับยอดเข้าบัญชี FCD จริง</p>
-                      </div>
-                      <UiButton className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={addReceiptSplit}>
-                        <Plus aria-hidden="true" className="mr-1 h-4 w-4" />เพิ่มบัญชี
-                      </UiButton>
-                    </div>
-                    <div className="space-y-2 p-4">
-                      {receiptSplits.map((split, splitIndex) => {
-                        const splitAmountKey = `foreign-receipt-split:${split.id ?? splitIndex}:amount`
-                        return <div key={split.id ?? splitIndex} className="grid items-end gap-3 rounded-md border border-slate-200 bg-slate-50/50 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_10rem_2rem]">
-                          <label className="block"><span className="mb-1 block text-xs font-medium text-slate-600">วิธีรับเงิน *</span><UiSelect className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm" value={split.method ?? ''} onChange={(event) => updateReceiptSplit(splitIndex, { method: event.target.value })}><option value="">เลือกวิธีรับเงิน</option>{paymentMethods.map((method) => <option key={method.name} value={method.name}>{method.name}</option>)}</UiSelect></label>
-                          <SearchCombobox inputClassName="!h-9 px-2 py-1.5" inputId={`foreign-receipt-account-${split.id ?? splitIndex}`} label="บัญชี FCD *" options={foreignFcdAccountOptions} placeholder={foreignFcdAccountOptions.length ? 'เลือกบัญชี FCD' : `ไม่มีบัญชี FCD ที่รองรับ ${receiptCurrencyCode}`} value={split.accountId} onChange={(accountId) => updateReceiptSplit(splitIndex, { accountId })} />
-                          <label className="block"><span className="mb-1 block text-xs font-medium text-slate-600">ยอดเข้า ({receiptCurrencyCode}) *</span><UiInput className="h-9 w-full text-right tabular-nums" inputMode="decimal" type="text" value={moneyInputValue(splitAmountKey, Number(split.amount) || 0)} onBlur={() => finishMoneyInput(splitAmountKey)} onChange={(event) => changeMoneyInput(splitAmountKey, event.target.value, (amount) => updateReceiptSplit(splitIndex, { amount }))} onFocus={() => startMoneyInput(splitAmountKey, Number(split.amount) || 0)} /></label>
-                          <UiButton aria-label="ลบบัญชี FCD" className="h-9 w-9 px-0" disabled={receiptSplits.length <= 1} size="icon" type="button" variant="ghost" onClick={() => removeReceiptSplit(splitIndex)}><X aria-hidden="true" className="h-4 w-4" /></UiButton>
-                        </div>
-                      })}
-                      <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">รวมเข้าบัญชี FCD ({receiptCurrencyCode})</span><span className={Math.abs(receiptSplitTotal - receivedNativeAmount) <= 0.01 ? 'font-bold tabular-nums text-emerald-700' : 'font-bold tabular-nums text-rose-700'}>{formatMoney(receiptSplitTotal)} / {formatMoney(receivedNativeAmount)}</span></div>
-                    </div>
-                  </section> : <PaymentSplitsSection
-                    activeAccounts={functionalReceiptAccounts}
-                    addButtonLabel="+ เพิ่มบัญชีรับ"
-                    afterLabel="📊 หลังรับ"
-                    amountLabel="➕ รับ"
-                    balanceMode="add"
-                    form={form}
-                    formNetAmount={formNetAmount}
+                    </div>}
                     moneyInputValue={moneyInputValue}
-                    netTargetLabel="🎯 ยอดสุทธิที่ต้องรับ"
+                    netTargetLabel={isForeignReceipt ? `🎯 ยอดที่ลูกค้าโอน (${receiptCurrencyCode})` : '🎯 ยอดสุทธิที่ต้องรับ'}
                     paymentSplits={receiptSplits}
                     paymentSplitTotal={receiptSplitTotal}
-                    sectionHelp="เลือกได้หลายบัญชี กรณีรับเงินเข้าหลายบัญชี"
-                    sectionTitle="💳 บัญชีรับเงิน *"
-                    totalLabel="💰 รวมเข้าบัญชี"
+                    sectionHelp={isForeignReceipt ? `ทุกบัญชีต้องเป็น FCD และรองรับ ${receiptCurrencyCode}` : 'เลือกได้หลายบัญชี กรณีรับเงินเข้าหลายบัญชี'}
+                    sectionTitle={isForeignReceipt ? '💳 บัญชี FCD ที่รับเงิน *' : '💳 บัญชีรับเงิน *'}
+                    showDiscount={receiptSourceType === 'SB'}
+                    showReconciliationSummary={!isForeignReceipt}
+                    showSplitBalancePreview={!isForeignReceipt}
+                    splitAmountHelper={isForeignReceipt ? (split) => {
+                      const splitBookAmount = roundMoney((Number(split.amount) || 0) * foreignFxRate)
+                      return foreignFxRate > 0 && Number(split.amount) > 0
+                        ? `≈ ${formatMoney(splitBookAmount)} ${functionalCurrencyCode}`
+                        : `≈ - ${functionalCurrencyCode}`
+                    } : undefined}
+                    totalLabel={isForeignReceipt ? `💰 ยอดที่บันทึกเข้า FCD (${receiptCurrencyCode})` : '💰 รวมเข้าบัญชี'}
                     onAddPaymentSplit={addReceiptSplit}
                     onChangeMoneyInput={changeMoneyInput}
                     onFinishMoneyInput={finishMoneyInput}
@@ -4013,11 +4064,11 @@ export function MoneyMovementPageClient({
                     onStartMoneyInput={startMoneyInput}
                     onUpdatePaymentForm={updateReceiptForm}
                     onUpdatePaymentSplit={updateReceiptSplit}
-                    paymentMethods={paymentMethods}
+                    paymentMethods={isForeignReceipt ? foreignReceiptPaymentMethods : paymentMethods}
                     methodValue={form.method}
                     onMethodChange={(value) => updateReceiptForm({ method: value })}
                     methodDisabled={false}
-                  />}
+                  />
                   <div>
                     <label className="block text-sm font-medium mt-4">
                       <span className="mb-1 block text-xs font-medium text-slate-600">หมายเหตุ</span>
@@ -4161,9 +4212,9 @@ export function MoneyMovementPageClient({
                   <div>
                     <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                     <div className="flex items-center gap-2">
-                      <DatePickerInput className="flex-1" value={dateFrom} onChange={setDateFrom} />
+                      <DatePickerInput className="h-9 flex-1" value={dateFrom} onChange={setDateFrom} />
                       <span className="text-slate-400">→</span>
-                      <DatePickerInput className="flex-1" value={dateTo} onChange={setDateTo} />
+                      <DatePickerInput className="h-9 flex-1" value={dateTo} onChange={setDateTo} />
                     </div>
                   </div>
 
@@ -4287,15 +4338,15 @@ export function MoneyMovementPageClient({
                     ) : null}
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-2">
-                        <span className="font-bold text-slate-800 text-sm">{row.docNo}</span>
-                        <span className="text-xs text-slate-500">{formatDateDisplay(row.date)}</span>
+                        <span className="text-center font-mono font-bold text-sm text-slate-800 whitespace-nowrap">{row.docNo}</span>
+                        <span className="text-center text-xs text-slate-500 whitespace-nowrap">{formatDateDisplay(row.date)}</span>
                       </div>
                       <div className="text-xs text-slate-600 mb-3 space-y-1">
                         <div>
                           <span className="font-semibold text-slate-500">{partyLabel}: </span>
                           <span className="text-slate-800">{row.partyName}</span>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-center text-xs text-slate-500 whitespace-nowrap">
                           อ้างอิง: {billDocNos.join(', ')}
                         </div>
                         <div className="text-xs text-slate-500">
@@ -4359,18 +4410,18 @@ export function MoneyMovementPageClient({
                         />
                       </th>
                     ) : null}
-                    <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="เลขที่รายการ" resizeProps={historyColumnResize.getResizeHandleProps('docNo', 'เลขที่รายการ')} sortKey="docNo" onSort={toggleHistorySort} />
-                    <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label={mode === 'receipt' ? 'วันที่รับเงิน' : 'วันที่สร้างรายการ'} resizeProps={historyColumnResize.getResizeHandleProps('date', mode === 'receipt' ? 'วันที่รับเงิน' : 'วันที่สร้างรายการ')} sortKey="date" onSort={toggleHistorySort} />
+                    <TableSortHeader activeKey={historySortField} align="center" direction={historySortDirection} label="เลขที่รายการ" resizeProps={historyColumnResize.getResizeHandleProps('docNo', 'เลขที่รายการ')} sortKey="docNo" onSort={toggleHistorySort} />
+                    <TableSortHeader activeKey={historySortField} align="center" direction={historySortDirection} label={mode === 'receipt' ? 'วันที่รับเงิน' : 'วันที่สร้างรายการ'} resizeProps={historyColumnResize.getResizeHandleProps('date', mode === 'receipt' ? 'วันที่รับเงิน' : 'วันที่สร้างรายการ')} sortKey="date" onSort={toggleHistorySort} />
                     <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label={partyLabel} resizeProps={historyColumnResize.getResizeHandleProps('partyName', partyLabel)} sortKey="partyName" onSort={toggleHistorySort} />
-                    <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="บิลอ้างอิง" resizeProps={historyColumnResize.getResizeHandleProps('billRefs', 'บิลอ้างอิง')} sortKey="billRefs" onSort={toggleHistorySort} />
+                    <TableSortHeader activeKey={historySortField} align="center" direction={historySortDirection} label="บิลอ้างอิง" resizeProps={historyColumnResize.getResizeHandleProps('billRefs', 'บิลอ้างอิง')} sortKey="billRefs" onSort={toggleHistorySort} />
                     <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label={accountLabel} resizeProps={historyColumnResize.getResizeHandleProps('accountName', accountLabel)} sortKey="accountName" onSort={toggleHistorySort} />
                     <TableSortHeader activeKey={historySortField} align="right" direction={historySortDirection} label={mode === 'receipt' ? 'ยอดรับ (THB)' : amountLabel} resizeProps={historyColumnResize.getResizeHandleProps('amount', mode === 'receipt' ? 'ยอดรับ (THB)' : amountLabel)} sortKey="amount" onSort={toggleHistorySort} />
                     <TableSortHeader activeKey={historySortField} align="right" direction={historySortDirection} label="ภาษีหัก ณ ที่จ่าย" resizeProps={historyColumnResize.getResizeHandleProps('wht', 'ภาษีหัก ณ ที่จ่าย')} sortKey="wht" onSort={toggleHistorySort} />
                     <TableSortHeader activeKey={historySortField} align="right" direction={historySortDirection} label="ค่าธรรมเนียมธนาคาร" resizeProps={historyColumnResize.getResizeHandleProps('bankFee', 'ค่าธรรมเนียมธนาคาร')} sortKey="bankFee" onSort={toggleHistorySort} />
                     <TableSortHeader activeKey={historySortField} align="right" direction={historySortDirection} label={mode === 'receipt' ? 'เงินเข้าสุทธิ (THB)' : 'สุทธิ'} resizeProps={historyColumnResize.getResizeHandleProps('netAmount', mode === 'receipt' ? 'เงินเข้าสุทธิ (THB)' : 'สุทธิ')} sortKey="netAmount" onSort={toggleHistorySort} />
-                    <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="สถานะ" resizeProps={historyColumnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={toggleHistorySort} />
+                    <TableSortHeader activeKey={historySortField} align="center" direction={historySortDirection} label="สถานะ" resizeProps={historyColumnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={toggleHistorySort} />
                     <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="หมายเหตุ" resizeProps={historyColumnResize.getResizeHandleProps('notes', 'หมายเหตุ')} sortKey="notes" onSort={toggleHistorySort} />
-                    <ResizableTableHead align="right" label="จัดการ" resizeProps={historyColumnResize.getResizeHandleProps('action', 'จัดการ')} />
+                    <ResizableTableHead align="center" label="จัดการ" resizeProps={historyColumnResize.getResizeHandleProps('action', 'จัดการ')} />
                   </tr>
                 </TableHeader>
                 <TableBody className="divide-y divide-slate-100">
@@ -4400,18 +4451,18 @@ export function MoneyMovementPageClient({
                             />
                           </TableCell>
                         ) : null}
-                        <TableCell className="text-sm font-semibold text-slate-700">{row.docNo}</TableCell>
-                        <TableCell className="text-sm font-medium text-slate-700">{formatDateDisplay(row.date)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-center font-mono text-sm font-semibold text-slate-700">{row.docNo}</TableCell>
+                        <TableCell className="whitespace-nowrap text-center text-sm font-medium text-slate-700">{formatDateDisplay(row.date)}</TableCell>
                         <TableCell className="text-sm font-medium text-slate-700">{row.partyName}</TableCell>
-                        <TableCell className="text-sm font-medium text-slate-700">
+                        <TableCell className="whitespace-nowrap text-center font-mono text-sm font-medium text-slate-700">
                           <div className="space-y-1">
                             <CollapsedList items={billDocNos} />
                             {mode === 'payment' && row.approvalIds?.length ? (
-                              <div className="pt-1 text-xs text-slate-500">
+                              <div className="whitespace-nowrap pt-1 text-xs text-slate-500">
                                 PMA: {row.approvalIds.map((approvalId, index) => (
                                   <span key={`${row.id}-approval-${approvalId}`}>
                                     {index > 0 ? ', ' : ''}
-                                    <span className="text-slate-700">{approvalId}</span>
+                                    <span className="font-mono text-slate-700">{approvalId}</span>
                                   </span>
                                 ))}
                               </div>
@@ -4427,14 +4478,14 @@ export function MoneyMovementPageClient({
                         <TableCell className="whitespace-nowrap pr-4 text-right text-sm font-semibold text-amber-700 tabular-nums">{formatMoney(row.withholdingTax)}</TableCell>
                         <TableCell className="whitespace-nowrap pr-4 text-right text-sm font-semibold text-slate-700 tabular-nums">{formatMoney(row.fee)}</TableCell>
                         <TableCell className={`whitespace-nowrap pr-4 text-right text-sm font-semibold tabular-nums ${theme.strong}`}>{formatMoney(historyBookNetAmount(row, mode))}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <div className={`inline-flex items-center gap-1.5 text-xs font-semibold ${paymentHistoryStatusTone(row.status)}`}>
                             <span className={`size-1.5 rounded-full ${paymentHistoryStatusDot(row.status)}`} />
                             <span>{paymentHistoryStatusLabel(row.status, mode)}</span>
                           </div>
                         </TableCell>
                         <TableCell className="max-w-56 truncate text-sm font-medium text-slate-700">{row.notes || '-'}</TableCell>
-                        <TableCell className="p-2">
+                        <TableCell className="p-2 text-center">
                           <TableActionButton menu={(
                             <>
                               <TableActionMenuItem onSelect={() => { if (mode === 'payment') void openPaymentHistoryRow(row); else openReceiptDetail(row) }}>ดูรายละเอียด</TableActionMenuItem>
@@ -4771,16 +4822,16 @@ function PaymentHistoryDetailDialog({
                   <table className="ns-table w-full text-sm">
                     <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                       <tr>
-                        <th className="p-2 text-left">{detail.type === 'approval' ? 'PMT' : 'PMA'}</th>
-                        <th className="p-2 text-left">เอกสารต้นทาง</th>
+                        <th className="p-2 text-center">{detail.type === 'approval' ? 'PMT' : 'PMA'}</th>
+                        <th className="p-2 text-center">เอกสารต้นทาง</th>
                         <th className="p-2 text-right">ยอดจัดสรร</th>
                       </tr>
                     </thead>
                     <tbody>
                       {detail.approvalRows.map((approval) => (
                         <tr key={`${approval.docNo}-${approval.sourceDocNo}`} className="border-t border-slate-100">
-                          <td className="p-2 font-mono text-slate-800">{approval.docNo}</td>
-                          <td className="p-2 font-mono">{approval.sourceDocNo}</td>
+                          <td className="whitespace-nowrap p-2 text-center font-mono text-slate-800">{approval.docNo}</td>
+                          <td className="whitespace-nowrap p-2 text-center font-mono">{approval.sourceDocNo}</td>
                           <td className="p-2 text-right font-medium tabular-nums">{formatMoney(approval.amount)}</td>
                         </tr>
                       ))}
@@ -4800,7 +4851,7 @@ function PaymentHistoryDetailDialog({
                       <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                         <tr>
                           <th className="p-2 text-left">บัญชี</th>
-                          <th className="p-2 text-left">รายการธนาคาร</th>
+                          <th className="p-2 text-center">รายการธนาคาร</th>
                           <th className="p-2 text-right">ยอด</th>
                         </tr>
                       </thead>
@@ -4808,7 +4859,7 @@ function PaymentHistoryDetailDialog({
                         {detail.accountRows.map((account) => (
                           <tr key={`${account.accountName}-${account.bankStatementDocNo}-${account.amount}`} className="border-t border-slate-100">
                             <td className="p-2">{account.accountName}</td>
-                            <td className="p-2 font-mono">{account.bankStatementDocNo}</td>
+                            <td className="whitespace-nowrap p-2 text-center font-mono">{account.bankStatementDocNo}</td>
                             <td className="p-2 text-right font-medium tabular-nums">{formatMoney(account.amount)}</td>
                           </tr>
                         ))}
@@ -5025,7 +5076,7 @@ function ReceiptDetailDialog({
             <>
               <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
                 <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <div className="text-xs text-slate-500">{row.foreignAudit ? (row.sourceType === 'CADV' ? 'ยอดตัด CADV (THB)' : 'Settlement (THB)') : 'ยอดรับ (THB)'}</div>
+                  <div className="text-xs text-slate-500">{row.foreignAudit ? 'มูลค่าเงินรับ ณ วันรับเงิน (THB)' : 'ยอดรับ (THB)'}</div>
                   <div className="text-lg font-bold text-emerald-700">{formatMoney(receiptBookAmount(row))}</div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -5064,12 +5115,14 @@ function ReceiptDetailDialog({
                 title="ข้อมูลต่างประเทศ (audit)"
                 rows={[
                   ['สกุลเงินที่รับจริง', row.foreignAudit.currencyCode],
-                  [`ยอดที่ลูกค้าโอน (${row.foreignAudit.currencyCode})`, formatMoney(row.foreignAudit.customerTransferredNativeAmount)],
-                  [`ยอดเข้าบัญชี FCD (${row.foreignAudit.currencyCode})`, formatMoney(row.foreignAudit.receivedNativeAmount)],
-                  ['อัตราแลกเปลี่ยน', `${formatFxRate(row.foreignAudit.fxRate)} (${row.foreignAudit.fxRateType}, ${row.foreignAudit.fxRateDate || '-'})`],
-                  ['แหล่งอัตราแลกเปลี่ยน', row.foreignAudit.fxRateOverridden ? 'กรอก/แก้ไขโดยผู้ใช้' : row.foreignAudit.fxRateSource || '-'],
-                  [row.sourceType === 'CADV' ? 'ยอดตัด CADV (THB)' : 'ยอดตัด AR (THB)', formatMoney(row.foreignAudit.settlementBookAmount)],
-                  ...(row.sourceType === 'SB' ? [['Settlement FX (THB)', formatMoney(row.foreignAudit.settlementFxDifference)] as [string, string]] : []),
+                  [`ยอดที่ลูกค้าโอน (${row.foreignAudit.currencyCode})`, formatMoney(row.foreignAudit.nativeAmount)],
+                  ['อัตราแลกเปลี่ยน', `${formatFxRate(row.foreignAudit.fxRate)} (${row.foreignAudit.fxRateDate || '-'})`],
+                  ['มูลค่าเงินรับ ณ วันรับเงิน (THB)', formatMoney(row.foreignAudit.settlementBookAmount)],
+                  ...(row.sourceType === 'SB' ? [
+                    ['เงินสดตัดลูกหนี้ (THB)', formatMoney(row.foreignAudit.cashAppliedThb)] as [string, string],
+                    ['ยอดตัดลูกหนี้ (THB)', formatMoney(row.foreignAudit.arSettledThb)] as [string, string],
+                    ['กำไร FX จากการปิดบิล (THB)', formatMoney(row.foreignAudit.settlementFxDifference)] as [string, string],
+                  ] : []),
                   ['Carrying (THB)', formatMoney(row.foreignAudit.carryingBookAmount)],
                 ]}
               /> : null}
@@ -5082,14 +5135,14 @@ function ReceiptDetailDialog({
                   {row.sourceType === 'CADV' ? <table className="ns-table w-full text-sm">
                     <thead className="bg-slate-100 text-slate-700">
                       <tr>
-                        <th className="p-2 text-left">CADV</th>
+                        <th className="p-2 text-center">CADV</th>
                         <th className="p-2 text-right">ยอดตัด CADV (THB)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(row.customerAdvanceLines ?? []).map((line, index) => (
                         <tr key={`${line.customerAdvanceDocNo}-${index}`} className="border-t border-slate-200">
-                          <td className="p-2 font-mono text-slate-800">{line.customerAdvanceDocNo || '-'}</td>
+                          <td className="whitespace-nowrap p-2 text-center font-mono text-slate-800">{line.customerAdvanceDocNo || '-'}</td>
                           <td className="p-2 text-right font-semibold tabular-nums">{formatMoney(line.receiptAmount)}</td>
                         </tr>
                       ))}
@@ -5098,8 +5151,8 @@ function ReceiptDetailDialog({
                   </table> : <table className="ns-table w-full text-sm">
                     <thead className="bg-slate-100 text-slate-700">
                       <tr>
-                        <th className="p-2 text-left">บิลขาย</th>
-                        <th className="p-2 text-right">ยอดตัด AR (THB)</th>
+                        <th className="p-2 text-center">บิลขาย</th>
+                        <th className="p-2 text-right">ยอดตัดลูกหนี้ (THB)</th>
                         <th className="p-2 text-right">ภาษีหัก ณ ที่จ่าย (THB)</th>
                         <th className="p-2 text-right">ส่วนลด (THB)</th>
                       </tr>
@@ -5107,7 +5160,7 @@ function ReceiptDetailDialog({
                     <tbody>
                       {lines.map((line, index) => (
                         <tr key={`${line.salesBillDocNo}-${index}`} className="border-t border-slate-200">
-                          <td className="p-2 font-mono text-slate-800">{line.salesBillDocNo || '-'}</td>
+                          <td className="whitespace-nowrap p-2 text-center font-mono text-slate-800">{line.salesBillDocNo || '-'}</td>
                           <td className="p-2 text-right font-semibold tabular-nums">{formatMoney(line.receiptAmount)}</td>
                           <td className="p-2 text-right font-semibold tabular-nums text-amber-700">{formatMoney(line.withholdingTaxAmount)}</td>
                           <td className="p-2 text-right font-semibold tabular-nums">{formatMoney(line.discountAmount)}</td>

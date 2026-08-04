@@ -283,6 +283,11 @@ export type MasterDataColumn = {
 }
 
 export type MasterDataPageConfig = {
+  actionPermissions?: {
+    create?: string
+    status?: string
+    update?: string
+  }
   apiPath: string
   createLabel: string
   description?: string
@@ -365,6 +370,20 @@ async function readJson<TSchema extends z.ZodTypeAny>(response: Response, schema
 export async function listMasterDataRecords(apiPath: string): Promise<MasterDataRecord[]> {
   const response = await fetch(apiPath, { cache: 'no-store' })
   return readJson(response, masterDataRecordListSchema)
+}
+
+const supplierOptionsSchema = z.object({
+  bankNames: masterDataRecordListSchema,
+  branches: masterDataRecordListSchema,
+  paymentMethods: masterDataRecordListSchema,
+  salespersons: masterDataRecordListSchema,
+})
+
+export type SupplierOptions = z.infer<typeof supplierOptionsSchema>
+
+export async function loadSupplierOptions(apiPath: string): Promise<SupplierOptions> {
+  const response = await fetch(apiPath, { cache: 'no-store' })
+  return readJson(response, supplierOptionsSchema)
 }
 
 export async function saveMasterDataRecord(apiPath: string, values: MasterDataFormValues): Promise<MasterDataRecord> {
