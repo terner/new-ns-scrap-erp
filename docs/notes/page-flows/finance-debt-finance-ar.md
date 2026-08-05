@@ -150,8 +150,9 @@ Permission ปัจจุบัน: `finance.cash.view`.
 
 ## Compact Filter Layout 2026-08-04
 
-- What is what: the desktop AR filter card keeps search, customer, sales channel, aging bucket and branch in its first compact row; status, bill-date range, clear action and Excel export remain in the second row. Filter controls remain `h-9`, while the export action remains `h-10`.
-- Why it has to be like this: customer, channel, aging and branch define the primary AR data scope and should be visible together without each select consuming a full row. Status/date and actions remain grouped separately so the card matches the shared two-row list-filter convention and leaves more space for the receivable data.
+- What is what: desktop row one owns search, customer, sales channel, aging bucket, branch, bill-date range and the full `ล้างตัวกรอง` action; row two owns status and `ส่งออก Excel`. The result count belongs only to the table/pagination surface. Mobile keeps search/actions compact and puts `ล้างตัวกรอง` in the expanded filter surface.
+- Why it has to be like this: all scope controls stay together, status and export remain easy to scan, and the same result count is not repeated in both the filter card and the table toolbar.
+- Responsive boundary: the two-row desktop toolbar is used from `2xl` upward, where the full first row still fits when the sidebar expands. Narrower desktop/tablet widths use the compact filter surface so controls never wrap into a third visual row; filter state and results remain identical.
 - Preserved boundary: filter state, query parameters, API requests, export scope, pagination, permissions and the existing mobile filter interaction do not change.
 
 ## Implementation Checklist
