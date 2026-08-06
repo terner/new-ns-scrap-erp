@@ -9,7 +9,7 @@ import {
 } from './MoneyMovementPageClient'
 import { isBlankExpenseLine } from './DailyExpensePageClient'
 import { isBlankApprovalSplit } from './PaymentApprovalPageClient'
-import { isBlankStockTransferItem } from './StockTransferPageClient'
+import { formatStockTransferProductSummary, isBlankStockTransferItem } from './StockTransferPageClient'
 
 describe('money movement local-row removal safety', () => {
   it('distinguishes blank seeded rows from populated finance rows', () => {
@@ -106,5 +106,14 @@ describe('stock transfer local-row removal safety', () => {
     expect(isBlankStockTransferItem({ productId: '', qty: 0 })).toBe(true)
     expect(isBlankStockTransferItem({ productId: 'PRODUCT-001', qty: 0 })).toBe(false)
     expect(isBlankStockTransferItem({ productId: '', qty: 25 })).toBe(false)
+  })
+
+  it('summarizes product names for the transfer list', () => {
+    const item = (productName: string) => ({ lineValue: 0, productId: productName, productName, qty: 1, sourceUnitCost: 0 })
+
+    expect(formatStockTransferProductSummary([])).toBe('-')
+    expect(formatStockTransferProductSummary([item('กระดาษ')])).toBe('กระดาษ')
+    expect(formatStockTransferProductSummary([item('กระดาษ'), item('ผ้า')])).toBe('กระดาษ และอีก 1 รายการ')
+    expect(formatStockTransferProductSummary([item('กระดาษ'), item('ผ้า'), item('พลาสติก'), item('เหล็ก')])).toBe('กระดาษ และอีก 3 รายการ')
   })
 })
