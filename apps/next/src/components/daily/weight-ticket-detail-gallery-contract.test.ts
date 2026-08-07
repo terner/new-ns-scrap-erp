@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { encodeStoredImageReference } from '@/lib/weight-tickets'
 import { buildWeightTicketLineGallery } from './WeightTicketProductBreakdownTable'
 
 const detailSources = [
   'src/components/daily/WeightTicketDetailModal.tsx',
-  'src/components/daily/WeightTicketDetailPageClient.tsx',
 ].map((file) => ({
   file,
   source: readFileSync(resolve(process.cwd(), file), 'utf8').replaceAll('\r\n', '\n'),
@@ -18,7 +18,6 @@ const imageEntryPointSources = [
   'src/components/daily/WeightTicketImageGallery.tsx',
   'src/components/daily/WeightTicketProductBreakdownTable.tsx',
   'src/components/daily/WeightTicketDetailModal.tsx',
-  'src/components/daily/WeightTicketDetailPageClient.tsx',
 ].map((file) => ({
   file,
   source: readFileSync(resolve(process.cwd(), file), 'utf8').replaceAll('\r\n', '\n'),
@@ -30,14 +29,14 @@ describe('WTI/WTO detail gallery contract', () => {
       {
         id: 'lot-1',
         imageNames: [
-          JSON.stringify({ fileName: 'lot-1-a.jpg', url: 'https://example.com/lot-1-a.jpg' }),
-          JSON.stringify({ fileName: 'lot-1-b.jpg', url: 'https://example.com/lot-1-b.jpg' }),
+          encodeStoredImageReference('lot-1-a.jpg', 'https://example.com/lot-1-a.jpg', 'weight-ticket/lot-1-a.jpg', 'weight-ticket-images'),
+          encodeStoredImageReference('lot-1-b.jpg', 'https://example.com/lot-1-b.jpg', 'weight-ticket/lot-1-b.jpg', 'weight-ticket-images'),
         ],
         title: 'กระทะดำ · เต๋าที่ 1',
       },
       {
         id: 'lot-2',
-        imageNames: [JSON.stringify({ fileName: 'lot-2-a.jpg', url: 'https://example.com/lot-2-a.jpg' })],
+        imageNames: [encodeStoredImageReference('lot-2-a.jpg', 'https://example.com/lot-2-a.jpg', 'weight-ticket/lot-2-a.jpg', 'weight-ticket-images')],
         title: 'กระทะดำ · เต๋าที่ 2',
       },
     ]
@@ -79,7 +78,8 @@ describe('WTI/WTO detail gallery contract', () => {
       expect(statusIndex, file).toBeGreaterThan(productDetailsIndex)
       expect(galleryIndex, file).toBeGreaterThan(statusIndex)
       expect(usageHistoryIndex, file).toBeGreaterThan(galleryIndex)
-      expect(source, file).toContain('imageNames={ticket.imageNames}')
+      expect(source, file).toContain('imageNames={lineImageNames}')
+      expect(source, file).toContain('downloadImageNames={ticket.imageNames}')
       expect(source, file).toContain('onOpenLineGallery={setLineGallery}')
       expect(source, file).toContain('activeGalleryImage.contextTitle ?? lineGallery.title')
       expect(source, file).toContain('aria-label="รูปก่อนหน้า"')

@@ -60,12 +60,23 @@ const salesFormSource = sectionSource(transactionBillsSource, "{showSalesForm &&
 describe('sales bill line-item field states', () => {
   it('keeps stock-sale inputs manual while calculated cells are visibly neutral', () => {
     expect(globalsSource).toContain('background-color: var(--ns-manual-entry-bg) !important;')
-    expect(stockTableSource).toContain("updateSalesStockSaleWeight(index, 'netWeight'")
+    expect(stockTableSource).toContain("updateSalesStockSaleWeight(index, 'grossWeight'")
     expect(stockTableSource).toContain("updateSalesStockSaleWeight(index, 'deductWeight'")
+    expect(transactionBillsSource).toContain('const qty = calculateSalesNetWeight(next.grossWeight, next.deductWeight)')
     expect(stockTableSource).toContain('disabled={hasSelectedPoSell}')
 
     expect(cellContaining(stockTableSource, 'data-error-key={`items.${index}.qty`}')).toContain('bg-slate-50')
     expect(cellContaining(stockTableSource, 'item.qty * item.price - item.discount')).toContain('bg-slate-50')
+  })
+
+  it('lets a split WTO row select a Sales Bill label without changing its stock source product', () => {
+    const splitRowStart = stockTableSource.indexOf('sales-bill-stock-display-product-search-${index}')
+    const splitRow = stockTableSource.slice(splitRowStart, stockTableSource.indexOf('</div>', splitRowStart) + 6)
+
+    expect(splitRowStart).toBeGreaterThan(-1)
+    expect(splitRow).toContain('updateSalesStockProduct(index, value)')
+    expect(splitRow).toContain('สินค้าที่ขาย · ตัด WTO, สต็อก และต้นทุนตาม')
+    expect(splitRow).not.toContain('updateSalesSplitProduct')
   })
 
   it('keeps the Trading table column order and field states unambiguous', () => {

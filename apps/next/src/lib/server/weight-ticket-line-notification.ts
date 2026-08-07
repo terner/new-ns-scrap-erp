@@ -1,20 +1,25 @@
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { buildReceiptPrintHtml } from '@/lib/weight-ticket-print'
+import {
+  buildReceiptPrintHtml,
+  buildWeightTicketAttachmentImages,
+  getWeightTicketAttachmentIdentity,
+  getWeightTicketAttachmentReferences,
+} from '@/lib/weight-ticket-print'
 import { type CompanyProfilePrintValues } from '@/lib/company-profile'
 import type { Prisma } from '../../../generated/prisma/client'
-import { decodeStoredImageAsset, formatDateDisplay, formatWeight, type WeightTicketRecord, typeLabels, type StoredImageAsset } from '@/lib/weight-tickets'
+import { decodeStoredImageAsset, encodeStoredImageReference, formatDateDisplay, formatWeight, type WeightTicketRecord, typeLabels, type StoredImageAsset } from '@/lib/weight-tickets'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/reference-master-cache'
 import { getSupabaseAdminClient } from '@/lib/server/supabase-admin'
+import { assertWeightTicketImageStorageKey } from '@/lib/server/weight-ticket-storage'
 import {
   findScopedWeightTicket,
   getWeightTicketUsageCounts,
   mapWeightTicketRow,
   type WeightTicketRow,
 } from '@/lib/server/weight-tickets'
-import { syncWeightTicketToGoogleSheets } from '@/lib/server/google-sheets-sync'
 // module ใหม่ที่ใช้ react-pdf + @napi-rs/canvas แทน Playwright
 // (import เป็น alias เพื่อไม่ให้ชนกับชื่อ function legacy ในไฟล์นี้)
 import { generateWeightTicketPdf as generateWeightTicketPdfReactPdf } from '@/lib/server/pdf/weight-ticket-pdf'
@@ -23,13 +28,15 @@ type NotifyOptions = {
   customMessage?: string
   origin: string
   requestedBy: string
-  scopedBranchIds: string[]
+  scopedBranchIds: string[] | null
   targetId?: string
   force?: boolean
   retryKey?: string
 }
 
 type NotificationLogStatus = 'failed' | 'sent'
+
+const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7
 
 async function resolveNotificationConfigs() {
   const dbSettings = await prisma.system_settings.findMany({
@@ -39,6 +46,7 @@ async function resolveNotificationConfigs() {
           'LINE_CHANNEL_ACCESS_TOKEN',
           'LINE_CHANNEL_SECRET',
           'LINE_DEFAULT_TARGET_ID',
+          'WEIGHT_TICKET_IMAGE_BUCKET',
           'WEIGHT_TICKET_PDF_BUCKET',
           'NEXT_PUBLIC_APP_URL',
           'LINE_NOTIFY_TEXT_TEMPLATE_WTI',
@@ -57,17 +65,27 @@ async function resolveNotificationConfigs() {
 
   const wtoDefaultTemplate = `ใบส่งของ WTO [DocumentNo]\n━━━━━━━━━━━━━━━\nลูกค้า: [PartyName]\nสาขา: [BranchName]\nวันที่/เวลาเอกสาร: [DocDateTime]\nน้ำหนักรวม: [GrossWeight] กก.\nหักภาชนะ: [ContainerWeight] กก.\nหักสิ่งเจือปน: [DeductionWeight] กก.\nน้ำหนักสุทธิ: [NetWeight] กก.\n━━━━━━━━━━━━━━━\nลิงค์โหลด pdf:\n[PdfUrl]`
 
+  const imageBucket = configMap.WEIGHT_TICKET_IMAGE_BUCKET || process.env.WEIGHT_TICKET_IMAGE_BUCKET || ''
+  const pdfBucket = configMap.WEIGHT_TICKET_PDF_BUCKET || process.env.WEIGHT_TICKET_PDF_BUCKET || ''
+  if (!imageBucket || !pdfBucket) {
+    throw new Error('ยังไม่ได้ตั้งค่า Storage Bucket สำหรับรูปหลักฐานและ PDF WTI/WTO')
+  }
+
   return {
     lineChannelAccessToken: configMap.LINE_CHANNEL_ACCESS_TOKEN || process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     lineChannelSecret: configMap.LINE_CHANNEL_SECRET || process.env.LINE_CHANNEL_SECRET || '',
     lineDefaultTargetId: configMap.LINE_DEFAULT_TARGET_ID || process.env.LINE_DEFAULT_TARGET_ID || '',
-    pdfBucket: configMap.WEIGHT_TICKET_PDF_BUCKET || process.env.WEIGHT_TICKET_PDF_BUCKET || 'weight-ticket-pdfs',
+    imageBucket,
+    pdfBucket,
     appUrl: configMap.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '',
     wtiTemplate: configMap.LINE_NOTIFY_TEXT_TEMPLATE_WTI || wtiDefaultTemplate,
     wtoTemplate: configMap.LINE_NOTIFY_TEXT_TEMPLATE_WTO || wtoDefaultTemplate,
     albumShowBadges: configMap.LINE_ALBUM_SHOW_BADGES !== 'false',
     albumShowTimestamps: configMap.LINE_ALBUM_SHOW_TIMESTAMPS !== 'false',
-    albumQuality: configMap.LINE_ALBUM_QUALITY ? parseInt(configMap.LINE_ALBUM_QUALITY, 10) : 90,
+    albumQuality: (() => {
+      const parsed = configMap.LINE_ALBUM_QUALITY ? Number.parseInt(configMap.LINE_ALBUM_QUALITY, 10) : 90
+      return Number.isFinite(parsed) ? Math.min(100, Math.max(10, parsed)) : 90
+    })(),
   }
 }
 
@@ -80,13 +98,11 @@ function safeStorageSegment(value: string) {
   return value.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
-function imageFromDataUrl(value: string) {
-  const match = value.match(/^data:image\/(png|jpe?g);base64,(.+)$/i)
-  if (!match) return null
-  return {
-    bytes: Buffer.from(match[2], 'base64'),
-    type: match[1].toLowerCase().startsWith('jp') ? 'jpg' as const : 'png' as const,
-  }
+function sanitizeNotificationError(value: unknown) {
+  const message = value instanceof Error ? value.message : String(value ?? 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ')
+  return message
+    .replace(/https?:\/\/\S+/gi, '[url]')
+    .slice(0, 500)
 }
 
 async function loadCompanyPrintProfile(branchId: string): Promise<CompanyProfilePrintValues | null> {
@@ -112,7 +128,7 @@ async function loadCompanyPrintProfile(branchId: string): Promise<CompanyProfile
   }
 }
 
-async function loadWeightTicketRecord(documentNo: string, scopedBranchIds: string[]) {
+async function loadWeightTicketRecord(documentNo: string, scopedBranchIds: string[] | null) {
   const ticket = await findScopedWeightTicket(documentNo, scopedBranchIds)
   if (!ticket) return null
   const usage = await getWeightTicketUsageCounts(prisma, ticket.id)
@@ -178,6 +194,7 @@ async function uploadPdf(ticket: WeightTicketRecord, pdfBuffer: Buffer, bucketNa
   if (process.env.NODE_ENV === 'test' && process.env.MOCK_PDF_UPLOAD === 'true') {
     return {
       pdfUrl: `https://test.invalid/storage/${bucketName}/dummy-test-ticket.pdf`,
+      pdfDownloadUrl: `https://test.invalid/storage/${bucketName}/dummy-test-ticket.pdf?download=1`,
       storageKey: 'dummy-test-ticket.pdf'
     }
   }
@@ -185,6 +202,8 @@ async function uploadPdf(ticket: WeightTicketRecord, pdfBuffer: Buffer, bucketNa
   if (!supabase) {
     throw new Error('ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY สำหรับอัปโหลด PDF')
   }
+  // This is an outbound derivative. The notification log keeps the reference;
+  // cleanup must follow an approved retention policy and never delete source evidence.
   const storageKey = `${safeStorageSegment(ticket.documentNo)}/${Date.now()}-${safeStorageSegment(ticket.documentNo)}.pdf`
   const { error } = await supabase.storage.from(bucketName).upload(storageKey, pdfBuffer, {
     contentType: 'application/pdf',
@@ -194,7 +213,11 @@ async function uploadPdf(ticket: WeightTicketRecord, pdfBuffer: Buffer, bucketNa
     throw new Error(`อัปโหลด PDF ไป Supabase Storage ไม่สำเร็จ: ${error.message}`)
   }
   const { data } = supabase.storage.from(bucketName).getPublicUrl(storageKey)
-  return { pdfUrl: data.publicUrl, storageKey }
+  return {
+    pdfDownloadUrl: `${data.publicUrl}?download=${encodeURIComponent(`${safeStorageSegment(ticket.documentNo)}.pdf`)}`,
+    pdfUrl: data.publicUrl,
+    storageKey,
+  }
 }
 
 async function uploadAlbumImage(ticket: WeightTicketRecord, buffer: Buffer, pageIdx: number, bucketName: string) {
@@ -205,6 +228,8 @@ async function uploadAlbumImage(ticket: WeightTicketRecord, buffer: Buffer, page
   if (!supabase) {
     throw new Error('ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY สำหรับอัปโหลดรูปภาพอัลบั้ม')
   }
+  // Album images are outbound derivatives referenced by the notification flow;
+  // they are not the private source evidence stored for the weight ticket.
   const storageKey = `${safeStorageSegment(ticket.documentNo)}/album/finish-${Date.now()}-${pageIdx + 1}.jpg`
   const { error } = await supabase.storage.from(bucketName).upload(storageKey, buffer, {
     contentType: 'image/jpeg',
@@ -217,8 +242,28 @@ async function uploadAlbumImage(ticket: WeightTicketRecord, buffer: Buffer, page
   return data.publicUrl
 }
 
-function buildDetailUrl(origin: string, documentNo: string) {
-  return new URL(`/daily/weight-ticket-list/${encodeURIComponent(documentNo)}`, origin).toString()
+function buildDetailUrl(origin: string, documentNo: string, type: 'WTI' | 'WTO') {
+  return new URL(`/daily/weight-ticket-list?detail=${encodeURIComponent(documentNo)}&type=${encodeURIComponent(type)}`, origin).toString()
+}
+
+function withResolvedImageUrls(ticket: WeightTicketRecord, imageUrls: string[]): WeightTicketRecord {
+  const references = getWeightTicketAttachmentReferences(ticket)
+  const urlsByIdentity = new Map(
+    references.map((rawValue, index) => [getWeightTicketAttachmentIdentity(rawValue), imageUrls[index]]),
+  )
+  const resolve = (rawValue: string) => {
+    const asset = decodeStoredImageAsset(rawValue)
+    const url = urlsByIdentity.get(getWeightTicketAttachmentIdentity(rawValue))
+    return asset.bucket && asset.storageKey && url
+      ? encodeStoredImageReference(asset.fileName, url, asset.storageKey, asset.bucket)
+      : rawValue
+  }
+
+  return {
+    ...ticket,
+    imageNames: ticket.imageNames.map(resolve),
+    vehicleImageNames: ticket.vehicleImageNames.map(resolve),
+  }
 }
 
 function buildProductDetailRows(ticket: WeightTicketRecord) {
@@ -308,11 +353,39 @@ function buildProductDetailRows(ticket: WeightTicketRecord) {
   return rows
 }
 
+export function buildWeightTicketPdfActions(pdfUrl: string, pdfDownloadUrl: string) {
+  return [
+    ...(pdfUrl ? [{
+      type: 'button' as const,
+      style: 'primary' as const,
+      color: '#0f172a',
+      height: 'sm' as const,
+      margin: 'md' as const,
+      action: {
+        type: 'uri' as const,
+        label: 'ดู PDF',
+        uri: pdfUrl,
+      },
+    }] : []),
+    ...(pdfDownloadUrl ? [{
+      type: 'button' as const,
+      style: 'secondary' as const,
+      height: 'sm' as const,
+      action: {
+        type: 'uri' as const,
+        label: 'ดาวน์โหลด PDF',
+        uri: pdfDownloadUrl,
+      },
+    }] : []),
+  ]
+}
+
 function buildFlexMessage(
   ticket: WeightTicketRecord,
   pdfUrl: string,
+  pdfDownloadUrl: string,
   detailUrl: string,
-  imagePublicUrls: string[],
+  attachmentImages: Array<{ fileName: string; url: string }>,
   albumImageUrls: string[],
   customMessage?: string
 ) {
@@ -544,7 +617,8 @@ function buildFlexMessage(
               wrap: true
             }
           ]
-        }
+        },
+        ...buildWeightTicketPdfActions(pdfUrl, pdfDownloadUrl),
       ]
     },
     footer: {
@@ -568,16 +642,7 @@ function buildFlexMessage(
   const bubbles: any[] = [summaryBubble]
 
   // 2. Paginate photo attachments (chunks of 8)
-  const images = ticket.imageNames || []
-  const decodedImages = images
-    .map((img, idx) => {
-      const asset = decodeStoredImageAsset(img)
-      return {
-        fileName: asset.fileName,
-        url: imagePublicUrls[idx] || ''
-      }
-    })
-    .filter(asset => asset.url && (asset.url.startsWith('http://') || asset.url.startsWith('https://')))
+  const decodedImages = attachmentImages.filter((asset) => asset.url)
 
   if (decodedImages.length > 0) {
     const chunkSize = 8
@@ -596,12 +661,12 @@ function buildFlexMessage(
 
         // Column 1
         const idx1 = pageIdx * chunkSize + r * 2 + 1
-        rowContents.push(buildPhotoTile(img1, idx1, ticket.createdAt, isWti, albumUrl))
+        rowContents.push(buildPhotoTile(img1, idx1, ticket.createdAt, albumUrl))
 
         // Column 2
         if (img2) {
           const idx2 = pageIdx * chunkSize + r * 2 + 2
-          rowContents.push(buildPhotoTile(img2, idx2, ticket.createdAt, isWti, albumUrl))
+          rowContents.push(buildPhotoTile(img2, idx2, ticket.createdAt, albumUrl))
         } else {
           rowContents.push({
             type: 'box' as const,
@@ -752,14 +817,8 @@ function buildPhotoTile(
   asset: { fileName: string; url: string },
   index: number,
   ticketCreatedAt: string,
-  isWti: boolean,
   albumUrl: string
 ) {
-  const isOut = asset.fileName.toLowerCase().includes('out') ||
-                asset.fileName.toLowerCase().includes('exit') ||
-                asset.fileName.includes('ขาออก')
-  const badgeText = isOut ? 'ขาออก' : (isWti ? 'รับเข้า' : 'ขาออก')
-  const badgeColor = isOut ? '#10b981' : '#0ea5e9'
   const photoTime = getPhotoTimestamp(asset.fileName, ticketCreatedAt)
 
   return {
@@ -784,28 +843,6 @@ function buildPhotoTile(
               uri: albumUrl
             }
           },
-          {
-            type: 'box' as const,
-            layout: 'vertical' as const,
-            position: 'absolute' as const,
-            offsetTop: '4px',
-            offsetStart: '4px',
-            backgroundColor: badgeColor,
-            cornerRadius: 'xs' as const,
-            paddingStart: '4px',
-            paddingEnd: '4px',
-            paddingTop: '2px',
-            paddingBottom: '2px',
-            contents: [
-              {
-                type: 'text' as const,
-                text: badgeText,
-                color: '#ffffff',
-                size: 'xxs' as const,
-                weight: 'bold' as const
-              }
-            ]
-          }
         ]
       },
       {
@@ -953,13 +990,16 @@ export async function sendLinePush(targetId: string, messages: any[], token: str
     }),
     headers,
     method: 'POST',
-    signal,
+    signal: signal ?? AbortSignal.timeout(10_000),
   })
 
   if (response.status === 409 && retryKey) {
     const acceptedRequestId = response.headers.get('x-line-accepted-request-id') || response.headers.get('x-line-request-id')
+    if (!acceptedRequestId) {
+      throw new Error('LINE Push Message ตอบกลับ 409 แต่ไม่คืน accepted request id')
+    }
     return {
-      lineRequestId: acceptedRequestId || null,
+      lineRequestId: acceptedRequestId,
       isConflict: true
     }
   }
@@ -968,8 +1008,12 @@ export async function sendLinePush(targetId: string, messages: any[], token: str
     const body = await response.text()
     throw new Error(`LINE Push Message ไม่สำเร็จ (${response.status}): ${body}`)
   }
+  const lineRequestId = response.headers.get('x-line-request-id')
+  if (!lineRequestId) {
+    throw new Error('LINE Push Message ไม่คืน x-line-request-id')
+  }
   return {
-    lineRequestId: response.headers.get('x-line-request-id') || null,
+    lineRequestId,
     isConflict: false
   }
 }
@@ -1022,51 +1066,25 @@ async function recordNotificationLog(values: {
 }
 
 async function resolveImagePublicUrls(ticket: WeightTicketRecord, bucketName: string): Promise<string[]> {
-  const images = ticket.imageNames || []
+  const images = getWeightTicketAttachmentReferences(ticket)
+  const supabase = getSupabaseAdminClient()
+  if (!supabase) throw new Error('ยังไม่ได้ตั้งค่า Storage สำหรับสร้างลิงก์รูปหลักฐาน')
   const publicUrls: string[] = []
 
   for (const img of images) {
     const asset = decodeStoredImageAsset(img)
-    if (!asset.url) {
-      publicUrls.push('')
-      continue
+    if (!asset.bucket || !asset.storageKey) {
+      throw new Error(`พบรูปหลักฐาน ${asset.fileName} ที่ยังไม่ถูกย้ายเข้า private image bucket กรุณารัน migration/backfill ก่อนส่ง LINE`)
     }
-
-    if (asset.url.startsWith('http://') || asset.url.startsWith('https://')) {
-      publicUrls.push(asset.url)
-      continue
+    if (asset.bucket !== bucketName) {
+      throw new Error(`รูปหลักฐาน ${asset.fileName} อ้างอิง bucket ไม่ตรงกับ private image bucket`)
     }
-
-    try {
-      const imgData = imageFromDataUrl(asset.url)
-      if (imgData) {
-        if (process.env.MOCK_PDF_UPLOAD !== 'true') {
-          const supabase = getSupabaseAdminClient()
-          if (!supabase) {
-            publicUrls.push('')
-            continue
-          }
-          const storageKey = `${safeStorageSegment(ticket.documentNo)}/photos/${safeStorageSegment(asset.fileName)}`
-          const { error } = await supabase.storage.from(bucketName).upload(storageKey, imgData.bytes, {
-            contentType: imgData.type === 'png' ? 'image/png' : 'image/jpeg',
-            upsert: true,
-          })
-          if (error) {
-            console.error('Failed to upload ticket image to Supabase:', error.message)
-          } else {
-            const { data } = supabase.storage.from(bucketName).getPublicUrl(storageKey)
-            publicUrls.push(data.publicUrl)
-          }
-        } else {
-          publicUrls.push('')
-        }
-      } else {
-        publicUrls.push('')
-      }
-    } catch (err) {
-      console.warn('Failed to upload dataUrl photo:', err)
-      publicUrls.push('')
+    const storageKey = assertWeightTicketImageStorageKey(asset.storageKey)
+    const { data, error } = await supabase.storage.from(bucketName).createSignedUrl(storageKey, SIGNED_URL_TTL_SECONDS)
+    if (error || !data?.signedUrl) {
+      throw new Error(`สร้าง signed URL รูปหลักฐาน ${asset.fileName} ไม่สำเร็จ: ${error?.message ?? 'ไม่พบ signed URL'}`)
     }
+    publicUrls.push(data.signedUrl)
   }
 
   return publicUrls
@@ -1076,6 +1094,12 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
   const loaded = await loadWeightTicketRecord(documentNo, options.scopedBranchIds)
   if (!loaded) {
     return { code: 'NOT_FOUND' as const, status: 404, error: 'ไม่พบใบรับ-ส่งของ' }
+  }
+  if (loaded.record.status === 'draft') {
+    return { code: 'BAD_REQUEST' as const, status: 400, error: 'ต้องยืนยันเอกสารก่อนส่ง LINE' }
+  }
+  if (loaded.record.status === 'cancelled') {
+    return { code: 'BAD_REQUEST' as const, status: 400, error: 'เอกสารที่ยกเลิกแล้วไม่สามารถส่ง LINE ได้' }
   }
 
   const configs = await resolveNotificationConfigs()
@@ -1113,27 +1137,32 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
 
   try {
     const profile = await loadCompanyPrintProfile(loaded.record.branchId)
-    const detailUrl = buildDetailUrl(options.origin || configs.appUrl, loaded.record.documentNo)
+    const detailUrl = buildDetailUrl(options.origin || configs.appUrl, loaded.record.documentNo, loaded.record.type)
 
-    // --- PDF + album generation (optional, graceful degradation) ---
-    // ถ้า Playwright/Supabase พัง → ยังส่งข้อความ LINE ได้ (ไม่มี PDF แนบ)
-    // เพราะ template รองรับ pdfUrl='' อยู่แล้ว (degrades เป็น '-')
-    // ทำตามแนวทางของ ChatGPT: อย่าให้ PDF gen เป็น hard blocker ของทั้ง notification
+    const imagePublicUrls = await resolveImagePublicUrls(loaded.record, configs.imageBucket)
+    const pdfRecord = withResolvedImageUrls(loaded.record, imagePublicUrls)
+
+    // PDF, public album artifacts, and private source-image resolution are one
+    // evidence boundary. If any part fails, do not send a misleading message
+    // that omits the document evidence.
     let pdfUrl = ''
     let albumImageUrls: string[] = []
     let pdfStorageBucket = configs.pdfBucket
     let pdfStorageKey: string | undefined
+    let pdfDownloadUrl = ''
 
     try {
       // ใช้ module ใหม่ react-pdf + @napi-rs/canvas (แทน Playwright)
       // กำจัด dependency Chromium binary ออกจาก Docker image ทั้งหมด
-      const { pdfBuffer, albumImages } = await generateWeightTicketPdfReactPdf(loaded.record, profile as CompanyProfilePrintValues, {
+      const { pdfBuffer, albumImages } = await generateWeightTicketPdfReactPdf(pdfRecord, profile as CompanyProfilePrintValues, {
+        // Keep the existing admin setting effective for generated LINE albums.
         showBadges: configs.albumShowBadges,
         showTimestamps: configs.albumShowTimestamps,
         quality: configs.albumQuality,
       })
       const uploaded = await uploadPdf(loaded.record, pdfBuffer, configs.pdfBucket)
       pdfUrl = uploaded.pdfUrl
+      pdfDownloadUrl = uploaded.pdfDownloadUrl
       pdfStorageKey = uploaded.storageKey
 
       // Upload album images
@@ -1142,14 +1171,13 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
         albumImageUrls.push(url)
       }
     } catch (pdfErr) {
-      // PDF/album พัง → log warning แล้วทำงานต่อ ส่งข้อความอย่างเดียว (ไม่มี PDF แนบ)
       const errMsg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr)
-      console.warn('[notifyWeightTicketLine] PDF generation failed, sending message without PDF attachment:', errMsg)
+      throw new Error(`เตรียม PDF/รูปหลักฐานสำหรับส่ง LINE ไม่สำเร็จ: ${errMsg}`)
     }
 
-    const imagePublicUrls = await resolveImagePublicUrls(loaded.record, configs.pdfBucket)
-    const flexMessage = buildFlexMessage(loaded.record, pdfUrl, detailUrl, imagePublicUrls, albumImageUrls, options.customMessage)
-    const customTemplate = loaded.record.type === 'WTI' ? configs.wtiTemplate : configs.wtoTemplate
+    const attachmentImages = buildWeightTicketAttachmentImages(pdfRecord)
+    const flexMessage = buildFlexMessage(pdfRecord, pdfUrl, pdfDownloadUrl, detailUrl, attachmentImages, albumImageUrls, options.customMessage)
+    const customTemplate = pdfRecord.type === 'WTI' ? configs.wtiTemplate : configs.wtoTemplate
     const textMessage = {
       type: 'text',
       text: formatCustomTemplate(customTemplate, loaded.record, pdfUrl)
@@ -1215,15 +1243,6 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
     const skippedCount = sentResults.filter((r) => r.status === 'skipped').length
     const failedResults = sentResults.filter((r) => r.status === 'failed')
 
-    if (sentCount > 0) {
-      await syncWeightTicketToGoogleSheets('update', {
-        ...loaded.record,
-        pdfUrl,
-      } as any).catch((err) => {
-        console.error('[line-notification] failed to sync to google sheets:', err)
-      })
-    }
-
     if (sentCount === 0 && skippedCount > 0 && failedResults.length === 0) {
       return {
         code: 'ALREADY_SENT' as const,
@@ -1258,6 +1277,14 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
     }
   } catch (caught) {
     const errorMessage = caught instanceof Error ? caught.message : 'สร้างเอกสารหรืออัปโหลด PDF ไม่สำเร็จ'
+    await recordNotificationLog({
+      errorMessage: sanitizeNotificationError(caught),
+      pdfStorageBucket: configs.pdfBucket,
+      requestedBy: options.requestedBy,
+      status: 'failed',
+      targetId: options.targetId && options.targetId !== 'routing' ? options.targetId : undefined,
+      ticketId: loaded.id,
+    })
     return { code: 'SEND_FAILED' as const, status: 500, error: errorMessage }
   }
 }

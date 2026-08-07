@@ -1,0 +1,35 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describe, expect, it } from 'vitest'
+
+const appRoot = resolve(fileURLToPath(new URL('../../../', import.meta.url)))
+const repoRoot = resolve(appRoot, '../..')
+
+const weightTicketSources = [
+  resolve(appRoot, 'src/app/api/daily/weight-tickets/route.ts'),
+  resolve(appRoot, 'src/app/api/daily/weight-tickets/[id]/route.ts'),
+  resolve(appRoot, 'src/lib/server/weight-ticket-line-notification.ts'),
+  resolve(appRoot, 'src/app/api/admin/line-settings/route.ts'),
+  resolve(appRoot, 'src/app/admin/line-settings/LineSettingsPageClient.tsx'),
+].map((path) => readFileSync(path, 'utf8'))
+const retirementMigration = readFileSync(
+  resolve(repoRoot, 'supabase/migrations/20260806100000_retire_google_sheets_weight_ticket_setting.sql'),
+  'utf8',
+)
+
+describe('weight-ticket Google Sheets removal contract', () => {
+  it('does not sync WTI or WTO lifecycle events to Google Sheets', () => {
+    for (const source of weightTicketSources) {
+      expect(source).not.toContain('syncWeightTicketToGoogleSheets')
+      expect(source).not.toContain('google-sheets-sync')
+      expect(source).not.toContain('GOOGLE_SHEETS_WEBHOOK_URL')
+      expect(source).not.toContain('googleSheetsWebhookUrl')
+    }
+  })
+
+  it('retires the obsolete persisted webhook setting without changing migration history', () => {
+    expect(retirementMigration).toContain("where key = 'GOOGLE_SHEETS_WEBHOOK_URL'")
+    expect(retirementMigration).toContain('delete from public.system_settings')
+  })
+})

@@ -22,7 +22,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const body = notifySchema.parse(await request.json().catch(() => ({})))
     const scopedBranchIds = branchScopeIds(auth)
     const ticket = await prisma.weight_tickets.findFirst({
-      select: { status: true },
+      select: { doc_no: true, status: true },
       where: {
         ...(scopedBranchIds !== null ? { branches: { code: { in: scopedBranchIds } } } : {}),
         OR: [{ id: /^\d+$/.test(id) ? BigInt(id) : -1n }, { doc_no: id }],
@@ -32,9 +32,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (ticket.status === 'draft') {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'ต้องยืนยันเอกสารก่อนส่ง LINE' }, { status: 400 })
     }
+    if (ticket.status === 'cancelled') {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'เอกสารที่ยกเลิกแล้วไม่สามารถส่ง LINE ได้' }, { status: 400 })
+    }
 
     // Manual triggers always force: true
-    const enqueueResult = await enqueueNotificationJob(id, {
+    const enqueueResult = await enqueueNotificationJob(ticket.doc_no, {
       customMessage: body.customMessage || undefined,
       requestedBy: enteredByLabel(auth),
       targetId: body.targetId || undefined,

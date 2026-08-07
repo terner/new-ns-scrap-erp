@@ -42,6 +42,45 @@ const validWtiPayload = (lines: TestWeightTicketLine[]) => ({
 })
 
 describe('weight ticket totals', () => {
+  it('allows header-only drafts for WTI and WTO while a normal WTO save still requires lines and a godown', () => {
+    expect(weightTicketFormSchema.safeParse({
+      ...validWtiPayload([]),
+      godownName: '',
+    }).success).toBe(true)
+
+    expect(weightTicketFormSchema.safeParse({
+      ...validWtiPayload([]),
+      godownName: 'โกดังทดสอบ',
+      saveScope: 'header',
+      type: 'WTO',
+    }).success).toBe(true)
+
+    expect(weightTicketFormSchema.safeParse({
+      ...validWtiPayload([]),
+      godownName: 'โกดังทดสอบ',
+      type: 'WTO',
+    }).success).toBe(false)
+
+    expect(weightTicketFormSchema.safeParse({
+      ...validWtiPayload([{
+        ...validWtiLine('header-with-line'),
+        warehouseId: 'WAREHOUSE-1',
+      }]),
+      godownName: 'โกดังทดสอบ',
+      saveScope: 'header',
+      type: 'WTO',
+    }).success).toBe(false)
+
+    expect(weightTicketFormSchema.safeParse({
+      ...validWtiPayload([{
+        ...validWtiLine('wto-line'),
+        warehouseId: 'WAREHOUSE-1',
+      }]),
+      godownName: '',
+      type: 'WTO',
+    }).success).toBe(false)
+  })
+
   it('deducts a child impurity from the whole product instead of clipping it to the first lot', () => {
     const totals = calculateTicketTotals([
       {

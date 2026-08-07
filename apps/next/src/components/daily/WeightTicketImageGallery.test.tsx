@@ -27,8 +27,8 @@ afterAll(() => {
 describe('stored weight ticket image URL contract', () => {
   it('accepts only parseable HTTP(S) assets for previews', () => {
     const assets = [
-      encodeStoredImageReference('http.jpg', 'http://storage.example.com/http.jpg', 'weight-ticket/http.jpg'),
-      encodeStoredImageReference('https.jpg', 'https://storage.example.com/https.jpg?token=signed', 'weight-ticket/https.jpg'),
+      encodeStoredImageReference('http.jpg', 'http://storage.example.com/http.jpg', 'weight-ticket/http.jpg', 'weight-ticket-images'),
+      encodeStoredImageReference('https.jpg', 'https://storage.example.com/https.jpg?token=signed', 'weight-ticket/https.jpg', 'weight-ticket-images'),
       'data:image/png;base64,AAAA',
       'legacy-pipe.jpg|data:image/jpeg;base64,BBBB',
       JSON.stringify({ dataUrl: 'data:image/webp;base64,CCCC', fileName: 'legacy-json.webp' }),
@@ -56,12 +56,14 @@ describe('WeightTicketImageGallery', () => {
   afterEach(() => {
     act(() => root.unmount())
     container.remove()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('renders the combined ticket images and opens the existing gallery at the clicked image', () => {
     const onOpen = vi.fn()
     const imageNames = Array.from({ length: 6 }, (_, index) => (
-      encodeStoredImageReference(`evidence-${index + 1}.jpg`, `https://example.com/evidence-${index + 1}.jpg`, `weight-ticket/evidence-${index + 1}.jpg`)
+      encodeStoredImageReference(`evidence-${index + 1}.jpg`, `https://example.com/evidence-${index + 1}.jpg`, `weight-ticket/evidence-${index + 1}.jpg`, 'weight-ticket-images')
     ))
 
     act(() => root.render(<WeightTicketImageGallery imageNames={imageNames} onOpen={onOpen} />))
@@ -86,6 +88,57 @@ describe('WeightTicketImageGallery', () => {
     }))
   })
 
+  it('downloads all previewable images through the document ZIP endpoint', async () => {
+    const onOpen = vi.fn()
+    const fetchMock = vi.fn().mockResolvedValue(new Response(new Blob(['zip']), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const createObjectUrl = vi.fn().mockReturnValue('blob:weight-ticket-images')
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const imageNames = [
+      encodeStoredImageReference('evidence.jpg', 'https://example.com/evidence.jpg', 'weight-ticket/evidence.jpg', 'weight-ticket-images'),
+    ]
+
+    act(() => root.render(
+      <WeightTicketImageGallery
+        downloadUrl="/api/daily/weight-tickets/WTI-001/images/download"
+        imageNames={imageNames}
+        onOpen={onOpen}
+      />,
+    ))
+
+    const downloadButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('ดาวน์โหลดรูปทั้งหมด'))
+    expect(downloadButton).not.toBeUndefined()
+    await act(async () => {
+      downloadButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/daily/weight-tickets/WTI-001/images/download', { cache: 'no-store' })
+    expect(createObjectUrl).toHaveBeenCalled()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: undefined })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: undefined })
+  })
+
+  it('keeps the download button enabled when only vehicle images are downloadable', () => {
+    const onOpen = vi.fn()
+    const vehicleImage = encodeStoredImageReference('vehicle.jpg', 'https://example.com/vehicle.jpg', 'weight-ticket/vehicle.jpg', 'weight-ticket-images')
+
+    act(() => root.render(
+      <WeightTicketImageGallery
+        downloadImageNames={[vehicleImage]}
+        downloadUrl="/api/daily/weight-tickets/WTI-001/images/download"
+        imageNames={[]}
+        onOpen={onOpen}
+      />,
+    ))
+
+    const downloadButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('ดาวน์โหลดรูปทั้งหมด'))
+    expect(downloadButton).not.toBeUndefined()
+    expect(downloadButton?.disabled).toBe(false)
+    expect(container.textContent).toContain('1 รูปทั้งหมด')
+  })
+
   it('shows an empty evidence state when the ticket has no images', () => {
     const onOpen = vi.fn()
 
@@ -99,7 +152,7 @@ describe('WeightTicketImageGallery', () => {
   it('opens a single image as a one-item gallery', () => {
     const onOpen = vi.fn()
     const imageNames = [
-      encodeStoredImageReference('single.jpg', 'https://example.com/single.jpg', 'weight-ticket/single.jpg'),
+      encodeStoredImageReference('single.jpg', 'https://example.com/single.jpg', 'weight-ticket/single.jpg', 'weight-ticket-images'),
     ]
 
     act(() => root.render(<WeightTicketImageGallery imageNames={imageNames} onOpen={onOpen} />))
@@ -117,7 +170,7 @@ describe('WeightTicketImageGallery', () => {
   it('keeps legacy filename-only evidence readable without creating a broken preview', () => {
     const onOpen = vi.fn()
     const imageNames = [
-      encodeStoredImageReference('preview.jpg', 'https://example.com/preview.jpg', 'weight-ticket/preview.jpg'),
+      encodeStoredImageReference('preview.jpg', 'https://example.com/preview.jpg', 'weight-ticket/preview.jpg', 'weight-ticket-images'),
       'legacy-camera-01.jpg',
     ]
 
@@ -131,7 +184,7 @@ describe('WeightTicketImageGallery', () => {
   it('previews only valid web URLs and keeps every legacy data URL format unavailable', () => {
     const onOpen = vi.fn()
     const imageNames = [
-      encodeStoredImageReference('stored.jpg', 'https://storage.example.com/stored.jpg?token=signed', 'weight-ticket/stored.jpg'),
+      encodeStoredImageReference('stored.jpg', 'https://storage.example.com/stored.jpg?token=signed', 'weight-ticket/stored.jpg', 'weight-ticket-images'),
       'data:image/png;base64,AAAA',
       'legacy-pipe.jpg|data:image/jpeg;base64,BBBB',
       JSON.stringify({ dataUrl: 'data:image/webp;base64,CCCC', fileName: 'legacy-json.webp' }),

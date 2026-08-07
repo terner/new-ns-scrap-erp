@@ -13,7 +13,7 @@ tags:
   - decision
 status: draft
 created: 2026-06-11
-updated: 2026-08-04
+updated: 2026-08-06
 ---
 
 # WTI/WTO Flow / Flow ใบรับ-ส่งของ
@@ -25,6 +25,15 @@ updated: 2026-08-04
 - สิ่งนี้เป็น validation/feedback ของหลักฐานธุรกรรมระดับ L5 เท่านั้น ไม่เก็บรูปหรือ permission response ใน browser storage และยังใช้ API/Storage เดิมเป็น source of truth; ผู้ใช้ต้องเห็นความล้มเหลวก่อนกดบันทึกเอกสาร
 
 What is what: upload result คือสถานะของไฟล์แนบแต่ละไฟล์ ไม่ใช่สถานะของเอกสาร WTI/WTO. Why it has to be like this: หน้างานต้องรู้ทันทีว่าหลักฐานรูปใดหายไป และไม่ควรเสียรูปที่อัปโหลดสำเร็จเพียงเพราะอีกรูปหนึ่งมีปัญหา.
+
+## WTO downstream integrity review (2026-08-05)
+
+- ร่าง WTO ตรวจน้ำหนัก/สต็อกก่อนบันทึก แต่ยังไม่กันของออกจาก available; `pending_out` จะถูกสร้างเมื่อผู้ใช้กด `ยืนยันส่งของ` เท่านั้น. เหตุผลคือร่างที่ยังไม่ยืนยันไม่ควรทำให้ยอดสต็อกที่รอออกเปลี่ยน และจุดยืนยันเป็น transaction boundary ของการกันของ.
+- Sales Bill ยกเลิกหลังมี usage log `returned_from_sales_bill` หรือ `loss_from_sales_bill` ได้โดยเขียน `SB-CANCEL` แบบ append-only เพื่อคืน stock ตาม movement เดิม แต่ต้องไม่ reopen/recreate `pending_out` ซ้ำ.
+- WTO ที่ถูกเปิดบิลบางส่วน (`partially_billed`) ยังเป็นตัวเลือกของ Sales Bill ได้ โดยระบบต้องใช้ remaining quantity/weight ของแต่ละบรรทัด ไม่เปิดให้ตัดยอดเดิมซ้ำ.
+- การยกเลิก WTO บันทึก audit snapshot เป็น `cancelled` ให้ตรงกับสถานะ hold ที่ถูกยกเลิก. ไฟล์แนบ WTI/WTO ตรวจสิทธิ์ `daily.weight_tickets.update` และคืน signed URL จาก bucket ที่ตั้งค่าไว้ แทน public URL เพื่อไม่เปิดหลักฐานธุรกรรมเป็นสาธารณะ.
+
+What is what: `pending_out` คือ reservation ของ stock ที่ยืนยันแล้ว, usage log คือประวัติการนำ WTO ไปใช้/คืน/สูญเสีย, และ attachment URL คือสิทธิ์อ่านหลักฐานที่มีอายุจำกัด. Why it has to be like this: downstream cancellation ต้องคืน stock ด้วย ledger reversal เสมอ แต่การคืน/สูญเสียก่อนหน้าไม่ควรทำให้ reservation ถูกสร้างซ้ำ และรูปภายในต้องไม่เผยแพร่ผ่าน URL สาธารณะ.
 
 ## Attachment chooser scroll stability and weight-field alignment (2026-08-03)
 
@@ -66,11 +75,34 @@ What is what: upload result คือสถานะของไฟล์แน�
 - เมื่อกดบันทึก ให้ถือว่าออกเอกสารจริงและมีผลต่อ usage/timeline ทันที แต่ยังไม่เขียน stock ledger
 - เลขเอกสาร, วันที่เอกสาร, เวลา, และผู้บันทึก เป็น system-generated หลัง save เท่านั้น
 - ผู้ใช้ต้องกรอกข้อมูลธุรกิจและน้ำหนักจริงก่อน ไม่ preview เลขเอกสารล่วงหน้า
+- WTI อนุญาตให้บันทึกเอกสารโดยยังไม่มีรายการสินค้าได้ เพื่อเก็บการมาถึงของรถ/ผู้ขายก่อนชั่งหรือคัดสินค้า; ก่อนบันทึกต้องมี `สาขา`, `ผู้ขาย`, และ `ทะเบียนรถ` เสมอ ส่วน `โกดัง` ที่หัวเอกสารเป็นข้อมูลเสริมและไม่บังคับ. WTI ที่ยังไม่มีรายการไม่สร้าง product summary, stock ledger หรือ side effect สต็อก; เพิ่มสินค้าและน้ำหนักภายหลังได้ตาม flow เดิม. WTO ยังต้องมีรายการสินค้าและคลังระดับรายการตามกฎขาออกเดิม
 - WTI create/edit modal ต้องแสดง elapsed timer ใต้ title bar เพื่อบอกเวลาตั้งแต่เริ่มสร้างรายการจนถึงสถานะ `received` / `รับของแล้ว`; timer และจำนวนรายการต้องอยู่ใน surface เดียวกันทั้ง desktop/mobile โดยเริ่มต้นเป็นแบบย่อ แสดงเฉพาะเวลาและจำนวนรายการ และให้ผู้ใช้กดแสดง/ซ่อนรายละเอียดเอง ส่วนยอดน้ำหนักของแต่ละรายการยังแสดงใน section รายการด้านล่าง ไม่แสดงซ้ำใน timer summary เอกสารที่บันทึกแล้วใช้ `weight_tickets.created_at` เป็นเวลาเริ่ม และยังนับต่อหลังบันทึก draft จนกว่าผู้ใช้กดปุ่มยืนยันรับของ ซึ่งเขียน `weight_ticket_status_logs.to_status = received` เป็นเวลาหยุดเท่านั้น ห้าม fallback ไปใช้ `updated_at` เพราะเวลานั้นอาจมาจากการแก้ไขอื่น ส่วน draft ที่ยังไม่บันทึกให้เริ่มนับจากเวลาที่เปิด modal เท่านั้น ไม่เพิ่ม field ใหม่ใน DB
 - รูปต่อรายการสินค้าเป็นข้อมูลบังคับของเอกสาร WTI/WTO
 - รูปสินค้าที่ใช้เลือกในฟอร์มเป็นเพียง master-data thumbnail เพื่อช่วยเลือกสินค้า ไม่ใช่หลักฐานแทนรูปหน้างาน
 - PDF/LINE share ต้องให้หน้าแรกเป็นใบพิมพ์ A4 และต่อหน้า 2+ เป็นอัลบั้มรูปหลักฐานจากรูปรถและรูปสินค้า
+- ใน detail/modal ส่วน `รูปภาพประกอบ` มีปุ่ม `ดาวน์โหลดรูปทั้งหมด` สำหรับดาวน์โหลดรูปที่ preview ได้ของรถและทุกรายการสินค้าเป็น ZIP เดียว. API ตรวจ `daily.weight_tickets.view` และ branch scope ก่อนอ่าน storage reference; ไม่เก็บ ZIP หรือรูปลง browser storage และไม่ทำ bucket ให้เป็น public
 - history/timeline ของเอกสารต้องเป็น append-only ตาม [[Document Timeline Policy]]
+
+## Shared save-progress and WTO line-add flow (2026-08-05)
+
+ฟอร์ม WTI/WTO ใช้ `WeightTicketSaveProgress` เป็นส่วนกลางสำหรับสถานะการบันทึกทุกจุดที่ผู้ใช้ต้องรอผลจาก server โดยไม่ปิดหน้าฟอร์มและไม่ซ่อนข้อผิดพลาด:
+
+- `auto_save`: เมื่อผู้ใช้กด `เพิ่มสินค้า` หรือ `เพิ่มเต๋า` ระบบเพิ่มแถวและเปิดช่องกรอกใน client state ทันที ไม่รอ response จาก server. จากนั้นจึงส่ง draft เป็น background (`saveScope=header` สำหรับการเพิ่มสินค้าครั้งแรก และ `saveScope=document` สำหรับเอกสารที่มีรายการแล้ว) เพื่อเก็บ document id/ข้อมูลเดิม โดยไม่เปิด save stage ซ้ำเมื่อมี request เดิมกำลังทำงานอยู่
+- `save`: WTI บันทึกข้อมูลตามปุ่มบันทึกเดิม
+- `stock_check`: WTO ตรวจ stock และข้อมูลทุกรายการใหม่ก่อนบันทึกทุกครั้ง
+- หลัง transaction หลัก commit สำเร็จ API save จะทำ audit แล้วตอบเฉพาะข้อมูลที่ฟอร์มต้องใช้ต่อทันที โดยไม่ sign URL รูปและไม่ query timeline/pending-out detail ใน response; หน้า detail จะโหลดข้อมูลประกอบและ signed preview URL ผ่าน endpoint แยกเมื่อจำเป็น. เหตุผลคือการบันทึกธุรกรรมต้องรอ DB commit และ audit ให้เสร็จ แต่ไม่ควรบล็อกด้วยข้อมูลประกอบที่ไม่ได้ใช้ต่อในฟอร์ม.
+- `confirm`: ยืนยันรับ/ส่งของจากหน้า detail หรือ modal
+
+การแสดงสถานะเป็น `role=status`, `aria-live=polite` และปิดปุ่มที่เรียก operation เดิมระหว่างรอ เพื่อป้องกันการกดซ้ำ. หลัง auto-save สำเร็จ การบันทึกปุ่มสุดท้ายต้อง update ticket เดิมผ่าน `savedTicket.id` ไม่สร้างเอกสารซ้ำ. Server/database ยังคงเป็น source of truth และ UI ไม่ใช้ข้อมูลสำรองแบบ hard-code.
+
+เหตุผล: event การเพิ่มแถวกับ event การ persist ต้องแยกกันเพื่อให้ผู้ใช้กรอกต่อได้ทันที ขณะที่ข้อมูลหัวเอกสารยังถูกเก็บเป็น draft แบบ background. เมื่อ server ตอบกลับแล้วจึงผูก `ticket_id` เดิม และ final save update เอกสารเดียวกัน. WTI ยังคงใช้ contract เดิมที่อนุญาตให้บันทึกโดยไม่มีรายการสินค้า.
+
+## Read performance and private image preview boundary (2026-08-06)
+
+- list JSON ใช้ lightweight projection และ batch usage count; detail action ต้องรอ full detail ก่อนเปิด action ที่แก้ไข/ยืนยัน/พิมพ์/แชร์ เพื่อไม่ให้ list row ที่มี `lines` และ timeline ว่างถูกนำไปใช้เป็นรายละเอียดจริง
+- list/detail/preview API ที่อ่านข้อมูล WTI/WTO ใช้ `Cache-Control: private, no-store` เพราะมีข้อมูลสาขา สินค้า น้ำหนัก และสถานะธุรกรรม
+- preview จะ sign เฉพาะ reference ที่มี `bucket` และ `storageKey` ตรงกับ `WEIGHT_TICKET_IMAGE_BUCKET`; reference ที่เป็น bucket อื่น, URL-only, data URL หรือ filename-only จะถูกตัดออกจาก preview response แบบ fail-closed. การตรวจนี้เป็น read boundary เพิ่มจาก write validation เพื่อไม่เปิด URL ของ artifact bucket หรือข้อมูล legacy
+- modal ยกเลิก request detail, preview และ stock-return เมื่อปิดหรือเปลี่ยนเอกสาร เพื่อลดงานที่ค้างและป้องกัน response เก่าชน state ปัจจุบัน
 
 ## WTI Concurrent Draft / Auto-save Design (2026-07-23)
 
@@ -231,7 +263,7 @@ Server เป็นผู้สร้าง `line_id`, ตรวจสิทธ�
 - [ ] `WTI-42` ป้องกันการส่ง request ซ้ำจากการกดเร็ว, debounce เฉพาะ field น้ำหนักที่กำลังพิมพ์ และคง stable row/line identity
 - [ ] `WTI-43` เมื่อ event จากตราชั่งอื่นเข้ามา ให้ merge รายการและ summary โดยไม่ล้างข้อมูลที่ผู้ใช้กำลังกรอก
 - [ ] `WTI-44` แยก dirty state ของ manual fields ออกจาก auto-save state; ถ้ากดยกเลิกขณะ manual fields ยังไม่บันทึก ให้ถามยืนยัน
-- [ ] `WTI-45` หลัง WTI ถูก `received` หรือ `cancelled` ให้เปลี่ยนทั้งสองเครื่องเป็น read-only และหยุด auto-save
+- [ ] `WTI-45` หลัง WTI ถูก `cancelled` หรือถูกใช้ใน Purchase Bill ให้เปลี่ยนทั้งสองเครื่องเป็น read-only และหยุด auto-save; WTI ที่ `received` แต่ยังไม่มี PB ยังแก้ไขได้ตามสิทธิ์
 
 #### Phase 5: Validation และ rollout
 
@@ -685,9 +717,13 @@ WTI/WTO มีรูป 2 ระดับ:
 ### Contract รูปใน detail gallery
 
 - รูปหลักฐานเป็นข้อมูลเอกสารระดับ L5: Database เก็บ attachment metadata/storage key เป็น source of truth และ binary อยู่ใน object storage ตาม bucket/privacy policy
-- ทุก entry point ของ detail gallery ทั้งรูปรถ รูปรายการสินค้า และอัลบั้มรวม สร้าง preview/open payload เฉพาะ absolute `http://` หรือ `https://` URL ที่ parse ได้ รวม signed URL; `data:image` แบบ raw/pipe/JSON, URL ที่ผิดรูปแบบ และ filename-only เป็น legacy metadata ที่ unavailable จึงแสดงได้เพียงจำนวนแจ้งเตือนโดยไม่สร้าง `<img>` หรือ runtime fallback
+- รูปหลักฐาน WTI/WTO ใช้ bucket private ที่ตั้งค่าผ่าน `WEIGHT_TICKET_IMAGE_BUCKET`; DB เก็บเฉพาะ `bucket`, `storageKey`, `fileName` โดย signed URL สร้างใหม่เฉพาะ response/preview/LINE/PDF ตามสิทธิ์และอายุที่กำหนด ห้ามเก็บ bearer URL ระยะยาวหรือใช้ public URL ของรูปต้นฉบับ. ทุก read/write boundary ต้องตรวจ bucket ให้ตรงและให้ `storageKey` อยู่ใต้ namespace `attachments/` โดย reject absolute path, `\\` และ `..` segment ก่อนอ่านหรือสร้าง signed URL
+- PDF ที่สร้างเพื่อส่งออกและรูปอัลบั้มที่สร้างเพื่อ LINE ใช้ bucket public แยกต่างหากผ่าน `WEIGHT_TICKET_PDF_BUCKET`; รูปอัลบั้มเป็น outbound artifact ไม่ใช่ source evidence ของเอกสาร
+- ทุก entry point ของ detail gallery ทั้งรูปรถ รูปรายการสินค้า และอัลบั้มรวม รับ preview เฉพาะ canonical reference ที่มี `bucket` + `storageKey` ของ private image bucket และ signed URL ที่สร้าง ณ เวลาอ่าน; `data:image`, URL-only, bucket อื่น และ filename-only เป็น legacy metadata ที่ unavailable จึงแสดงได้เพียงจำนวนแจ้งเตือนโดยไม่สร้าง `<img>` หรือ runtime fallback
 - หน้า detail โหลด stored/original asset เมื่อผู้ใช้เปิดดู ส่วน list/picker ยังคงใช้ thumbnail; รอบนี้ไม่เพิ่ม browser/Redis cache และอายุ signed URL/cache headers เป็น contract ของ Storage
 - รูป legacy ต้องย้ายด้วย migration/backfill ไป object storage ไม่อ่าน base64 ย้อนกลับใน runtime; focused test ครอบ 0/1/many, signed HTTPS และ payload legacy ที่ unavailable
+- เพดาน 10 MB ต่อรูปใช้เฉพาะ upload contract; ตอนดาวน์โหลดไม่มีเพดานต่อรูป และรวมก่อนบีบ ZIP มี server-safety guard ไม่เกิน 100 MB เพื่อป้องกัน memory สูงผิดปกติ. ชื่อไฟล์จะ normalize extension เป็นตัวพิมพ์เล็ก เช่น `.JPG` เป็น `.jpg` โดยไม่แปลงชนิด/คุณภาพภาพ
+- ตัวดูภาพหลักใช้ `object-contain` ในพื้นที่คงที่เพื่อไม่ตัดรูปแนวตั้ง และ thumbnail ใช้แถวเดียวเลื่อนซ้าย-ขวาเพื่อลดความสูงของ gallery
 
 ### Legacy attachment backfill checkpoint (2026-07-19)
 
@@ -696,6 +732,7 @@ WTI/WTO มีรูป 2 ระดับ:
 - รูปที่ย้ายต้องเป็น JPEG/PNG/WebP จริง ขนาด decoded ไม่เกิน 10 MB และใช้ immutable key ที่มี SHA-256 โดย hash document token แทนเลขเอกสารใน public path; Storage upload ใช้ `cacheControl=31536000`, `upsert=false` จากนั้นจึง compare-and-swap ค่า array ใน DB ภายใน transaction โดยไม่เปลี่ยน business `updated_at`/audit timeline
 - ถ้า upload ผ่านแต่ DB เปลี่ยนระหว่างทาง ระบบไม่ลบ object หรือ reference เดิม แต่รายงาน CAS conflict/orphan แบบ sanitized เพื่อให้ operator ตรวจและตัดสินใจเอง
 - วันที่ 2026-07-19 apply สำเร็จทั้ง dev/SIT: ย้าย JSON data URL 214 รูปไป `weight-ticket-pdfs` และ CAS-remove exact 15-byte `mock image data` 2 รายการต่อ environment โดยไม่มี failure, CAS conflict, missing key หรือ orphan; rollback manifest แยกอยู่นอก repo และไม่เปลี่ยน business `updated_at`/audit timeline
+- checkpoint เดิมย้ายรูปไป bucket public ก่อนมีการแยก privacy; migration `20260806120000_split_weight_ticket_image_and_pdf_buckets.sql` จัดเตรียม `weight-ticket-images` แบบ private และคง `weight-ticket-pdfs` แบบ public. ต้องรัน `migrate:weight-ticket-image-bucket --apply --manifest=<absolute path outside repo>` แบบ dry-run/review ก่อน และยังไม่ลบ source object จนกว่าจะตรวจ reference และ rollback manifest ครบ
 - post-apply audit ยืนยัน data URL, invalid reference และ known mock เป็น `0`; canonical storage-key เป็น dev `219` / SIT `218`, Storage objects เป็น dev `625` / SIT `631`, ส่วน filename-only ยังคง 23 รายการต่อ environment เพราะไม่มี binary/source mapping ให้ย้าย จึงแสดง unavailable ตาม contract โดยไม่เดา path
 - WTI/WTO attachment ใน #151 เป็น L5 original ที่โหลดเฉพาะ detail/preview ไม่มี list/picker consumer จึงไม่สร้าง thumbnail ใน backfill นี้; thumbnail/compression เป็น migration แยกเมื่อมี consumer และ quality contract ที่ยืนยันแล้ว
 
@@ -711,11 +748,19 @@ WTI/WTO มีรูป 2 ระดับ:
 ### Print
 
 - `WTI` และ `WTO` ต้องพิมพ์ได้จากหน้า list และ detail
+- เอกสารสถานะ `แบบร่าง` พิมพ์ได้ทั้ง WTI และ WTO แม้ยังไม่มีรายการสินค้า/เต๋า เพื่อใช้เป็นเอกสารตรวจทานภายใน; การพิมพ์ไม่ถือเป็นการยืนยันรับ/ส่งของ และไม่บังคับรูปแบบข้อความสถานะบนใบพิมพ์
 - ใช้ข้อมูลบริษัทจาก `ข้อมูลบริษัท (สำหรับใบพิมพ์)`
 - HTML print popup ต้องใช้ `Noto Sans Thai` จาก `/fonts/` ของแอปและ system fallback เท่านั้น ไม่โหลด stylesheet หรือ font จากภายนอก เพื่อให้ผ่าน CSP เดียวกับแอปโดยไม่เปลี่ยน layout หรือสูตรน้ำหนักของใบพิมพ์
 - ใช้ wording แยกตามทิศทางเอกสาร
   - `WTI` = ใบรับสินค้า / ผู้ขาย / ผู้รับของ
   - `WTO` = ใบส่งของ / ลูกค้า / ผู้ส่งของ / ผู้รับของ
+
+### WTO print subtotal rule (2026-08-05)
+
+- `WTO` ที่มีรายละเอียดสินค้าจริงเพียง 1 แถว ให้แสดงแถวนั้นโดยตรงและไม่สร้างแถบสีเขียว `product-total`; ถ้าสินค้ากลุ่มเดียวกันมีมากกว่า 1 แถว ให้คงแถบสรุปสีเขียวไว้
+- แถว `รวมทั้งสิ้น` ของเอกสารยังต้องแสดงเสมอ และพฤติกรรมการพิมพ์ของ `WTI` ไม่เปลี่ยนแปลง
+
+What is what: raw detail row คือรายการน้ำหนักจริงของสินค้า ส่วน `product-total` คือแถวสรุปของกลุ่มสินค้า. Why it has to be like this: กลุ่มที่มีข้อมูลเดียวไม่ต้องมีแถวซ้ำให้ผู้ใช้อ่าน แต่กลุ่มที่มีหลายรายการยังต้องมีแถบสรุปเพื่อเห็นยอดรวมของสินค้าอย่างชัดเจน.
 
 ### Share
 
@@ -790,7 +835,7 @@ Implementation separation checkpoint 2026-06-30:
 - `handlers.ts` แยก decision กลางที่ route เคย branch เอง เช่น party snapshot, warehouse resolution, stock validation, และ pending_out create/edit side effect
 - WTI-specific write guard อยู่ใน `apps/next/src/lib/server/weight-ticket-write/wti.ts` เช่น supplier eligibility
 - WTO-specific write guard อยู่ใน `apps/next/src/lib/server/weight-ticket-write/wto.ts` เช่น customer eligibility และ WTO-only impurity restriction
-- WTO edit pending_out/cost plan อยู่ใน `apps/next/src/lib/server/weight-ticket-write/wto.ts` เพื่อให้การ preserve cost snapshot, audit event type, และ qty-before map เป็น logic ของใบส่งของ ไม่กระจายใน API route
+- WTO delivered edit ใช้ release/rebuild pending_out ทั้งชุดใน transaction เดียว: route เก็บ hold เดิมเพื่อเขียน `edit_release` event หลัง release, แล้วสร้าง hold ใหม่ด้วยต้นทุนเฉลี่ยปัจจุบันและเขียน `edit_rebuild` event. ไม่ preserve cost เดิมและไม่ใช้ Delta; policy นี้อยู่ใน route/stock-holds write path และต้อง lock เมื่อมี Sales Bill usage
 - `apps/next/src/lib/server/weight-ticket-write/type-guards.ts` เป็นตัวประสานตาม `values.type` เพื่อให้ route ไม่ต้องมี WTI/WTO guard กระจายหลายจุด
 - stock/cost side effect ของ WTO ยังอยู่ใน `stock-holds.ts` และ `weight-ticket-pending-out-events.ts`; WTI ไม่เรียก path เหล่านี้
 
@@ -831,6 +876,23 @@ Implementation separation checkpoint 2026-06-30:
 | `billed` | `ออกบิลแล้ว` | ถูกใช้ใน SB ครบแล้ว |
 | `cancelled` | `ยกเลิก` | เอกสารถูกยกเลิก |
 
+## ตารางสถานะและปุ่มที่แสดงบน WTI/WTO
+
+ปุ่ม `รายละเอียด` มีทุกสถานะ และเปิด read-only detail/modal. ปุ่มที่เหลือขึ้นกับสถานะร่วมกับสิทธิ์ผู้ใช้และข้อเท็จจริงว่าเอกสารถูกใช้กับ PB/SB แล้วหรือยัง ดังนั้นคำว่า `มีสิทธิ์` ในตารางหมายถึงต้องผ่านทั้งสองเงื่อนไขนั้นด้วย.
+
+| ประเภท/สถานะ | ปุ่มที่ควรเห็น | ปุ่มที่ไม่ควรเห็น |
+|---|---|---|
+| WTI/WTO `draft` | `รายละเอียด`, `พิมพ์`, `ยืนยันรับของ`/`ยืนยันส่งของ` เมื่อมีรายการครบ, `แก้ไข`, `ยกเลิก` | `แชร์`, `เปิดบิล`, `รับของคืน` |
+| WTI `received` | `รายละเอียด`, `พิมพ์`, `แชร์`, `แก้ไข` (ถ้ามีสิทธิ์และยังไม่มี PB), `เปิดบิลซื้อ` (ถ้ามีสิทธิ์), `ยกเลิก` (ถ้ามีสิทธิ์) | `ยืนยันรับของ`, `รับของคืน` |
+| WTI `billed` | `รายละเอียด`, `พิมพ์`, `แชร์` | `แก้ไข`, `ยกเลิก`, `เปิดบิลซื้อ`, `รับของคืน` |
+| WTI `cancelled` | `รายละเอียด` | `พิมพ์`, `แชร์`, `แก้ไข`, `ยกเลิก`, `เปิดบิลซื้อ`, `รับของคืน` |
+| WTO `delivered` | `รายละเอียด`, `พิมพ์`, `แชร์`, `แก้ไข` (ถ้ามีสิทธิ์และยังไม่มี SB), `เปิดบิลขาย` (ถ้ามีสิทธิ์), `ยกเลิก` (ถ้ามีสิทธิ์) | `ยืนยันส่งของ` |
+| WTO `partially_billed` | `รายละเอียด`, `พิมพ์`, `แชร์`, `รับของคืน` (เมื่อยังมีน้ำหนัก/รายการคงเหลือ) | `แก้ไข`, `ยกเลิก`, `เปิดบิลขาย` |
+| WTO `billed` | `รายละเอียด`, `พิมพ์`, `แชร์` | `แก้ไข`, `ยกเลิก`, `เปิดบิลขาย`, `รับของคืน` |
+| WTO `cancelled` | `รายละเอียด` | `พิมพ์`, `แชร์`, `แก้ไข`, `ยกเลิก`, `เปิดบิลขาย`, `รับของคืน` |
+
+`WTI` ไม่มี `partially_billed`; สถานะนี้เป็นของ WTO เท่านั้น. `แชร์` หมายถึงการเปิด dialog เพื่อ `แชร์เองผ่าน LINE` หรือ `ส่งเข้ากลุ่มหลัก` และห้ามแสดง/รับคำขอสำหรับ `draft` และ `cancelled`.
+
 ## Use Case Map
 
 | Use Case | ชื่อกรณี | ครอบคลุมในเอกสารนี้ | สถานะ |
@@ -850,7 +912,7 @@ Implementation separation checkpoint 2026-06-30:
 |---|---|
 | dedicated `weight_ticket_status_logs` / `weight_ticket_usage_logs` | ให้ timeline/read model แยกจาก audit log รวม |
 | policy รายละเอียดของ partial unlock หลัง downstream cancel/reversal | ต้อง finalize จาก usage facts ของ PB/SB ทุกกรณี |
-| image cleanup/orphan policy ของรูปหน้างาน | ต้องกำหนด lifecycle ตอน edit/cancel/replace ให้ชัด |
+| image cleanup/orphan policy ของรูปหน้างาน | ต้องกำหนด lifecycle ตอน edit/cancel/replace ให้ชัด และตรวจ source object เก่าหลังแยก private image bucket |
 | report/reconciliation และ aging เอกสาร WTI/WTO แยกหน้า | flow หลักมีแล้ว แต่รายงานตรวจสอบและ aging ต้องอิง [[Document Aging Policy]] เพิ่ม |
 
 ## Remaining Implementation Gaps
@@ -911,9 +973,10 @@ Implementation separation checkpoint 2026-06-30:
    - **แนวคิดการออกแบบ**: แต่เดิมในแถบรายการสินค้าด้านซ้ายของ Modal ใบรับ-ส่งของแสดงคำว่า "X รูป" ซึ่งทำให้ผู้ใช้งานสับสน เนื่องจากผู้ใช้งานหน้างานสนใจนับจำนวนรอบชั่งสินค้า/กองสินค้า ("เต๋า" หรือ Lot) มากกว่าจำนวนไฟล์รูปภาพหลักฐาน
    - **การแก้ไข**: เปลี่ยนการแสดงผลในแถบรายการด้านซ้ายจาก `{getLineEvidenceImages(line).length} รูป` ไปเป็นจำนวนเต๋าชั่งจริงผ่านฟังก์ชันคำนวณจำนวน Lot `{calculateRealLotSummary(line, form.lines).lotCount} เต๋า`
 
-2. **การรวมรายการสินค้าที่มี 1 เต๋าเป็นบรรทัดสีเขียวบรรทัดเดียวในหน้าเอกสาร PDF (NSERP-83)**:
+2. **การรวมรายการสินค้าที่มี 1 เต๋าเป็นบรรทัดสีเขียวบรรทัดเดียวในหน้าเอกสาร PDF ของ WTI (NSERP-83)**:
    - **แนวคิดการออกแบบ**: สำหรับรายการสินค้าที่มีการชั่งน้ำหนักเพียงเต๋าเดียว (1 Lot) การแสดงผลในหน้าเอกสาร PDF ไม่จำเป็นต้องแยกแถวรายการสินค้ากับแถวประวัติเต๋า เพราะทำให้เอกสารยาวโดยไม่จำเป็น ควรยุบข้อมูลขึ้นไปแสดงในบรรทัด Highlight สรุป (บรรทัดสีเขียว) เป็นบรรทัดเดียวได้เลย และนำข้อมูลสิ่งเจือปน/โน้ตไปรวบแสดงในคอลัมน์รายละเอียด (Description)
    - **การแก้ไข**: ปรับตรรกะในฟังก์ชัน `buildPrintWeightRows` โดยตรวจสอบว่ารายการสินค้ามีจำนวน Lot จริงเพียง 1 รายการ (`realLotLines.length === 1`) หรือไม่ หากใช่ จะทำการข้ามแถวเต๋าย่อยและยุบยอดน้ำหนักทั้งหมดขึ้นไปที่แถวสินค้าหลัก (`product-total` class ซึ่งจะแสดงพื้นหลังสีเขียวพรีเมียม) พร้อมนำรายการสิ่งเจือปนและโน้ตมาต่อข้อความแสดงในคอลัมน์รายละเอียด
+   - **ขอบเขตปัจจุบัน**: กติกาแถบสีเขียวนี้เป็นของ `WTI` เท่านั้น; `WTO` จะแสดงแถวข้อมูลเดิมเมื่อกลุ่มสินค้ามีรายละเอียดเดียว และแสดงแถวสรุปเมื่อมีหลายรายละเอียดตามกติกา WTO print subtotal rule ด้านบน
 
 3. **การเรียงลำดับสินค้าตามลำดับการชั่งน้ำหนักจริง (NSERP-82)**:
    - **แนวคิดการออกแบบ**: เอกสารใบรับ-ส่งของหน้ารายละเอียด และหน้าเอกสาร PDF พิมพ์ใบรับสินค้า ควรแสดงรายการสินค้าเรียงตามลำดับที่ผู้ใช้ชั่งน้ำหนักจริง (Weighing/Insertion Order) เพื่อให้ง่ายต่อการตรวจสอบย้อนกลับและเทียบกับใบชั่งรถกระดาษ ไม่ควรจัดเรียงลำดับสินค้าตามตัวอักษรโดยอัตโนมัติ
@@ -935,6 +998,8 @@ Implementation separation checkpoint 2026-06-30:
 ### เป้าหมาย
 
 เมื่อผู้ใช้ยืนยัน `WTI` หรือ `WTO` แล้ว ระบบจึงส่งสรุปเข้า LINE group ที่ตั้งค่าไว้
+
+ลิงก์ PDF และรูปอัลบั้มใน LINE ใช้ public URL จาก `WEIGHT_TICKET_PDF_BUCKET` ซึ่งเป็น outbound artifact bucket แยกจาก source evidence image bucket. Flex Message แสดงปุ่ม `ดู PDF` สำหรับเปิดอ่าน และ `ดาวน์โหลด PDF` สำหรับดาวน์โหลดไฟล์โดยตรง; ปุ่ม `เปิดในระบบ` ยังเป็นลิงก์ที่ต้อง login ตามสิทธิ์เดิม. รูปหลักฐานต้นฉบับยังอยู่ใน private `WEIGHT_TICKET_IMAGE_BUCKET` และใช้ signed URL ชั่วคราวเฉพาะตอนสร้าง PDF/ส่ง LINE เท่านั้น.
 พร้อม Flex Message ที่มี:
 
 - ข้อมูลหัวเอกสาร (เลขที่, ผู้ขาย/ลูกค้า, สาขา, น้ำหนักสุทธิ)
@@ -943,19 +1008,50 @@ Implementation separation checkpoint 2026-06-30:
 
 ใช้ **LINE Messaging API + Flex Message** (ไม่ใช้ LINE Notify ที่ปิดบริการแล้ว)
 
+### ขอบเขต Google Sheets
+
+WTI และ WTO ไม่ sync ไป Google Sheets แล้ว ทั้ง header-only auto-save, การบันทึก draft,
+การแก้ไข, การยืนยัน, การยกเลิก และการอัปเดตหลังสร้าง PDF สำหรับ LINE จะไม่เรียก webhook
+Google Sheets. ระบบยังคงบันทึกข้อมูลในฐานข้อมูล ส่ง LINE และเก็บ audit/timeline ตาม flow
+ปกติ โดยไม่มี Google Sheets เป็น downstream side effect.
+
 ### Trigger Points ทั้ง 3 ทาง
 
 | ทาง | เงื่อนไข | สถานะจริง | ไฟล์ |
 |---|---|---|---|
-| **Manual** ปุ่ม `แชร์ → ส่งเข้ากลุ่มหลัก` | ผู้ใช้กดเองหลังยืนยันเอกสารแล้ว | ✅ ทำงาน (force=true, execute ทันที); API ปฏิเสธเอกสารแบบร่าง | `api/daily/weight-tickets/[id]/notify-line/route.ts` |
+| **Manual** ปุ่ม `แชร์ → ส่งเข้ากลุ่มหลัก` | ผู้ใช้กดเองหลังยืนยันเอกสารแล้ว | ✅ ทำงาน (force=true, execute ทันที); UI/API ปฏิเสธ `draft` และ `cancelled` | `api/daily/weight-tickets/[id]/notify-line/route.ts` |
 | **Auto-send หลังยืนยัน** | `LINE_AUTO_SEND_WTI`/`LINE_AUTO_SEND_WTO = 'true'` | ✅ ทำงานหลัง `draft -> received/delivered` เท่านั้น | `api/daily/weight-tickets/[id]/route.ts` |
 | **Worker drain** | กดปุ่ม `⚙️ เรียกใช้งาน Worker` ในหน้า admin/line-settings | ✅ ใช้สำหรับ retry/pending jobs ที่ execute ล้มเหลว | `api/admin/line-jobs/route.ts` action=process |
+
+### สถานะที่พิมพ์และส่ง LINE ได้
+
+| ประเภท | สถานะ | พิมพ์/PDF | แชร์/ส่ง LINE เอง | Auto-send หลังยืนยัน |
+|---|---|---|---|---|
+| WTI | `draft` | ไม่ได้ | ไม่ได้ | ไม่ได้ |
+| WTI | `received` | ได้ | ได้ | ได้ เมื่อ `LINE_AUTO_SEND_WTI=true` ตอนเปลี่ยนจาก draft |
+| WTI | `billed` | ได้ | ได้ | ไม่ยิงซ้ำจากการเปิด PB |
+| WTI | `cancelled` | ไม่ได้ | ไม่ได้ | ไม่ได้ |
+| WTO | `draft` | ไม่ได้ | ไม่ได้ | ไม่ได้ |
+| WTO | `delivered` | ได้ | ได้ | ได้ เมื่อ `LINE_AUTO_SEND_WTO=true` ตอนเปลี่ยนจาก draft |
+| WTO | `partially_billed` | ได้ | ได้ | ไม่ยิงซ้ำจากการออก SB/คืนของ |
+| WTO | `billed` | ได้ | ได้ | ไม่ยิงซ้ำจากการออก SB |
+| WTO | `cancelled` | ไม่ได้ | ไม่ได้ | ไม่ได้ |
+
+การพิมพ์และการส่ง LINE ใช้ PDF เอกสารเดียวกัน: หน้าแรกเป็นใบพิมพ์ A4 และหน้าถัดไปเป็นอัลบั้มรูปหลักฐาน. ถ้าการ resolve รูป private, สร้าง PDF หรืออัปโหลด PDF/อัลบั้มล้มเหลว job ต้องเป็น `failed` และไม่ส่งข้อความ LINE ที่ขาดหลักฐาน; การสร้าง/แก้ไขเอกสารหลักยังไม่ rollback เพราะ notification เป็นงานหลัง transaction.
 
 ### ⚠️ ข้อจำกัดสำคัญที่ต้องเข้าใจ
 
 #### 0. PDF ใน LINE/Storage คือใบพิมพ์พร้อมหน้าอัลบั้มรูป
 
 PDF ที่ `notifyWeightTicketLine` สร้างและอัปโหลดขึ้น Storage ต้องเริ่มด้วยเอกสารธุรกิจสำหรับพิมพ์: header บริษัท, ข้อมูลคู่ค้า, รายการน้ำหนัก, สรุป, ลายเซ็น และ footer ต้องอยู่ใน A4 ตาม template ใบพิมพ์เดียวกับระบบหน้า list/detail. หลังจากหน้าใบพิมพ์ ให้ต่อหน้า photo album เป็นหน้า 2+ จากรูปหลักฐานของเอกสารเดียวกัน เพื่อให้ไฟล์ PDF เดียวเปิดดูได้ครบทั้งใบชั่งและรูปหน้างาน. LINE ยังสามารถส่ง album/image path แยกได้เพื่อให้คนในแชทเห็นรูปทันที โดยไม่เปลี่ยนข้อกำหนดว่าหน้าแรกของ PDF ต้องยังเป็นใบพิมพ์ A4 ที่พอดี.
+
+ไฟล์ PDF และภาพ album ใน bucket นี้เป็น outbound derivatives ที่สร้างเพื่อการแจ้งเตือนและการดาวน์โหลด โดย `weight_ticket_notification_logs.pdf_storage_bucket/pdf_storage_key/pdf_url` เป็น audit reference ของไฟล์ที่ถูกส่ง. ระบบยังไม่ลบไฟล์อัตโนมัติจนกว่าจะมี retention policy และ cleanup job ที่อนุมัติชัดเจน; เมื่อเพิ่มภายหลังต้องลบเฉพาะไฟล์ที่ไม่ถูกอ้างอิงและห้ามลบ private source evidence หรือ audit log ตามอายุไฟล์โดยตรง.
+
+#### 0.1 ลำดับรูปในเอกสารพิมพ์และ PDF
+
+หน้าพิมพ์, PDF ใน LINE และภาพอัลบั้มต้องใช้ลำดับรูปจาก contract เดียวกัน: `vehicle_image_names` (รูปรถ) มาก่อนรายการรวมใน `image_names` และต้อง deduplicate ด้วย bucket/storage key เดียวกัน. ดังนั้นรูปรถจะแสดงเป็นรูปที่ 1 ใต้หัวข้อ `ใบรับสินค้า (รูปถ่ายแนบ)` หรือ `ใบส่งของ (รูปถ่ายแนบ)` เมื่อมีรูป โดยไม่แสดงซ้ำแม้ read model จะมีรูปรถอยู่ทั้งสองรายการ.
+
+กรอบรูปอัลบั้มใช้สัดส่วน 4:3 และต้องแสดง source image แบบ `contain` เพื่อรักษาอัตราส่วนเดิม ไม่ยืดหรือ crop รูปแนวตั้ง/แนวนอน; พื้นที่ว่างในกรอบเป็นผลที่ยอมรับได้เพื่อให้เห็นหลักฐานเต็มรูป. เอกสาร A4 แบ่ง 4 รูปต่อหน้าสำหรับพื้นที่อ่านและเลขหน้าที่ถูกต้อง ส่วนภาพ album ที่ส่งแยกใน LINE ยังใช้ chunk 8 รูปได้เพราะไม่ถูกจำกัดด้วยพื้นที่กระดาษ A4.
 
 #### 1. Auto-send ทำงานทันทีหลังยืนยัน
 
@@ -1103,3 +1199,23 @@ stock validation หรือ API contract
 
 ลำดับ refactor ถัดไปคือแยก vehicle attachments, line attachments และ preview dialog
 ออกจาก container โดยใช้ attachment state contract เดิม
+
+## บันทึกก่อนเพิ่มสินค้า/เต๋า (2026-08-05)
+
+เมื่อผู้ใช้กด `เพิ่มสินค้า` ครั้งแรก ระบบจะแยก event เป็นสองส่วน: เพิ่มแถวว่างใน client
+state ทันที และส่ง header-only draft แบบ background ด้วย `saveScope=header` เพื่อให้ได้
+document id โดยไม่ต้องรอ response ก่อนเปิดช่องกรอกสินค้า. การส่ง header-only ห้ามส่ง line
+และห้ามตรวจหรือสร้าง `pending_out`.
+
+เมื่อมีรายการเดิมที่กรอกครบแล้วและผู้ใช้กด `เพิ่มเต๋า` ระบบจะเพิ่มแถวใหม่ใน client state
+ทันที แล้วส่งข้อมูล draft ของส่วนที่มีอยู่เป็น background event (`saveScope=document`)
+เพื่อคงข้อมูลก่อนหน้า. ถ้า background save กำลังทำงานอยู่ event เพิ่มสินค้า/เพิ่มเต๋ายังคง
+แสดงผลได้ แต่จะไม่เปิด save stage ซ้ำ; การกด action เดิมถี่ภายในช่วง debounce เดียวกัน
+จะไม่สร้างแถวซ้ำ. การแก้ไขข้อมูลใน line ใหม่ยังอยู่ใน local dirty state จนกดบันทึกตาม
+validation gate ของฟอร์ม.
+
+ทั้ง WTI และ WTO draft จึงเป็นเพียงเอกสารที่บันทึกแล้ว ยังไม่ยืนยันการรับ/ส่งของและไม่
+สร้างการจอง `pending_out`. การบันทึก/แก้ไข/ยืนยัน/ยกเลิก WTI และ WTO ไม่ส่งข้อมูลไป
+Google Sheets อีกต่อไป; ข้อมูลหลักอยู่ในฐานข้อมูลและ audit/timeline ของระบบ. เฉพาะการกด
+`ยืนยันส่งของ` ของ WTO เท่านั้นที่ตรวจ stock และสร้าง reservation/pending-out ใน transaction
+เดียวกัน.

@@ -15,11 +15,13 @@ import { Input } from '@/components/ui/Input'
 import { useActionConfirmation, useUnsavedChangesGuard } from '@/components/ui/FormSafetyProvider'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { WeightTicketAttachmentGrid as AttachmentProfileGrid, type WeightTicketAttachmentPreview as AttachmentPreview } from '@/components/daily/WeightTicketAttachmentGrid'
+import { WeightTicketSaveProgress, useWeightTicketSaveProgress } from '@/components/daily/WeightTicketSaveProgress'
+import { useWeightTicketRealtime } from '@/components/daily/useWeightTicketRealtime'
 import { WeightTicketWtiFormSection, WeightTicketWtoFormSection } from '@/components/daily/WeightTicketTypeFormSections'
 import { ApiError, getErrorMessage } from '@/lib/api-client'
 import { recordImageDelivery } from '@/lib/client-image-delivery-telemetry'
 import { cn } from '@/lib/utils'
-import { cachedWeightTicketReferences } from '@/lib/weight-ticket-reference-cache'
+import { cachedWeightTicketReferences, fetchFreshWeightTicketReferences } from '@/lib/weight-ticket-reference-cache'
 import { invalidatePurchaseBillOptionsCache } from '@/lib/purchase-bill-options-cache'
 import {
   calculateWeightTicketLineTotals,
@@ -71,9 +73,14 @@ type FormState = {
 
 type WeightTicketOptionsPayload = {
   branches?: Array<{ code?: string | null; id: string; name: string }>
-  customers?: Array<{ branchIds?: string[]; code?: string | null; id: string; name: string }>
-  impurities?: Array<{ id: string; label: string }>
-  suppliers?: Array<{ branchIds?: string[]; code?: string | null; id: string; name: string }>
+}
+
+type WeightTicketPartyOptionsPayload = {
+  options?: Array<{ branchIds?: string[]; code?: string | null; id: string; name: string }>
+}
+
+type WeightTicketImpurityOptionsPayload = {
+  options?: Array<{ id: string; label: string }>
 }
 
 type WeightTicketProductsPayload = {
@@ -101,6 +108,7 @@ type WtoStockOptionsState = Record<string, {
 
 const ADDED_IMPURITY_NOTE = 'หักสิ่งเจือปนเพิ่มเติม'
 const MAX_WEIGHT_TICKET_UPLOAD_BYTES = 4 * 1024 * 1024
+const MAX_WEIGHT_TICKET_FILE_BYTES = 10 * 1024 * 1024
 const MAX_WEIGHT_TICKET_IMAGE_DIMENSION = 2400
 
 export type WeightTicketDeletionLine = Pick<
@@ -130,6 +138,57 @@ function createFormWeightTicketLine(id?: string): FormWeightTicketLine {
     imageFiles: [],
   }
 }
+
+export function resolvePersistedWeightTicketLotSource(
+  sourceLine: Pick<FormWeightTicketLine, 'productId' | 'warehouseId'>,
+  persistedLines: Array<Pick<FormWeightTicketLine, 'id' | 'productId' | 'warehouseId'>>,
+  sourceLineIndex: number,
+) {
+  const persistedSourceLine = persistedLines[sourceLineIndex]
+  if (!persistedSourceLine) return null
+  if (persistedSourceLine.productId !== sourceLine.productId) return null
+  if (persistedSourceLine.warehouseId !== sourceLine.warehouseId) return null
+  return persistedSourceLine
+}
+
+const lineErrorFields = 'product|warehouse|gross|container|images|impurity|impurity-product|deduction'
+
+export function remapWeightTicketLineIds<T extends Pick<FormWeightTicketLine, 'id' | 'parentId' | 'impuritySourceLineId'>>(
+  lines: T[],
+  idMap: Record<string, string>,
+) {
+  return lines.map((line) => ({
+    ...line,
+    id: idMap[line.id] ?? line.id,
+    parentId: line.parentId ? (idMap[line.parentId] ?? line.parentId) : line.parentId,
+    impuritySourceLineId: line.impuritySourceLineId
+      ? (idMap[line.impuritySourceLineId] ?? line.impuritySourceLineId)
+      : line.impuritySourceLineId,
+  }) as T)
+}
+
+export function remapWeightTicketLineKey(key: string, idMap: Record<string, string>) {
+  const match = key.match(new RegExp(`^line-(.+?)-(${lineErrorFields})$`))
+  if (!match) return key
+  return `line-${idMap[match[1]] ?? match[1]}-${match[2]}`
+}
+
+function remapWeightTicketLineState(
+  state: Record<string, boolean>,
+  idMap: Record<string, string>,
+) {
+  return Object.entries(state).reduce<Record<string, boolean>>((next, [key, value]) => {
+    const remappedKey = remapWeightTicketLineKey(key, idMap)
+    next[remappedKey] = Boolean(next[remappedKey] || value)
+    return next
+  }, {})
+}
+
+export function shouldPersistWeightTicketBeforeAdding(type: WeightTicketType, lineCount: number) {
+  return lineCount > 0 || type === 'WTI' || type === 'WTO'
+}
+
+const ADD_INTERACTION_DEBOUNCE_MS = 350
 
 function initialForm(type: WeightTicketType = 'WTI'): FormState {
   return {
@@ -408,6 +467,20 @@ function isImpurityPurchaseLine(line: FormWeightTicketLine) {
   return Boolean(line.impuritySourceLineId)
 }
 
+export function changeWeightTicketProduct(
+  lines: FormWeightTicketLine[],
+  lineId: string,
+  productId: string,
+  productName: string,
+) {
+  return lines.map((line) => (
+    line.id === lineId
+    || (line.parentId === lineId && !isImpurityPurchaseLine(line))
+      ? { ...line, productId, productName }
+      : line
+  ))
+}
+
 function getMainParentLines(lines: FormWeightTicketLine[]) {
   return lines.filter((line) => !line.parentId)
 }
@@ -469,7 +542,23 @@ function createAttachmentPreview(fileName: string): AttachmentPreview {
   }
 }
 
+function formatAttachmentFileSize(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function validateSelectedWeightTicketImage(file: File) {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type.toLowerCase())) {
+    return `ไฟล์ ${file.name} ไม่รองรับ รองรับเฉพาะ JPG, PNG และ WebP`
+  }
+  if (file.size > MAX_WEIGHT_TICKET_FILE_BYTES) {
+    return `ไฟล์ ${file.name} มีขนาด ${formatAttachmentFileSize(file.size)} เกิน 10 MB กรุณาเลือกรูปใหม่`
+  }
+  return null
+}
+
 async function createAttachmentPreviewFromFile(file: File): Promise<AttachmentPreview> {
+  const validationError = validateSelectedWeightTicketImage(file)
+  if (validationError) throw new Error(validationError)
   const uploadFile = await prepareWeightTicketImageFile(file)
   const body = new FormData()
   body.set('file', uploadFile)
@@ -477,10 +566,11 @@ async function createAttachmentPreviewFromFile(file: File): Promise<AttachmentPr
   const payload = await response.json().catch(() => ({})) as {
     error?: string
     fileName?: string
+    bucket?: string
     storageKey?: string
     url?: string
   }
-  if (!response.ok || !payload.fileName || !payload.storageKey || !payload.url) {
+  if (!response.ok || !payload.bucket || !payload.fileName || !payload.storageKey || !payload.url) {
     const statusHint = response.status === 413
       ? 'ไฟล์มีขนาดใหญ่เกินกว่าที่ระบบรับได้'
       : `เซิร์ฟเวอร์ตอบกลับ ${response.status || 'ไม่ทราบสถานะ'}`
@@ -489,16 +579,26 @@ async function createAttachmentPreviewFromFile(file: File): Promise<AttachmentPr
   return {
     fileName: payload.fileName,
     id: makeFileId(),
-    rawValue: encodeStoredImageReference(payload.fileName, payload.url, payload.storageKey),
+    // Keep only the durable private-bucket reference in the form payload.
+    // The signed URL is preview-only and must never be persisted to the ticket.
+    rawValue: encodeStoredImageReference(payload.fileName, undefined, payload.storageKey, payload.bucket),
     url: payload.url,
   }
 }
 
 async function prepareWeightTicketImageFile(file: File): Promise<File> {
-  if (!file.type.startsWith('image/')) {
+  const imageType = file.type.toLowerCase()
+  const imageConfig = imageType === 'image/jpeg'
+    ? { extension: 'jpg', mimeType: 'image/jpeg', quality: 0.82 }
+    : imageType === 'image/png'
+      ? { extension: 'png', mimeType: 'image/png', quality: undefined }
+      : imageType === 'image/webp'
+        ? { extension: 'webp', mimeType: 'image/webp', quality: 0.82 }
+        : null
+  if (!imageConfig) {
     throw new Error(`ไฟล์ ${file.name} ไม่ใช่รูปภาพที่รองรับ (JPG, PNG หรือ WebP)`)
   }
-  if (file.size <= MAX_WEIGHT_TICKET_UPLOAD_BYTES && file.type !== 'image/png') return file
+  if (file.size <= MAX_WEIGHT_TICKET_UPLOAD_BYTES) return file
 
   let bitmap: ImageBitmap
   try {
@@ -518,11 +618,11 @@ async function prepareWeightTicketImageFile(file: File): Promise<File> {
     if (!context) throw new Error(`ไม่สามารถเตรียมรูป ${file.name} สำหรับอัปโหลดได้`)
     context.drawImage(bitmap, 0, 0, width, height)
 
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82))
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, imageConfig.mimeType, imageConfig.quality))
     if (!blob) throw new Error(`ไม่สามารถบีบอัดรูป ${file.name} สำหรับอัปโหลดได้`)
-    return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, {
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.${imageConfig.extension}`, {
       lastModified: file.lastModified,
-      type: 'image/jpeg',
+      type: imageConfig.mimeType,
     })
   } finally {
     bitmap.close()
@@ -773,6 +873,7 @@ export function WeightTicketFormCore({
   const router = useRouter()
   const editingTicketId = ticketId.trim()
   const [form, setForm] = useState<FormState>(() => initialForm(initialType))
+  const formRef = useRef(form)
   const [formBaseline, setFormBaseline] = useState(() => formSafetySnapshot(initialForm(initialType)))
   const [branches, setBranches] = useState<OptionItem[]>([])
   const [suppliers, setSuppliers] = useState<OptionItem[]>([])
@@ -783,7 +884,7 @@ export function WeightTicketFormCore({
   const [impurities, setImpurities] = useState<OptionItem[]>([])
   const [loadedTicket, setLoadedTicket] = useState<WeightTicketRecord | null>(null)
   const [savedTicket, setSavedTicket] = useState<WeightTicketRecord | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
+  const { begin: beginSaveStage, end: endSaveStage, isSaving, stage: saveStage } = useWeightTicketSaveProgress()
   const [isLoadingTicket, setIsLoadingTicket] = useState(Boolean(editingTicketId))
   const [loadError, setLoadError] = useState('')
   const [attachmentError, setAttachmentError] = useState('')
@@ -795,12 +896,33 @@ export function WeightTicketFormCore({
   const [isMobileProductEditorVisible, setMobileProductEditorVisible] = useState(false)
   const mobileProductEditorCloseTimeoutRef = useRef<number | null>(null)
   const mobileProductEditorOpenAnimationFrameRef = useRef<number | null>(null)
+  const saveInFlightRef = useRef<'auto_save' | 'save' | null>(null)
+  const pendingAttachmentUploadsRef = useRef<Set<Promise<unknown>>>(new Set())
+  const lastAddInteractionRef = useRef<{ actionKey: string; occurredAt: number } | null>(null)
   const [collapsedLotIds, setCollapsedLotIds] = useState<Record<string, boolean>>({})
   const [collapsedImpurityIds, setCollapsedImpurityIds] = useState<Record<string, boolean>>({})
   const [pendingFocusField, setPendingFocusField] = useState<string | null>(null)
   const [draftStartedAt] = useState(() => new Date().toISOString())
   const [timerNow, setTimerNow] = useState(() => Date.now())
   const [isWeightTicketSummaryCollapsed, setIsWeightTicketSummaryCollapsed] = useState(true)
+
+  useEffect(() => {
+    formRef.current = form
+  }, [form])
+
+  function trackAttachmentUpload<T>(promise: Promise<T>) {
+    let trackedPromise!: Promise<T>
+    trackedPromise = promise.finally(() => {
+      pendingAttachmentUploadsRef.current.delete(trackedPromise)
+    })
+    pendingAttachmentUploadsRef.current.add(trackedPromise)
+    return trackedPromise
+  }
+
+  async function waitForPendingAttachmentUploads() {
+    const pending = Array.from(pendingAttachmentUploadsRef.current)
+    if (pending.length > 0) await Promise.allSettled(pending)
+  }
 
   const cancelMobileProductEditorOpenAnimation = useCallback(() => {
     if (mobileProductEditorOpenAnimationFrameRef.current === null) return
@@ -842,6 +964,18 @@ export function WeightTicketFormCore({
   useEffect(() => {
     onDirtyChange?.(isFormDirty)
   }, [isFormDirty, onDirtyChange])
+
+  const realtimeBranchIds = useMemo(() => {
+    const branchId = (savedTicket ?? loadedTicket)?.branchId
+    return branchId ? [branchId] : []
+  }, [loadedTicket, savedTicket])
+
+  useWeightTicketRealtime((event) => {
+    if (!editingTicketId || event.documentNo !== editingTicketId) return
+    if (saveInFlightRef.current) return
+    if (event.updatedAt && event.updatedAt === (savedTicket ?? loadedTicket)?.updatedAt) return
+    setMergeNotice('มีผู้ใช้อื่นบันทึกเอกสารนี้แล้ว ระบบจะไม่ทับข้อมูลที่กำลังกรอกอยู่ กรุณาตรวจสอบและบันทึกอีกครั้ง')
+  }, Boolean(editingTicketId), realtimeBranchIds)
 
   const partyOptions = useMemo(() => {
     const options = form.type === 'WTI' ? suppliers : customers
@@ -921,7 +1055,7 @@ export function WeightTicketFormCore({
       try {
         const [data, productData] = await Promise.all([
           cachedWeightTicketReferences<WeightTicketOptionsPayload>('/api/daily/weight-tickets/options'),
-          cachedWeightTicketReferences<WeightTicketProductsPayload>('/api/daily/weight-tickets/products'),
+          fetchFreshWeightTicketReferences<WeightTicketProductsPayload>('/api/daily/weight-tickets/products'),
         ])
 
         if (!cancelled && !controller.signal.aborted) {
@@ -931,29 +1065,6 @@ export function WeightTicketFormCore({
             id: branch.id,
             label: branch.name,
           })))
-          setSuppliers((data.suppliers ?? []).map((supplier) => {
-            const code = supplier.code?.trim() ?? ''
-            return {
-              code: code || undefined,
-              description: code ? `Supplier · ${code}` : 'Supplier',
-              branchIds: supplier.branchIds ?? [],
-              id: supplier.id,
-              label: supplier.name,
-              searchText: [code, supplier.name].filter(Boolean).join(' '),
-            }
-          }))
-          setCustomers((data.customers ?? []).map((customer) => {
-            const code = customer.code?.trim() ?? ''
-            return {
-              code: code || undefined,
-              description: code ? `Customer · ${code}` : 'Customer',
-              branchIds: customer.branchIds ?? [],
-              id: customer.id,
-              label: customer.name,
-              searchText: [code, customer.name].filter(Boolean).join(' '),
-            }
-          }))
-          setImpurities((data.impurities ?? []).filter((impurity) => !isOtherProductImpurityLabel(impurity.label)))
           setProducts((productData.rows ?? []).map((product) => ({
             category: product.type ?? undefined,
             code: product.code ?? undefined,
@@ -1021,6 +1132,65 @@ export function WeightTicketFormCore({
       controller.abort()
     }
   }, [form.branchId, form.type, wtoProductKeys])
+
+  useEffect(() => {
+    if (!form.branchId) {
+      setSuppliers([])
+      setCustomers([])
+      return
+    }
+
+    const controller = new AbortController()
+    let cancelled = false
+    const params = new URLSearchParams({ branchId: form.branchId, type: form.type })
+
+    async function loadPartyOptions() {
+      try {
+        const data = await fetchFreshWeightTicketReferences<WeightTicketPartyOptionsPayload>(
+          `/api/daily/weight-tickets/party-options?${params.toString()}`,
+        )
+        if (cancelled || controller.signal.aborted) return
+        const options = (data.options ?? []).map((party) => {
+          const code = party.code?.trim() ?? ''
+          return {
+            code: code || undefined,
+            description: code ? `${form.type === 'WTI' ? 'Supplier' : 'Customer'} · ${code}` : form.type === 'WTI' ? 'Supplier' : 'Customer',
+            branchIds: party.branchIds ?? [],
+            id: party.id,
+            label: party.name,
+            searchText: [code, party.name].filter(Boolean).join(' '),
+          }
+        })
+        if (form.type === 'WTI') setSuppliers(options)
+        else setCustomers(options)
+      } catch {
+        if (!cancelled && !controller.signal.aborted) {
+          if (form.type === 'WTI') setSuppliers([])
+          else setCustomers([])
+        }
+      }
+    }
+
+    void loadPartyOptions()
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [form.branchId, form.type])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadImpurityOptions() {
+      try {
+        const data = await fetchFreshWeightTicketReferences<WeightTicketImpurityOptionsPayload>('/api/daily/weight-tickets/impurity-options')
+        if (!cancelled) setImpurities((data.options ?? []).filter((impurity) => !isOtherProductImpurityLabel(impurity.label)))
+      } catch {
+        if (!cancelled) setImpurities([])
+      }
+    }
+    void loadImpurityOptions()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!editingTicketId) {
@@ -1134,10 +1304,10 @@ export function WeightTicketFormCore({
     if (!form.branchId) next.branchId = 'เลือกสาขา'
     if (!form.partyId) next.partyId = form.type === 'WTI' ? 'เลือกผู้ขาย' : 'เลือกลูกค้า'
     if (form.vehicleNo.trim().length < 2) next.vehicleNo = 'กรอกทะเบียนรถ'
-    if (!form.godownName || form.godownName.trim().length === 0) next.godownName = 'กรอกโกดัง'
+    if (form.type === 'WTO' && !form.godownName.trim()) next.godownName = 'กรอกโกดัง'
 
     const parentLines = getMainParentLines(form.lines)
-    if (parentLines.length === 0) next.lines = 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ'
+    if (form.type === 'WTO' && parentLines.length === 0) next.lines = 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ'
 
     form.lines.forEach((line) => {
       if (isImpurityPurchaseLine(line)) return
@@ -1320,36 +1490,157 @@ export function WeightTicketFormCore({
     })
   }
 
+  function getLineEvidenceImagesForState(sourceForm: FormState, line: FormWeightTicketLine) {
+    if (!isImpurityPurchaseLine(line)) return getLineImages(line)
+    const sourceLine = sourceForm.lines.find((entry) => entry.id === line.impuritySourceLineId)
+    const sourceParentLine = sourceLine?.parentId
+      ? sourceForm.lines.find((entry) => entry.id === sourceLine.parentId)
+      : null
+    return getLineImages(sourceParentLine ?? sourceLine ?? line)
+  }
+
+  function shouldIgnoreRapidAdd(actionKey: string) {
+    const occurredAt = Date.now()
+    const previous = lastAddInteractionRef.current
+    if (
+      previous?.actionKey === actionKey
+      && occurredAt - previous.occurredAt < ADD_INTERACTION_DEBOUNCE_MS
+    ) return true
+
+    lastAddInteractionRef.current = { actionKey, occurredAt }
+    return false
+  }
+
+  async function saveDraftBeforeAdding(snapshot: FormState = form): Promise<FormState | null> {
+    // Save the current document before opening another product entry so the
+    // draft has a stable ticket identity and existing data is not lost.
+    if (isSaving || isLoadingTicket || saveInFlightRef.current) return null
+    const headerErrorKeys = ['branchId', 'partyId', 'vehicleNo', 'godownName']
+    const firstHeaderError = headerErrorKeys.find((key) => errors[key])
+    if (firstHeaderError) {
+      setTouched((current) => ({ ...current, [firstHeaderError]: true }))
+      setPendingFocusField(firstHeaderError)
+      return null
+    }
+    const firstLineError = Object.keys(errors).find((key) => key === 'lines' || key.startsWith('line-'))
+    if (snapshot.lines.length > 0 && firstLineError) {
+      setTouched((current) => ({ ...current, [firstLineError]: true }))
+      setPendingFocusField(firstLineError)
+      // Keep the product workspace usable while a blank entry is being filled.
+      // A line with a selected product still must pass validation before the
+      // existing draft is persisted and another product is opened.
+      return snapshot.lines.some((line) => !line.productId) ? snapshot : null
+    }
+
+    // Both WTI and WTO persist an empty header draft before the first product
+    // editor opens. The API marks this as a header-only save and skips line
+    // validation until the user has selected a product.
+    if (!shouldPersistWeightTicketBeforeAdding(snapshot.type, snapshot.lines.length)) return snapshot
+
+    saveInFlightRef.current = 'auto_save'
+    beginSaveStage('auto_save')
+    try {
+      await waitForPendingAttachmentUploads()
+      const latestForm = formRef.current
+      const latestLinesById = new Map(latestForm.lines.map((line) => [line.id, line]))
+      const snapshotToSave: FormState = {
+        ...snapshot,
+        lines: snapshot.lines.map((line) => ({
+          ...line,
+          imageFiles: latestLinesById.get(line.id)?.imageFiles ?? line.imageFiles,
+        })),
+        vehicleImageFiles: latestForm.vehicleImageFiles,
+      }
+      const ticket = await saveWeightTicket({
+        branchId: snapshotToSave.branchId,
+        collaborationBaseDocumentNo: (savedTicket ?? loadedTicket)?.documentNo,
+        collaborationBaseLineIds: snapshotToSave.lines.map((line) => line.id),
+        collaborationBaseUpdatedAt: (savedTicket ?? loadedTicket)?.updatedAt ?? null,
+        id: savedTicket?.id ?? editingTicketId,
+        lines: snapshotToSave.lines.map((line) => ({
+          containerDeductionWeight: Number(line.containerDeductionWeight || 0),
+          deductionMode: line.deductionMode,
+          deductionValue: Number(line.deductionValue || 0),
+          grossWeight: Number(line.grossWeight || 0),
+          id: line.id,
+          imageNames: getLineEvidenceImagesForState(snapshotToSave, line).map((file) => file.rawValue),
+          impurityId: getLineImpurityId(line),
+          impurityProductId: line.impurityProductId ?? '',
+          impuritySourceLineId: line.impuritySourceLineId,
+          note: line.note,
+          productId: line.productId,
+          warehouseId: line.warehouseId,
+          parentId: line.parentId,
+        })),
+        partyId: snapshotToSave.partyId,
+        remark: snapshotToSave.remark.trim(),
+        saveScope: snapshotToSave.lines.length === 0 ? 'header' : undefined,
+        type: snapshotToSave.type,
+        vehicleImageNames: snapshotToSave.vehicleImageFiles.map((file) => file.rawValue),
+        vehicleNo: snapshotToSave.vehicleNo.trim(),
+        godownName: snapshotToSave.godownName.trim(),
+      })
+      invalidatePurchaseBillOptionsCache()
+      const nextForm = ticketToFormState(ticket)
+      setLoadedTicket(ticket)
+      setSavedTicket(ticket)
+      // This is a background save started by "เพิ่มสินค้า". Keep the live
+      // form untouched because the user may already be editing the newly
+      // opened line while this response is in flight.
+      setFormBaseline(formSafetySnapshot(nextForm))
+      setLoadError('')
+      return nextForm
+    } catch (caught) {
+      setLoadError(getErrorMessage(caught, 'บันทึกแบบร่างก่อนเพิ่มรายการไม่ได้'))
+      return null
+    } finally {
+      endSaveStage()
+      saveInFlightRef.current = null
+    }
+  }
+
   function changeLineProduct(lineId: string, productId: string) {
     setMergeNotice('')
     setForm((current) => {
       const targetLine = current.lines.find((line) => line.id === lineId)
       if (!targetLine || targetLine.productId === productId) return current
 
-      const childIds = current.lines
-        .filter((line) => line.parentId === lineId)
-        .map((line) => line.id)
-      const resetLine = {
-        ...createFormWeightTicketLine(lineId),
-        productId,
-        productName: products.find((product) => product.id === productId)?.label ?? '',
-      }
-
       return {
         ...current,
-        lines: current.lines
-          .filter((line) => line.id === lineId || (line.parentId !== lineId && !childIds.includes(line.impuritySourceLineId ?? '')))
-          .map((line) => line.id === lineId ? resetLine : line),
+        lines: changeWeightTicketProduct(
+          current.lines,
+          lineId,
+          productId,
+          products.find((product) => product.id === productId)?.label ?? '',
+        ),
       }
     })
   }
 
-  function addLine() {
+  async function addLine() {
     setMergeNotice('')
+    const headerErrorKeys = ['branchId', 'partyId', 'vehicleNo', 'godownName']
+    const firstHeaderError = headerErrorKeys.find((key) => errors[key])
+    const firstLineError = Object.keys(errors).find((key) => key === 'lines' || key.startsWith('line-'))
+    const hasBlockingLineError = form.lines.length > 0
+      && Boolean(firstLineError)
+      && !form.lines.some((line) => !line.productId)
+
+    if (firstHeaderError || hasBlockingLineError) {
+      void saveDraftBeforeAdding()
+      return
+    }
+
+    // Keep the add-product interaction independent from background draft
+    // persistence. Only the explicit final save may replace the live form.
+    if (isLoadingTicket || saveInFlightRef.current === 'save') return
+    if (shouldIgnoreRapidAdd('product')) return
+
     const nextLine = createFormWeightTicketLine()
     setForm((current) => ({ ...current, lines: [...current.lines, nextLine] }))
     setActiveLineId(nextLine.id)
     setMobileProductView('editor')
+    void saveDraftBeforeAdding(form)
   }
 
   const closeMobileProductEditor = useCallback((focusTargetId = activeLineId, onClosed?: () => void) => {
@@ -1385,6 +1676,23 @@ export function WeightTicketFormCore({
 
   function addSameProductLot(sourceLine: FormWeightTicketLine) {
     setMergeNotice('')
+    const sourceLineIndex = form.lines.findIndex((line) => line.id === sourceLine.id)
+    const firstHeaderError = ['branchId', 'partyId', 'vehicleNo', 'godownName'].find((key) => errors[key])
+    const firstLineError = Object.keys(errors).find((key) => key === 'lines' || key.startsWith('line-'))
+    const hasBlockingLineError = form.lines.length > 0
+      && Boolean(firstLineError)
+      && !form.lines.some((line) => !line.productId)
+    // Auto-save must not block the local lot editor. Only the explicit final
+    // save may prevent a new lot from being added because it replaces the form
+    // with the persisted response when it completes.
+    const isFinalSaveInFlight = saveInFlightRef.current === 'save'
+    if (firstHeaderError || hasBlockingLineError || isFinalSaveInFlight || isLoadingTicket) {
+      if (firstHeaderError || hasBlockingLineError) void saveDraftBeforeAdding()
+      return
+    }
+    if (shouldIgnoreRapidAdd(`lot:${sourceLine.id}`)) return
+
+    const draftSnapshot = form
     const nextLine = createFormWeightTicketLine()
     nextLine.productId = sourceLine.productId
     nextLine.warehouseId = sourceLine.warehouseId
@@ -1402,6 +1710,30 @@ export function WeightTicketFormCore({
     }))
     setForm((current) => ({ ...current, lines: [...current.lines, nextLine] }))
     setPendingFocusField(`line-${nextLine.id}-gross`)
+
+    const draftSave = saveDraftBeforeAdding(draftSnapshot)
+    void draftSave.then((savedForm) => {
+      if (!savedForm) return
+      const persistedSourceLine = resolvePersistedWeightTicketLotSource(sourceLine, savedForm.lines, sourceLineIndex)
+      if (!persistedSourceLine || persistedSourceLine.id === sourceLine.id) return
+      const lineIdMap = { [sourceLine.id]: persistedSourceLine.id }
+
+      setForm((current) => ({
+        ...current,
+        lines: remapWeightTicketLineIds(current.lines, lineIdMap),
+      }))
+      setCollapsedLotIds((current) => {
+        return remapWeightTicketLineState(current, lineIdMap)
+      })
+      setCollapsedImpurityIds((current) => {
+        return remapWeightTicketLineState(current, lineIdMap)
+      })
+      setTouched((current) => {
+        return remapWeightTicketLineState(current, lineIdMap)
+      })
+      setPendingFocusField((current) => current ? remapWeightTicketLineKey(current, lineIdMap) : current)
+      setActiveLineId((current) => current === sourceLine.id ? persistedSourceLine.id : current)
+    })
   }
 
   function changeLineWarehouse(lineId: string, warehouseId: string, warehouse: WtoStockWarehouseOption | null | undefined) {
@@ -1496,8 +1828,10 @@ export function WeightTicketFormCore({
       {
         cancelLabel: 'ไม่เปลี่ยน',
         confirmLabel: 'เปลี่ยนสินค้า',
-        description: 'ข้อมูลสินค้า เต๋า และสิ่งเจือปนที่เกี่ยวข้องจะถูกล้างจากรายการนี้',
-        destructive: true,
+        description: form.type === 'WTO'
+          ? 'ข้อมูลเดิมจะคงไว้ ระบบจะตรวจ stock ของรายการทั้งหมดใหม่ก่อนบันทึก'
+          : 'เปลี่ยนเฉพาะสินค้า น้ำหนัก และสิ่งเจือปน ข้อมูลและรูปถ่ายอื่นจะคงเดิม',
+        destructive: false,
         title: 'เปลี่ยนสินค้า?',
       },
       () => changeLineProduct(lineId, productId),
@@ -1564,7 +1898,9 @@ export function WeightTicketFormCore({
   }
 
   function addImpurityLine(sourceLine: FormWeightTicketLine) {
+    if (isLoadingTicket || saveInFlightRef.current === 'save') return
     if (calculateRealLotSummary(sourceLine, form.lines).lotCount === 0) return
+    if (shouldIgnoreRapidAdd(`impurity:${sourceLine.id}`)) return
     const nextLine = createFormWeightTicketLine()
     nextLine.productId = sourceLine.productId
     nextLine.warehouseId = sourceLine.warehouseId
@@ -1667,10 +2003,17 @@ export function WeightTicketFormCore({
   async function appendLineImages(lineId: string, files: FileList | null) {
     if (!files?.length) return
     setAttachmentError('')
-    const results = await Promise.allSettled(Array.from(files).map(createAttachmentPreviewFromFile))
+    const results = await Promise.allSettled(Array.from(files).map((file) => trackAttachmentUpload(createAttachmentPreviewFromFile(file))))
     const nextFiles = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
     const failures = results.flatMap((result) => result.status === 'rejected' ? [getErrorMessage(result.reason, 'อัปโหลดรูปสินค้าไม่สำเร็จ')] : [])
     if (nextFiles.length > 0) {
+      const currentForm = formRef.current
+      formRef.current = {
+        ...currentForm,
+        lines: currentForm.lines.map((line) => line.id === lineId
+          ? { ...line, imageFiles: [...getLineImages(line), ...nextFiles] }
+          : line),
+      }
       updateLine(lineId, (line) => ({ ...line, imageFiles: [...getLineImages(line), ...nextFiles] }))
       markTouched(`line-${lineId}-images`)
     }
@@ -1686,10 +2029,15 @@ export function WeightTicketFormCore({
   async function appendVehicleImages(files: FileList | null) {
     if (!files?.length) return
     setAttachmentError('')
-    const results = await Promise.allSettled(Array.from(files).map(createAttachmentPreviewFromFile))
+    const results = await Promise.allSettled(Array.from(files).map((file) => trackAttachmentUpload(createAttachmentPreviewFromFile(file))))
     const nextFiles = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
     const failures = results.flatMap((result) => result.status === 'rejected' ? [getErrorMessage(result.reason, 'อัปโหลดรูปรถไม่สำเร็จ')] : [])
     if (nextFiles.length > 0) {
+      const currentForm = formRef.current
+      formRef.current = {
+        ...currentForm,
+        vehicleImageFiles: [...currentForm.vehicleImageFiles, ...nextFiles],
+      }
       setForm((current) => ({ ...current, vehicleImageFiles: [...current.vehicleImageFiles, ...nextFiles] }))
     }
     if (failures.length > 0) {
@@ -1723,6 +2071,7 @@ export function WeightTicketFormCore({
   }, [backToList, onRequestClose])
 
   async function saveTicket() {
+    if (isSaving || saveInFlightRef.current) return
     const nextTouched: Record<string, boolean> = {
       branchId: true,
       partyId: true,
@@ -1759,12 +2108,19 @@ export function WeightTicketFormCore({
       return
     }
 
-    setIsSaving(true)
+    saveInFlightRef.current = 'save'
+    beginSaveStage(form.type === 'WTO' ? 'stock_check' : 'save')
     try {
+      await waitForPendingAttachmentUploads()
+      const formToSave = formRef.current
+      const saveSnapshot = formSafetySnapshot(formToSave)
       const ticket = await saveWeightTicket({
-        branchId: form.branchId,
-        id: editingTicketId || undefined,
-        lines: form.lines.map((line) => ({
+        branchId: formToSave.branchId,
+        collaborationBaseDocumentNo: (savedTicket ?? loadedTicket)?.documentNo,
+        collaborationBaseLineIds: formToSave.lines.map((line) => line.id),
+        collaborationBaseUpdatedAt: (savedTicket ?? loadedTicket)?.updatedAt ?? null,
+        id: savedTicket?.id ?? editingTicketId,
+        lines: formToSave.lines.map((line) => ({
           containerDeductionWeight: Number(line.containerDeductionWeight || 0),
           deductionMode: line.deductionMode,
           deductionValue: Number(line.deductionValue || 0),
@@ -1779,20 +2135,25 @@ export function WeightTicketFormCore({
           warehouseId: line.warehouseId,
           parentId: line.parentId,
         })),
-        partyId: form.partyId,
-        remark: form.remark.trim(),
-        type: form.type,
-        vehicleImageNames: form.vehicleImageFiles.map((file) => file.rawValue),
-        vehicleNo: form.vehicleNo.trim(),
-        godownName: form.godownName.trim(),
+        partyId: formToSave.partyId,
+        remark: formToSave.remark.trim(),
+        type: formToSave.type,
+        vehicleImageNames: formToSave.vehicleImageFiles.map((file) => file.rawValue),
+        vehicleNo: formToSave.vehicleNo.trim(),
+        godownName: formToSave.godownName.trim(),
       })
       invalidatePurchaseBillOptionsCache()
       setLoadError('')
       const nextForm = ticketToFormState(ticket)
       setLoadedTicket(ticket)
       setSavedTicket(ticket)
-      setForm(nextForm)
-      setFormBaseline(formSafetySnapshot(nextForm))
+      if (formSafetySnapshot(formRef.current) === saveSnapshot) {
+        setForm(nextForm)
+        setFormBaseline(formSafetySnapshot(nextForm))
+      } else {
+        setMergeNotice('บันทึกข้อมูลเดิมแล้ว แต่มีการแก้ไขข้อมูลใหม่ระหว่างบันทึก จึงคงข้อมูลล่าสุดไว้ให้ตรวจสอบและบันทึกอีกครั้ง')
+        return
+      }
       if (onSaveSuccess) {
         onSaveSuccess(ticket)
       } else {
@@ -1804,7 +2165,8 @@ export function WeightTicketFormCore({
       }
       setLoadError(getErrorMessage(caught, editingTicketId ? 'แก้ไขใบรับ-ส่งของไม่ได้' : 'บันทึกใบรับ-ส่งของไม่ได้'))
     } finally {
-      setIsSaving(false)
+      endSaveStage()
+      saveInFlightRef.current = null
     }
   }
 
@@ -1936,6 +2298,7 @@ export function WeightTicketFormCore({
           {loadError}
         </div>
       ) : null}
+      <WeightTicketSaveProgress stage={saveStage} type={form.type} />
       {attachmentError ? (
         <div role="alert" aria-live="assertive" className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
@@ -2027,7 +2390,7 @@ export function WeightTicketFormCore({
                   onChange={(event) => updateForm('vehicleNo', normalizeVehicleNo(event.target.value))}
                 />
               </FieldBlock>
-	              <FieldBlock error={showError('godownName')} label="โกดัง*">
+	              <FieldBlock error={showError('godownName')} label={form.type === 'WTO' ? 'โกดัง*' : 'โกดัง'}>
 	                <Input
 	                  placeholder="เช่น โกดัง A"
 	                  value={form.godownName}
@@ -2065,6 +2428,7 @@ export function WeightTicketFormCore({
                   <div className="text-sm font-medium text-slate-700">รายการทั้งหมด {getMainParentLines(form.lines).length} รายการ</div>
                   <Button
                     aria-describedby={showError('lines') ? 'weight-ticket-lines-error' : undefined}
+                    className="h-9 border-emerald-600 bg-emerald-600 px-3 font-semibold text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white"
                     id="weight-ticket-add-product"
                     size="xs"
                     type="button"
@@ -2200,10 +2564,9 @@ export function WeightTicketFormCore({
                           {products.find((product) => product.id === activeLine.productId)?.name || 'เลือกสินค้าเพื่อเริ่มกรอกข้อมูล'}
                         </div>
                         <Button
-                          className="h-8 shrink-0 px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                          className="h-8 shrink-0 bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 hover:text-white"
                           size="xs"
                           type="button"
-                          variant="ghost"
                           onClick={addLine}
                         >
                           <Plus className="mr-1 size-3" />
@@ -2341,9 +2704,15 @@ export function WeightTicketFormCore({
                               const lotGrossWeight = Math.max(0, Number(lot.grossWeight || 0))
                               const lotContainerWeight = Math.max(0, Number(lot.containerDeductionWeight || 0))
                               const lotNetBeforeImpurityWeight = Math.max(0, lotGrossWeight - lotContainerWeight)
+                              const showLotSummary = isCollapsed
                               return (
-                                <div key={lot.id} className="bg-white p-3 rounded-xl border border-slate-200/60 space-y-3">
-                                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <section
+                                  aria-labelledby={`weight-ticket-lot-title-${lot.id}`}
+                                  className="space-y-3 rounded-xl border border-slate-300 bg-white p-3 shadow-sm ring-1 ring-slate-200/60 sm:p-4"
+                                  data-testid={`weight-ticket-lot-${lot.id}`}
+                                  key={lot.id}
+                                >
+                                  <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                                     <button
                                       type="button"
                                       className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
@@ -2352,13 +2721,15 @@ export function WeightTicketFormCore({
                                     >
                                       <ChevronDown className={cn("size-4 shrink-0 text-slate-500 transition-transform", isCollapsed ? "-rotate-90" : "rotate-0")} />
                                       <div className="min-w-0">
-                                        <div className="text-sm font-bold text-slate-700">เต๋าที่ {lotIndex + 1}</div>
-                                        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-semibold text-slate-500">
-                                          <span>รวม {formatWeight(lotGrossWeight)} กก.</span>
-                                          <span>ภาชนะ {formatWeight(lotContainerWeight)} กก.</span>
-                                          <span className="text-emerald-700 font-bold">หลังหัก {formatWeight(lotNetBeforeImpurityWeight)} กก.</span>
-                                          <span>{getLineImages(lot).length} รูป</span>
-                                        </div>
+                                        <span className="block truncate text-sm font-bold text-slate-800" id={`weight-ticket-lot-title-${lot.id}`}>รายละเอียดเต๋าที่ {lotIndex + 1}</span>
+                                        {showLotSummary ? (
+                                          <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-semibold text-slate-500">
+                                            <span>รวม {formatWeight(lotGrossWeight)} กก.</span>
+                                            <span>ภาชนะ {formatWeight(lotContainerWeight)} กก.</span>
+                                            <span className="text-emerald-700 font-bold">หลังหัก {formatWeight(lotNetBeforeImpurityWeight)} กก.</span>
+                                            <span>{getLineImages(lot).length} รูป</span>
+                                          </div>
+                                        ) : null}
                                       </div>
                                     </button>
                                     <div className="flex items-center gap-1">
@@ -2435,7 +2806,7 @@ export function WeightTicketFormCore({
                                       </FieldBlock>
                                     </>
                                   ) : null}
-                                </div>
+                                </section>
                               )
                             })
                           })()}
@@ -2590,6 +2961,7 @@ export function WeightTicketFormCore({
                                 const selectedImpurityId = getLineImpurityId(child)
                                 const hasSelectedImpurity = Boolean(selectedImpurityId)
                                 const isOtherProductImpurity = isOtherProductImpurityOption(selectedImpurityId)
+                                const showImpurityImageField = form.type === 'WTI' || isOtherProductImpurity
                                 const impurityOptionsForChild = optionsWithCurrentValue(impurityOptions, selectedImpurityId, child.impurityName)
                                 const impurityPurchaseProducts = optionsWithCurrentValue(
                                   normalProducts.filter((product) => product.id !== line.productId),
@@ -2802,9 +3174,9 @@ export function WeightTicketFormCore({
                                         เลือกสินค้าที่ปนมาก่อน จึงจะกรอกน้ำหนักหักและเลือกซื้อ/ไม่ซื้อได้
                                       </div>
                                     ) : null}
-                                    {isOtherProductImpurity ? (
+                                    {showImpurityImageField ? (
                                       <div className="mt-2 border-t border-slate-100 pt-2">
-                                        <FieldBlock label="รูปสินค้าที่ปนมา">
+                                        <FieldBlock label={isOtherProductImpurity ? 'รูปสินค้าที่ปนมา' : 'รูปสิ่งเจือปน (ไม่บังคับ)'}>
                                           <AttachmentProfileGrid
                                             id={`weight-images-${child.id}`}
                                             addLabel="เพิ่มรูป"
@@ -2881,7 +3253,7 @@ export function WeightTicketFormCore({
                           เพิ่มเต๋า
                         </Button>
                         <Button
-                          className="h-10 border-blue-200 bg-white text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:border-slate-200 disabled:text-slate-400"
+                          className="h-10 border-red-600 bg-red-600 text-sm font-semibold text-white hover:border-red-700 hover:bg-red-700 hover:text-white disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={!activeLine.productId || calculateRealLotSummary(activeLine, form.lines).lotCount === 0}
                           type="button"
                           variant="outline"

@@ -157,6 +157,15 @@ export type WeightTicketRecord = {
   godownName: string
 }
 
+export type WeightTicketImagePreviews = {
+  imageNames: string[]
+  lines: Array<{
+    imageNames: string[]
+    lineNo: number
+  }>
+  vehicleImageNames: string[]
+}
+
 export type OptionItem = {
   branchIds?: string[]
   category?: string
@@ -173,8 +182,10 @@ export type WeightTicketSortBy = 'createdAt' | 'documentNo' | 'partyName' | 'net
 export type WeightTicketSortDir = 'asc' | 'desc'
 
 export type StoredImageAsset = {
+  bucket?: string | null
   fileName: string
   rawValue: string
+  storageKey?: string | null
   url: string | null
 }
 
@@ -316,10 +327,14 @@ const weightTicketLinePayloadSchema = z.object({
 
 export const weightTicketFormSchema = z.object({
   branchId: z.string().trim().min(1, 'เลือกสาขา'),
+  collaborationBaseDocumentNo: z.string().trim().max(80).optional(),
+  collaborationBaseLineIds: z.array(z.string().trim().min(1).max(80)).optional(),
+  collaborationBaseUpdatedAt: z.string().datetime().nullable().optional(),
   id: z.string().trim().max(80).optional(),
-  lines: z.array(weightTicketLinePayloadSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ'),
+  lines: z.array(weightTicketLinePayloadSchema),
   partyId: z.string().trim().min(1, 'เลือกคู่ค้า'),
   remark: z.preprocess(blankToEmpty, z.string().max(500, 'หมายเหตุยาวเกินไป').default('')),
+  saveScope: z.enum(['header', 'document']).optional(),
   type: typeEnum,
   vehicleImageNames: z.array(attachmentValueSchema).default([]),
   vehicleNo: z
@@ -328,8 +343,29 @@ export const weightTicketFormSchema = z.object({
     .min(2, 'กรอกทะเบียนรถ')
     .max(24, 'ทะเบียนรถยาวเกินไป')
     .regex(/^[\p{L}\p{M}\p{N}\s.-]+$/u, 'ทะเบียนรถมีรูปแบบไม่ถูกต้อง'),
-  godownName: z.string().trim().min(1, 'กรอกโกดัง').max(100, 'ชื่อโกดังยาวเกินไป'),
+  godownName: z.preprocess(blankToEmpty, z.string().max(100, 'ชื่อโกดังยาวเกินไป').default('')),
 }).superRefine((value, ctx) => {
+  if (value.saveScope === 'header' && value.lines.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'การบันทึกหัวเอกสารต้องไม่ส่งรายการสินค้า',
+      path: ['lines'],
+    })
+  }
+  if (value.type === 'WTO' && value.lines.length === 0 && value.saveScope !== 'header') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ',
+      path: ['lines'],
+    })
+  }
+  if (value.type === 'WTO' && !value.godownName) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'กรอกโกดัง',
+      path: ['godownName'],
+    })
+  }
   const lineById = new Map<string, (typeof value.lines)[number]>()
   value.lines.forEach((line, index) => {
     if (lineById.has(line.id)) {
@@ -598,6 +634,15 @@ const weightTicketListResultSchema = z.object({
   totalRows: z.number().int().nonnegative(),
 })
 
+const weightTicketImagePreviewsSchema = z.object({
+  imageNames: z.array(z.string()),
+  lines: z.array(z.object({
+    imageNames: z.array(z.string()),
+    lineNo: z.number().int(),
+  })),
+  vehicleImageNames: z.array(z.string()),
+})
+
 function createClientUuid() {
   if (typeof globalThis.crypto.randomUUID === 'function') {
     return globalThis.crypto.randomUUID()
@@ -715,8 +760,14 @@ export function encodeStoredImageAsset(fileName: string, dataUrl: string) {
   return JSON.stringify({ dataUrl, fileName })
 }
 
-export function encodeStoredImageReference(fileName: string, url: string, storageKey: string) {
-  return JSON.stringify({ fileName, storageKey, url })
+export function encodeStoredImageReference(fileName: string, url: string | undefined, storageKey: string, bucket?: string) {
+  const reference: { bucket?: string; fileName: string; storageKey: string; url?: string } = {
+    bucket,
+    fileName,
+    storageKey,
+  }
+  if (url?.trim()) reference.url = url
+  return JSON.stringify(reference)
 }
 
 export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
@@ -727,6 +778,7 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
     return {
       fileName: mimeType || trimmed.slice(0, 32),
       rawValue,
+      storageKey: null,
       url: trimmed,
     }
   }
@@ -740,18 +792,38 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
       return {
         fileName,
         rawValue,
+        storageKey: null,
         url,
       }
     }
   }
 
   try {
-    const parsed = JSON.parse(trimmed) as { dataUrl?: unknown; fileName?: unknown; url?: unknown }
+    const parsed = JSON.parse(trimmed) as { bucket?: unknown; dataUrl?: unknown; fileName?: unknown; storageKey?: unknown; url?: unknown }
     if (typeof parsed.fileName === 'string' && typeof parsed.dataUrl === 'string' && parsed.dataUrl.startsWith('data:image/')) {
       return {
         fileName: parsed.fileName,
         rawValue,
+        bucket: typeof parsed.bucket === 'string' && parsed.bucket.trim() ? parsed.bucket.trim() : null,
+        storageKey: typeof parsed.storageKey === 'string' && parsed.storageKey.trim() ? parsed.storageKey.trim() : null,
         url: parsed.dataUrl,
+      }
+    }
+    if (
+      typeof parsed.fileName === 'string'
+      && typeof parsed.storageKey === 'string'
+      && parsed.storageKey.trim()
+      && typeof parsed.bucket === 'string'
+      && parsed.bucket.trim()
+      && !('dataUrl' in parsed)
+      && (!parsed.url || (typeof parsed.url === 'string' && (parsed.url.startsWith('http://') || parsed.url.startsWith('https://'))))
+    ) {
+      return {
+        fileName: parsed.fileName,
+        rawValue,
+        bucket: parsed.bucket.trim(),
+        storageKey: parsed.storageKey.trim(),
+        url: typeof parsed.url === 'string' ? parsed.url : null,
       }
     }
     if (
@@ -762,6 +834,8 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
       return {
         fileName: parsed.fileName,
         rawValue,
+        bucket: typeof parsed.bucket === 'string' && parsed.bucket.trim() ? parsed.bucket.trim() : null,
+        storageKey: typeof parsed.storageKey === 'string' && parsed.storageKey.trim() ? parsed.storageKey.trim() : null,
         url: parsed.url,
       }
     }
@@ -772,6 +846,7 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
   return {
     fileName: trimmed,
     rawValue,
+    storageKey: null,
     url: null,
   }
 }
@@ -779,7 +854,7 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
 export function isPreviewableStoredImageAsset(
   image: StoredImageAsset,
 ): image is StoredImageAsset & { url: string } {
-  if (!image.url) return false
+  if (!image.bucket || !image.storageKey || !image.url) return false
 
   try {
     const url = new URL(image.url)
@@ -969,12 +1044,33 @@ export const statusLabels: Record<WeightTicketStatus, string> = {
   received: 'รับของแล้ว',
 }
 
+export function canPrintWeightTicket(status: WeightTicketStatus) {
+  return status !== 'cancelled'
+}
+
+export function canShareWeightTicket(status: WeightTicketStatus) {
+  return status !== 'draft' && status !== 'cancelled'
+}
+
+export function canConfirmWeightTicket(ticket: Pick<WeightTicketRecord, 'status' | 'productSummaries' | 'usedInPurchaseBillCount' | 'usedInSalesBillCount'>) {
+  return ticket.status === 'draft'
+    && ticket.productSummaries.length > 0
+    && ticket.usedInPurchaseBillCount === 0
+    && ticket.usedInSalesBillCount === 0
+}
+
+export function canReturnWeightTicket(ticket: Pick<WeightTicketRecord, 'type' | 'status' | 'usedInSalesBillCount' | 'productSummaries'>) {
+  return ticket.type === 'WTO'
+    && ticket.status === 'partially_billed'
+    && ticket.usedInSalesBillCount > 0
+    && ticket.productSummaries.some((summary) => summary.remainingWeight > 0.0001)
+}
+
 export function displayWeightTicketStatus(type: WeightTicketType, status: WeightTicketStatus) {
   if (status === 'draft') {
     return type === 'WTO' ? 'ร่าง' : 'แบบร่าง'
   }
   if (type === 'WTI') {
-    if (status === 'partially_billed') return 'ออกบิลแล้วบางส่วน'
     if (status === 'billed') return 'เสร็จสิ้น'
     if (status === 'cancelled') return 'ยกเลิก'
     return 'รับของแล้ว'
@@ -996,7 +1092,6 @@ export function weightTicketStatusBadgeClass(type: WeightTicketType, status: Wei
   }
   if (status === 'cancelled') return 'text-rose-700'
   if (type === 'WTI') {
-    if (status === 'partially_billed') return 'text-amber-700'
     if (status === 'billed') return 'text-blue-700'
     return 'text-emerald-700'
   }
@@ -1041,9 +1136,15 @@ export async function listWeightTickets(params: {
   return readJsonResponse(response, weightTicketListResultSchema, 'โหลดรายการใบรับ-ส่งของไม่ได้')
 }
 
-export async function getWeightTicket(id: string) {
-  const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(id)}`, { cache: 'no-store' })
+export async function getWeightTicket(id: string, options: { includeImagePreviews?: boolean; signal?: AbortSignal } = {}) {
+  const query = options.includeImagePreviews === false ? '?includeImagePreviews=false' : ''
+  const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(id)}${query}`, { cache: 'no-store', signal: options.signal })
   return readJsonResponse(response, weightTicketRecordSchema, 'โหลดใบรับ-ส่งของไม่ได้')
+}
+
+export async function getWeightTicketImagePreviews(id: string, options: { signal?: AbortSignal } = {}) {
+  const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(id)}/images/preview`, { cache: 'no-store', signal: options.signal })
+  return readJsonResponse(response, weightTicketImagePreviewsSchema, 'โหลด preview รูปใบรับ-ส่งของไม่ได้')
 }
 
 function payloadFromForm(values: WeightTicketFormValues) {

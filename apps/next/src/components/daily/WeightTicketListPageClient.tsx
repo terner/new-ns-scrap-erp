@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, Download, Plus, Printer, RotateCcw, Search, Share2, SquarePen, XCircle } from 'lucide-react'
@@ -26,6 +26,7 @@ import { invalidatePurchaseBillOptionsCache } from '@/lib/purchase-bill-options-
 import { WeightTicketDetailModal } from './WeightTicketDetailModal'
 import { WeightTicketStockReturnDialog } from './WeightTicketStockReturnDialog'
 import { WeightTicketsPageClient } from './WeightTicketsPageClient'
+import { useWeightTicketRealtime } from './useWeightTicketRealtime'
 import {
   WEIGHT_TICKET_COLUMN_STORAGE_KEY,
   WEIGHT_TICKET_TABLE_COLUMN_COUNT,
@@ -33,9 +34,14 @@ import {
 } from './weight-ticket-table-layout'
 import {
   cancelWeightTicket,
+  canConfirmWeightTicket,
+  canPrintWeightTicket,
+  canReturnWeightTicket,
+  canShareWeightTicket,
   confirmWeightTicket,
   displayWeightTicketStatus,
   formatWeight,
+  getWeightTicket,
   listWeightTickets,
   notifyWeightTicketLine,
   type OptionItem,
@@ -172,9 +178,7 @@ function canOpenSalesBillFromTicket(ticket: WeightTicketRecord, canOpenBill: boo
 }
 
 function canConfirmTicket(ticket: WeightTicketRecord) {
-  return ticket.status === 'draft'
-    && ticket.usedInPurchaseBillCount === 0
-    && ticket.usedInSalesBillCount === 0
+  return canConfirmWeightTicket(ticket)
 }
 
 function confirmTicketLabel(ticket: WeightTicketRecord) {
@@ -182,15 +186,16 @@ function confirmTicketLabel(ticket: WeightTicketRecord) {
 }
 
 function canReturnWtoStock(ticket: WeightTicketRecord) {
-  return ticket.type === 'WTO'
-    && ticket.usedInSalesBillCount > 0
-    && ticket.productSummaries.some((summary) => summary.remainingWeight > 0.0001)
+  return canReturnWeightTicket(ticket)
 }
 
 export function WeightTicketListPageClient() {
   const router = useRouter()
   const { requestConfirmation } = useActionConfirmation()
   const guardedFormCloseRef = useRef<() => void>(() => {})
+  const autoOpenDetailRef = useRef('')
+  const realtimeRefreshEventRef = useRef('')
+  const realtimeRefreshTimeoutRef = useRef<number | null>(null)
   const [tickets, setTickets] = useState<WeightTicketRecord[]>([])
   const [canOpenPurchaseBill, setCanOpenPurchaseBill] = useState(false)
   const [canOpenSalesBill, setCanOpenSalesBill] = useState(false)
@@ -200,6 +205,8 @@ export function WeightTicketListPageClient() {
   const [totalRows, setTotalRows] = useState(0)
   const [branches, setBranches] = useState<OptionItem[]>([])
   const [query, setQuery] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [isUrlStateReady, setIsUrlStateReady] = useState(false)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('WTI')
   const [statusFilter, setStatusFilter] = useState<StatusFilter[]>([])
   const [sortBy, setSortBy] = useState<WeightTicketSortBy>('documentNo')
@@ -229,7 +236,11 @@ export function WeightTicketListPageClient() {
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const safePage = Math.min(page, totalPages)
-  const activeFilters = Boolean(query || statusFilter.length > 0 || branchFilter !== 'all' || dateFrom || dateTo)
+  const activeDetailTicket = activeDetailId
+    ? tickets.find((ticket) => ticket.id === activeDetailId)
+    : undefined
+  const activeFilters = Boolean(searchInput || statusFilter.length > 0 || branchFilter !== 'all' || dateFrom || dateTo)
+  const realtimeBranchIds = useMemo(() => branches.map((branch) => branch.id), [branches])
   const statusOptions = useMemo(() => statusOptionsByType[typeFilter], [typeFilter])
   const exportHref = useMemo(() => {
     const params = new URLSearchParams({ format: 'xlsx', sortBy, sortDir, type: typeFilter })
@@ -267,21 +278,27 @@ export function WeightTicketListPageClient() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const type = new URLSearchParams(window.location.search).get('type')
+    const params = new URLSearchParams(window.location.search)
+    const type = params.get('type')
+    const search = params.get('search')
+    const detail = params.get('detail')
+    const nextSearch = detail || search || ''
+    setSearchInput(nextSearch)
+    setQuery(nextSearch)
     if (type === 'WTO') {
       setTypeFilter('WTO')
       setStatusFilter([])
       setPage(1)
-      return
-    }
-    if (type === 'WTI') {
+    } else if (type === 'WTI') {
       setTypeFilter('WTI')
       setStatusFilter([])
       setPage(1)
     }
+    setIsUrlStateReady(true)
   }, [])
 
   useEffect(() => {
+    if (!isUrlStateReady) return
     let cancelled = false
 
     async function loadRows() {
@@ -319,9 +336,49 @@ export function WeightTicketListPageClient() {
     return () => {
       cancelled = true
     }
-  }, [branchFilter, dateFrom, dateTo, page, pageSize, query, sortBy, sortDir, statusFilter, typeFilter, refreshKey])
+  }, [branchFilter, dateFrom, dateTo, isUrlStateReady, page, pageSize, query, sortBy, sortDir, statusFilter, typeFilter, refreshKey])
+
+  const scheduleRealtimeRefresh = useCallback((event: { documentNo: string; updatedAt: string | null; changeType: string }) => {
+    const eventKey = `${event.documentNo}:${event.updatedAt ?? ''}:${event.changeType}`
+    if (realtimeRefreshEventRef.current === eventKey) return
+    realtimeRefreshEventRef.current = eventKey
+    if (realtimeRefreshTimeoutRef.current !== null) return
+    realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
+      realtimeRefreshTimeoutRef.current = null
+      setRefreshKey((previous) => previous + 1)
+    }, 250)
+  }, [])
+
+  useEffect(() => () => {
+    if (realtimeRefreshTimeoutRef.current !== null) window.clearTimeout(realtimeRefreshTimeoutRef.current)
+  }, [])
+
+  useWeightTicketRealtime(scheduleRealtimeRefresh, isUrlStateReady, realtimeBranchIds)
+
+  useEffect(() => {
+    if (!isUrlStateReady || searchInput === query) return
+    const timeoutId = window.setTimeout(() => {
+      setQuery(searchInput)
+      setPage(1)
+    }, 350)
+    return () => window.clearTimeout(timeoutId)
+  }, [isUrlStateReady, query, searchInput])
+
+  useEffect(() => {
+    if (isLoading || tickets.length === 0 || typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const detail = params.get('detail')?.trim()
+    if (!detail) return
+    const key = `${typeFilter}:${detail}`
+    if (autoOpenDetailRef.current === key) return
+    const ticket = tickets.find((row) => row.documentNo === detail)
+    if (!ticket) return
+    autoOpenDetailRef.current = key
+    setActiveDetailId(ticket.id)
+  }, [isLoading, tickets, typeFilter])
 
   function clearFilters() {
+    setSearchInput('')
     setQuery('')
     setStatusFilter([])
     setSortBy('documentNo')
@@ -402,11 +459,13 @@ export function WeightTicketListPageClient() {
   }
 
   async function handlePrintTicket(ticket: WeightTicketRecord) {
+    if (!canPrintWeightTicket(ticket.status)) return
     setPrintingTicketId(ticket.id)
     let printWindow: Window | null = null
     try {
       printWindow = openWeightTicketPrintWindow(ticket)
-      await openWeightTicketReceiptPrint(ticket, printWindow)
+      const detailTicket = await getWeightTicket(ticket.id)
+      await openWeightTicketReceiptPrint(detailTicket, printWindow)
     } catch (caught) {
       printWindow?.close()
       window.alert(getErrorMessage(caught, 'เปิดใบพิมพ์ใบรับ-ส่งสินค้าไม่สำเร็จ'))
@@ -416,13 +475,14 @@ export function WeightTicketListPageClient() {
   }
 
   function openShareDialog(ticket: WeightTicketRecord) {
+    if (!canShareWeightTicket(ticket.status)) return
     setShareTicket(ticket)
     setShareNote('')
     setShareError('')
   }
 
   async function handleSendLineNotification() {
-    if (!shareTicket) return
+    if (!shareTicket || !canShareWeightTicket(shareTicket.status)) return
     setIsSendingLine(true)
     setShareError('')
     try {
@@ -439,7 +499,7 @@ export function WeightTicketListPageClient() {
   }
 
   function handleManualLineShare() {
-    if (!shareTicket) return
+    if (!shareTicket || !canShareWeightTicket(shareTicket.status)) return
     openWeightTicketLineShare(shareTicket)
     setShareTicket(null)
     setShareNote('')
@@ -497,11 +557,8 @@ export function WeightTicketListPageClient() {
               <Input
                 className="h-9 pl-9"
                 placeholder="ค้นหาเลขที่, ผู้ขาย/ลูกค้า, ทะเบียนรถ, สินค้า, สิ่งเจือปน"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setPage(1)
-                }}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
               />
             </label>
             <label className="text-xs text-slate-500">วันที่:</label>
@@ -565,11 +622,8 @@ export function WeightTicketListPageClient() {
             <Input
               className="pl-9 h-9 text-slate-800"
               placeholder="ค้นหาเลขที่, คู่ค้า, ทะเบียน..."
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                setPage(1)
-              }}
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
             />
           </label>
           <button
@@ -663,7 +717,10 @@ export function WeightTicketListPageClient() {
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 text-sm text-slate-600">
-        <div>{summaryText}</div>
+        <div>
+          {summaryText}
+          {isLoading && tickets.length > 0 ? <span className="ml-2 text-xs text-slate-400" role="status">กำลังอัปเดต...</span> : null}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {columnResize.hasCustomWidths ? <Button className="hidden lg:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
           <PageSizeDropdown disabled={isLoading} options={pageSizeOptions} value={pageSize} onChange={(size) => {
@@ -678,7 +735,7 @@ export function WeightTicketListPageClient() {
 
       {/* Mobile Card List (Hidden on Desktop) */}
       <div className="block md:hidden space-y-3">
-        {isLoading ? (
+        {isLoading && tickets.length === 0 ? (
           <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : loadError ? (
           <div className="rounded-xl bg-white p-8 text-center text-red-600 shadow-sm border border-slate-200">{loadError}</div>
@@ -727,10 +784,8 @@ export function WeightTicketListPageClient() {
               )}>
                 <div>
                   <span className={cn(
-                    'inline-flex items-center gap-1.5 text-sm font-semibold px-2 py-0.5 rounded',
-                    isCancelled
-                      ? 'bg-red-100 text-red-800 ring-1 ring-red-200'
-                      : weightTicketStatusBadgeClass(ticket.type, ticket.status),
+                    'inline-flex items-center gap-1.5 text-sm font-semibold',
+                    weightTicketStatusBadgeClass(ticket.type, ticket.status),
                   )}
                   >
                     <span className="size-1.5 rounded-full bg-current" />
@@ -754,12 +809,13 @@ export function WeightTicketListPageClient() {
                   mobileLabel
                   menu={(
                     <>
+                      <TableActionMenuItem onSelect={() => setActiveDetailId(ticket.id)}>รายละเอียด</TableActionMenuItem>
                       {canOpenPurchaseBillFromTicket(ticket, canOpenPurchaseBill) ? <TableActionMenuItem onSelect={() => openBillFromTicket(ticket)}>เปิดบิลซื้อ</TableActionMenuItem> : null}
                       {canOpenSalesBillFromTicket(ticket, canOpenSalesBill) ? <TableActionMenuItem onSelect={() => openBillFromTicket(ticket)}>เปิดบิลขาย</TableActionMenuItem> : null}
                       {canConfirmTicket(ticket) ? <TableActionMenuItem disabled={confirmingTicketId === ticket.id} onSelect={() => void handleConfirmTicket(ticket)}>{confirmingTicketId === ticket.id ? 'กำลังยืนยัน...' : confirmTicketLabel(ticket)}</TableActionMenuItem> : null}
                       {canReturnWtoStock(ticket) ? <TableActionMenuItem onSelect={() => setStockReturnTicket(ticket)}>รับของคืน</TableActionMenuItem> : null}
-                      <TableActionMenuItem disabled={printingTicketId === ticket.id} onSelect={() => void handlePrintTicket(ticket)}>{printingTicketId === ticket.id ? 'กำลังเตรียมพิมพ์...' : 'พิมพ์'}</TableActionMenuItem>
-                      <TableActionMenuItem onSelect={() => openShareDialog(ticket)}>แชร์</TableActionMenuItem>
+                      {canPrintWeightTicket(ticket.status) ? <TableActionMenuItem disabled={printingTicketId === ticket.id} onSelect={() => void handlePrintTicket(ticket)}>{printingTicketId === ticket.id ? 'กำลังเตรียมพิมพ์...' : 'พิมพ์'}</TableActionMenuItem> : null}
+                      {canShareWeightTicket(ticket.status) ? <TableActionMenuItem onSelect={() => openShareDialog(ticket)}>แชร์</TableActionMenuItem> : null}
                       {ticket.canEdit ? <TableActionMenuItem onSelect={() => setActiveForm({ id: ticket.id, type: ticket.type })}>แก้ไข</TableActionMenuItem> : null}
                       {ticket.canCancel ? (
                         <TableActionMenuItem onSelect={() => {
@@ -804,7 +860,7 @@ export function WeightTicketListPageClient() {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
+              {isLoading && tickets.length === 0 ? (
                 <tr>
                   <td className="px-3 py-10 text-center text-slate-500" colSpan={WEIGHT_TICKET_TABLE_COLUMN_COUNT}>กำลังโหลดข้อมูล</td>
                 </tr>
@@ -848,9 +904,7 @@ export function WeightTicketListPageClient() {
                       <div className="flex min-h-[23px] flex-col items-center justify-center">
                         <span className={cn(
                           'inline-flex items-center gap-1.5 text-xs font-medium',
-                          isCancelled
-                            ? 'rounded-md bg-red-100 px-2 py-0.5 font-semibold text-red-800 ring-1 ring-red-200'
-                            : weightTicketStatusBadgeClass(ticket.type, ticket.status),
+                          weightTicketStatusBadgeClass(ticket.type, ticket.status),
                         )}
                         >
                           <span className="size-1.5 rounded-full bg-current" />
@@ -868,12 +922,13 @@ export function WeightTicketListPageClient() {
                         busy={confirmingTicketId === ticket.id || printingTicketId === ticket.id}
                         menu={(
                           <>
+                            <TableActionMenuItem onSelect={() => setActiveDetailId(ticket.id)}>รายละเอียด</TableActionMenuItem>
                             {canOpenPurchaseBillFromTicket(ticket, canOpenPurchaseBill) ? <TableActionMenuItem onSelect={() => openBillFromTicket(ticket)}>เปิดบิลซื้อ</TableActionMenuItem> : null}
                             {canOpenSalesBillFromTicket(ticket, canOpenSalesBill) ? <TableActionMenuItem onSelect={() => openBillFromTicket(ticket)}>เปิดบิลขาย</TableActionMenuItem> : null}
                             {canConfirmTicket(ticket) ? <TableActionMenuItem disabled={confirmingTicketId === ticket.id} onSelect={() => void handleConfirmTicket(ticket)}>{confirmingTicketId === ticket.id ? 'กำลังยืนยัน...' : confirmTicketLabel(ticket)}</TableActionMenuItem> : null}
                             {canReturnWtoStock(ticket) ? <TableActionMenuItem onSelect={() => setStockReturnTicket(ticket)}>รับของคืน</TableActionMenuItem> : null}
-                            <TableActionMenuItem disabled={printingTicketId === ticket.id} onSelect={() => void handlePrintTicket(ticket)}>{printingTicketId === ticket.id ? 'กำลังเตรียมพิมพ์...' : 'พิมพ์'}</TableActionMenuItem>
-                            <TableActionMenuItem onSelect={() => openShareDialog(ticket)}>แชร์</TableActionMenuItem>
+                            {canPrintWeightTicket(ticket.status) ? <TableActionMenuItem disabled={printingTicketId === ticket.id} onSelect={() => void handlePrintTicket(ticket)}>{printingTicketId === ticket.id ? 'กำลังเตรียมพิมพ์...' : 'พิมพ์'}</TableActionMenuItem> : null}
+                            {canShareWeightTicket(ticket.status) ? <TableActionMenuItem onSelect={() => openShareDialog(ticket)}>แชร์</TableActionMenuItem> : null}
                             {ticket.canEdit ? <TableActionMenuItem onSelect={() => setActiveForm({ id: ticket.id, type: ticket.type })}>แก้ไข</TableActionMenuItem> : null}
                             {ticket.canCancel ? (
                               <TableActionMenuItem onSelect={() => {
@@ -998,6 +1053,7 @@ export function WeightTicketListPageClient() {
 
       {activeDetailId && (
         <WeightTicketDetailModal
+          initialTicket={activeDetailTicket}
           ticketId={activeDetailId}
           onClose={() => {
             setActiveDetailId(null)

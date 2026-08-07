@@ -204,6 +204,8 @@ function timelinePendingOutChangeLabel(
     }
     return withFieldChanges('แก้ไขเต๋าเดิม')
   }
+  if (row.eventType === 'edit_rebuild') return 'สร้าง pending_out ใหม่หลังแก้ไข'
+  if (row.eventType === 'edit_release') return 'release pending_out เดิมก่อน rebuild'
   if (row.eventType === 'cancel_release') return 'ยกเลิกใบส่งของ'
   if (row.eventType === 'sales_bill_consume') return 'ใช้ในบิลขาย'
   if (row.eventType === 'sales_bill_edit_release') return 'คืนจากแก้ไขบิลขาย'
@@ -531,7 +533,7 @@ export function WeightTicketProductBreakdownTable({
   )
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto pb-3 sm:pb-5 [&_td]:px-5 [&_th]:px-5">
       <table className="ns-table hidden lg:table min-w-full divide-y divide-slate-100 text-sm">
         <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold text-slate-500">
           <tr>

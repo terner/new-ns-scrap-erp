@@ -153,8 +153,10 @@ export function buildWeightTicketImageStorageKey({ bytes, documentNo, extension,
   return `attachments/migrated/${documentToken}/${safeSegment(owner)}/${position}-${digest}.${extension}`
 }
 
-export function encodeStoredWeightTicketImageReference(fileName, storageKey, url) {
-  return JSON.stringify({ fileName, storageKey, url })
+export function encodeStoredWeightTicketImageReference(fileName, storageKey, url, bucket) {
+  const reference = { bucket, fileName, storageKey }
+  if (url?.trim()) reference.url = url
+  return JSON.stringify(reference)
 }
 
 function databaseProjectRef(databaseUrl) {

@@ -1,10 +1,11 @@
 /* eslint-disable jsx-a11y/alt-text */
 import 'server-only'
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
-import { type WeightTicketRecord, decodeStoredImageAsset, type StoredImageAsset } from '@/lib/weight-tickets'
+import { type WeightTicketRecord, type StoredImageAsset } from '@/lib/weight-tickets'
 import { type CompanyProfilePrintValues } from '@/lib/company-profile'
 import {
   buildPrintWeightRows,
+  buildWeightTicketAttachmentImages,
   formatPrintableNumber,
   FIRST_PAGE_ITEM_ROWS,
   CONTINUATION_PAGE_ITEM_ROWS,
@@ -109,6 +110,7 @@ const styles = StyleSheet.create({
     color: TEXT_DARK,
     lineHeight: 1.24,
   },
+  mainPage: { paddingTop: 12, paddingBottom: 8 },
   accent: {
     height: 3,
     backgroundColor: ACCENT_GREEN,
@@ -174,8 +176,8 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
   },
   tableHeaderCell: {
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 3,
+    paddingBottom: 3,
     paddingLeft: 3,
     paddingRight: 3,
     fontSize: 9,
@@ -185,8 +187,8 @@ const styles = StyleSheet.create({
     borderRightColor: BORDER,
   },
   tableHeaderCellLast: {
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 3,
+    paddingBottom: 3,
     paddingLeft: 3,
     paddingRight: 3,
     fontSize: 9,
@@ -200,8 +202,8 @@ const styles = StyleSheet.create({
     borderColor: BORDER_LIGHT,
   },
   tableCell: {
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 3,
+    paddingBottom: 3,
     paddingLeft: 3,
     paddingRight: 3,
     fontSize: 9,
@@ -209,15 +211,15 @@ const styles = StyleSheet.create({
     borderRightColor: BORDER_LIGHT,
   },
   tableCellLast: {
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 3,
+    paddingBottom: 3,
     paddingLeft: 3,
     paddingRight: 3,
     fontSize: 9,
   },
   tableCellRight: {
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 3,
+    paddingBottom: 3,
     paddingLeft: 3,
     paddingRight: 3,
     fontSize: 9,
@@ -226,16 +228,16 @@ const styles = StyleSheet.create({
     borderRightColor: BORDER_LIGHT,
   },
   tableCellRightLast: {
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 3,
+    paddingBottom: 3,
     paddingLeft: 3,
     paddingRight: 3,
     fontSize: 9,
     textAlign: 'right',
   },
   tableCellStrong: {
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 3,
+    paddingBottom: 3,
     paddingLeft: 3,
     paddingRight: 3,
     fontSize: 9,
@@ -246,8 +248,8 @@ const styles = StyleSheet.create({
     borderRightColor: BORDER_LIGHT,
   },
   tableCellStrongLast: {
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 3,
+    paddingBottom: 3,
     paddingLeft: 3,
     paddingRight: 3,
     fontSize: 9,
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
   bgProductTotal: { backgroundColor: BG_PRODUCT_TOTAL, fontWeight: 700 },
 
   // Bottom section
-  bottomGrid: { flexDirection: 'row', gap: 7, marginTop: 8 },
+  bottomGrid: { flexDirection: 'row', gap: 7, marginTop: 6 },
   bottomPanelBody: { padding: 4, flexDirection: 'row', flexWrap: 'wrap' },
   bottomField: { width: '50%', marginBottom: 1, paddingRight: 5 },
   weightInfoBody: { paddingBottom: 7 },
@@ -281,13 +283,13 @@ const styles = StyleSheet.create({
   noteText: { fontSize: 9, color: TEXT_DARK },
 
   // Signatures
-  signatures: { flexDirection: 'row', gap: 12, marginTop: 18 },
+  signatures: { flexDirection: 'row', gap: 12, marginTop: 'auto', marginBottom: 14 },
   sig: { flex: 1 },
   sigLine: {
     borderTopWidth: 1,
     borderTopColor: '#94a3b8',
     paddingTop: 4,
-    marginTop: 18,
+    marginTop: 10,
     fontSize: 9,
     fontWeight: 700,
     textAlign: 'center',
@@ -297,19 +299,6 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
     marginTop: 2,
     textAlign: 'center',
-  },
-
-  // Footer
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-    borderTopStyle: 'dashed' as any,
-    fontSize: 7.2,
-    color: TEXT_MUTED,
   },
 
   // Continued marker
@@ -369,29 +358,14 @@ const styles = StyleSheet.create({
   },
   albumImageWrapper: {
     position: 'relative',
-    height: 120,
+    height: 195,
     backgroundColor: '#f8fafc',
     overflow: 'hidden',
   },
   albumImage: {
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
-  },
-  albumBadge: {
-    position: 'absolute',
-    top: 6,
-    left: 6,
-    paddingTop: 2,
-    paddingBottom: 2,
-    paddingLeft: 6,
-    paddingRight: 6,
-    borderRadius: 4,
-  },
-  albumBadgeText: {
-    fontSize: 9,
-    fontWeight: 700,
-    color: '#ffffff',
+    objectFit: 'contain',
   },
   albumCardBar: {
     flexDirection: 'row',
@@ -479,7 +453,7 @@ function ItemRow({ row, isReceipt }: { row: PrintWeightRow; isReceipt: boolean }
       <View style={[styles.tableCell, { width: isReceipt ? COL_ITEM : `${100 - 4 - 12 - 12 - 26}%` }]}>
         <Text style={styles.itemName}>{nt(row.productName)}</Text>
         {row.label ? <Text style={styles.muted}>{nt(row.label)}</Text> : null}
-        <Text style={styles.muted}>{nt(row.detail)}</Text>
+        {row.detail ? <Text style={styles.muted}>{nt(row.detail)}</Text> : null}
       </View>
       <View style={[styles.tableCellRight, { width: COL_GROSS }]}>
         <Text>{formatPrintableNumber(row.grossWeight)}</Text>
@@ -500,24 +474,6 @@ function ItemRow({ row, isReceipt }: { row: PrintWeightRow; isReceipt: boolean }
       <View style={[styles.tableCellStrongLast, { width: isReceipt ? COL_NET : COL_NET_WTO }]}>
         <Text>{formatPrintableNumber(row.netWeight)}</Text>
       </View>
-    </View>
-  )
-}
-
-function FillerRow({ isReceipt }: { isReceipt: boolean }) {
-  return (
-    <View style={[styles.tableRow, { height: 14 }]}>
-      <View style={[styles.tableCell, { width: COL_RANK }]}><Text> </Text></View>
-      <View style={[styles.tableCell, { width: isReceipt ? COL_ITEM : `${100 - 4 - 12 - 12 - 26}%` }]}><Text> </Text></View>
-      <View style={[styles.tableCellRight, { width: COL_GROSS }]}><Text> </Text></View>
-      <View style={[styles.tableCellRight, { width: COL_CONTAINER }]}><Text> </Text></View>
-      {isReceipt ? (
-        <>
-          <View style={[styles.tableCellRight, { width: COL_AFTER_CONTAINER }]}><Text> </Text></View>
-          <View style={[styles.tableCellRight, { width: COL_DEDUCTION }]}><Text> </Text></View>
-        </>
-      ) : null}
-      <View style={[styles.tableCellStrongLast, { width: isReceipt ? COL_NET : COL_NET_WTO }]}><Text> </Text></View>
     </View>
   )
 }
@@ -615,13 +571,12 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
   const lotLines = ticket.lines.filter(isLotLine)
   const lotCount = lotLines.length
 
-  const ticketImages = ticket.imageNames || []
-  const decodedImages = ticketImages
-    .map((img) => decodeStoredImageAsset(img))
-    .filter((img) => img.url && (img.url.startsWith('http') || img.url.startsWith('data:')))
+  const decodedImages = buildWeightTicketAttachmentImages(ticket)
 
   const albumChunks: Array<StoredImageAsset[]> = []
-  const albumChunkSize = 8
+  // Four 4:3 cards fit reliably on an A4 portrait page with the header and
+  // metadata bar while keeping the source image fully visible.
+  const albumChunkSize = 4
   for (let i = 0; i < decodedImages.length; i += albumChunkSize) {
     albumChunks.push(decodedImages.slice(i, i + albumChunkSize))
   }
@@ -670,7 +625,7 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
       {pages.map((page, pageIndex) => {
         const isLastPage = pageIndex === totalPages - 1
         return (
-          <Page key={pageIndex} size="A4" style={styles.page}>
+          <Page key={pageIndex} size="A4" style={[styles.page, styles.mainPage]}>
             {/* Accent */}
             <View style={styles.accent} />
 
@@ -750,10 +705,6 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
               {page.items.map((row, idx) => (
                 <ItemRow key={idx} row={row} isReceipt={isReceipt} />
               ))}
-              {/* Filler rows to align height exactly with printed output */}
-              {Array.from({ length: Math.max(0, page.capacity - page.items.length) }).map((_, idx) => (
-                <FillerRow key={`filler-${idx}`} isReceipt={isReceipt} />
-              ))}
               {isLastPage ? <TableFooter ticket={ticket} isReceipt={isReceipt} /> : null}
             </View>
 
@@ -812,7 +763,7 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
                 </View>
 
                 {/* Signatures */}
-                <View style={styles.signatures}>
+                <View style={styles.signatures} wrap={false}>
                   <View style={styles.sig}>
                     <Text style={styles.sigLine}>{nt(signatureLeft)}</Text>
                     <Text style={styles.sigDate}>{nt('วันที่ ____ / ____ / ______')}</Text>
@@ -835,11 +786,6 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
               <Text style={styles.continued}>{nt('ต่อหน้าถัดไป')}</Text>
             )}
 
-            {/* Footer */}
-            <View style={styles.footer}>
-              <Text>{nt(profile.footerNote || '')}</Text>
-              <Text render={({ pageNumber, totalPages }) => `${nt('หน้า')} ${pageNumber} / ${totalPages}`} />
-            </View>
           </Page>
         )
       })}
@@ -866,20 +812,12 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
           <View style={styles.albumGrid}>
             {chunk.map((img, imgIdx) => {
               const globalIdx = chunkIdx * albumChunkSize + imgIdx + 1
-              const isOut = img.fileName.toLowerCase().includes('out') ||
-                img.fileName.toLowerCase().includes('exit') ||
-                img.fileName.includes('ขาออก')
-              const badgeText = isOut ? 'ขาออก' : (isReceipt ? 'รับเข้า' : 'ขาออก')
-              const badgeColor = isOut ? '#10b981' : '#0ea5e9'
               const photoTime = getPhotoTimestamp(img.fileName, ticket.createdAt)
 
               return (
                 <View key={imgIdx} style={styles.albumCard}>
                   <View style={styles.albumImageWrapper}>
                     <Image src={img.url || ''} style={styles.albumImage} />
-                    <View style={[styles.albumBadge, { backgroundColor: badgeColor }]}>
-                      <Text style={styles.albumBadgeText}>{nt(badgeText)}</Text>
-                    </View>
                   </View>
 
                   <View style={styles.albumCardBar}>
@@ -891,12 +829,6 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
                 </View>
               )
             })}
-          </View>
-
-          <View style={styles.spacer} />
-          <View style={styles.footer}>
-            <Text>{nt(profile.footerNote || '')}</Text>
-            <Text render={({ pageNumber, totalPages }) => `${nt('หน้า')} ${pageNumber} / ${totalPages}`} />
           </View>
         </Page>
       ))}

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { readJsonResponse } from '@/lib/api-client'
 import { companyProfileForPrint, companyProfileResponseSchema, type CompanyProfilePrintValues } from '@/lib/company-profile'
-import { displayWeightTicketStatus, stripImpurityProductMeta, type WeightTicketRecord, weightTicketImpurityDisplayName } from '@/lib/weight-tickets'
+import { decodeStoredImageAsset, displayWeightTicketStatus, isPreviewableStoredImageAsset, stripImpurityProductMeta, type StoredImageAsset, type WeightTicketRecord, weightTicketImpurityDisplayName } from '@/lib/weight-tickets'
 
 const companyProfilePayloadSchema = z.object({
   ...companyProfileResponseSchema.shape,
@@ -62,6 +62,50 @@ function formatDateTime(value?: string | null) {
 
 function missing(value: string | null | undefined) {
   return value?.trim() || 'ไม่มีข้อมูล'
+}
+
+/**
+ * Keep Print, React-PDF, and LINE album ordering identical.
+ * Vehicle evidence is part of the document attachments and must be shown first.
+ */
+export function buildWeightTicketAttachmentImages(
+  ticket: Pick<WeightTicketRecord, 'imageNames' | 'vehicleImageNames'>,
+): Array<StoredImageAsset & { url: string }> {
+  return getWeightTicketAttachmentReferences(ticket)
+    .map(decodeStoredImageAsset)
+    .filter(isPreviewableStoredImageAsset)
+}
+
+/**
+ * The read model keeps imageNames as the aggregate album (vehicle + line
+ * evidence) while vehicleImageNames remains available for vehicle-specific UI.
+ * Keep vehicle images first, but collapse the overlap when both arrays contain
+ * the same stored object.
+ */
+export function getWeightTicketAttachmentReferences(
+  ticket: Pick<WeightTicketRecord, 'imageNames' | 'vehicleImageNames'>,
+): string[] {
+  const seen = new Set<string>()
+  const references: string[] = []
+
+  for (const rawValue of [...ticket.vehicleImageNames, ...ticket.imageNames]) {
+    const identity = getWeightTicketAttachmentIdentity(rawValue)
+
+    if (seen.has(identity)) continue
+    seen.add(identity)
+    references.push(rawValue)
+  }
+
+  return references
+}
+
+export function getWeightTicketAttachmentIdentity(rawValue: string): string {
+  const asset = decodeStoredImageAsset(rawValue)
+  return asset.bucket && asset.storageKey
+    ? `storage:${asset.bucket}:${asset.storageKey}`
+    : asset.url
+      ? `url:${asset.url}`
+      : `raw:${rawValue}`
 }
 
 function cleanNote(note: string | null | undefined): string {
@@ -162,18 +206,19 @@ export function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: bool
         })
       })
 
-      // Add subtotal row for this product group
-      rows.push({
-        className: 'product-total',
-        containerDeductionWeight: summary.containerDeductionWeight,
-        deductionWeight: summary.deductWeight,
-        detail: '',
-        grossWeight: summary.grossWeight,
-        label: '',
-        netWeight: summary.netWeight,
-        productName: `รวม ${summary.productName}`,
-        rank: '',
-      })
+      if (productLines.length > 1) {
+        rows.push({
+          className: 'product-total',
+          containerDeductionWeight: summary.containerDeductionWeight,
+          deductionWeight: summary.deductWeight,
+          detail: '',
+          grossWeight: summary.grossWeight,
+          label: '',
+          netWeight: summary.netWeight,
+          productName: `รวม ${summary.productName}`,
+          rank: '',
+        })
+      }
     })
     return rows
   }
@@ -217,15 +262,16 @@ export function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: bool
       })
 
       realLotLines.forEach((line, lotIndex) => {
+        const detail = cleanNote(line.note)
         rows.push({
           className: 'lot-row',
           containerDeductionWeight: line.containerDeductionWeightValue,
           deductionWeight: line.deductionWeight,
-          detail: cleanNote(line.note),
+          detail: detail === '-' ? '' : detail,
           grossWeight: line.grossWeightValue,
-          label: `เต๋าที่ ${lotIndex + 1}`,
+          label: '',
           netWeight: Math.max(0, line.grossWeightValue - line.containerDeductionWeightValue - line.deductionWeight),
-          productName: summary.productName,
+          productName: `${summary.productName} - ${lotIndex + 1}`,
         })
       })
     }
@@ -264,6 +310,7 @@ export function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: bool
 }
 
 export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: CompanyProfilePrintValues) {
+  const attachmentImagesPerPage = 4
   const isReceipt = ticket.type === 'WTI'
   const docTitle = isReceipt ? 'ใบชั่งน้ำหนัก / ใบรับสินค้า' : 'ใบชั่งน้ำหนัก / ใบส่งของ'
   const partyLabel = isReceipt ? 'ผู้ขาย/ผู้ส่งของ' : 'ลูกค้า/ผู้รับสินค้า'
@@ -278,14 +325,11 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
     ${profile.website ? `<br>Website: ${escapeHtml(profile.website)}` : ''}
   `
 
-  const vehicleImageBlocks = ticket.vehicleImageNames
-    .map((name) => {
-      const match = /^([^|]+)\|(data:image\/[^|]+)$/.exec(name)
-      if (!match) return null
-      return `<div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;page-break-inside:avoid"><img src="${escapeHtml(match[2])}" style="width:100%;height:auto;display:block;max-height:8cm;object-fit:cover"><div style="padding:4px 8px;background:#f1f5f9;font-size: 12px;color:#475569">${escapeHtml(match[1])}</div></div>`
-    })
-    .filter(Boolean)
-    .join('')
+  const attachmentImages = buildWeightTicketAttachmentImages(ticket)
+  const attachmentChunks: Array<typeof attachmentImages> = []
+  for (let index = 0; index < attachmentImages.length; index += attachmentImagesPerPage) {
+    attachmentChunks.push(attachmentImages.slice(index, index + attachmentImagesPerPage))
+  }
 
   const isLotLine = (line: WeightTicketRecord['lines'][number]) => {
     if (!isReceipt) return true
@@ -331,15 +375,6 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
     `
   }
 
-  function emptyRows(count: number) {
-    const tds = isReceipt
-      ? '<td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td>'
-      : '<td>&nbsp;</td><td></td><td></td><td></td><td></td>'
-    return Array.from({ length: Math.max(0, count) }, () => (
-      `<tr class="empty">${tds}</tr>`
-    )).join('')
-  }
-
   const printRows = buildPrintWeightRows(ticket, isReceipt)
   const pages: Array<{ capacity: number; items: PrintWeightRow[] }> = []
   let cursor = 0
@@ -356,7 +391,6 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
   const pageHtml = pages.map((page, pageIndex) => {
     const isLastPage = pageIndex === totalPages - 1
     const rows = page.items.map((row) => rowHtml(row)).join('')
-    const fillerRows = emptyRows(page.capacity - page.items.length)
     const totalAfterContainer = Math.max(0, ticket.totals.grossWeight - ticket.totals.containerDeductionWeight)
 
     return `
@@ -398,6 +432,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
           </div>
         </section>
 
+        <div class="items-frame">
         <table class="items">
           <thead>
             <tr>
@@ -416,7 +451,6 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
           </thead>
           <tbody>
             ${rows}
-            ${fillerRows}
           </tbody>
           ${isLastPage ? `
             <tfoot>
@@ -435,6 +469,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
             </tfoot>
           ` : ''}
         </table>
+        </div>
 
         ${isLastPage ? `
           <section class="bottom-grid">
@@ -464,8 +499,6 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
             </div>
           </section>
 
-          ${vehicleImageBlocks ? `<section class="photos"><div class="panel-title">รูปรถ${isReceipt ? 'ส่งของ' : 'ขนส่ง'}</div><div class="photos-grid">${vehicleImageBlocks}</div></section>` : ''}
-
           <section class="signatures">
             <div class="sig"><div class="sig-line">${escapeHtml(signatureLeft)}</div><div>วันที่ ____ / ____ / ______</div></div>
             <div class="sig"><div class="sig-line">พนักงานชั่ง</div><div>${escapeHtml(ticket.enteredBy || '-')}</div></div>
@@ -473,14 +506,39 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
             <div class="sig"><div class="sig-line">ผู้อนุมัติ</div><div>วันที่ ____ / ____ / ______</div></div>
           </section>
         ` : '<div class="continued">ต่อหน้าถัดไป</div>'}
-
-        <footer class="footer">
-          <span>${escapeHtml(profile.footerNote || '')}</span>
-          <span>หน้า ${pageIndex + 1} / ${totalPages}</span>
-        </footer>
       </main>
     `
   }).join('')
+
+  const attachmentPageHtml = attachmentChunks.map((chunk, chunkIndex) => `
+    <main class="page attachment-page">
+      <div class="accent"></div>
+      <section class="album-header">
+        <div>
+          <div class="album-title">${escapeHtml(isReceipt ? 'ใบรับสินค้า (รูปถ่ายแนบ)' : 'ใบส่งของ (รูปถ่ายแนบ)')}</div>
+          <div class="album-subtitle">เลขที่เอกสาร: ${escapeHtml(ticket.documentNo)} · คู่ค้า: ${escapeHtml(ticket.partyName)} · วันที่: ${escapeHtml(ticket.documentDate || '-')}</div>
+        </div>
+        <div class="album-page-number">หน้า ${totalPages + chunkIndex + 1} / ${totalPages + attachmentChunks.length}</div>
+      </section>
+      <div class="album-separator"></div>
+      <section class="album-grid">
+        ${chunk.map((image, imageIndex) => {
+          const globalIndex = chunkIndex * attachmentImagesPerPage + imageIndex + 1
+          return `
+            <article class="album-card">
+              <div class="album-image-wrap">
+                <img src="${escapeHtml(image.url)}" alt="${escapeHtml(image.fileName)}">
+              </div>
+              <div class="album-card-bar">
+                <span class="album-file-name">${escapeHtml(image.fileName)}</span>
+                <span class="album-index">#${globalIndex}</span>
+              </div>
+            </article>
+          `
+        }).join('')}
+      </section>
+    </main>
+  `).join('')
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>${escapeHtml(docTitle)} ${escapeHtml(ticket.documentNo)}</title>
@@ -489,6 +547,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       @font-face { font-family: 'Noto Sans Thai'; src: url('/fonts/NotoSansThai-Bold.ttf') format('truetype'); font-style: normal; font-weight: 700; font-display: swap; }
       @page { size: A4 portrait; margin: 10mm; }
       * { box-sizing: border-box; }
+      html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body { margin: 0; color: #0f172a; font-family: 'Noto Sans Thai', Arial, sans-serif; font-size: 11px; line-height: 1.25; background: #f8fafc; }
       .toolbar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; background: #0f172a; color: white; }
       .toolbar button { border: 0; border-radius: 6px; padding: 7px 14px; background: #15803d; color: white; font: inherit; cursor: pointer; }
@@ -512,7 +571,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       .kv .value, .field-value { font-size: 10.5px; font-weight: 600; color: #0f172a; margin-top: 1px; overflow-wrap: anywhere; }
       .field-value.strong { font-size: 12.5px; color: #059669; font-weight: 700; }
       .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; flex: 0 0 auto; }
-      .panel { border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+      .panel { border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
       .panel-title { padding: 4px 7px; background: #f1f5f9; color: #334155; font-weight: 700; }
       .panel-body { padding: 5px 7px; }
       .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; }
@@ -521,7 +580,8 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       .weight-info-net { grid-column: 2; min-width: 0; }
       .weight-info-net .field-value { margin-top: 1px; white-space: nowrap; }
       table { width: 100%; border-collapse: collapse; }
-      .items { margin-top: 8px; font-size: 10.5px; table-layout: fixed; flex: 0 0 auto; }
+      .items-frame { margin: 8px 1px 0; border-radius: 6px; box-shadow: 0 0 0 1px #cbd5e1; overflow: hidden; flex: 0 0 auto; }
+      .items { margin-top: 0; font-size: 10.5px; table-layout: fixed; }
       .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 4px 3px; text-align: left; font-weight: 700; }
       .items td { border: 1px solid #dbe3ea; padding: 4px 3px; vertical-align: top; }
       .items .empty td { height: 24px; color: transparent; }
@@ -543,15 +603,25 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       .bottom-grid { display: grid; grid-template-columns: 1.15fr 0.8fr 1.05fr; gap: 8px; margin-top: 8px; align-items: start; break-inside: avoid; page-break-inside: avoid; }
       .note { min-height: 28px; color: #334155; white-space: pre-wrap; }
       .summary-cards { display: grid; gap: 8px; }
-      .summary-card { border: 1px solid #dbe3ea; border-radius: 8px; padding: 5px; background: #f8fafc; }
+      .summary-card { border: 1px solid #dbe3ea; border-radius: 6px; padding: 5px; background: #f8fafc; }
       .summary-card .value { font-size: 10.5px; font-weight: 700; color: #0f172a; margin-top: 2px; }
-      .photos { margin-top: 12px; break-inside: avoid; page-break-inside: avoid; }
-      .photos-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 8px; border: 1px solid #cbd5e1; border-top: 0; border-radius: 0 0 8px 8px; }
-      .signatures { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 20px; break-inside: avoid; page-break-inside: avoid; }
+      .attachment-page { padding-top: 6mm; }
+      .album-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+      .album-title { color: #14532d; font-size: 16px; font-weight: 700; line-height: 1.25; }
+      .album-subtitle { color: #475569; font-size: 10px; margin-top: 5px; line-height: 1.25; }
+      .album-page-number { color: #64748b; font-size: 10px; font-weight: 700; white-space: nowrap; }
+      .album-separator { height: 1px; background: #cbd5e1; margin-bottom: 10px; }
+      .album-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .album-card { border: 1px solid #dbe3ea; border-radius: 6px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+      .album-image-wrap { position: relative; aspect-ratio: 4 / 3; height: auto; min-height: 180px; background: #f8fafc; display: flex; align-items: center; justify-content: center; }
+      .album-image-wrap img { width: 100%; height: 100%; display: block; object-fit: contain; }
+      .album-card-bar { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 7px; }
+      .album-file-name { min-width: 0; overflow-wrap: anywhere; color: #334155; font-size: 9px; }
+      .album-index { flex: 0 0 auto; border-radius: 4px; padding: 2px 5px; background: #f1f5f9; color: #475569; font-size: 9px; font-weight: 700; }
+      .signatures { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: auto; margin-bottom: 14px; break-inside: avoid; page-break-inside: avoid; }
       .sig { text-align: center; color: #475569; }
       .sig-line { border-top: 1px solid #94a3b8; padding-top: 4px; margin-top: 16px; font-weight: 700; color: #1e293b; }
       .continued { margin-top: auto; padding-top: 8px; text-align: right; color: #64748b; font-weight: 700; }
-      .footer { margin-top: auto; padding-top: 5px; display: flex; justify-content: space-between; gap: 12px; border-top: 1px dashed #cbd5e1; color: #64748b; font-size: 10px; flex: 0 0 auto; }
       @media print {
         @page { size: A4 portrait; margin: 8mm; }
         body { background: white; font-size: 10.5px; line-height: 1.18; }
@@ -575,18 +645,22 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
         .panel-body { padding: 5px 7px; }
         .two-col { gap: 4px 8px; }
         .weight-info-grid { gap: 3px 8px; padding-bottom: 6px; }
-        .items { font-size: 10px; margin-top: 6px; }
+        .items-frame { margin-top: 6px; }
+        .items { font-size: 10px; }
         .items th, .items td { padding: 2.5px; }
         .items .empty td { height: 18px; }
         .muted { font-size: 9px; }
         .detail-line { margin-top: 0; line-height: 1.25; }
         .bottom-grid { gap: 8px; margin-top: 7px; }
+        .album-title { font-size: 15px; }
+        .album-subtitle { font-size: 9.5px; }
+        .album-grid { gap: 7px; }
+        .album-image-wrap { min-height: 170px; }
         .note { min-height: 24px; }
         .summary-card { padding: 5px; }
         .summary-card .value { font-size: 10.5px; }
-        .signatures { gap: 12px; margin-top: 18px; }
+        .signatures { gap: 12px; margin-top: auto; margin-bottom: 5mm; }
         .sig-line { margin-top: 12px; padding-top: 3px; }
-        .footer { padding-top: 3px; }
       }
     </style>
   </head><body>
@@ -595,7 +669,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       <button class="secondary" onclick="window.close()">ปิด</button>
       <span style="font-size: 12px;color:#cbd5e1">A4 portrait multi-page print</span>
     </div>
-    ${pageHtml}
+    ${pageHtml}${attachmentPageHtml}
   </body></html>`
 }
 

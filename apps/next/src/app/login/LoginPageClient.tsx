@@ -1,11 +1,11 @@
 'use client'
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { GuardedLink } from '@/components/ui/GuardedLink'
-import { useActionConfirmation, useUnsavedChangesGuard } from '@/components/ui/FormSafetyProvider'
 import { loginSchema } from '@/lib/auth'
 import { completeBrowserLoginSession } from '@/lib/auth-client-contract'
+import { createAuthOperationQueue } from '@/lib/auth-operation-queue'
 import { getSessionSafely, getSupabaseClient } from '@/lib/supabase'
 
 function safeRedirectPath(value: string | null) {
@@ -33,42 +33,46 @@ export function LoginPageClient() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [successfulRedirect, setSuccessfulRedirect] = useState<string | null>(null)
+  const authFlowIdRef = useRef(0)
   const hasValidatedExistingSession = useRef(false)
+  const [enqueueAuthOperation] = useState(createAuthOperationQueue)
   const supabase = getSupabaseClient()
   const isSupabaseReady = Boolean(supabase)
-  const { hasUnsavedChanges } = useActionConfirmation()
-  const isFormDirty = !successfulRedirect && Boolean(identifier || password)
-  useUnsavedChangesGuard(isFormDirty)
 
   useEffect(() => {
-    if (!successfulRedirect || hasUnsavedChanges) return
+    if (!successfulRedirect) return
     window.location.assign(successfulRedirect)
-  }, [hasUnsavedChanges, successfulRedirect])
+  }, [successfulRedirect])
 
   useEffect(() => {
     if (!supabase || hasValidatedExistingSession.current) return
     hasValidatedExistingSession.current = true
 
     let mounted = true
+    const authFlowId = authFlowIdRef.current
+    const isCurrentFlow = () => mounted && authFlowIdRef.current === authFlowId
 
-    void (async () => {
+    void enqueueAuthOperation(async () => {
       const session = await getSessionSafely(supabase).catch(async () => {
         // Clear a stale refresh-token session before allowing a fresh login.
+        if (!isCurrentFlow()) return null
         await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
         return null
       })
-      if (!mounted || !session) return
+      if (!isCurrentFlow() || !session) return
 
       const { error: refreshError } = await supabase.auth.refreshSession()
+      if (!isCurrentFlow()) return
       if (refreshError) {
-        await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
+        if (isCurrentFlow()) await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
         return
       }
       const completion = await completeBrowserLoginSession({
         fetchImpl: fetch,
-        signOut: () => supabase.auth.signOut({ scope: 'local' }),
+        expectedAuthUserId: session.user.id,
+        signOut: () => isCurrentFlow() ? supabase.auth.signOut({ scope: 'local' }) : Promise.resolve(),
       })
-      if (!mounted) return
+      if (!isCurrentFlow()) return
 
       if (!completion.ok) {
         setError(completion.message)
@@ -78,15 +82,16 @@ export function LoginPageClient() {
       const redirectParam = searchParams.get('redirect')
       const redirectPath = redirectParam ? safeRedirectPath(redirectParam) : await resolveDefaultLandingPath()
       window.location.replace(redirectPath)
-    })()
+    })
 
     return () => {
       mounted = false
     }
-  }, [searchParams, supabase])
+  }, [enqueueAuthOperation, searchParams, supabase])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isLoading) return
     setError(null)
 
     const parsed = loginSchema.safeParse({ email: identifier, password })
@@ -97,47 +102,64 @@ export function LoginPageClient() {
     }
 
     if (!supabase) {
-      setError('ยังไม่ได้ตั้งค่า Supabase dev ใน environment')
+      setError('ยังไม่ได้ตั้งค่า Supabase ใน environment')
       return
     }
 
+    const authFlowId = ++authFlowIdRef.current
+    const isCurrentFlow = () => authFlowIdRef.current === authFlowId
     setIsLoading(true)
 
     try {
-      // Avoid a stale local session racing with password authentication.
-      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
+      await enqueueAuthOperation(async () => {
+        // Avoid a stale local session racing with password authentication.
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
+        if (!isCurrentFlow()) return
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: parsed.data.email,
-        password: parsed.data.password,
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: parsed.data.email,
+          password: parsed.data.password,
+        })
+
+        if (!isCurrentFlow()) return
+
+        if (signInError) {
+          setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
+          return
+        }
+
+        if (!signInData.user) {
+          setError('Session เข้าสู่ระบบไม่ถูกต้อง กรุณาลองใหม่')
+          return
+        }
+
+        const completion = await completeBrowserLoginSession({
+          fetchImpl: fetch,
+          expectedAuthUserId: signInData.user.id,
+          signOut: () => isCurrentFlow() ? supabase.auth.signOut({ scope: 'local' }) : Promise.resolve(),
+        })
+
+        if (!isCurrentFlow()) return
+
+        if (!completion.ok) {
+          setError(completion.message)
+          return
+        }
+
+        await supabase.auth.getSession().catch(() => undefined)
+        setIdentifier('')
+        setPassword('')
+        const redirectParam = searchParams.get('redirect')
+        const redirectPath = redirectParam ? safeRedirectPath(redirectParam) : await resolveDefaultLandingPath()
+        if (isCurrentFlow()) setSuccessfulRedirect(redirectPath)
       })
-
-      if (signInError) {
-        setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
-        return
-      }
-
-      const completion = await completeBrowserLoginSession({
-        fetchImpl: fetch,
-        signOut: () => supabase.auth.signOut({ scope: 'local' }),
-      })
-
-      if (!completion.ok) {
-        setError(completion.message)
-        return
-      }
-
-      await supabase.auth.getSession().catch(() => undefined)
-      setIdentifier('')
-      setPassword('')
-      const redirectParam = searchParams.get('redirect')
-      const redirectPath = redirectParam ? safeRedirectPath(redirectParam) : await resolveDefaultLandingPath()
-      setSuccessfulRedirect(redirectPath)
     } catch {
-      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
-      setError('เชื่อมต่อระบบเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่')
+      if (isCurrentFlow()) {
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
+        setError('เชื่อมต่อระบบเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่')
+      }
     } finally {
-      setIsLoading(false)
+      if (isCurrentFlow()) setIsLoading(false)
     }
   }
 
@@ -159,7 +181,7 @@ export function LoginPageClient() {
 
         {!isSupabaseReady ? (
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            ยังไม่ได้ตั้งค่า Supabase dev ใน environment
+            ยังไม่ได้ตั้งค่า Supabase ใน environment
           </div>
         ) : null}
 
@@ -217,9 +239,9 @@ export function LoginPageClient() {
           </label>
 
           <div className="text-right">
-            <GuardedLink className="text-sm font-medium text-blue-700 hover:underline" href="/forgot-password">
+            <Link className="text-sm font-medium text-blue-700 hover:underline" href="/forgot-password">
               ลืมรหัสผ่าน?
-            </GuardedLink>
+            </Link>
           </div>
 
           {error ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}

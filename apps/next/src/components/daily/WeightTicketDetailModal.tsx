@@ -19,9 +19,11 @@ import { WeightTicketImageGallery } from '@/components/daily/WeightTicketImageGa
 import { WeightTicketStockReturnDialog, type StockReturnPayload } from '@/components/daily/WeightTicketStockReturnDialog'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
-import { cancelWeightTicket, confirmWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, isPreviewableStoredImageAsset, notifyWeightTicketLine, type WeightTicketRecord, type WeightTicketStatus, type WeightTicketType, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
+import { cancelWeightTicket, canConfirmWeightTicket, canPrintWeightTicket, canShareWeightTicket, confirmWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, getWeightTicketImagePreviews, isPreviewableStoredImageAsset, notifyWeightTicketLine, type StoredImageAsset, type WeightTicketImagePreviews, type WeightTicketRecord, type WeightTicketStatus, type WeightTicketType, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
+import { WeightTicketSaveProgress, useWeightTicketSaveProgress } from '@/components/daily/WeightTicketSaveProgress'
 import { getErrorMessage } from '@/lib/api-client'
 import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
+import { useWeightTicketRealtime } from './useWeightTicketRealtime'
 
 function formatDateTime(value?: string | null) {
   if (!value) return '-'
@@ -93,23 +95,40 @@ function usageWeightClass(action: string) {
   return 'text-rose-700'
 }
 
+function mergeWeightTicketImagePreviews(ticket: WeightTicketRecord, previews: WeightTicketImagePreviews): WeightTicketRecord {
+  const imageNamesByLineNo = new Map(previews.lines.map((line) => [line.lineNo, line.imageNames]))
+  return {
+    ...ticket,
+    imageNames: previews.imageNames,
+    lines: ticket.lines.map((line) => ({
+      ...line,
+      imageNames: line.lineNo == null ? line.imageNames : imageNamesByLineNo.get(line.lineNo) ?? line.imageNames,
+    })),
+    vehicleImageNames: previews.vehicleImageNames,
+  }
+}
+
 export function WeightTicketDetailModal({
   ticketId,
+  initialTicket,
   onClose,
   onEdit,
 }: {
+  initialTicket?: WeightTicketRecord
   ticketId: string
   onClose: () => void
   onEdit?: (id: string, type: WeightTicketType) => void
 }) {
   const { requestConfirmation } = useActionConfirmation()
-  const [ticket, setTicket] = useState<WeightTicketRecord | null>(null)
+  const [ticket, setTicket] = useState<WeightTicketRecord | null>(() => initialTicket ?? null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [isLoadingImagePreview, setIsLoadingImagePreview] = useState(false)
+  const [imagePreviewError, setImagePreviewError] = useState('')
   const [cancelNote, setCancelNote] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
-  const [isConfirming, setIsConfirming] = useState(false)
+  const { begin: beginSaveStage, end: endSaveStage, isSaving: isConfirming, stage: saveStage } = useWeightTicketSaveProgress()
   const [previewImage, setPreviewImage] = useState<{ fileName: string; url: string } | null>(null)
   const [isPrinting, setIsPrinting] = useState(false)
   const [lineGallery, setLineGallery] = useState<{
@@ -121,6 +140,10 @@ export function WeightTicketDetailModal({
   const [shareNote, setShareNote] = useState('')
   const [shareError, setShareError] = useState('')
   const [isSendingLine, setIsSendingLine] = useState(false)
+  const realtimeBranchIds = useMemo(() => {
+    const branchId = ticket?.branchId ?? initialTicket?.branchId
+    return branchId ? [branchId] : []
+  }, [initialTicket?.branchId, ticket?.branchId])
   const [showStockReturnDialog, setShowStockReturnDialog] = useState(false)
   const [canReturnStock, setCanReturnStock] = useState(false)
   const { requestDiscard: requestDiscardCancelNote } = useUnsavedChangesGuard(Boolean(ticket?.canCancel && cancelNote.trim()))
@@ -140,56 +163,75 @@ export function WeightTicketDetailModal({
   }
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
 
     async function loadTicket() {
+      setTicket(initialTicket ?? null)
       setIsLoading(true)
       setLoadError('')
+      setImagePreviewError('')
+      setIsLoadingImagePreview(false)
       try {
-        const nextTicket = await getWeightTicket(ticketId)
-        if (cancelled) return
+        const nextTicket = await getWeightTicket(ticketId, { includeImagePreviews: false, signal: controller.signal })
+        if (controller.signal.aborted) return
         setTicket(nextTicket)
         setCancelNote(nextTicket.cancelNote ?? '')
+        setIsLoading(false)
+        setIsLoadingImagePreview(true)
+        try {
+          const previews = await getWeightTicketImagePreviews(ticketId, { signal: controller.signal })
+          if (controller.signal.aborted) return
+          setTicket((current) => current ? mergeWeightTicketImagePreviews(current, previews) : current)
+        } catch {
+          if (!controller.signal.aborted) setImagePreviewError('ยังโหลด preview รูปภาพไม่สำเร็จ แต่ข้อมูลเอกสารยังใช้งานได้')
+        } finally {
+          if (!controller.signal.aborted) setIsLoadingImagePreview(false)
+        }
       } catch (caught) {
-        if (!cancelled) setLoadError(getErrorMessage(caught, 'โหลดใบรับ-ส่งของไม่ได้'))
-      } finally {
-        if (!cancelled) setIsLoading(false)
+        if (!controller.signal.aborted) {
+          setLoadError(getErrorMessage(caught, 'โหลดใบรับ-ส่งของไม่ได้'))
+          setIsLoading(false)
+        }
       }
     }
 
     void loadTicket()
     return () => {
-      cancelled = true
+      controller.abort()
     }
-  }, [ticketId])
+  }, [initialTicket, ticketId])
 
   useEffect(() => {
-    if (ticket?.type !== 'WTO') {
+    if (isLoading || ticket?.type !== 'WTO' || ticket.status !== 'partially_billed') {
       setCanReturnStock(false)
       return
     }
 
     const documentNo = ticket.documentNo
-    let cancelled = false
+    const controller = new AbortController()
     async function loadAvailability() {
       try {
-        const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(documentNo)}/stock-returns`, { cache: 'no-store' })
+        const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(documentNo)}/stock-returns`, { cache: 'no-store', signal: controller.signal })
         if (!response.ok) throw new Error(await response.text())
         const payload = await response.json() as StockReturnPayload
-        if (!cancelled) setCanReturnStock(payload.options.length > 0)
+        if (!controller.signal.aborted) setCanReturnStock(payload.options.length > 0)
       } catch {
-        if (!cancelled) setCanReturnStock(false)
+        if (!controller.signal.aborted) setCanReturnStock(false)
       }
     }
 
     void loadAvailability()
     return () => {
-      cancelled = true
+      controller.abort()
     }
-  }, [ticket?.documentNo, ticket?.type])
+  }, [isLoading, ticket?.documentNo, ticket?.status, ticket?.type])
 
   const vehicleImages = useMemo(
     () => (ticket?.vehicleImageNames ?? []).map(decodeStoredImageAsset),
+    [ticket],
+  )
+  const lineImageNames = useMemo(
+    () => ticket?.lines.flatMap((line) => line.imageNames) ?? [],
     [ticket],
   )
 
@@ -227,7 +269,7 @@ export function WeightTicketDetailModal({
 
   async function handleConfirmTicket() {
     if (!ticket) return
-    setIsConfirming(true)
+    beginSaveStage('confirm')
     try {
       const updated = await confirmWeightTicket(ticket.id)
       setTicket(updated)
@@ -235,17 +277,20 @@ export function WeightTicketDetailModal({
     } catch (caught) {
       window.alert(getErrorMessage(caught, 'ยืนยันใบรับ-ส่งของไม่ได้'))
     } finally {
-      setIsConfirming(false)
+      endSaveStage()
     }
   }
 
   async function handlePrintReceipt() {
-    if (!ticket) return
+    if (!ticket || !canPrintWeightTicket(ticket.status)) return
     setIsPrinting(true)
     let printWindow: Window | null = null
     try {
-      printWindow = openWeightTicketPrintWindow(ticket)
-      await openWeightTicketReceiptPrint(ticket, printWindow)
+      const printableTicket = ticket.imageNames.some((imageName) => !isPreviewableStoredImageAsset(decodeStoredImageAsset(imageName)))
+        ? await getWeightTicket(ticketId)
+        : ticket
+      printWindow = openWeightTicketPrintWindow(printableTicket)
+      await openWeightTicketReceiptPrint(printableTicket, printWindow)
     } catch (caught) {
       printWindow?.close()
       window.alert(getErrorMessage(caught, 'เปิดใบพิมพ์ใบรับ-ส่งสินค้าไม่สำเร็จ'))
@@ -255,9 +300,19 @@ export function WeightTicketDetailModal({
   }
 
   async function reloadTicket() {
-    const nextTicket = await getWeightTicket(ticketId)
+    const nextTicket = await getWeightTicket(ticketId, { includeImagePreviews: false })
     setTicket(nextTicket)
     setCancelNote(nextTicket.cancelNote ?? '')
+    setImagePreviewError('')
+    setIsLoadingImagePreview(true)
+    try {
+      const previews = await getWeightTicketImagePreviews(ticketId)
+      setTicket((current) => current ? mergeWeightTicketImagePreviews(current, previews) : current)
+    } catch {
+      setImagePreviewError('ยังโหลด preview รูปภาพไม่สำเร็จ แต่ข้อมูลเอกสารยังใช้งานได้')
+    } finally {
+      setIsLoadingImagePreview(false)
+    }
     if (nextTicket.type === 'WTO') {
       await loadStockReturnAvailability(nextTicket.documentNo)
     } else {
@@ -265,8 +320,15 @@ export function WeightTicketDetailModal({
     }
   }
 
+  useWeightTicketRealtime((event) => {
+    if (event.documentNo !== ticketId) return
+    void reloadTicket().catch((caught) => {
+      setLoadError(getErrorMessage(caught, 'โหลดข้อมูลใบรับ-ส่งของล่าสุดไม่ได้'))
+    })
+  }, Boolean(ticketId), realtimeBranchIds)
+
   async function handleSendLineNotification() {
-    if (!ticket) return
+    if (!ticket || !canShareWeightTicket(ticket.status)) return
     setIsSendingLine(true)
     setShareError('')
     try {
@@ -282,7 +344,7 @@ export function WeightTicketDetailModal({
   }
 
   function handleManualLineShare() {
-    if (!ticket) return
+    if (!ticket || !canShareWeightTicket(ticket.status)) return
     openWeightTicketLineShare(ticket)
     setShowShareDialog(false)
     setShareNote('')
@@ -306,9 +368,9 @@ export function WeightTicketDetailModal({
               <DialogDescription className="truncate text-slate-300">{ticket?.partyName ?? (isLoading ? 'กำลังโหลดข้อมูล' : '-')}</DialogDescription>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {ticket ? (
+              {ticket && !isLoading ? (
                 <>
-                  {ticket.status === 'draft' ? (
+                  {canConfirmWeightTicket(ticket) ? (
                     <div className="flex items-center gap-3">
                       {ticket.type === 'WTO' ? <span className="text-xs text-current">ยังไม่จอง stock</span> : null}
                       <Button
@@ -358,14 +420,16 @@ export function WeightTicketDetailModal({
                     </Button>
                   )
                 ) : null}
-                {ticket.status !== 'draft' ? <Button aria-label="แชร์" className="h-10 w-10 shrink-0 gap-0 px-0 font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" type="button" variant="outline" onClick={() => setShowShareDialog(true)}>
+                {canShareWeightTicket(ticket.status) ? <Button aria-label="แชร์" className="h-10 w-10 shrink-0 gap-0 px-0 font-normal border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" type="button" variant="outline" onClick={() => setShowShareDialog(true)}>
                   <Share2 className="size-4" />
                   <span className="sr-only sm:not-sr-only">แชร์</span>
                 </Button> : null}
-                <Button aria-label={isPrinting ? 'กำลังเตรียมพิมพ์' : 'พิมพ์'} className="h-10 w-10 shrink-0 gap-0 border-emerald-600 bg-emerald-600 px-0 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
-                  <Printer className="size-4" />
-                  <span className="sr-only sm:not-sr-only">{isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}</span>
-                </Button>
+                {canPrintWeightTicket(ticket.status) ? (
+                  <Button aria-label={isPrinting ? 'กำลังเตรียมพิมพ์' : 'พิมพ์'} className="h-10 w-10 shrink-0 gap-0 border-emerald-600 bg-emerald-600 px-0 font-normal text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white sm:h-9 sm:w-auto sm:gap-2 sm:px-4" disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
+                    <Printer className="size-4" />
+                    <span className="sr-only sm:not-sr-only">{isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}</span>
+                  </Button>
+                ) : null}
                 </>
               ) : null}
               <Button className="h-10 shrink-0 border-rose-600 bg-rose-600 font-normal text-white hover:border-rose-700 hover:bg-rose-700 hover:text-white sm:h-9" disabled={isCanceling} type="button" variant="outline" onClick={requestClose}>ปิด</Button>
@@ -383,14 +447,11 @@ export function WeightTicketDetailModal({
           </div>
         ) : (
           <div className="space-y-4 p-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:space-y-5 sm:p-4">
+            <WeightTicketSaveProgress stage={saveStage} type={ticket.type} />
             <div className="space-y-4">
               <Card className="p-4 sm:p-5">
                 <SectionTitle title="ข้อมูลเอกสาร" />
                 <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 md:grid-cols-4">
-                  <DetailItem
-                    label={ticket.type === 'WTI' ? 'ใบรับของ' : 'ใบส่งของ'}
-                    value={ticket.documentNo}
-                  />
                   <DetailItem label="วันที่/เวลาสร้าง" value={formatDateTime(ticket.createdAt)} />
                   <DetailItem label="ผู้กรอก" value={ticket.enteredBy} />
                   <DetailItem label="อัปเดตล่าสุด" value={formatDateTime(ticket.updatedAt || ticket.createdAt)} />
@@ -400,13 +461,27 @@ export function WeightTicketDetailModal({
                   ) : (
                     <DetailItem label="อ้างอิงบิลขาย" value={`${ticket.usedInSalesBillCount} รายการ`} />
                   )}
+                  <div>
+                    <div className="text-sm font-medium text-slate-500">สถานะเอกสาร</div>
+                    <div className="mt-1">
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-semibold',
+                        weightTicketStatusBadgeClass(ticket.type, ticket.status),
+                      )}
+                      >
+                        <span className="size-1.5 rounded-full bg-current" />
+                        {displayWeightTicketStatus(ticket.type, ticket.status)}
+                      </span>
+                    </div>
+                  </div>
+                  {ticket.cancelledAt ? <DetailItem label="ยกเลิกเมื่อ" value={formatDateTime(ticket.cancelledAt)} /> : null}
                 </div>
                 {ticket.type === 'WTI' && ticket.usedInPurchaseBillDocNos.length > 0 ? (
                   <div className="mt-4 rounded-md bg-slate-50 px-4 py-3">
                     <div className="text-sm font-semibold text-slate-500">เลขที่บิลซื้อที่อ้างอิง</div>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                       {ticket.usedInPurchaseBillDocNos.map((docNo) => (
-                        <span className="rounded-md bg-white px-2.5 py-1 text-sm font-medium text-slate-700 shadow-sm" key={docNo}>
+                        <span className="font-mono text-sm font-medium text-blue-700" key={docNo}>
                           {docNo}
                         </span>
                       ))}
@@ -461,63 +536,26 @@ export function WeightTicketDetailModal({
                 </div>
               </Card>
 
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
-                <div className="space-y-4">
-                  <Card className="overflow-hidden p-0">
-                    <div className="border-b border-slate-200 px-4 py-3 sm:px-5 sm:py-4">
-                      <SectionTitle title="รายละเอียดสินค้าและที่มา" />
-                    </div>
-                    <WeightTicketProductBreakdownTable
-                      ticket={ticket}
-                      onOpenLineGallery={setLineGallery}
-                    />
-                  </Card>
+              <div className="space-y-4">
+                <Card className="w-full overflow-hidden p-0">
+                  <div className="border-b border-slate-200 px-4 py-3 sm:px-5 sm:py-4">
+                    <SectionTitle title="รายละเอียดสินค้าและที่มา" />
                   </div>
-
-                <Card className="p-4 sm:p-5">
-                  <SectionTitle title="สถานะ" />
-                  <div className="mt-4 space-y-3">
-                    <div className="rounded-md bg-slate-50 px-4 py-3">
-                      <div className="text-sm font-semibold text-slate-500">สถานะเอกสาร</div>
-                      <div className="mt-1">
-                        <span className={cn(
-                          'inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded',
-                          weightTicketStatusBadgeClass(ticket.type, ticket.status),
-                        )}
-                        >
-                          <span className="size-1.5 rounded-full bg-current" />
-                          {displayWeightTicketStatus(ticket.type, ticket.status)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="rounded-md bg-slate-50 px-4 py-3">
-                      <div className="text-sm font-semibold text-slate-500">การอ้างอิงเอกสาร</div>
-                      <div className="mt-1 text-sm font-medium text-slate-900">
-                        {ticket.type === 'WTI'
-                          ? `บิลซื้อ ${ticket.usedInPurchaseBillCount} รายการ`
-                          : `บิลขาย ${ticket.usedInSalesBillCount} รายการ`}
-                      </div>
-                      {ticket.type === 'WTI' && ticket.usedInPurchaseBillDocNos.length > 0 ? (
-                        <div className="mt-2 space-y-1 text-sm text-slate-600">
-                          {ticket.usedInPurchaseBillDocNos.map((docNo) => (
-                            <div key={docNo}>{docNo}</div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                    {ticket.cancelledAt ? (
-                      <div className="rounded-md bg-slate-50 px-4 py-3">
-                        <div className="text-sm font-semibold text-slate-500">ยกเลิกเมื่อ</div>
-                        <div className="mt-1 text-sm font-medium text-slate-900">{formatDateTime(ticket.cancelledAt)}</div>
-                      </div>
-                    ) : null}
-                  </div>
+                  <WeightTicketProductBreakdownTable
+                    ticket={ticket}
+                    onOpenLineGallery={setLineGallery}
+                  />
                 </Card>
               </div>
 
               <WeightTicketImageGallery
-                imageNames={ticket.imageNames}
+                downloadUrl={`/api/daily/weight-tickets/${encodeURIComponent(ticket.documentNo)}/images/download`}
+                downloadFileName={`${ticket.documentNo}-images.zip`}
+                downloadImageNames={ticket.imageNames}
+                imageNames={lineImageNames}
+                isLoadingPreview={isLoadingImagePreview}
                 onOpen={(gallery) => setLineGallery(gallery)}
+                previewError={imagePreviewError}
               />
 
             {ticket.type === 'WTI' ? (
@@ -788,14 +826,14 @@ export function WeightTicketDetailModal({
                 </div>
               </DialogHeader>
               <div className="space-y-4 p-4 bg-slate-950">
-                <div className="relative overflow-hidden rounded-md bg-slate-950">
+                <div className="relative flex h-[min(65vh,48rem)] w-full items-center justify-center overflow-hidden rounded-md bg-slate-950">
                   <Image
                     alt={activeGalleryImage.fileName}
-                    className="max-h-[70vh] w-full object-contain"
-                    height={1200}
+                    className="object-contain"
+                    fill
                     src={activeGalleryImage.url}
                     unoptimized
-                    width={1600}
+                    sizes="(max-width: 768px) 100vw, 80vw"
                   />
                   {lineGallery.images.length > 1 ? (
                     <>
@@ -825,11 +863,11 @@ export function WeightTicketDetailModal({
                   ) : null}
                 </div>
                 {lineGallery.images.length > 1 ? (
-                  <div className="grid grid-cols-4 gap-3 md:grid-cols-6">
+                  <div className="flex max-w-full snap-x gap-3 overflow-x-auto pb-2">
                     {lineGallery.images.map((image, index) => (
                       <button
                         className={cn(
-                          'overflow-hidden rounded-md border bg-slate-50 text-left transition',
+                          'w-28 shrink-0 snap-start overflow-hidden rounded-md border bg-slate-50 text-left transition md:w-32',
                           index === lineGallery.activeIndex ? 'border-blue-500 ring-1 ring-blue-200' : 'border-slate-200 hover:border-slate-300',
                         )}
                         key={`${image.fileName}-${index}`}
@@ -948,7 +986,7 @@ function ImageGrid({
   images,
   onOpen,
 }: {
-  images: Array<{ fileName: string; rawValue: string; url: string | null }>
+  images: StoredImageAsset[]
   onOpen: (image: { fileName: string; url: string }) => void
 }) {
   if (images.length === 0) {
